@@ -22,9 +22,9 @@ Where:
 
 Time evolution of the system follows:
 
-$$\\frac{dq}{dt}$$ = $$\\frac{\\partial H}{\\partial p} - $$\\Gamma_s(t, x)$$ $$F_s(t, x)$$
+$$\\frac{dq}{dt}$$ $$=$$ $$\\frac{\\partial H}{\\partial p} $$-\\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
-$$\frac{dp}{dt}$$ = $$-\frac{\\partial H}{\\partial q}$$ + $$\\Gamma_s(t, x) F_s(t, x)$$
+$$\frac{dp}{dt}$$ = $$-\frac{\\partial H}{\\partial q}$$ + $$\\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
@@ -79,8 +79,7 @@ The subcellular location data provided in \`subcellular_locations.tsv\` and \`su
 - Mapping **nutrient uptake efficiency** and **DNA repair** in stressed conditions.
 `;
 
-// License
-const licenseSection = `
+`
 ### License
 
 This repository is licensed under the Creative Commons. See the \`LICENSE.txt\` file for more information.
