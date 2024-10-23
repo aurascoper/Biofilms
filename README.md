@@ -9,8 +9,7 @@ At the core of this model, we simulate **multi-species biofilm dynamics** under 
 The simulations rely on **stochastic partial differential equations** (SPDEs) for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
 `;
 
-// LaTeX Overview of the Core Equations
-const latexOverview = `
+`
 The general Hamiltonian-based system is written as:
 
 $$H_{k-NN} = \\sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \\Gamma_s(t, x) $$
@@ -22,7 +21,7 @@ Where:
 
 Time evolution of the system follows:
 
-$$\\frac{dq}{dt}$$ $$=$$ $$\\frac{\\partial H}{\\partial p} $$-\\Gamma_s(t, x)$$ $$F_s(t, x)$$
+$$\\frac{dq}{dt}$$ $$=$$ $$\\frac{\\partial H}{\\partial p}$$ $$-$$\\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
 $$\frac{dp}{dt}$$ = $$-\frac{\\partial H}{\\partial q}$$ + $$\\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
