@@ -1,0 +1,1856 @@
+<?xml version='1.0' encoding='utf-8' ?>
+
+<!-- build 20242.24.0910.0334                               -->
+<workbook original-version='18.1' source-build='2024.2.3 (20242.24.0910.0334)' source-platform='win' version='18.1' xmlns:user='http://www.tableausoftware.com/xml/user'>
+  <document-format-change-manifest>
+    <_.fcp.AnimationOnByDefault.true...AnimationOnByDefault />
+    <MapboxVectorStylesAndLayers />
+    <_.fcp.MarkAnimation.true...MarkAnimation />
+    <_.fcp.ObjectModelEncapsulateLegacy.true...ObjectModelEncapsulateLegacy />
+    <_.fcp.ObjectModelExtractV2.true...ObjectModelExtractV2 />
+    <_.fcp.ObjectModelTableType.true...ObjectModelTableType />
+    <_.fcp.SchemaViewerObjectModel.true...SchemaViewerObjectModel />
+    <SheetIdentifierTracking />
+    <_.fcp.VConnDownstreamExtractsWithWarnings.true...VConnDownstreamExtractsWithWarnings />
+    <WindowsPersistSimpleIdentifiers />
+  </document-format-change-manifest>
+  <preferences>
+    <preference name='ui.encoding.shelf.height' value='24' />
+    <preference name='ui.shelf.height' value='26' />
+  </preferences>
+  <_.fcp.AnimationOnByDefault.false...style>
+    <_.fcp.AnimationOnByDefault.false..._.fcp.MarkAnimation.true...style-rule element='animation'>
+      <_.fcp.AnimationOnByDefault.false...format attr='animation-on' value='ao-on' />
+    </_.fcp.AnimationOnByDefault.false..._.fcp.MarkAnimation.true...style-rule>
+  </_.fcp.AnimationOnByDefault.false...style>
+  <datasources>
+    <datasource caption='power_plant_database_global' inline='true' name='federated.0faxpov0fef8qc12mcwkz1rhnpvd' version='18.1'>
+      <connection class='federated'>
+        <named-connections>
+          <named-connection caption='power_plant_database_global' name='textscan.19maa3j1leuv471bcsaeh0w8m225'>
+            <connection class='textscan' directory='C:/Users/aurascoper/Documents/SysDev/Kaggles' filename='power_plant_database_global.csv' password='' server='' />
+          </named-connection>
+        </named-connections>
+        <_.fcp.ObjectModelEncapsulateLegacy.false...relation connection='textscan.19maa3j1leuv471bcsaeh0w8m225' name='power_plant_database_global.csv' table='[power_plant_database_global#csv]' type='table'>
+          <columns character-set='UTF-8' header='yes' locale='en_US' separator=','>
+            <column datatype='string' name='country' ordinal='0' />
+            <column datatype='string' name='country_long' ordinal='1' />
+            <column datatype='string' name='name' ordinal='2' />
+            <column datatype='string' name='gppd_idnr' ordinal='3' />
+            <column datatype='real' name='capacity_mw' ordinal='4' />
+            <column datatype='real' name='latitude' ordinal='5' />
+            <column datatype='real' name='longitude' ordinal='6' />
+            <column datatype='string' name='primary_fuel' ordinal='7' />
+            <column datatype='string' name='other_fuel1' ordinal='8' />
+            <column datatype='string' name='other_fuel2' ordinal='9' />
+            <column datatype='string' name='other_fuel3' ordinal='10' />
+            <column datatype='real' name='commissioning_year' ordinal='11' />
+            <column datatype='string' name='owner' ordinal='12' />
+            <column datatype='string' name='source' ordinal='13' />
+            <column datatype='string' name='url' ordinal='14' />
+            <column datatype='string' name='geolocation_source' ordinal='15' />
+            <column datatype='integer' name='wepp_id' ordinal='16' />
+            <column datatype='integer' name='year_of_capacity_data' ordinal='17' />
+            <column datatype='real' name='generation_gwh_2013' ordinal='18' />
+            <column datatype='real' name='generation_gwh_2014' ordinal='19' />
+            <column datatype='real' name='generation_gwh_2015' ordinal='20' />
+            <column datatype='real' name='generation_gwh_2016' ordinal='21' />
+            <column datatype='real' name='generation_gwh_2017' ordinal='22' />
+            <column datatype='real' name='generation_gwh_2018' ordinal='23' />
+            <column datatype='string' name='generation_gwh_2019' ordinal='24' />
+            <column datatype='string' name='generation_data_source' ordinal='25' />
+            <column datatype='real' name='estimated_generation_gwh_2013' ordinal='26' />
+            <column datatype='real' name='estimated_generation_gwh_2014' ordinal='27' />
+            <column datatype='real' name='estimated_generation_gwh_2015' ordinal='28' />
+            <column datatype='real' name='estimated_generation_gwh_2016' ordinal='29' />
+            <column datatype='real' name='estimated_generation_gwh_2017' ordinal='30' />
+            <column datatype='string' name='estimated_generation_note_2013' ordinal='31' />
+            <column datatype='string' name='estimated_generation_note_2014' ordinal='32' />
+            <column datatype='string' name='estimated_generation_note_2015' ordinal='33' />
+            <column datatype='string' name='estimated_generation_note_2016' ordinal='34' />
+            <column datatype='string' name='estimated_generation_note_2017' ordinal='35' />
+          </columns>
+        </_.fcp.ObjectModelEncapsulateLegacy.false...relation>
+        <_.fcp.ObjectModelEncapsulateLegacy.true...relation connection='textscan.19maa3j1leuv471bcsaeh0w8m225' name='power_plant_database_global.csv' table='[power_plant_database_global#csv]' type='table'>
+          <columns character-set='UTF-8' header='yes' locale='en_US' separator=','>
+            <column datatype='string' name='country' ordinal='0' />
+            <column datatype='string' name='country_long' ordinal='1' />
+            <column datatype='string' name='name' ordinal='2' />
+            <column datatype='string' name='gppd_idnr' ordinal='3' />
+            <column datatype='real' name='capacity_mw' ordinal='4' />
+            <column datatype='real' name='latitude' ordinal='5' />
+            <column datatype='real' name='longitude' ordinal='6' />
+            <column datatype='string' name='primary_fuel' ordinal='7' />
+            <column datatype='string' name='other_fuel1' ordinal='8' />
+            <column datatype='string' name='other_fuel2' ordinal='9' />
+            <column datatype='string' name='other_fuel3' ordinal='10' />
+            <column datatype='real' name='commissioning_year' ordinal='11' />
+            <column datatype='string' name='owner' ordinal='12' />
+            <column datatype='string' name='source' ordinal='13' />
+            <column datatype='string' name='url' ordinal='14' />
+            <column datatype='string' name='geolocation_source' ordinal='15' />
+            <column datatype='integer' name='wepp_id' ordinal='16' />
+            <column datatype='integer' name='year_of_capacity_data' ordinal='17' />
+            <column datatype='real' name='generation_gwh_2013' ordinal='18' />
+            <column datatype='real' name='generation_gwh_2014' ordinal='19' />
+            <column datatype='real' name='generation_gwh_2015' ordinal='20' />
+            <column datatype='real' name='generation_gwh_2016' ordinal='21' />
+            <column datatype='real' name='generation_gwh_2017' ordinal='22' />
+            <column datatype='real' name='generation_gwh_2018' ordinal='23' />
+            <column datatype='string' name='generation_gwh_2019' ordinal='24' />
+            <column datatype='string' name='generation_data_source' ordinal='25' />
+            <column datatype='real' name='estimated_generation_gwh_2013' ordinal='26' />
+            <column datatype='real' name='estimated_generation_gwh_2014' ordinal='27' />
+            <column datatype='real' name='estimated_generation_gwh_2015' ordinal='28' />
+            <column datatype='real' name='estimated_generation_gwh_2016' ordinal='29' />
+            <column datatype='real' name='estimated_generation_gwh_2017' ordinal='30' />
+            <column datatype='string' name='estimated_generation_note_2013' ordinal='31' />
+            <column datatype='string' name='estimated_generation_note_2014' ordinal='32' />
+            <column datatype='string' name='estimated_generation_note_2015' ordinal='33' />
+            <column datatype='string' name='estimated_generation_note_2016' ordinal='34' />
+            <column datatype='string' name='estimated_generation_note_2017' ordinal='35' />
+          </columns>
+        </_.fcp.ObjectModelEncapsulateLegacy.true...relation>
+        <metadata-records>
+          <metadata-record class='capability'>
+            <remote-name />
+            <remote-type>0</remote-type>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias />
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <attributes>
+              <attribute datatype='string' name='character-set'>&quot;UTF-8&quot;</attribute>
+              <attribute datatype='string' name='collation'>&quot;en_US&quot;</attribute>
+              <attribute datatype='string' name='field-delimiter'>&quot;,&quot;</attribute>
+              <attribute datatype='string' name='header-row'>&quot;true&quot;</attribute>
+              <attribute datatype='string' name='locale'>&quot;en_US&quot;</attribute>
+              <attribute datatype='string' name='single-char'>&quot;&quot;</attribute>
+            </attributes>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>country</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[country]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>country</remote-alias>
+            <ordinal>0</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>country_long</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[country_long]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>country_long</remote-alias>
+            <ordinal>1</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>name</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[name]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>name</remote-alias>
+            <ordinal>2</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>gppd_idnr</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[gppd_idnr]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>gppd_idnr</remote-alias>
+            <ordinal>3</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>capacity_mw</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[capacity_mw]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>capacity_mw</remote-alias>
+            <ordinal>4</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>latitude</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[latitude]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>latitude</remote-alias>
+            <ordinal>5</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>longitude</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[longitude]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>longitude</remote-alias>
+            <ordinal>6</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>primary_fuel</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[primary_fuel]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>primary_fuel</remote-alias>
+            <ordinal>7</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>other_fuel1</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[other_fuel1]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>other_fuel1</remote-alias>
+            <ordinal>8</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>other_fuel2</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[other_fuel2]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>other_fuel2</remote-alias>
+            <ordinal>9</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>other_fuel3</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[other_fuel3]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>other_fuel3</remote-alias>
+            <ordinal>10</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <approx-count>1</approx-count>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>commissioning_year</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[commissioning_year]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>commissioning_year</remote-alias>
+            <ordinal>11</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>owner</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[owner]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>owner</remote-alias>
+            <ordinal>12</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>source</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[source]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>source</remote-alias>
+            <ordinal>13</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>url</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[url]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>url</remote-alias>
+            <ordinal>14</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>geolocation_source</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[geolocation_source]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>geolocation_source</remote-alias>
+            <ordinal>15</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>wepp_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[wepp_id]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>wepp_id</remote-alias>
+            <ordinal>16</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>year_of_capacity_data</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[year_of_capacity_data]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>year_of_capacity_data</remote-alias>
+            <ordinal>17</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2013</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[generation_gwh_2013]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2013</remote-alias>
+            <ordinal>18</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2014</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[generation_gwh_2014]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2014</remote-alias>
+            <ordinal>19</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2015</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[generation_gwh_2015]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2015</remote-alias>
+            <ordinal>20</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2016</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[generation_gwh_2016]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2016</remote-alias>
+            <ordinal>21</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2017</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[generation_gwh_2017]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2017</remote-alias>
+            <ordinal>22</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2018</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[generation_gwh_2018]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2018</remote-alias>
+            <ordinal>23</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_gwh_2019</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[generation_gwh_2019]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_gwh_2019</remote-alias>
+            <ordinal>24</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <approx-count>1</approx-count>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>generation_data_source</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[generation_data_source]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>generation_data_source</remote-alias>
+            <ordinal>25</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_gwh_2013</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[estimated_generation_gwh_2013]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_gwh_2013</remote-alias>
+            <ordinal>26</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_gwh_2014</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[estimated_generation_gwh_2014]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_gwh_2014</remote-alias>
+            <ordinal>27</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_gwh_2015</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[estimated_generation_gwh_2015]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_gwh_2015</remote-alias>
+            <ordinal>28</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_gwh_2016</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[estimated_generation_gwh_2016]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_gwh_2016</remote-alias>
+            <ordinal>29</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_gwh_2017</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[estimated_generation_gwh_2017]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_gwh_2017</remote-alias>
+            <ordinal>30</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_note_2013</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[estimated_generation_note_2013]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_note_2013</remote-alias>
+            <ordinal>31</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_note_2014</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[estimated_generation_note_2014]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_note_2014</remote-alias>
+            <ordinal>32</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_note_2015</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[estimated_generation_note_2015]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_note_2015</remote-alias>
+            <ordinal>33</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_note_2016</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[estimated_generation_note_2016]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_note_2016</remote-alias>
+            <ordinal>34</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>estimated_generation_note_2017</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[estimated_generation_note_2017]</local-name>
+            <parent-name>[power_plant_database_global.csv]</parent-name>
+            <remote-alias>estimated_generation_note_2017</remote-alias>
+            <ordinal>35</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag='0' name='LEN_RUS' />
+            <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled='yes' />
+      <_.fcp.ObjectModelTableType.true...column caption='power_plant_database_global.csv' datatype='table' name='[__tableau_internal_object_id__].[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]' role='measure' type='quantitative' />
+      <column caption='Capacity Mw' datatype='real' name='[capacity_mw]' role='measure' type='quantitative' />
+      <column caption='Commissioning Year' datatype='real' name='[commissioning_year]' role='dimension' type='quantitative' />
+      <column caption='Country' datatype='string' name='[country]' role='dimension' semantic-role='[Country].[ISO3166_2]' type='nominal' />
+      <column caption='Country Long' datatype='string' name='[country_long]' role='dimension' semantic-role='[Country].[ISO3166_2]' type='nominal' />
+      <column caption='Estimated Generation Gwh 2013' datatype='real' name='[estimated_generation_gwh_2013]' role='measure' type='quantitative' />
+      <column caption='Estimated Generation Gwh 2014' datatype='real' name='[estimated_generation_gwh_2014]' role='measure' type='quantitative' />
+      <column caption='Estimated Generation Gwh 2015' datatype='real' name='[estimated_generation_gwh_2015]' role='measure' type='quantitative' />
+      <column caption='Estimated Generation Gwh 2016' datatype='real' name='[estimated_generation_gwh_2016]' role='measure' type='quantitative' />
+      <column caption='Estimated Generation Gwh 2017' datatype='real' name='[estimated_generation_gwh_2017]' role='measure' type='quantitative' />
+      <column caption='Estimated Generation Note 2013' datatype='string' name='[estimated_generation_note_2013]' role='dimension' type='nominal' />
+      <column caption='Estimated Generation Note 2014' datatype='string' name='[estimated_generation_note_2014]' role='dimension' type='nominal' />
+      <column caption='Estimated Generation Note 2015' datatype='string' name='[estimated_generation_note_2015]' role='dimension' type='nominal' />
+      <column caption='Estimated Generation Note 2016' datatype='string' name='[estimated_generation_note_2016]' role='dimension' type='nominal' />
+      <column caption='Estimated Generation Note 2017' datatype='string' name='[estimated_generation_note_2017]' role='dimension' type='nominal' />
+      <column caption='Generation Data Source' datatype='string' name='[generation_data_source]' role='dimension' type='nominal' />
+      <column caption='Generation Gwh 2013' datatype='real' name='[generation_gwh_2013]' role='measure' type='quantitative' />
+      <column caption='Generation Gwh 2014' datatype='real' name='[generation_gwh_2014]' role='measure' type='quantitative' />
+      <column caption='Generation Gwh 2015' datatype='real' name='[generation_gwh_2015]' role='measure' type='quantitative' />
+      <column caption='Generation Gwh 2016' datatype='real' name='[generation_gwh_2016]' role='measure' type='quantitative' />
+      <column caption='Generation Gwh 2017' datatype='real' name='[generation_gwh_2017]' role='measure' type='quantitative' />
+      <column caption='Generation Gwh 2018' datatype='real' name='[generation_gwh_2018]' role='measure' type='quantitative' />
+      <column aggregation='CountD' caption='Generation Gwh 2019' datatype='string' default-role='measure' default-type='quantitative' name='[generation_gwh_2019]' role='dimension' type='nominal' />
+      <column caption='Geolocation Source' datatype='string' name='[geolocation_source]' role='dimension' semantic-role='[Country].[Name]' type='nominal' />
+      <column caption='Gppd Idnr' datatype='string' name='[gppd_idnr]' role='dimension' type='nominal' />
+      <column aggregation='Avg' caption='Latitude' datatype='real' name='[latitude]' role='measure' semantic-role='[Geographical].[Latitude]' type='quantitative' />
+      <column aggregation='Avg' caption='Longitude' datatype='real' name='[longitude]' role='measure' semantic-role='[Geographical].[Longitude]' type='quantitative' />
+      <column caption='Name' datatype='string' name='[name]' role='dimension' type='nominal' />
+      <column caption='Other Fuel1' datatype='string' name='[other_fuel1]' role='dimension' type='nominal' />
+      <column caption='Other Fuel2' datatype='string' name='[other_fuel2]' role='dimension' type='nominal' />
+      <column caption='Other Fuel3' datatype='string' name='[other_fuel3]' role='dimension' type='nominal' />
+      <column caption='Owner' datatype='string' name='[owner]' role='dimension' type='nominal' />
+      <column caption='Primary Fuel' datatype='string' name='[primary_fuel]' role='dimension' type='nominal' />
+      <column caption='Source' datatype='string' name='[source]' role='dimension' type='nominal' />
+      <column caption='Url' datatype='string' name='[url]' role='dimension' type='nominal' />
+      <column caption='Wepp Id' datatype='integer' name='[wepp_id]' role='dimension' type='ordinal' />
+      <column caption='Year Of Capacity Data' datatype='integer' name='[year_of_capacity_data]' role='dimension' type='quantitative' />
+      <extract _.fcp.ObjectModelExtractV2.true...object-id='' _.fcp.VConnDownstreamExtractsWithWarnings.true...user-specific='false' count='-1' enabled='true' units='records'>
+        <connection access_mode='readonly' author-locale='en_US' class='hyper' dbname='C:/Users/AURASC~1/AppData/Local/Temp/TableauTemp/#TableauTemp_046g0gp0g3beh01dzg4bb0tk7a9h.hyper' default-settings='hyper' schema='Extract' sslmode='' tablename='Extract' update-time='10/15/2024 06:25:02 AM' username='tableau_internal_user'>
+          <_.fcp.ObjectModelEncapsulateLegacy.false...relation name='Extract' table='[Extract].[Extract]' type='table' />
+          <_.fcp.ObjectModelEncapsulateLegacy.true...relation name='Extract' table='[Extract].[Extract]' type='table' />
+          <metadata-records>
+            <metadata-record class='column'>
+              <remote-name>country</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[country]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>country</remote-alias>
+              <ordinal>0</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>252</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>country_long</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[country_long]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>country_long</remote-alias>
+              <ordinal>1</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>252</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>name</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[name]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>name</remote-alias>
+              <ordinal>2</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>34936</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>gppd_idnr</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[gppd_idnr]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>gppd_idnr</remote-alias>
+              <ordinal>3</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>34936</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>capacity_mw</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[capacity_mw]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>capacity_mw</remote-alias>
+              <ordinal>4</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>2324</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>latitude</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[latitude]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>latitude</remote-alias>
+              <ordinal>5</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>31563</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>longitude</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[longitude]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>longitude</remote-alias>
+              <ordinal>6</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>33250</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>primary_fuel</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[primary_fuel]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>primary_fuel</remote-alias>
+              <ordinal>7</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>21</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>other_fuel1</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[other_fuel1]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>other_fuel1</remote-alias>
+              <ordinal>8</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>19</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>other_fuel2</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[other_fuel2]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>other_fuel2</remote-alias>
+              <ordinal>9</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>8</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>other_fuel3</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[other_fuel3]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>other_fuel3</remote-alias>
+              <ordinal>10</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>1</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>commissioning_year</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[commissioning_year]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>commissioning_year</remote-alias>
+              <ordinal>11</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>643</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>owner</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[owner]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>owner</remote-alias>
+              <ordinal>12</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>4381</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>source</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[source]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>source</remote-alias>
+              <ordinal>13</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>498</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>url</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[url]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>url</remote-alias>
+              <ordinal>14</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>1553</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>geolocation_source</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[geolocation_source]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>geolocation_source</remote-alias>
+              <ordinal>15</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>33</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>wepp_id</remote-name>
+              <remote-type>20</remote-type>
+              <local-name>[wepp_id]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>wepp_id</remote-alias>
+              <ordinal>16</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>integer</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>21394</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>year_of_capacity_data</remote-name>
+              <remote-type>20</remote-type>
+              <local-name>[year_of_capacity_data]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>year_of_capacity_data</remote-alias>
+              <ordinal>17</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>integer</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>7</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2013</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[generation_gwh_2013]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2013</remote-alias>
+              <ordinal>18</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>6474</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2014</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[generation_gwh_2014]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2014</remote-alias>
+              <ordinal>19</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>6337</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2015</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[generation_gwh_2015]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2015</remote-alias>
+              <ordinal>20</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>7253</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2016</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[generation_gwh_2016]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2016</remote-alias>
+              <ordinal>21</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>7925</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2017</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[generation_gwh_2017]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2017</remote-alias>
+              <ordinal>22</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>11036</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2018</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[generation_gwh_2018]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2018</remote-alias>
+              <ordinal>23</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>11132</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_gwh_2019</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[generation_gwh_2019]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_gwh_2019</remote-alias>
+              <ordinal>24</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>11322</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>generation_data_source</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[generation_data_source]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>generation_data_source</remote-alias>
+              <ordinal>25</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>27</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_gwh_2013</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[estimated_generation_gwh_2013]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_gwh_2013</remote-alias>
+              <ordinal>26</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>7115</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_gwh_2014</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[estimated_generation_gwh_2014]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_gwh_2014</remote-alias>
+              <ordinal>27</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>6358</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_gwh_2015</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[estimated_generation_gwh_2015]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_gwh_2015</remote-alias>
+              <ordinal>28</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>5618</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_gwh_2016</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[estimated_generation_gwh_2016]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_gwh_2016</remote-alias>
+              <ordinal>29</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>5946</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_gwh_2017</remote-name>
+              <remote-type>5</remote-type>
+              <local-name>[estimated_generation_gwh_2017]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_gwh_2017</remote-alias>
+              <ordinal>30</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>real</local-type>
+              <aggregation>Sum</aggregation>
+              <approx-count>7638</approx-count>
+              <contains-null>true</contains-null>
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_note_2013</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[estimated_generation_note_2013]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_note_2013</remote-alias>
+              <ordinal>31</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>5</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_note_2014</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[estimated_generation_note_2014]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_note_2014</remote-alias>
+              <ordinal>32</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>5</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_note_2015</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[estimated_generation_note_2015]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_note_2015</remote-alias>
+              <ordinal>33</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>5</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_note_2016</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[estimated_generation_note_2016]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_note_2016</remote-alias>
+              <ordinal>34</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>5</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+            <metadata-record class='column'>
+              <remote-name>estimated_generation_note_2017</remote-name>
+              <remote-type>129</remote-type>
+              <local-name>[estimated_generation_note_2017]</local-name>
+              <parent-name>[Extract]</parent-name>
+              <remote-alias>estimated_generation_note_2017</remote-alias>
+              <ordinal>35</ordinal>
+              <family>power_plant_database_global.csv</family>
+              <local-type>string</local-type>
+              <aggregation>Count</aggregation>
+              <approx-count>6</approx-count>
+              <contains-null>true</contains-null>
+              <collation flag='0' name='LEN_RUS' />
+              <_.fcp.ObjectModelEncapsulateLegacy.true...object-id>[power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A]</_.fcp.ObjectModelEncapsulateLegacy.true...object-id>
+            </metadata-record>
+          </metadata-records>
+        </connection>
+      </extract>
+      <layout _.fcp.SchemaViewerObjectModel.false...dim-percentage='0.5' _.fcp.SchemaViewerObjectModel.false...measure-percentage='0.4' dim-ordering='alphabetic' measure-ordering='alphabetic' show-structure='true' />
+      <semantic-values>
+        <semantic-value key='[Country].[Name]' value='&quot;United States&quot;' />
+      </semantic-values>
+      <_.fcp.ObjectModelEncapsulateLegacy.true...object-graph>
+        <objects>
+          <object caption='power_plant_database_global.csv' id='power_plant_database_global.csv_B19A7C98C40949D4903AEA9087ED1B0A'>
+            <properties context=''>
+              <relation connection='textscan.19maa3j1leuv471bcsaeh0w8m225' name='power_plant_database_global.csv' table='[power_plant_database_global#csv]' type='table'>
+                <columns character-set='UTF-8' header='yes' locale='en_US' separator=','>
+                  <column datatype='string' name='country' ordinal='0' />
+                  <column datatype='string' name='country_long' ordinal='1' />
+                  <column datatype='string' name='name' ordinal='2' />
+                  <column datatype='string' name='gppd_idnr' ordinal='3' />
+                  <column datatype='real' name='capacity_mw' ordinal='4' />
+                  <column datatype='real' name='latitude' ordinal='5' />
+                  <column datatype='real' name='longitude' ordinal='6' />
+                  <column datatype='string' name='primary_fuel' ordinal='7' />
+                  <column datatype='string' name='other_fuel1' ordinal='8' />
+                  <column datatype='string' name='other_fuel2' ordinal='9' />
+                  <column datatype='string' name='other_fuel3' ordinal='10' />
+                  <column datatype='real' name='commissioning_year' ordinal='11' />
+                  <column datatype='string' name='owner' ordinal='12' />
+                  <column datatype='string' name='source' ordinal='13' />
+                  <column datatype='string' name='url' ordinal='14' />
+                  <column datatype='string' name='geolocation_source' ordinal='15' />
+                  <column datatype='integer' name='wepp_id' ordinal='16' />
+                  <column datatype='integer' name='year_of_capacity_data' ordinal='17' />
+                  <column datatype='real' name='generation_gwh_2013' ordinal='18' />
+                  <column datatype='real' name='generation_gwh_2014' ordinal='19' />
+                  <column datatype='real' name='generation_gwh_2015' ordinal='20' />
+                  <column datatype='real' name='generation_gwh_2016' ordinal='21' />
+                  <column datatype='real' name='generation_gwh_2017' ordinal='22' />
+                  <column datatype='real' name='generation_gwh_2018' ordinal='23' />
+                  <column datatype='string' name='generation_gwh_2019' ordinal='24' />
+                  <column datatype='string' name='generation_data_source' ordinal='25' />
+                  <column datatype='real' name='estimated_generation_gwh_2013' ordinal='26' />
+                  <column datatype='real' name='estimated_generation_gwh_2014' ordinal='27' />
+                  <column datatype='real' name='estimated_generation_gwh_2015' ordinal='28' />
+                  <column datatype='real' name='estimated_generation_gwh_2016' ordinal='29' />
+                  <column datatype='real' name='estimated_generation_gwh_2017' ordinal='30' />
+                  <column datatype='string' name='estimated_generation_note_2013' ordinal='31' />
+                  <column datatype='string' name='estimated_generation_note_2014' ordinal='32' />
+                  <column datatype='string' name='estimated_generation_note_2015' ordinal='33' />
+                  <column datatype='string' name='estimated_generation_note_2016' ordinal='34' />
+                  <column datatype='string' name='estimated_generation_note_2017' ordinal='35' />
+                </columns>
+              </relation>
+            </properties>
+            <properties context='extract'>
+              <relation name='Extract' table='[Extract].[Extract]' type='table' />
+            </properties>
+          </object>
+        </objects>
+      </_.fcp.ObjectModelEncapsulateLegacy.true...object-graph>
+    </datasource>
+  </datasources>
+  <mapsources>
+    <mapsource name='Tableau' />
+  </mapsources>
+  <worksheets>
+    <worksheet name='Primary Fuel Source Geolocator'>
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run>Primary Fuel Source</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption='power_plant_database_global' name='federated.0faxpov0fef8qc12mcwkz1rhnpvd' />
+          </datasources>
+          <mapsources>
+            <mapsource name='Tableau' />
+          </mapsources>
+          <datasource-dependencies datasource='federated.0faxpov0fef8qc12mcwkz1rhnpvd'>
+            <column-instance column='[capacity_mw]' derivation='Avg' name='[avg:capacity_mw:qk]' pivot='key' type='quantitative' />
+            <column-instance column='[generation_gwh_2013]' derivation='Avg' name='[avg:generation_gwh_2013:qk]' pivot='key' type='quantitative' />
+            <column-instance column='[generation_gwh_2018]' derivation='Avg' name='[avg:generation_gwh_2018:qk]' pivot='key' type='quantitative' />
+            <column caption='Capacity Mw' datatype='real' name='[capacity_mw]' role='measure' type='quantitative' />
+            <column caption='Generation Gwh 2013' datatype='real' name='[generation_gwh_2013]' role='measure' type='quantitative' />
+            <column caption='Generation Gwh 2018' datatype='real' name='[generation_gwh_2018]' role='measure' type='quantitative' />
+            <column aggregation='Avg' caption='Latitude' datatype='real' name='[latitude]' role='measure' semantic-role='[Geographical].[Latitude]' type='quantitative' />
+            <column aggregation='Avg' caption='Longitude' datatype='real' name='[longitude]' role='measure' semantic-role='[Geographical].[Longitude]' type='quantitative' />
+            <column-instance column='[latitude]' derivation='None' name='[none:latitude:qk]' pivot='key' type='quantitative' />
+            <column-instance column='[longitude]' derivation='None' name='[none:longitude:qk]' pivot='key' type='quantitative' />
+            <column-instance column='[primary_fuel]' derivation='None' name='[none:primary_fuel:nk]' pivot='key' type='nominal' />
+            <column caption='Primary Fuel' datatype='string' name='[primary_fuel]' role='dimension' type='nominal' />
+            <column-instance column='[capacity_mw]' derivation='StdevP' name='[stp:capacity_mw:qk]' pivot='key' type='quantitative' />
+          </datasource-dependencies>
+          <filter class='quantitative' column='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[stp:capacity_mw:qk]' included-values='in-range'>
+            <min>0.0</min>
+            <max>2055.0</max>
+          </filter>
+          <slices>
+            <column>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[stp:capacity_mw:qk]</column>
+          </slices>
+          <aggregation value='true' />
+        </view>
+        <style>
+          <style-rule element='axis'>
+            <encoding attr='space' class='0' field='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:longitude:qk]' field-type='quantitative' max='39198201.31551443' min='28787994.747598413' projection='EPSG:3857' range-type='fixed' scope='cols' type='space' />
+            <encoding attr='space' class='0' field='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:latitude:qk]' field-type='quantitative' max='2397547.2185568763' min='-4726972.5250745416' projection='EPSG:3857' range-type='fixed' scope='rows' type='space' />
+          </style-rule>
+          <style-rule element='mark'>
+            <encoding attr='color' field='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:generation_gwh_2018:qk]' num-steps='8' palette='sunrise_sunset_diverging_10_0' type='interpolated' />
+          </style-rule>
+          <style-rule element='map'>
+            <format attr='washout' value='0.0' />
+          </style-rule>
+        </style>
+        <panes>
+          <pane id='2' selection-relaxation-option='selection-relaxation-allow'>
+            <view>
+              <breakdown value='auto' />
+            </view>
+            <mark class='Automatic' />
+            <encodings>
+              <size column='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:generation_gwh_2013:qk]' />
+              <color column='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:capacity_mw:qk]' />
+              <text column='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:primary_fuel:nk]' />
+              <text column='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:generation_gwh_2018:qk]' />
+            </encodings>
+            <style>
+              <style-rule element='mark'>
+                <format attr='mark-labels-show' value='true' />
+                <format attr='mark-labels-cull' value='true' />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:latitude:qk]</rows>
+        <cols>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:longitude:qk]</cols>
+      </table>
+      <simple-id uuid='{E591EB2A-9396-4C4F-9DEC-A935DEB8977F}' />
+    </worksheet>
+  </worksheets>
+  <windows saved-dpi-scale-factor='1.5' source-height='44'>
+    <window class='worksheet' maximized='true' name='Primary Fuel Source Geolocator'>
+      <cards>
+        <edge name='left'>
+          <strip size='280'>
+            <card size='29' type='pages' />
+            <card size='46' type='filters' />
+            <card size='258' type='marks' />
+          </strip>
+        </edge>
+        <edge name='top'>
+          <strip size='2147483647'>
+            <card type='columns' />
+          </strip>
+          <strip size='2147483647'>
+            <card type='rows' />
+          </strip>
+          <strip size='30'>
+            <card type='title' />
+          </strip>
+        </edge>
+        <edge name='right'>
+          <strip size='160'>
+            <card pane-specification-id='2' param='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:generation_gwh_2013:qk]' type='size' />
+            <card pane-specification-id='2' param='[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:capacity_mw:qk]' type='color' />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <highlight>
+          <color-one-way>
+            <field>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[avg:capacity_mw:qk]</field>
+            <field>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:estimated_generation_note_2013:nk]</field>
+            <field>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:latitude:qk]</field>
+            <field>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:longitude:qk]</field>
+            <field>[federated.0faxpov0fef8qc12mcwkz1rhnpvd].[none:primary_fuel:nk]</field>
+          </color-one-way>
+        </highlight>
+        <default-map-tool-selection tool='1' />
+      </viewpoint>
+      <simple-id uuid='{25A6B38E-6E99-43BB-BA93-22BF43E6D1A7}' />
+    </window>
+  </windows>
+  <thumbnails>
+    <thumbnail height='192' name='Primary Fuel Source Geolocator' width='192'>
+      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
+      DIGA/w9SNtIO9IfwRgAAAABJRU5ErkJggg==
+    </thumbnail>
+  </thumbnails>
+</workbook>
