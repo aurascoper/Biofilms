@@ -1,9 +1,3 @@
-// Biofilms README Script with Technical Overview
-
-// Install necessary R packages:
-const installRPackages = `
-To run the R scripts, install the necessary packages with the following command:
-
 \`\`\`R
 install.packages(c("deSolve", "plotly", "kmeans", "data.table", "ggplot2"))
 \`\`\`
