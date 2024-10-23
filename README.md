@@ -22,9 +22,9 @@ Where:
 
 Time evolution of the system follows:
 
-$$ \\frac{dq}{dt} = \\frac{\\partial H}{\\partial p} - \\Gamma_s(t, x) F_s(t, x) $$
+$$\\frac{dq}{dt}$$ = $$\\frac{\\partial H}{\\partial p} - $$\\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
-$$ \\frac{dp}{dt} = - \\frac{\\partial H}{\\partial q} + \\Gamma_s(t, x) F_s(t, x) $$
+$$\frac{dp}{dt}$$ = $$-\frac{\\partial H}{\\partial q}$$ + $$\\Gamma_s(t, x) F_s(t, x)$$
 
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
@@ -93,18 +93,3 @@ This repository is licensed under the Creative Commons. See the \`LICENSE.txt\` 
 
 For any questions or collaboration inquiries, feel free to contact \`hkinder@stlteach.org\`.
 `;
-
-// Export the full README content as a string
-const fullReadmeContent = `
-${installRPackages}
-${installJuliaPackages}
-${introduction}
-${latexOverview}
-${reactorDecisionTree}
-${biofilmsR}
-${biofilms3DJulia}
-${subcellularLocationData}
-${licenseSection}
-`;
-
-console.log(fullReadmeContent);
