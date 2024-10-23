@@ -1,4 +1,3 @@
-Installation
 To run the R scripts, make sure you have the following packages installed:
 
 R
@@ -36,6 +35,6 @@ Subcellular Location Data
 The subcellular location data is provided in subcellular_locations.tsv and subcellular_location_data.tsv. These datasets contain key biological processes mapped to their respective subcellular locations and can be used to map metabolic functions under radiation stress.
 
 License
-This repository is licensed under the Creative Commons. See the LICENSE file for more information.
+This repository is licensed under the Creative Commons. See the LICENSE.txt file for more information.
 
 If there are questions or collaborator interest, please email hkinder@stlteach.org 
