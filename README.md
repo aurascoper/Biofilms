@@ -1,5 +1,3 @@
-# thorium
-
 Installation
 R Environment
 To run the R scripts, make sure you have the following packages installed:
@@ -21,9 +19,9 @@ This script models microbial interactions in radiotrophic environments using dec
 Usage:
 
 Load the dataset for subcellular locations (e.g., subcellular_locations.tsv).
-Run the decision tree to analyze fitness functions of microbial populations under gamma radiation and thorium interactions.
-biofilms.R
-Simulates the biofilm growth dynamics of multiple species exposed to radiation. Includes nutrient uptake and species-specific motility models.
+Run the decision tree to analyze fitness functions of metagenomic analyses for screening of extremophilic microbials under gamma radiation and thorium interactions.
+
+biofilms.R Simulates the biofilm growth dynamics of multiple species exposed to radiation. Includes nutrient uptake and species-specific motility models.
 
 Usage:
 
