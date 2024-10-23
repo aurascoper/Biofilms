@@ -13,7 +13,7 @@ using Pkg
 Pkg.add(["DifferentialEquations", "PlotlyJS", "MLJ", "Clustering"])
 
 For Script reactor_decision_tree.R : 
-This script models microbial interactions in radiotrophic environments using decision tree analysis. It utilizes thorium decay data and CAN use subcellular localization to assess microbial fitness and metabolic activity under radiation stress.
+This script generates the invariance in the decisions on reactor design and location which can be used to generate noise interactions in geospatial and radiotrophic environments using decision tree analysis. It utilizes thorium decay data and CAN use subcellular localization to assess microbial fitness and metabolic activity under radiation stress.
 
 Usage:
 
