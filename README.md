@@ -105,3 +105,5 @@ async function plotBiofilm3D(dataUrl: string) {
 }
 
 plotBiofilm3D('path_to_your_biofilm_data.json');
+
+For questions, collaboration interest of help, please email hkinder@stlteach.org
