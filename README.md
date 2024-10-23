@@ -1,18 +1,3 @@
-\`\`\`R
-install.packages(c("deSolve", "plotly", "kmeans", "data.table", "ggplot2"))
-\`\`\`
-`;
-
-// Install necessary Julia packages:
-const installJuliaPackages = `
-For 3D biofilm simulations, install the required Julia packages by running:
-
-\`\`\`julia
-using Pkg
-Pkg.add(["DifferentialEquations", "PlotlyJS", "MLJ", "Clustering"])
-\`\`\`
-`;
-
 // Introduction
 const introduction = `
 ## Introduction
