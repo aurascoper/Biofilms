@@ -74,6 +74,8 @@ Incorporating **k-means clustering** and **decision tree analysis**, this model 
 
 To render interactive plots for biofilm dynamics using Plotly.js, you can use the following TypeScript code.
 
+For questions, collaboration interest of help, please email hkinder@stlteach.org
+
 ```typescript
 import Plotly from 'plotly.js-dist';
 
@@ -105,5 +107,3 @@ async function plotBiofilm3D(dataUrl: string) {
 }
 
 plotBiofilm3D('path_to_your_biofilm_data.json');
-
-For questions, collaboration interest of help, please email hkinder@stlteach.org
