@@ -13,12 +13,12 @@ The simulations rely on **stochastic partial differential equations** (SPDEs) fo
 const latexOverview = `
 The general Hamiltonian-based system is written as:
 
-$$ H_{k-NN} = \\sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \\Gamma_s(t, x) $$
+$$H_{k-NN} = \\sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \\Gamma_s(t, x) $$
 
 Where:
-- $$ P_{s_j}(t) $$: transition probabilities between species
-- $$ F_j(t, x) $$: fitness function of species at position x
-- $$ \\Gamma_s(t, x) $$: phase-locked kernel affecting transitions
+- $$P_{s_j}(t) $$: transition probabilities between species
+- $$F_j(t, x) $$: fitness function of species at position x
+- $$\Gamma_s(t, x)$$: phase-locked kernel affecting transitions
 
 Time evolution of the system follows:
 
@@ -29,9 +29,7 @@ $$\frac{dp}{dt}$$ = $$-\frac{\\partial H}{\\partial q}$$ + $$\\Gamma_s(t, x) F_s
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
 `;
-
-// Decision Tree Functionality Overview
-const reactorDecisionTree = `
+`
 ### reactor_decision_tree.R
 
 This R script simulates microbial interactions in **radiotrophic environments** using **decision tree analysis**. It leverages **thorium decay** and subcellular localization data to model microbial fitness and metabolic activities under radiation stress.
@@ -43,8 +41,7 @@ This R script simulates microbial interactions in **radiotrophic environments** 
 The decision tree helps identify optimal survival strategies of **extremophilic microbes** by analyzing nutrient uptake, radiation resistance, and species-specific growth models.
 `;
 
-// Biofilm Simulations Overview
-const biofilmsR = `
+`
 ### biofilms.R
 
 This R script models **biofilm growth dynamics** of multiple species exposed to radiation. It incorporates:
@@ -60,7 +57,7 @@ This model explores how different species **cooperate** or **compete** for resou
 `;
 
 // 3D Biofilm Simulations Overview
-const biofilms3DJulia = `
+`
 ### biofilms_3d.R
 
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
@@ -72,8 +69,7 @@ This Julia script enables **3D visualization** of biofilm growth using **PlotlyJ
 Incorporating **k-means clustering** and **decision tree analysis**, this model helps predict biofilm structures and community interactions over time.
 `;
 
-// Subcellular Location Data Section
-const subcellularLocationData = `
+`
 ### Subcellular Location Data
 
 The subcellular location data provided in \`subcellular_locations.tsv\` and \`subcellular_location_data.tsv\` is essential for mapping **microbial metabolic processes** under **radiation stress**. It includes key biological processes localized in various subcellular compartments and their fitness implications in extreme environments.
