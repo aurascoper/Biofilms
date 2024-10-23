@@ -1,0 +1,3 @@
+[submodule "Lumped-Uncertainty-SLS-MPC"]
+	path = Lumped-Uncertainty-SLS-MPC
+	url = https://github.com/ShaoruChen/Lumped-Uncertainty-SLS-MPC.git
