@@ -19,9 +19,9 @@ H_{k-NN} = \sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \Gamma_s(t, x)
 $$
 
 Where:
-- \(P_{s_j}(t)\): transition probabilities between species
-- \(F_j(t, x)\): fitness function of species at position \(x\)
-- \(\Gamma_s(t, x)\): phase-locked kernel affecting transitions
+- $$\(P_{s_j}(t)\)$$ : transition probabilities between species
+- $$\(F_j(t, x)\)$$ : fitness function of species at position \(x\)
+- $$\(\Gamma_s(t, x)\)$$: phase-locked kernel affecting transitions
 
 The time evolution of the system follows:
 
