@@ -2,7 +2,7 @@
 
 This repository contains scripts for simulating biofilm dynamics under radiation stress, evaluating radiotrophic microbial communities, and analyzing microbial interactions under varying environmental conditions. These simulations can model nutrient uptake, microbial fitness, and motility in 2D and 3D environments, under both radiation exposure and nutrient gradients.
 
-### Mid-Level Technical Overview
+### Mid-Level Overview
 
 At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
 
@@ -12,11 +12,11 @@ The simulations rely on **stochastic partial differential equations** (SPDEs) fo
 `
 The general Hamiltonian-based system is written as:
 
-$$H_{k-NN} = \sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \Gamma_s(t, x) $$
+$$H_{k-NN}$$ = $$\sum_{j=1}^{n}$$ $$P_{s_j}(t)$$ $$F_j(t, x)$$ $$\Gamma_s(t, x)$$
 
 Where:
-- $$P_{s_j}(t) $$: transition probabilities between species
-- $$F_j(t, x) $$: fitness function of species at position x
+- $$P_{s_j}(t)$$: transition probabilities between species
+- $$F_j(t, x)$$: fitness function of species at position x
 - $$\Gamma_s(t, x)$$: phase-locked kernel affecting transitions
 
 Time evolution of the system follows:
