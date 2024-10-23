@@ -24,10 +24,10 @@ biofilms.R Simulates the biofilm growth dynamics of multiple species exposed to 
 
 Usage:
 
-Set the number of species and specify growth rates and radiation sensitivity in the model.
+Set the number of species, general sensitivity and motility gradients other parameters in the fitness function like specific growth rates and radiation sensitivities in the model.
 Visualize biofilm growth using ggplot2 for 2D plots or plotly for interactive 3D plots.
 biofilms_3d.R
-This script uses Julia for 3D biofilm growth simulations. It visualizes the biofilm as species grow and interact under radiation and nutrient gradients.
+This script uses plotly for 3D biofilm growth simulations. It visualizes the biofilm as species grow and interact under radiation and nutrient gradients.
 
 Usage:
 
@@ -37,6 +37,6 @@ Subcellular Location Data
 The subcellular location data is provided in subcellular_locations.tsv and subcellular_location_data.tsv. These datasets contain key biological processes mapped to their respective subcellular locations and can be used to map metabolic functions under radiation stress.
 
 License
-This repository is licensed under the MIT License. See the LICENSE file for more information.
+This repository is licensed under the Creative Commons. See the LICENSE file for more information.
 
 If there are questions or collaborator interest, please email hkinder@stlteach.org 
