@@ -1,5 +1,4 @@
 Installation
-R Environment
 To run the R scripts, make sure you have the following packages installed:
 
 R
