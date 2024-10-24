@@ -1,5 +1,32 @@
+Biofilm Dynamics Simulation under Radiation Stress
 
-Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
+## Introduction
+
+This repository contains scripts for simulating biofilm dynamics under radiation stress, evaluating radiotrophic microbial communities, and analyzing microbial interactions under varying environmental conditions. These simulations model nutrient uptake, microbial fitness, and motility in 2D and 3D environments under both radiation exposure and nutrient gradients and heat/pressure gradients.
+
+### Mid-Level Overview
+
+At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
+
+The simulations rely on **partial stochastic differential equations (SPDEs)** for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
+
+## Equations
+
+The general Hamiltonian-based system is written with the factors: 
+
+Species motility, radiation sensitivity, and nutrient uptake are supervised-dynamically and updated through these Hamiltonian interactions.
+
+$$
+H_{k-NN} = \sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \Gamma_s(t, x)
+$$
+
+$$
+\frac{dq}{dt} = \frac{\partial H}{\partial p} - \Gamma_s(t, x) F_s(t, x)
+$$
+
+$$
+\frac{dp}{dt} = -\frac{\partial H}{\partial q} + \Gamma_s(t, x) F_s(t, x)
+$$
 
 ## Scripts
 
