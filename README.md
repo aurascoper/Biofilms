@@ -14,24 +14,19 @@ The simulations rely on **partial stochastic differential equations (PSDEs)** fo
 
 The general Hamiltonian-based system is written as:
 
-$$
-H_{k-NN} = \sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \Gamma_s(t, x)
-$$
+$$H_{k-NN}$$ $$=$$ $$\sum_{j=1}^{n}$$ $$P_{s_j}(t)$$ $$F_j(t, x)$$ $$\Gamma_s(t, x)$$
 
 Where:
 - $$\(P_{s_j}(t)\)$$ : transition probabilities between species
-- $$\(F_j(t, x)\)$$ : fitness function of species at position \(x\)
+- $$\(F_j(t, x)\)$$ : fitness function of species at position $$\(x\)$$
 - $$\(\Gamma_s(t, x)\)$$: phase-locked kernel affecting transitions
 
 The time evolution of the system follows:
 
-$$
-\frac{dq}{dt} = \frac{\partial H}{\partial p} - \Gamma_s(t, x) F_s(t, x)
-$$
+$$\frac{dq}{dt}$$ $$=$$ $$\frac{\partial H}{\partial p}$$ - $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
-$$
-\frac{dp}{dt} = -\frac{\partial H}{\partial q} + \Gamma_s(t, x) F_s(t, x)
-$$
+
+$_\frac{dp}{dt} $$=$$ $$-\frac{\partial H}{\partial q}$$ + $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
@@ -93,22 +88,6 @@ This repository contains scripts for simulating biofilm dynamics under radiation
 
 At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
 
-## Species Trajectories with K-Means Clustering (2D)
-
-This shows the K-means clustering analysis of biofilm species' trajectories 
-under radiation stress and nutrient dynamics.
-
-import React from 'react';  // If using React, otherwise use vanilla JS methods
-
-const KMeansSpeciesTrajectory = () => {
-  return (
-    <div>
-      <h2>KMeans Species Trajectory</h2>
-      <p>This GIF shows the simulation of species motility and clustering behavior over time using KMeans clustering:</p>
-      <img src="path_to_your_gif/kmeans_species_trajectory.gif" alt="KMeans Species Trajectory Animation" />
-    </div>
-  );
-};
 
 alt="KMeans Species Trajectory Animation"
 
