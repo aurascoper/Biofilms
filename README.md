@@ -26,7 +26,7 @@ The time evolution of the system follows:
 $$\frac{dq}{dt}$$ = $$\frac{\partial H}{\partial p} - $$\Gamma_s(t, x),$$ $$F_s(t, x)$$
 
 
-$$\frac{dp}{dt}$$ = $$-\frac{\partial H}{\partial q}$$ + $$\Gamma_s(t, x) F_s(t, x)$$
+$$\frac{dp}{dt}$$ = $$-\frac{\partial H}{\partial q}$$ + $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
