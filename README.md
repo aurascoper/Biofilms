@@ -90,7 +90,7 @@ This shows the K-means clustering analysis of biofilm species' trajectories unde
 Here is a demo of the 3D biofilm growth simulation showing the interaction between multiple species under radiation stress.
 
 <video width="600" controls>
-   <source src="https://drive.google.com/uc?export=download&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a" type="video/mp4">
+   <source src="https://drive.google.com/uc?export=preview&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a" type="video/mp4">
    Your browser does not support the video tag.
 </video>
 
