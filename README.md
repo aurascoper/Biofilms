@@ -108,8 +108,9 @@ This model explores how different species **cooperate** or **compete** for resou
 ### biofilms_3d.R
 
 ## Project Demo
-
-[![Watch the video](https://https://drive.google.com/file/d/1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a/view?usp=drive_link/)
+<video width="600" controls>
+<src="https://https://drive.google.com/file/d/1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a/view?usp=drive_link/" alt="Biofilms.mp4">
+</video>
 
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
