@@ -58,6 +58,22 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 1. Define the number of species and set parameters such as **growth rates**, **radiation sensitivities**, and **nutrient uptake efficiencies**.
 2. Visualize biofilm growth using **ggplot2** for 2D plots or **Plotly** for interactive 3D plots.
 
+// TypeScript/JavaScript to embed the KMeans Species Trajectory GIF into your webpage
+
+import React from 'react';  // If using React, otherwise use vanilla JS methods
+
+const KMeansSpeciesTrajectory = () => {
+  return (
+    <div>
+      <h2>KMeans Species Trajectory</h2>
+      <p>This GIF shows the simulation of species motility and clustering behavior over time using KMeans clustering:</p>
+      <img src="C:/Users/aurascoper/Downloads/kmeans_species_trajectory.gif" alt="KMeans Species Trajectory Animation" />
+    </div>
+  );
+};
+
+export default KMeansSpeciesTrajectory;
+
 This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
 
 ### biofilms_3d.R
