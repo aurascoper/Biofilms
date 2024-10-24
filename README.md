@@ -45,21 +45,6 @@ This model explores how different species **cooperate** or **compete** for resou
 
 ### biofilms_3d.R
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KMeans Species Trajectory</title>
-</head>
-<body>
-    <h1>KMeans Species Trajectory</h1>
-    <p>This animation demonstrates the species' motility and clustering behavior over time using KMeans clustering.</p>
-    <img src="https://drive.google.com/uc?export=view&id=1IgOHbf3GupcqlWmakA0wooLYh-orulZ9" alt="KMeans Species Trajectory">
-</body>
-</html>
-
-
 This R script enables **3D visualization** of biofilm growth using **PlotlyJS**. It can also work with julia preprocessing or ML and Python as well. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
 **Usage**:
