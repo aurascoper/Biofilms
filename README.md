@@ -65,9 +65,8 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 <div>
   <h2>KMeans Species Trajectory</h2>
   <p>This GIF shows the simulation of species motility and clustering behavior over time using KMeans clustering:</p>
-  <img
-
-  // TypeScript/JavaScript to embed the KMeans Species Trajectory GIF into your webpage
+    
+// TypeScript/JavaScript to embed the KMeans Species Trajectory GIF into your webpage
 
 import React from 'react';  // If using React, otherwise use vanilla JS methods
 
