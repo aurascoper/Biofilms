@@ -84,23 +84,21 @@ This shows the K-means clustering analysis of biofilm species' trajectories
 under radiation stress and nutrient dynamics.
 
 ## Species Trajectories
+import React from 'react';
 
-<image
-(https://github.com/user-attachments/assets/76f0ddde-7cdb-466a-b1c9-dc3c26f64b9f)
-image/>
+const SpeciesTrajectories: React.FC = () => {
+  return (
+    <div>
+      <h2>Species Trajectories</h2>
+      <img 
+        src="https://github.com/user-attachments/assets/76f0ddde-7cdb-466a-b1c9-dc3c26f64b9f" 
+        alt="Species Trajectories" 
+      />
+    </div>
+  );
+}
 
-## Project Demo (3D Biofilm Growth Simulation)
-
-Here is a demo of the 3D biofilm growth simulation showing the interaction between multiple species under radiation stress.
-
-<video width="600" controls>
-   <source src="https://drive.google.com/uc?export=preview&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a" type="video/mp4">
-   Your browser does not support the video tag.
-</video>
-
-This shows the K-means clustering analysis of biofilm species' trajectories under radiation stress and nutrient dynamics.
-
-
+export default SpeciesTrajectories;
 
 
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
