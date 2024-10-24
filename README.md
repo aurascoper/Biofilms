@@ -55,10 +55,4 @@ This Julia script enables **3D visualization** of biofilm growth using **PlotlyJ
 1. Define parameters such as species-specific **motility** and **diffusion** rates.
 2. Use **PlotlyJS** for 3D visualization of the simulation.
 
-Incorporating **k-means clustering** and **decision tree analysis**, this model helps predict biofilm structures and community interactions over time.
-
-### TypeScript Plot Integration (For Web)
-
-To render interactive plots for biofilm dynamics using Plotly.js, you can use the following TypeScript code.
-
-For questions, collaboration interest, or help, please email hkinder@stlteach.org.
+It can incorporate **k-means clustering** and **decision tree analysis**, with the aim to model and help predict biofilm structures and community interactions over time.
