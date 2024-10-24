@@ -14,7 +14,7 @@ The simulations rely on **partial stochastic differential equations (PSDEs)** fo
 
 The general Hamiltonian-based system is written as:
 
-$$H_{k-NN}$$ = $$\sum_{j=1}^{n}P_{s_j}(t)$$ $$(F_j(t, x)$$ $$\Gamma_s(t, x))$$
+$$H_{k-NN}$$ = $$\sum_{j=1}^{n}P_{s_j}(t)$$ $$(F{_j}(t, x)$$ $$\Gamma{_s}(t, x))$$
 
 Where:
 - $$\(P_{s_j}(t)\)$$ : transition probabilities between species
