@@ -33,6 +33,45 @@ $$
 \frac{dp}{dt} = -\frac{\partial H}{\partial q} + \Gamma_s(t, x) F_s(t, x)
 $$
 
+// Import Three.js modules
+import * as THREE from 'three';
+
+// Setup the scene
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+
+// Set the size of the renderer
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Add lighting
+const ambientLight = new THREE.AmbientLight(0x404040);
+scene.add(ambientLight);
+
+// Example: Add a sphere to represent biofilm behavior
+const geometry = new THREE.SphereGeometry(1, 32, 32);
+const material = new THREE.MeshStandardMaterial({ color: 0x7f7fff });
+const sphere = new THREE.Mesh(geometry, material);
+scene.add(sphere);
+
+// Adjust camera position
+camera.position.z = 5;
+
+// Animation loop to represent biofilm growth or motion
+function animate() {
+    requestAnimationFrame(animate);
+
+    // Example of dynamic biofilm behavior (rotation)
+    sphere.rotation.x += 0.01;
+    sphere.rotation.y += 0.01;
+
+    renderer.render(scene, camera);
+}
+
+// Start the animation
+animate();
+
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
 ## Scripts
