@@ -39,7 +39,7 @@ Species motility, radiation sensitivity, and nutrient uptake are dynamically upd
 
 ### reactor_decision_tree.R
 
-This R script can simulate synthetic radiation noise which can be used to select reactor model path for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **thorium decay constant** and the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
+This R script can simulate synthetic radiation noise which can be used to select reactor model path for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **various nuclear decay constants** and the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
 
 **Usage**:
 1. Load your own dataset or use extremophiles as is and select sequence from datasets (e.g., `subcellular_locations.tsv, subcellular_locations_data`, etc). This model uses various radioprotective functions like Cryptococcus Neoformans and Deinonoccus Radiodurans, and Shewanella algae as well as other extremophiles.
