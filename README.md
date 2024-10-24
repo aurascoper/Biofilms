@@ -1,4 +1,4 @@
-Biofilm Dynamics Simulation under Radiation Stress
+## Biofilm Dynamics Simulation under Radiation Stress
 
 ## Introduction
 
@@ -42,6 +42,12 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
 
 ### biofilms_3d.R
+
+<video width="600" controls>
+   <source src=https://drive.google.com/file/d/1kaBYQW-Tl4HkH_r2DyOv7sorfP_cn1V_/view?usp=drive_link" type="video/mp4">
+   Your browser does not support the video tag.
+</video>
+
 
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
