@@ -67,11 +67,33 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
 
 ### biofilms_3d.R
+# Biofilm Dynamics Simulation under Radiation Stress
 
-## Project Demo
+## Introduction
+
+This repository contains scripts for simulating biofilm dynamics under radiation stress, evaluating radiotrophic microbial communities, and analyzing microbial interactions under varying environmental conditions. These simulations model nutrient uptake, microbial fitness, and motility in 2D and 3D environments under both radiation exposure and nutrient gradients and heat/pressure gradients.
+
+### Mid-Level Overview
+
+At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
+
+## Species Trajectories with K-Means Clustering (2D)
+
+This shows the K-means clustering analysis of biofilm species' trajectories under radiation stress and nutrient dynamics.
+
+![Species Trajectories](biofilm_2d_clustering.gif)
+
+---
+
+## Project Demo (3D Biofilm Growth Simulation)
+
+Here is a demo of the 3D biofilm growth simulation showing the interaction between multiple species under radiation stress.
+
 <video width="600" controls>
-<src="https://https://drive.google.com/file/d/1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a/view?usp=drive_link/" alt="Biofilms.mp4">
+   <source src="https://drive.google.com/uc?export=download&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a" type="video/mp4">
+   Your browser does not support the video tag.
 </video>
+
 
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
