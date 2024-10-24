@@ -35,6 +35,10 @@ $$
 
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
+## Project Intro Demo
+
+This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
+
 ## Scripts
 
 ### reactor_decision_tree.R
@@ -42,7 +46,7 @@ Species motility, radiation sensitivity, and nutrient uptake are dynamically upd
 This R script can simulate synthetic radiation noise which can be used to select reactor model path for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **various nuclear decay constants** and the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
 
 **Usage**:
-1. Load your own dataset or use extremophiles as is and select sequence from datasets (e.g., `subcellular_locations.tsv, subcellular_locations_data`, etc). This model uses various radioprotective functions like Cryptococcus Neoformans and Deinonoccus Radiodurans, and Shewanella algae as well as other extremophiles.
+1. Load your own dataset or use extremophiles as is and select sequence from datasets (e.g., `powerplant_databse_global.csv`,  `subcellular_locations.tsv` , `subcellular_locations_data`, etc). This model uses various radioprotective functions like Cryptococcus Neoformans and Deinonoccus Radiodurans, and Shewanella algae as well as other extremophiles.
 2. Fill in the decision tree from scratch for bioreactor engineering using energy/fitness landscapes to analyze bioreactor design strategiess that use **gamma radiation** and **thorium interactions** or others.
 
 The decision tree helps identify optimal survival strategies of **extremophilic microbes** by analyzing nutrient uptake, radiation resistance, and species-specific growth models.
@@ -61,18 +65,7 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 <div>
   <h2>KMeans Species Trajectory</h2>
   <p>This GIF shows the simulation of species motility and clustering behavior over time using KMeans clustering:</p>
-  <img 
-    
-## Project Demo
-
-## Project Demo
-
-[![Watch Biofilm 3D Growth](https://github.com/aurascoper/Biofilms/blob/main/images/biofilm-screenshot.png)](https://drive.google.com/uc?export=preview&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a "Watch the Biofilm 3D Growth Simulation")
-
-
-</div>
-
-This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
+  <img
 
 ### biofilms_3d.R
 # Biofilm Dynamics Simulation under Radiation Stress
