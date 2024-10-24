@@ -14,7 +14,7 @@ The simulations rely on **partial stochastic differential equations (SPDEs)** fo
 
 The general Hamiltonian-based system is written with the factors of: 
 
-Species motility, radiation sensitivity, and nutrient uptake are supervised-dynamically and updated through these Hamiltonian and Langevin, and Ruler-Langrangian interactions.
+Species motility, radiation sensitivity, and nutrient uptake are supervised-dynamically and updated through these Hamiltonian and Langevin, and Euler-Langrangian interactions.
 
 ## Scripts
 
