@@ -75,7 +75,7 @@ const KMeansSpeciesTrajectory = () => {
     <div>
       <h2>KMeans Species Trajectory</h2>
       <p>This GIF shows the simulation of species motility and clustering behavior over time using KMeans clustering:</p>
-      <img src="path_to_your_gif/kmeans_species_trajectory.gif" alt="KMeans Species Trajectory Animation" />
+      <img src="www.github.com/aurascoper/Biofilms/kmeans_species_trajectory (1).gif" alt="KMeans Species Trajectory Animation" />
     </div>
   );
 };
