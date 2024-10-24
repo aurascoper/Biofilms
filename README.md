@@ -102,6 +102,12 @@ Here is a demo of the 3D biofilm growth simulation showing the interaction betwe
    Your browser does not support the video tag.
 </video>
 
+---
+
+This shows the K-means clustering analysis of biofilm species' trajectories under radiation stress and nutrient dynamics.
+
+![Species Trajectories](biofilm_2d_clustering.gif)
+
 
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
