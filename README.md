@@ -61,7 +61,15 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 <div>
   <h2>KMeans Species Trajectory</h2>
   <p>This GIF shows the simulation of species motility and clustering behavior over time using KMeans clustering:</p>
-  <img src="https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExeHpqNmNvYTFjMHIyeGNpa3RtOHE3cmI1ajZhbHJib2hjODZ2bWdpeSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/oKfaA8IEcAoHQMlZG3/giphy.gif" alt="KMeans Species Trajectory Animation">
+  <img 
+    
+## Project Demo
+
+## Project Demo
+
+[![Watch Biofilm 3D Growth](https://github.com/aurascoper/Biofilms/blob/main/images/biofilm-screenshot.png)](https://drive.google.com/uc?export=preview&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a "Watch the Biofilm 3D Growth Simulation")
+
+
 </div>
 
 This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
