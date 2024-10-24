@@ -107,6 +107,10 @@ This model explores how different species **cooperate** or **compete** for resou
 
 ### biofilms_3d.R
 
+## Project Demo
+
+[![Watch the video](https://https://drive.google.com/file/d/1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a/view?usp=drive_link/)
+
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
 **Usage**:
@@ -115,40 +119,4 @@ This Julia script enables **3D visualization** of biofilm growth using **PlotlyJ
 
 Incorporating **k-means clustering** and **decision tree analysis**, this model helps predict biofilm structures and community interactions over time.
 
-### TypeScript Plot Integration (For Web)
-
-To render interactive plots for biofilm dynamics using Plotly.js, you can use the following TypeScript code.
-
 For questions, collaboration interest of help, please email hkinder@stlteach.org
-
-```typescript
-import Plotly from 'plotly.js-dist';
-
-async function plotBiofilm3D(dataUrl: string) {
-    const response = await fetch(dataUrl);
-    const data = await response.json();
-
-    const plotData = [
-        {
-            x: data.map((d: any) => d.x),
-            y: data.map((d: any) => d.y),
-            z: data.map((d: any) => d.z),
-            type: 'scatter3d',
-            mode: 'markers',
-            marker: { size: 3, color: data.map((d: any) => d.intensity) }
-        }
-    ];
-
-    const layout = {
-        title: 'Biofilm 3D Growth under Radiation Stress',
-        scene: {
-            xaxis: { title: 'X axis' },
-            yaxis: { title: 'Y axis' },
-            zaxis: { title: 'Z axis' }
-        }
-    };
-
-    Plotly.newPlot('plotDiv', plotData, layout);
-}
-
-plotBiofilm3D('path_to_your_biofilm_data.json');
