@@ -39,11 +39,11 @@ Species motility, radiation sensitivity, and nutrient uptake are dynamically upd
 
 ### reactor_decision_tree.R
 
-This R script can simulate synthetic radiation noise which can be used to select reactor model for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **thorium decay constant** and the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
+This R script can simulate synthetic radiation noise which can be used to select reactor model path for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **thorium decay constant** and the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
 
 **Usage**:
-1. Load the dataset (e.g., `subcellular_locations.tsv`).
-2. Run the decision tree to analyze microbial fitness under **gamma radiation** and **thorium interactions**.
+1. Load your own dataset or use extremophiles as is and select sequence from datasets (e.g., `subcellular_locations.tsv, subcellular_locations_data`, etc). This model uses various radioprotective functions like Cryptococcus Neoformans and Deinonoccus Radiodurans, and Shewanella algae as well as other extremophiles.
+2. Fill in the decision tree from scratch for bioreactor engineering using energy/fitness landscapes to analyze bioreactor design strategiess that use **gamma radiation** and **thorium interactions** or others.
 
 The decision tree helps identify optimal survival strategies of **extremophilic microbes** by analyzing nutrient uptake, radiation resistance, and species-specific growth models.
 
