@@ -44,7 +44,7 @@ This model explores how different species **cooperate** or **compete** for resou
 ### biofilms_3d.R
 
 <image width="600" controls>
-  ![KMeans Species Trajectory](https://example.com/path_to_gif.gif)
+  ![KMeans Species Trajectory](https://drive.google.com/file/d/1IgOHbf3GupcqlWmakA0wooLYh-orulZ9/view?usp=sharing)
 </image>
 
 
