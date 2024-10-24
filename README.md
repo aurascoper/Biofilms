@@ -14,21 +14,58 @@ The simulations rely on **partial stochastic differential equations (SPDEs)** fo
 
 The general Hamiltonian-based system is written as:
 
-$$H_{k-NN}$$ = $$\sum_{j=1}^{n}$$ $$P_{s_j}(t)$$ $$F_j(t, x)$$ $$\Gamma_s(t, x)$$
+# Biofilm Dynamics Simulation under Radiation Stress
+
+## Introduction
+
+This repository contains scripts for simulating biofilm dynamics under radiation stress, evaluating radiotrophic microbial communities, and analyzing microbial interactions under varying environmental conditions. These simulations model nutrient uptake, microbial fitness, and motility in 2D and 3D environments under both radiation exposure and nutrient gradients and heat/pressure gradients.
+
+### Mid-Level Overview
+
+At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
+
+The simulations rely on **partial stochastic differential equations (SPDEs)** for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
+
+Biofilm Dynamics Simulation under Radiation Stress
+
+
+## Equations
+
+The general Hamiltonian-based system is written as:
+
+
+Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
+
 
 Where:
-- $$\(P_{s_j}(t)\)$$ : transition probabilities between species
-- $$\(F_j(t, x)\)$$ : fitness function of species at position \(x\)
-- $$\(\Gamma_s(t, x)\)$$: phase-locked kernel affecting transitions
+- `$$P_{s_j}(t)$$` : transition probabilities between species
+- `$$F_j(t, x)$$` : fitness function of species at position $$x$$
+- `$$\Gamma_s(t, x)$$`: phase-locked kernel affecting transitions
 
 The time evolution of the system follows:
 
-$$\frac{dq}{dt} = \frac{\partial H}{\partial p}$$ - $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
+// The equations rendered in TypeScript:
 
-$$
-$$\frac{dp}{dt} = $$-\frac{\partial H}{\partial q}$$ + $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
+// Time evolution for dq/dt
+const dq_dt = (partialH_partialP: number, Gamma_s: number, F_s: number) => {
+    return partialH_partialP - Gamma_s * F_s;
+};
 
-Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
+// Time evolution for dp/dt
+const dp_dt = (partialH_partialQ: number, Gamma_s: number, F_s: number) => {
+    return -partialH_partialQ + Gamma_s * F_s;
+};
+
+// Example usage:
+// dq/dt = ∂H/∂p - Γ_s(t, x) * F_s(t, x)
+const dqdt = dq_dt(0.5, 1.2, 0.8);  // adjust numbers based on your model
+
+// dp/dt = -∂H/∂q + Γ_s(t, x) * F_s(t, x)
+const dpdt = dp_dt(0.7, 1.2, 0.8);  // adjust numbers based on your model
+
+console.log("dq/dt =", dqdt);
+console.log("dp/dt =", dpdt);
+
 
 ## Scripts
 
