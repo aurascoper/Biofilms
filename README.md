@@ -98,25 +98,6 @@ const SpeciesTrajectories: React.FC = () => {
   );
 }
 
-const img = document.createElement("img");
-img.src = "https://drive.google.com/uc?export=view&id=1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a";
-img.alt = "3D Species Trajectories";
-
-const container = document.getElementById("species-trajectories-container");
-if (container) {
-  container.appendChild(img);
-}
-
-// Alternatively, add a link
-const link = document.createElement("a");
-link.href = "https://drive.google.com/file/d/1huR7BzRkdLneXVtaaHBpmnxO7F_77v_a/view?usp=sharing";
-link.textContent = "View the 3D Species Trajectories";
-link.target = "_blank";
-
-if (container) {
-  container.appendChild(link);
-}
-
 This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
 
 **Usage**:
