@@ -14,7 +14,7 @@ The simulations rely on **partial stochastic differential equations (SPDEs)** fo
 
 The general Hamiltonian-based system is written as:
 
-$$H_{k-NN} = \sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \Gamma_s(t, x)$$
+$$H_{k-NN}$$ = $$\sum_{j=1}^{n}$$ $$P_{s_j}(t)$$ $$F_j(t, x)$$ $$\Gamma_s(t, x)$$
 
 Where:
 - $$\(P_{s_j}(t)\)$$ : transition probabilities between species
@@ -23,11 +23,10 @@ Where:
 
 The time evolution of the system follows:
 
-$$\frac{dq}{dt} = \frac{\partial H}{\partial p} - \Gamma_s(t, x) F_s(t, x)$$
+$$\frac{dq}{dt} = \frac{\partial H}{\partial p}$$ - $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
 $$
-\frac{dp}{dt} = -\frac{\partial H}{\partial q} + \Gamma_s(t, x) F_s(t, x)
-$$
+$$\frac{dp}{dt} = $$-\frac{\partial H}{\partial q}$$ + $$\Gamma_s(t, x)$$ $$F_s(t, x)$$
 
 Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
 
