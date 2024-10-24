@@ -1,19 +1,3 @@
-Biofilm Dynamics Simulation under Radiation Stress
-
-## Introduction
-
-This repository contains scripts for simulating biofilm dynamics under radiation stress, evaluating radiotrophic microbial communities, and analyzing microbial interactions under varying environmental conditions. These simulations model nutrient uptake, microbial fitness, and motility in 2D and 3D environments under both radiation exposure and nutrient gradients and heat/pressure gradients.
-
-### Mid-Level Overview
-
-At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
-
-The simulations rely on **partial stochastic differential equations (SPDEs)** for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
-
-## Equations
-
-The general Hamiltonian-based system is written as:
-
 # Biofilm Dynamics Simulation under Radiation Stress
 
 ## Introduction
@@ -26,122 +10,6 @@ At the core of this model, we simulate **multi-species biofilm dynamics** under 
 
 The simulations rely on **partial stochastic differential equations (SPDEs)** for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
 
-Biofilm Dynamics Simulation under Radiation Stress
-
-
-## Equations
-
-The general Hamiltonian-based system is written as:
-
-
-Species motility, radiation sensitivity, and nutrient uptake are dynamically updated through these Hamiltonian interactions.
-
-
-Where:
-- `$$P_{s_j}(t)$$` : transition probabilities between species
-- `$$F_j(t, x)$$` : fitness function of species at position $$x$$
-- `$$\Gamma_s(t, x)$$`: phase-locked kernel affecting transitions
-
-The time evolution of the system follows:
-
-// The equations rendered in TypeScript:
-
-// Time evolution for dq/dt
-const dq_dt = (partialH_partialP: number, Gamma_s: number, F_s: number) => {
-    return partialH_partialP - Gamma_s * F_s;
-};
-
-// Time evolution for dp/dt
-const dp_dt = (partialH_partialQ: number, Gamma_s: number, F_s: number) => {
-    return -partialH_partialQ + Gamma_s * F_s;
-};
-
-// Example usage:
-// dq/dt = ∂H/∂p - Γ_s(t, x) * F_s(t, x)
-const dqdt = dq_dt(0.5, 1.2, 0.8);  // adjust numbers based on your model
-
-// dp/dt = -∂H/∂q + Γ_s(t, x) * F_s(t, x)
-const dpdt = dp_dt(0.7, 1.2, 0.8);  // adjust numbers based on your model
-
-console.log("dq/dt =", dqdt);
-console.log("dp/dt =", dpdt);
-
-
-## Scripts
-
-### reactor_decision_tree.R
-
-This R script can simulate synthetic radiation noise which can be used to select reactor model for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **thorium decay constant** and subcellular the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
-
-**Usage**:
-1. Load the dataset (e.g., `subcellular_locations.tsv`).
-2. Run the decision tree to analyze microbial fitness under **gamma radiation** and **thorium interactions**.
-
-The decision tree helps identify optimal survival strategies of **extremophilic microbes** by analyzing nutrient uptake, radiation resistance, and species-specific growth models.
-
-### biofilms.R
-
-This R script models **biofilm growth dynamics** of multiple species exposed to radiation. It incorporates:
-- **Species-specific motility**
-- **Radiation sensitivity**
-- **Nutrient uptake models**
-
-**Usage**:
-1. Define the number of species and set parameters such as **growth rates**, **radiation sensitivities**, and **nutrient uptake efficiencies**.
-2. Visualize biofilm growth using **ggplot2** for 2D plots or **Plotly** for interactive 3D plots.
-
-This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
-
-### biofilms_3d.R
-
-This Julia script enables **3D visualization** of biofilm growth using **PlotlyJS**. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
-
-**Usage**:
-1. Define parameters such as species-specific **motility** and **diffusion** rates.
-2. Use **PlotlyJS** for 3D visualization of the simulation.
-
-Incorporating **k-means clustering** and **decision tree analysis**, this model helps predict biofilm structures and community interactions over time.
-
-### TypeScript Plot Integration (For Web)
-
-To render interactive plots for biofilm dynamics using Plotly.js, you can use the following TypeScript code.
-
-For questions, collaboration interest of help, please email hkinder@stlteach.org
-
-```typescript
-import Plotly from 'plotly.js-dist';
-
-async function plotBiofilm3D(dataUrl: string) {
-    const response = await fetch(dataUrl);
-    const data = await response.json();
-
-    const plotData = [
-        {
-            x: data.map((d: any) => d.x),
-            y: data.map((d: any) => d.y),
-            z: data.map((d: any) => d.z),
-            type: 'scatter3d',
-            mode: 'markers',
-            marker: { size: 3, color: data.map((d: any) => d.intensity) }
-        }
-    ];
-
-    const layout = {
-        title: 'Biofilm 3D Growth under Radiation Stress',
-        scene: {
-            xaxis: { title: 'X axis' },
-            yaxis: { title: 'Y axis' },
-            zaxis: { title: 'Z axis' }
-        }
-    };
-
-    Plotly.newPlot('plotDiv', plotData, layout);
-}
-
-plotBiofilm3D('path_to_your_biofilm_data.json'); models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
-
-The simulations rely on **partial stochastic differential equations (SPDEs)** for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
-
 ## Equations
 
 The general Hamiltonian-based system is written as:
@@ -151,9 +19,9 @@ H_{k-NN} = \sum_{j=1}^{n} P_{s_j}(t) F_j(t, x) \Gamma_s(t, x)
 $$
 
 Where:
-- $$\(P_{s_j}(t)\)$$ : transition probabilities between species
-- $$\(F_j(t, x)\)$$ : fitness function of species at position \(x\)
-- $$\(\Gamma_s(t, x)\)$$: phase-locked kernel affecting transitions
+- $$P_{s_j}(t)$$ : transition probabilities between species
+- $$F_j(t, x)$$ : fitness function of species at position $$x$$
+- $$\Gamma_s(t, x)$$: phase-locked kernel affecting transitions
 
 The time evolution of the system follows:
 
@@ -171,7 +39,7 @@ Species motility, radiation sensitivity, and nutrient uptake are dynamically upd
 
 ### reactor_decision_tree.R
 
-This R script can simulate synthetic radiation noise which can be used to select reactor model for energy or bioremediation, it uses **radiated environments** using **decision tree analysis**. It can leverage the **thorium decay constant** and subcellular the subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
+This R script simulates synthetic radiation noise, which can be used to select a reactor model for energy or bioremediation. It uses **decision tree analysis** within **radiated environments**. The script leverages the **thorium decay constant** and subcellular RNA localization data to model microbial fitness and metabolic activities under radiation stress.
 
 **Usage**:
 1. Load the dataset (e.g., `subcellular_locations.tsv`).
@@ -190,7 +58,7 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 1. Define the number of species and set parameters such as **growth rates**, **radiation sensitivities**, and **nutrient uptake efficiencies**.
 2. Visualize biofilm growth using **ggplot2** for 2D plots or **Plotly** for interactive 3D plots.
 
-This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
+This model explores how different species **cooperate** or **compete** for resources under radiation-induced stress.
 
 ### biofilms_3d.R
 
@@ -201,41 +69,3 @@ This Julia script enables **3D visualization** of biofilm growth using **PlotlyJ
 2. Use **PlotlyJS** for 3D visualization of the simulation.
 
 Incorporating **k-means clustering** and **decision tree analysis**, this model helps predict biofilm structures and community interactions over time.
-
-### TypeScript Plot Integration (For Web)
-
-To render interactive plots for biofilm dynamics using Plotly.js, you can use the following TypeScript code.
-
-For questions, collaboration interest of help, please email hkinder@stlteach.org
-
-```typescript
-import Plotly from 'plotly.js-dist';
-
-async function plotBiofilm3D(dataUrl: string) {
-    const response = await fetch(dataUrl);
-    const data = await response.json();
-
-    const plotData = [
-        {
-            x: data.map((d: any) => d.x),
-            y: data.map((d: any) => d.y),
-            z: data.map((d: any) => d.z),
-            type: 'scatter3d',
-            mode: 'markers',
-            marker: { size: 3, color: data.map((d: any) => d.intensity) }
-        }
-    ];
-
-    const layout = {
-        title: 'Biofilm 3D Growth under Radiation Stress',
-        scene: {
-            xaxis: { title: 'X axis' },
-            yaxis: { title: 'Y axis' },
-            zaxis: { title: 'Z axis' }
-        }
-    };
-
-    Plotly.newPlot('plotDiv', plotData, layout);
-}
-
-plotBiofilm3D('path_to_your_biofilm_data.json');
