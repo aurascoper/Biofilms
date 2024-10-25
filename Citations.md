@@ -27,3 +27,17 @@ Reduction in Mutation Frequency by Very Low-Dose Gamma Irradiation of Drosophila
 Pokhilko, P., & Krylov, A. (2020). Effective Hamiltonians derived from equation-of-motion coupled-cluster wave functions: Theory and application to the Hubbard and Heisenberg Hamiltonians.. 
 The Journal of chemical physics. https://doi.org/10.1063/1.5143318.
 
+% This article is the definitive citation for Biofilm.jl.
+@article{Owkes-Biofilm-2023,
+    title={Biofilm.jl: a fast solver for one-dimensional biofilm chemistry and ecology},
+    author={Owkes, Mark and Coblentz, Kai and Eriksson, Austen and Kammerzell, Takumi and Stewart, Philip S},
+    journal={Computer Physics Communications},
+    volume={293},
+    number={},
+    pages={108890},
+    year={2023},
+    publisher={Elsevier},
+    doi={https://doi.org/10.1016/j.cpc.2023.108890},
+    url={https://www.sciencedirect.com/science/article/abs/pii/S0010465523002357}
+}
+
