@@ -1,4 +1,4 @@
-# This work builds on the work of the following:
+# This work could not be done with out the current work of the following:
 
 Arpit Shukla, Paritosh Parmar, Dweipayan Goswami, Baldev Patel, Meenu Saraf,
 Characterization of novel thorium tolerant Ochrobactrum intermedium AM7 in consort with assessing its EPS-Thorium binding,
@@ -28,8 +28,7 @@ Pokhilko, P., & Krylov, A. (2020). Effective Hamiltonians derived from equation-
 The Journal of chemical physics. https://doi.org/10.1063/1.5143318.
 
 # This article is the definitive citation for Biofilm.jl.
-article{Owkes-Biofilm-2023,
-    Biofilm.jl: a fast solver for one-dimensional biofilm chemistry and ecology, Owkes, Mark and Coblentz, Kai and Eriksson, Austen and Kammerzell, Takumi and Stewart, Philip S},
+Owkes-Biofilm-2023, Biofilm.jl: a fast solver for one-dimensional biofilm chemistry and ecology, Owkes, Mark and Coblentz, Kai and Eriksson, Austen and Kammerzell, Takumi and Stewart, Philip S},
     journal={Computer Physics Communications},
     volume={293},
     number={},
@@ -38,5 +37,3 @@ article{Owkes-Biofilm-2023,
     publisher={Elsevier},
     doi={https://doi.org/10.1016/j.cpc.2023.108890},
     url={https://www.sciencedirect.com/science/article/abs/pii/S0010465523002357}
-
-
