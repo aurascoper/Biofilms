@@ -26,9 +26,9 @@ $$
 
 This R script can simulate synthetic radiation noise, which can be used to select a reactor model for energy or bioremediation. It uses **radiated environments** and **decision tree analysis**. It can leverage the **thorium decay constant** and subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
 
-**Usage**:
+**Usage Optional**:
 1. Load the dataset (e.g., `subcellular_locations.tsv`).
-2. Run the decision tree to analyze microbial fitness under **gamma radiation** and **thorium interactions**.
+2. Run a simple decision tree analysis to analyze cellular automata that could sync or **lock phases** with microbial fitness factors under **gamma radiation** and **thorium or your own radioactive or radiodialytic interactions**.
 
 The decision tree helps identify optimal survival strategies of **extremophilic microbes** by analyzing nutrient uptake, radiation resistance, and species-specific growth models.
 
