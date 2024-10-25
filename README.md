@@ -37,6 +37,7 @@ The decision tree helps identify optimal survival strategies of **extremophilic 
 ![kmeans_species_trajectory (1).gif](https://github.com/aurascoper/Biofilms/blob/b7a111904fc0d8f70b4df84e1f13eb9728e00ce5/kmeans_species_trajectory%20(1).gif)
 ![biofilm_dynamics_7_species.gif](https://github.com/aurascoper/Biofilms/blob/91ded6274b16aa950569f49d9ec51f23d4f729e1/biofilm_dynamics_7_species.gif)
 ![biofilm_dynamics.gif](https://github.com/aurascoper/Biofilms/blob/91ded6274b16aa950569f49d9ec51f23d4f729e1/biofilm_dynamics.gif)
+![Functor.jl Coordinate .gif](https://github.com/aurascoper/Biofilms/blob/b87615d25b630a393ea00211e73d69dfe3d196b5/12_step_24_second_animation_sped_up.gif)
 
 This R script models **biofilm growth dynamics** of multiple species exposed to radiation. It incorporates:
 - **Species-specific motility**
