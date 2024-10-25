@@ -28,7 +28,7 @@ Pokhilko, P., & Krylov, A. (2020). Effective Hamiltonians derived from equation-
 The Journal of chemical physics. https://doi.org/10.1063/1.5143318.
 
 # This article is the definitive citation for Biofilm.jl.
-[!article{Owkes-Biofilm-2023,
+article{Owkes-Biofilm-2023,
     title={Biofilm.jl: a fast solver for one-dimensional biofilm chemistry and ecology},
     author={Owkes, Mark and Coblentz, Kai and Eriksson, Austen and Kammerzell, Takumi and Stewart, Philip S},
     journal={Computer Physics Communications},
@@ -39,5 +39,5 @@ The Journal of chemical physics. https://doi.org/10.1063/1.5143318.
     publisher={Elsevier},
     doi={https://doi.org/10.1016/j.cpc.2023.108890},
     url={https://www.sciencedirect.com/science/article/abs/pii/S0010465523002357}
-}]
+}
 
