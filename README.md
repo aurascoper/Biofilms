@@ -53,4 +53,4 @@ This R script enables **3D visualization** of biofilm growth using **PlotlyJS**.
 1. Define parameters such as species-specific **motility** and **diffusion** rates.
 2. Use **PlotlyJS** for 3D visualization of the simulation.
 
-It can incorporate **k-means clustering** and **decision tree analysis**, with the aim to model and help predict biofilm structures and community interactions over time.
+It can incorporate **k-means clustering** and **decision tree analysis** based on a simple Hamiltonian = k-nn network, with the aim to model and help predict biofilm structures and community interactions over time.
