@@ -1,4 +1,4 @@
-# This work could not be done with out the current work of the following:
+# This work could not be done with out the current work of the following Sysmtems Biology principles:
 
 Arpit Shukla, Paritosh Parmar, Dweipayan Goswami, Baldev Patel, Meenu Saraf,
 Characterization of novel thorium tolerant Ochrobactrum intermedium AM7 in consort with assessing its EPS-Thorium binding,
