@@ -16,6 +16,10 @@ The general Hamiltonian-based system is written with the factors of:
 
 Species motility, radiation sensitivity, and nutrient uptake are supervised-dynamically and updated through these Hamiltonian and Langevin, and Euler-Langrangian interactions.
 
+$$
+\frac{dq}{dt} = \frac{\partial H}{\partial p}, \quad \frac{dp}{dt} = -\frac{\partial H}{\partial q} + \eta(t)
+$$
+
 ## Scripts
 
 ### reactor_decision_tree.R
