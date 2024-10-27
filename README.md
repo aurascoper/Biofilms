@@ -46,9 +46,11 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 - **Radiation sensitivity**
 - **Nutrient uptake models**
 
+![Bioreactor Growth Curves.png.png](https://github.com/aurascoper/Biofilms/blob/abcaeb99cc8d98cbae08995b925836c86cc0993c/Bioreactor%20Growth%20Curves.png.png)
+
 **Usage**:
 1. Define the number of species and set parameters such as **growth rates**, **radiation sensitivities**, and **nutrient uptake efficiencies**.
-2. Visualize biofilm growth using **ggplot2** for 2D plots or **Plotly** for interactive 3D plots.
+2. Visualize biofilm growth using **ggplot2** for 2D plots or **PlotlyJS** for interactive 3D plots.
 
 This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
 
