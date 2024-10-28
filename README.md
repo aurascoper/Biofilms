@@ -48,7 +48,7 @@ This R script models **biofilm growth dynamics** of multiple species exposed to 
 
 The same can be said for the Optimization Problems that can be done with Bioreactor.jl
 
-This Growth curve was calculated with JuMP and Cbc in Julia and is currently operating in JupyterLab
+This Growth curve was calculated with JuMP and Cbc in Julia and is currently operating in JupyterLab. It can be interpreted as a scalar graph for scaling molecular growth rates of interes (Billions of CFUs (colony forming units)).
 
 ![Bioreactor Growth Curves.png.png](https://github.com/aurascoper/Biofilms/blob/abcaeb99cc8d98cbae08995b925836c86cc0993c/Bioreactor%20Growth%20Curves.png.png)
 
