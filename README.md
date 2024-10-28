@@ -28,7 +28,7 @@ $$
 
 ### reactor_decision_tree.R
 
-This R script can synthesize radiosympletic noise, which can be used to select a reactor model for energy or bioremediation. It uses **radiated environments** and **decision tree analysis**. It can leverage the **thorium decay constant** and subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
+This R script can synthesize radiosympletic noise, which can be used to select a reactor model for bioenergy, particular biological product supplies, or bioremediation. It uses **radiated environments** and **decision tree analysis**. It can leverage the **thorium decay constant** and subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
 
 **Usage Optional**:
 1. Load the dataset (e.g., `subcellular_locations.tsv`).
