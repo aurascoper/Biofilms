@@ -83,7 +83,7 @@ $$
 P_\text{eff}(t) = P_0\,\exp\!\bigl(\alpha_P\,D_\text{cum}(t)\bigr)
 $$
 
-**Robin boundary condition** at the membrane wall $r = R$:
+**Robin boundary condition** at the membrane wall *r = R*:
 $$
 -D_\text{eff}\left.\frac{\partial c}{\partial r}\right|_{r=R}
   = P_\text{eff}(t)\,\bigl(c(R,t) - c_\text{ext}\bigr)
@@ -95,17 +95,21 @@ $$
 
 ### 1 · Langevin PSDE — `biofilms.R`
 
-Original flat-domain simulation. Seven species evolve under species-specific motility, radiation sensitivity, and pairwise Hamiltonian interactions. Stochastic Langevin integration with $k$-means spatial clustering.
+Original flat-domain simulation. Seven species evolve under species-specific motility, radiation sensitivity, and pairwise Hamiltonian interactions. Stochastic Langevin integration with *k*-means spatial clustering.
 
-| | |
-|---|---|
-| ![k-means trajectory animation](kmeans_species_trajectory%20(1).gif) | ![7-species biofilm dynamics](biofilm_dynamics_7_species.gif) |
+<p>
+<img src="kmeans_species_trajectory%20(1).gif" width="48%" alt="k-means trajectory animation">
+&nbsp;
+<img src="biofilm_dynamics_7_species.gif" width="48%" alt="7-species biofilm dynamics">
+</p>
+
+*Left: k-means cluster trajectories over 500 time steps. Right: full 7-species fitness field dynamics.*
 
 ---
 
 ### 2 · Cylindrical Bioreactor — `biofilms_3d.R`
 
-Interactive Shiny app. Langevin dynamics inside a cylindrical bioreactor of radius $R$, axial length $L$. Radiotrophic species (*C. neoformans*, *C. sphaerospermum*) are attracted toward the high-radiation central axis; radiosensitive species drift outward. Sliders: $I_0$, $\kappa$, nutrient $C_0$, thorium intensity.
+Interactive Shiny app. Langevin dynamics inside a cylindrical bioreactor of radius *R*, axial length *L*. Radiotrophic species (*C. neoformans*, *C. sphaerospermum*) are attracted toward the high-radiation central axis; radiosensitive species drift outward. Sliders: radiation intensity *I₀*, attenuation *κ*, nutrient *C₀*, thorium intensity.
 
 ```r
 shiny::runApp("biofilms_3d.R")
@@ -117,8 +121,8 @@ shiny::runApp("biofilms_3d.R")
 
 ### 3 · Cellular Potts Model — `biofilms_potts.jl`
 
-Pure Julia. $60^3$ cylindrical lattice, Metropolis MC, 5-term Hamiltonian
-($H_\text{adh} + H_\text{vol} + H_\text{rad} + H_\text{mel} + H_\text{pair}$),
+Pure Julia. 60³ cylindrical lattice, Metropolis MC, 5-term Hamiltonian
+(adhesion + volume + radiation + melanin + pairwise),
 coupled melanin/nutrient/radiation fields. Runs the radiodialysis PDE coupling
 by default; pass `--no-radiolysis` for plain CPM.
 
@@ -149,11 +153,11 @@ Rscript biofilms_radiodialysis.R
 
 ![Radiodialysis preview — contaminant profiles and membrane evolution](assets/preview_radiodialysis.png)
 
-**Fig 3 — Membrane damage and permeability.** Integrity $m(t)$ decays exponentially under 50 Gy cumulative dose (1.0 → 0.78). $P_\text{eff}$ rises 2.7× — the same radiation field that sustains the biofilm also opens the membrane wider, creating a self-regulating contaminant uptake loop.
+**Fig 3 — Membrane damage and permeability.** Integrity *m(t)* decays exponentially under 50 Gy cumulative dose (1.0 → 0.78). *P_eff* rises 2.7× — the same radiation field that sustains the biofilm also opens the membrane wider, creating a self-regulating contaminant uptake loop.
 
 ![Fig 3 — Membrane transport](preprint/figures/fig3_membrane_transport.png)
 
-**Fig 4 — Contaminant penetration.** Wall concentration $c(R,t)$ reaches 87% of $c_\text{ext}$ while the interior mean stays near zero — the biofilm consumes the contaminant within a thin annular zone at the membrane face. The slowly rising sorbed phase $s_\text{mean}$ confirms progressive immobilisation.
+**Fig 4 — Contaminant penetration.** Wall concentration *c(R,t)* reaches 87% of *c_ext* while the interior mean stays near zero — the biofilm consumes the contaminant within a thin annular zone at the membrane face. The slowly rising sorbed phase *s_mean* confirms progressive immobilisation.
 
 ![Fig 4 — Contaminant penetration](preprint/figures/fig4_contaminant_penetration.png)
 
@@ -163,15 +167,15 @@ Rscript biofilms_radiodialysis.R
 
 | Result | Value |
 |--------|-------|
-| Membrane integrity at 50 Gy | $m = 0.779$ |
+| Membrane integrity at 50 Gy | m = 0.779 |
 | P_eff increase | 2.7× baseline (0.010 → 0.027 cm s⁻¹) |
-| Interior contaminant mean | 0.024 $c_\text{ext}$ (98% depletion) |
-| Radiotrophic stratification | *C. neoformans* mean $r = 13.1$; *B. subtilis* mean $r = 9.9$ |
+| Interior contaminant mean | 0.024 c_ext (98% depletion) |
+| Radiotrophic stratification | *C. neoformans* mean r/R = 0.65; *B. subtilis* mean r/R = 0.50 |
 | *C. sphaerospermum* melanin (MCS 100) | 1.44 (field units) |
 | Pairwise community energy | −34.4 → −41.5 (tightening cooperation) |
 | All species surviving | 42 / 42 cells (no extinctions) |
 
-The central finding is a **self-regulating remediation loop**: radiation damages the membrane → $P_\text{eff}$ increases → more contaminant enters → metal-reducing *S. oneidensis* (co-located at the outer wall by CPM dynamics) immobilises it. No external energy input required.
+The central finding is a **self-regulating remediation loop**: radiation damages the membrane → P_eff increases → more contaminant enters → metal-reducing *S. oneidensis* (co-located at the outer wall by CPM dynamics) immobilises it. No external energy input required.
 
 ---
 

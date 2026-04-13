@@ -1005,6 +1005,10 @@ function main()
     end
     println()
 
+    # --- Export figures (Figs 1–2 only; no radiodialysis data) ---
+    println("  Exporting figures (plain CPM — Figs 1 & 2 only)...")
+    export_figures(trajectory, nothing, params)
+
     return state, trajectory
 end
 
@@ -1545,56 +1549,133 @@ function export_figures(trajectory::Vector{<:Any},
 
     mcs_vec = [s.mcs for s in snaps]
     N = params.N
+    R_wall = N / 2.0   # wall in lattice units
 
     # ----------------------------------------------------------------
-    # Figure 1: Radial stratification over MCS
+    # Figure 1: Radial stratification — normalised r/R, coloured bands
     # ----------------------------------------------------------------
-    fig1 = Figure(size = (780, 420))
+    fig1 = Figure(size = (860, 500), figure_padding = (12, 20, 10, 10))
     ax1  = Axis(fig1[1,1],
-                xlabel = "Monte Carlo Step",
-                ylabel = "Mean radial distance (lattice units)",
-                title  = "Radial stratification — CPM cylindrical bioreactor")
+                xlabel      = "Monte Carlo Steps",
+                ylabel      = "Mean radial position  r / R",
+                title       = "Radial stratification — cylindrical CPM bioreactor",
+                titlesize   = 15,
+                xlabelsize  = 13,
+                ylabelsize  = 13,
+                yticks      = LinearTicks(6),
+                limits      = (nothing, (0.0, 1.15)))
 
-    R_half = N / 2.0
-    hlines!(ax1, [R_half]; color = (:black, 0.25), linestyle = :dash,
-            label = "Wall (r = R)")
+    # Shaded zones: inner core (radiosensitive refuge) and outer ring (radiotrophic niche)
+    poly!(ax1,
+          Point2f[(mcs_vec[1], 0.0), (mcs_vec[end], 0.0),
+                  (mcs_vec[end], 0.45), (mcs_vec[1], 0.45)];
+          color = (:royalblue, 0.08), strokewidth = 0)
+    poly!(ax1,
+          Point2f[(mcs_vec[1], 0.65), (mcs_vec[end], 0.65),
+                  (mcs_vec[end], 1.0), (mcs_vec[1], 1.0)];
+          color = (:firebrick, 0.08), strokewidth = 0)
 
+    # Dashed wall line at r/R = 1.0
+    hlines!(ax1, [1.0]; color = (:black, 0.40), linestyle = :dash, linewidth = 1.5)
+
+    # Zone annotation text
+    text!(ax1, mcs_vec[end] * 0.02, 0.22;
+          text = "radiosensitive\ncore", fontsize = 10,
+          color = (:royalblue, 0.70), align = (:left, :center))
+    text!(ax1, mcs_vec[end] * 0.02, 0.82;
+          text = "radiotrophic\nniche", fontsize = 10,
+          color = (:firebrick, 0.70), align = (:left, :center))
+
+    line_handles = []
     for s in 1:N_SPECIES
         mean_r_vec = Float64[]
         for snap in snaps
             sd = snap.species_data[s]
-            push!(mean_r_vec, sd.n_cells > 0 ? sd.mean_r : NaN)
+            r_norm = sd.n_cells > 0 ? sd.mean_r / R_wall : NaN
+            push!(mean_r_vec, r_norm)
         end
-        lines!(ax1, mcs_vec, mean_r_vec;
-               color     = FIG_COLORS[s],
-               label     = FIG_LABELS[s],
-               linestyle = s in [CN, CS] ? :solid : :dash)
+        lw = s in [CN, CS] ? 3.2 : 2.2
+        ls = s in [CN, CS] ? :solid : (s in [BS, SO] ? :dash : :dot)
+        h = lines!(ax1, mcs_vec, mean_r_vec;
+                   color     = FIG_COLORS[s],
+                   label     = FIG_LABELS[s],
+                   linewidth = lw,
+                   linestyle = ls)
+        push!(line_handles, h)
     end
 
-    Legend(fig1[1,2], ax1; labelsize = 11)
+    # Annotate final r/R values for key species
+    for s in [CN, CS, BS]
+        last_r = NaN
+        for snap in reverse(snaps)
+            sd = snap.species_data[s]
+            if sd.n_cells > 0
+                last_r = sd.mean_r / R_wall
+                break
+            end
+        end
+        isnan(last_r) && continue
+        text!(ax1, Float64(mcs_vec[end]) + Float64(mcs_vec[end]) * 0.01, last_r;
+              text      = @sprintf("%.2f", last_r),
+              fontsize  = 9,
+              color     = FIG_COLORS[s],
+              align     = (:left, :center))
+    end
+
+    Legend(fig1[1,2], ax1;
+           labelsize   = 11,
+           rowgap      = 4,
+           framevisible = false,
+           title       = "Species",
+           titlesize   = 12)
     save(joinpath(outdir, "fig1_radial_stratification.pdf"), fig1)
     save(joinpath(outdir, "fig1_radial_stratification.png"), fig1; px_per_unit = 2)
     @printf("  Saved fig1_radial_stratification (.pdf + .png)\n")
 
     # ----------------------------------------------------------------
-    # Figure 2: Melanin accumulation (melanin-producing species)
+    # Figure 2: Melanin accumulation — filled area + final annotations
     # ----------------------------------------------------------------
     mel_producers = [CN, CS, AN]
 
-    fig2 = Figure(size = (700, 400))
+    fig2 = Figure(size = (780, 460), figure_padding = (12, 20, 10, 10))
     ax2  = Axis(fig2[1,1],
-                xlabel = "Monte Carlo Step",
-                ylabel = "Mean melanin field at occupied sites",
-                title  = "Melanin accumulation — radiation-driven production")
+                xlabel    = "Monte Carlo Steps",
+                ylabel    = "Mean melanin field value at occupied sites",
+                title     = "Melanin accumulation — radiation-driven production",
+                titlesize = 15,
+                xlabelsize = 13,
+                ylabelsize = 13)
 
     for s in mel_producers
-        mel_vec = [snap.species_data[s].mean_melanin for snap in snaps]
+        mel_vec = Float64[snap.species_data[s].mean_melanin for snap in snaps]
+        # Filled band from 0 to line
+        band!(ax2, mcs_vec, zeros(length(mcs_vec)), mel_vec;
+              color = (FIG_COLORS[s], 0.18))
         lines!(ax2, mcs_vec, mel_vec;
-               color = FIG_COLORS[s],
-               label = FIG_LABELS[s])
+               color     = FIG_COLORS[s],
+               linewidth = 2.8,
+               label     = FIG_LABELS[s])
+        # Annotate final value
+        final_val = mel_vec[end]
+        text!(ax2, Float64(mcs_vec[end]) + Float64(mcs_vec[end]) * 0.01, final_val;
+              text     = @sprintf("%.2f", final_val),
+              fontsize = 10,
+              color    = FIG_COLORS[s],
+              align    = (:left, :center))
     end
 
-    Legend(fig2[1,2], ax2; labelsize = 11)
+    # Mark radiotrophic species with a label in the legend title
+    Legend(fig2[1,2], ax2;
+           labelsize    = 11,
+           rowgap       = 4,
+           framevisible = false,
+           title        = "Melanin producers\n(★ radiotrophic)",
+           titlesize    = 11)
+    # Override first two labels to add star
+    text!(ax2, mcs_vec[1], -0.05;
+          text = "★ C. neoformans, C. sphaerospermum are radiotrophic (melanin-mediated energy gain)",
+          fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
+
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)
     save(joinpath(outdir, "fig2_melanin_accumulation.png"), fig2; px_per_unit = 2)
     @printf("  Saved fig2_melanin_accumulation (.pdf + .png)\n")
@@ -1608,68 +1689,137 @@ function export_figures(trajectory::Vector{<:Any},
     end
 
     ct = coupled_traj   # Vector{CoupledSnapshot}
-    t_vec      = [cs.cpm_snap.mcs for cs in ct]   # MCS axis (proxy for time)
+    t_vec      = [cs.cpm_snap.mcs for cs in ct]   # MCS axis
     m_vec      = [cs.m        for cs in ct]
     Peff_vec   = [cs.P_eff    for cs in ct]
     P0_val     = Peff_vec[1]   # baseline (t=0)
+    Peff_norm  = Peff_vec ./ P0_val
     c_wall_vec = [cs.c_wall   for cs in ct]
     c_mean_vec = [cs.c_mean   for cs in ct]
+    s_mean_vec = [cs.s_mean   for cs in ct]
 
     # ----------------------------------------------------------------
-    # Figure 3: Membrane integrity and effective permeability
+    # Figure 3: Membrane integrity and effective permeability — dual axis
     # ----------------------------------------------------------------
-    fig3  = Figure(size = (740, 420))
+    fig3  = Figure(size = (820, 500), figure_padding = (12, 24, 10, 10))
+
     ax3l  = Axis(fig3[1,1],
-                 xlabel      = "Monte Carlo Step",
-                 ylabel      = "Membrane integrity m(t)",
-                 title       = "Membrane damage and permeability evolution",
-                 yticklabelcolor = FIG_COLORS[DR])
+                 xlabel          = "Monte Carlo Steps",
+                 ylabel          = "Membrane integrity  m(t)",
+                 title           = "Membrane damage and radiation-driven permeability",
+                 titlesize       = 15,
+                 xlabelsize      = 13,
+                 ylabelsize      = 13,
+                 yticklabelcolor = colorant"#1f77b4",
+                 ylabelcolor     = colorant"#1f77b4",
+                 limits          = (nothing, (0.0, 1.1)))
+
     ax3r  = Axis(fig3[1,1],
-                 ylabel      = "P_eff / P₀",
-                 yaxisposition = :right,
-                 yticklabelcolor = FIG_COLORS[SO])
+                 ylabel          = "P_eff / P₀",
+                 yaxisposition   = :right,
+                 yticklabelcolor = colorant"#d62728",
+                 ylabelcolor     = colorant"#d62728")
     hidespines!(ax3r)
     hidexdecorations!(ax3r)
 
+    # Shaded region showing intact vs damaged membrane
+    band!(ax3l, t_vec, m_vec, ones(length(t_vec));
+          color = (colorant"#1f77b4", 0.12))
+
     l1 = lines!(ax3l, t_vec, m_vec;
-                color = FIG_COLORS[DR], label = "m(t) integrity")
-    l2 = lines!(ax3r, t_vec, Peff_vec ./ P0_val;
-                color = FIG_COLORS[SO], linestyle = :dash,
-                label = "P_eff / P₀")
+                color     = colorant"#1f77b4",
+                linewidth = 3.0,
+                label     = "m(t)  membrane integrity")
+    l2 = lines!(ax3r, t_vec, Peff_norm;
+                color     = colorant"#d62728",
+                linewidth = 2.8,
+                linestyle = :dash,
+                label     = "P_eff / P₀  permeability ratio")
+
+    # Key annotations
+    m_final   = m_vec[end]
+    Peff_final = Peff_norm[end]
+    text!(ax3l, Float64(t_vec[end]) * 0.55, m_final + 0.05;
+          text    = @sprintf("m = %.3f\n(50 Gy cumulative)", m_final),
+          fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
+    text!(ax3r, Float64(t_vec[end]) * 0.55, Peff_final * 0.88;
+          text    = @sprintf("%.1f× baseline", Peff_final),
+          fontsize = 10, color = colorant"#d62728", align = (:center, :top))
 
     Legend(fig3[1,2], [l1, l2],
-           ["m(t) integrity", "P_eff / P₀"]; labelsize = 11)
+           ["m(t)  integrity", "P_eff / P₀  permeability"];
+           labelsize    = 11,
+           rowgap       = 6,
+           framevisible = false)
     save(joinpath(outdir, "fig3_membrane_transport.pdf"), fig3)
     save(joinpath(outdir, "fig3_membrane_transport.png"), fig3; px_per_unit = 2)
     @printf("  Saved fig3_membrane_transport (.pdf + .png)\n")
 
     # ----------------------------------------------------------------
-    # Figure 4: Contaminant penetration
+    # Figure 4: Contaminant penetration — c_wall, c_mean, s_mean
+    #           s_mean is on right axis; scale matched to left for visibility
     # ----------------------------------------------------------------
-    fig4  = Figure(size = (740, 420))
+    fig4  = Figure(size = (820, 500), figure_padding = (12, 24, 10, 10))
+
     ax4l  = Axis(fig4[1,1],
-                 xlabel      = "Monte Carlo Step",
-                 ylabel      = "Contaminant concentration (normalised)",
-                 title       = "Contaminant penetration — mobile c and sorbed s")
+                 xlabel      = "Monte Carlo Steps",
+                 ylabel      = "Mobile contaminant  c / c_ext",
+                 title       = "Contaminant penetration and biosorption",
+                 titlesize   = 15,
+                 xlabelsize  = 13,
+                 ylabelsize  = 13,
+                 limits      = (nothing, (-0.02, 1.05)))
+
+    # Scale s_mean to [0,1] for dual-axis legibility; annotate true scale on right
+    s_max   = max(maximum(s_mean_vec), 1e-12)
+    s_norm  = s_mean_vec ./ s_max
+
     ax4r  = Axis(fig4[1,1],
-                 ylabel      = "Sorbed phase s_mean",
-                 yaxisposition = :right)
+                 ylabel          = @sprintf("Sorbed phase  s_mean  (×%.4f c_ext)", s_max),
+                 yaxisposition   = :right,
+                 yticklabelcolor = colorant"#2ca02c",
+                 ylabelcolor     = colorant"#2ca02c",
+                 limits          = (nothing, (-0.02, 1.05)))
     hidespines!(ax4r)
     hidexdecorations!(ax4r)
 
+    # Filled bands
+    band!(ax4l, t_vec, zeros(length(t_vec)), c_wall_vec;
+          color = (colorant"#d62728", 0.12))
+    band!(ax4l, t_vec, zeros(length(t_vec)), c_mean_vec;
+          color = (colorant"#1f77b4", 0.12))
+
     l3 = lines!(ax4l, t_vec, c_wall_vec;
-                color = colorant"#e6194b", label = "c(R,t) — at membrane")
+                color     = colorant"#d62728",
+                linewidth = 3.0,
+                label     = "c(R,t)  membrane wall")
     l4 = lines!(ax4l, t_vec, c_mean_vec;
-                color = colorant"#4363d8", linestyle = :dash,
-                label = "c_mean — interior average")
-    s_mean_vec = [cs.s_mean for cs in ct]
-    l5 = lines!(ax4r, t_vec, s_mean_vec;
-                color = colorant"#3cb44b", linestyle = :dot,
-                label = "s_mean — sorbed phase")
+                color     = colorant"#1f77b4",
+                linewidth = 2.5,
+                linestyle = :dash,
+                label     = "c_mean  interior average")
+    l5 = lines!(ax4r, t_vec, s_norm;
+                color     = colorant"#2ca02c",
+                linewidth = 2.5,
+                linestyle = :dashdot,
+                label     = "s_mean  sorbed (immobile)")
+
+    # Annotations
+    c_wall_final = c_wall_vec[end]
+    c_mean_final = c_mean_vec[end]
+    text!(ax4l, Float64(t_vec[end]) * 0.55, c_wall_final + 0.04;
+          text    = @sprintf("c(R) = %.0f%% c_ext", c_wall_final * 100),
+          fontsize = 10, color = colorant"#d62728", align = (:center, :bottom))
+    text!(ax4l, Float64(t_vec[end]) * 0.55, c_mean_final + 0.04;
+          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% depleted)",
+                             c_mean_final * 100, (1.0 - c_mean_final) * 100),
+          fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
 
     Legend(fig4[1,2], [l3, l4, l5],
-           ["c(R,t) membrane", "c_mean interior", "s_mean sorbed"];
-           labelsize = 11)
+           ["c(R,t)  at wall", "c_mean  interior", "s_mean  sorbed"];
+           labelsize    = 11,
+           rowgap       = 6,
+           framevisible = false)
     save(joinpath(outdir, "fig4_contaminant_penetration.pdf"), fig4)
     save(joinpath(outdir, "fig4_contaminant_penetration.png"), fig4; px_per_unit = 2)
     @printf("  Saved fig4_contaminant_penetration (.pdf + .png)\n")
