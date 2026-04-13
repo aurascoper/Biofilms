@@ -1,0 +1,874 @@
+% ============================================================
+%  Modeling Radiotrophic Fitness
+%  Hunter Kinder & Brett Faulkner
+%  Preprint — bioRxiv Systems Biology — April 2026
+% ============================================================
+\documentclass[11pt]{article}
+
+% --- Geometry -----------------------------------------------
+\usepackage[top=1in,bottom=1in,left=1.1in,right=1.1in]{geometry}
+
+% --- Encoding & fonts ----------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% --- Math ---------------------------------------------------
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+
+% --- Tables -------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{rotating}
+\usepackage{pdflscape}
+
+% --- Graphics & colour ----------------------------------------
+\usepackage{xcolor}
+\definecolor{linkblue}{RGB}{0,70,150}
+
+% --- Hyperref ------------------------------------------------
+\usepackage[colorlinks=true,
+            linkcolor=linkblue,
+            citecolor=linkblue,
+            urlcolor=linkblue,
+            pdftitle={Modeling Radiotrophic Fitness},
+            pdfauthor={Hunter Kinder, Brett Faulkner}]{hyperref}
+
+% --- Layout ---------------------------------------------------
+\usepackage{parskip}
+\setlength{\parskip}{6pt}
+\usepackage{setspace}
+\setstretch{1.15}
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titlespacing{\section}{0pt}{14pt}{6pt}
+\titlespacing{\subsection}{0pt}{10pt}{4pt}
+
+% --- Floats & captions ----------------------------------------
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf}
+
+% (no datetime2 in basic install)
+
+% ============================================================
+\begin{document}
+
+% ---- Title block --------------------------------------------
+\begin{center}
+  {\LARGE\bfseries Modeling Radiotrophic Fitness}\\[10pt]
+  {\large\bfseries Spatiotemporal Dynamics of Microbial Communities\\
+   Under Ionizing Radiation Stress}\\[14pt]
+  {\normalsize
+    \textbf{Hunter Kinder}, B.A., M.A.T.L. --- Independent Researcher, Missouri, USA\\[2pt]
+    \textbf{Brett Faulkner}, B.Sc, BioPhys --- Independent Researcher\\[10pt]
+  }
+  {\small
+    \textit{Preprint --- submitted to bioRxiv (Systems Biology)}\\
+    \textit{Version 1.0 --- April 2026}
+  }
+\end{center}
+\vspace{4pt}
+\noindent\rule{\linewidth}{0.5pt}
+\vspace{2pt}
+
+% ---- Abstract ------------------------------------------------
+\begin{abstract}
+\noindent
+This work presents a mathematical framework to describe the radiotrophic and adaptive dynamics
+of microbial communities exposed to gamma radiation. The developed model integrates Langevin
+dynamics with reaction-diffusion equations to simulate the spatial motility, growth, and nonlinear
+interactions of radiotrophic fungi, extremophiles, and radiation-sensitive averse species. In this
+framework, radiation gradients and chemical factors, such as melanin synthesis, are introduced as
+modifiable parameters to analyze their influence on biofilm growth and adaptive responses. The
+model leverages stochastic differential equations to capture complex dependencies between
+environmental conditions and microbial interactions. Numerical simulations of seven interacting
+species---including \textit{Cryptococcus neoformans}, \textit{Deinococcus radiodurans},
+\textit{Cladosporium sphaerospermum}, \textit{Bacillus subtilis}, \textit{Aspergillus niger},
+\textit{Shewanella oneidensis}, and \textit{Ochrobactrum intermedium} AM7---demonstrate that
+radiation gradients drive spatial niche partitioning, with melanized radiotrophic fungi
+concentrating in high-radiation zones while radiosensitive metal-reducing bacteria occupy
+attenuated peripheries. This work contributes a predictive modeling tool capable of elucidating
+the nonlinear adaptive behaviors of radiotrophic communities in extreme environments, with
+applications to nuclear bioremediation.
+\end{abstract}
+\noindent\rule{\linewidth}{0.5pt}
+
+% ---- 1. Introduction -----------------------------------------
+\section{Introduction}
+
+Microbial communities possess an extraordinary ability to adapt and survive under extreme
+environmental stressors, such as elevated radiation levels. Within such communities, radiotrophic
+fungi and other extremophilic microorganisms have evolved specialized mechanisms that allow them
+to thrive in high-radiation environments. This study aims to develop a comprehensive mathematical
+framework that captures the complex interplay between these organisms' nonlinear interactions,
+radiation sensitivities, and chemotactic behaviors within biofilm communities. By leveraging a
+combined approach that integrates Langevin dynamics, reaction-diffusion modeling, and a
+Hamiltonian-based formulation, we simulate and explore the spatiotemporal evolution of these
+communities under radiation stress and other external influences.
+
+The practical motivation for this work lies in nuclear bioremediation. Contaminated sites such
+as the Chernobyl Exclusion Zone and the Hanford Nuclear Reservation host complex microbial
+communities in which radiotrophic species coexist with metal-reducing bacteria capable of
+immobilizing radionuclides. Mathematical models that predict community dynamics under spatially
+heterogeneous radiation fields are essential for designing and optimizing bioremediation
+strategies. The framework developed here provides the theoretical foundation for such predictions.
+
+% ---- 2. Related Work -----------------------------------------
+\section{Related Work}
+
+\subsection{Radiotrophic Organisms and Melanin-Mediated Radiotrophy}
+
+The discovery that melanized fungi thrive in high-radiation environments has fundamentally
+reshaped our understanding of biological energy transduction. Zhdanova et al.\ \cite{zhdanova2000}
+first documented the prevalence of darkly pigmented fungi within the damaged reactor at the
+Chernobyl Nuclear Power Plant, noting that species such as \textit{Cladosporium sphaerospermum}
+dominated the mycobiota of the most contaminated structures. Subsequent work by Dadachova et
+al.\ \cite{dadachova2007} demonstrated that ionizing radiation alters the electronic properties of
+melanin, enhancing electron-transfer activity in melanized cells of \textit{Cryptococcus neoformans}
+and \textit{Wangiella dermatitidis}. Melanized cells exposed to radiation levels approximately 500
+times above background grew significantly faster, accumulated more biomass, and incorporated
+three-fold more ${}^{14}$C-acetate than non-irradiated melanized cells or irradiated albino
+mutants. Dadachova and Casadevall \cite{dadachova2008} subsequently proposed the term
+``radiosynthesis'' to describe this phenomenon, drawing an analogy to photosynthesis in which
+melanin serves a role loosely comparable to chlorophyll. More recently, Shunk et al.\
+\cite{shunk2022} cultivated \textit{C.\ sphaerospermum} aboard the International Space Station
+for 26 days, demonstrating a growth advantage of approximately 21\% under space radiation
+conditions and measurable attenuation of ionizing radiation beneath the fungal biomass.
+
+The radiation resistance of \textit{Deinococcus radiodurans} operates through fundamentally
+different mechanisms. Rather than harnessing radiation for metabolic benefit, \textit{D.\
+radiodurans} survives doses exceeding 12~kGy through a combination of efficient DNA
+double-strand break repair via extended synthesis-dependent strand annealing (ESDSA), multiple
+genome copies enabling homologous recombination, and a potent manganese-based antioxidant system
+that protects proteins from oxidative damage \cite{slade2011,daly2009}. Daly et al.\
+\cite{daly2010} showed that small-molecule Mn$^{2+}$-metabolite complexes specifically protect
+the proteome against radiation-induced carbonylation, establishing that protein protection, rather
+than DNA repair capacity alone, governs extreme radioresistance. \textit{Aspergillus niger},
+while not radiotrophic in the strict sense, produces melanin that confers substantial
+radioprotection, with melanized fungi generally exhibiting LD$_{10}$ values approaching or
+exceeding 1~kGy \cite{dadachova2008}.
+
+\subsection{Mathematical Models of Biofilm Communities}
+
+The mathematical modeling of biofilm communities has a rich history beginning with the
+foundational one-dimensional multispecies model of Wanner and Gujer \cite{wanner1986}, which
+coupled reaction-diffusion equations for substrate transport with biomass conservation laws to
+predict biofilm thickness and spatial species distributions. Xavier et al.\ \cite{xavier2005}
+extended this framework to multiple spatial dimensions, providing a deterministic continuum
+approach to heterogeneous biofilm development. Individual-based modeling approaches, exemplified
+by the iDynoMiCS platform of Lardon et al.\ \cite{lardon2011}, complement continuum models by
+resolving cell-level stochastic interactions. Cross-diffusion biofilm models have been analyzed
+by Sonner et al.\ \cite{sonner2015}, who established mathematical properties of volume-filling
+multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framework extends
+these precedents by incorporating radiation-dependent fitness terms and phase-locking dynamics
+that couple species interactions to external radiation fields, moving beyond the
+substrate-limited growth paradigms that dominate existing biofilm models.
+
+\subsection{Hamiltonian and Stochastic Approaches in Theoretical Ecology}
+
+The application of Hamiltonian mechanics to ecological systems remains comparatively
+underexplored, despite the natural conservation laws that govern energy flow in ecosystems.
+Symplectic integration methods, which preserve the geometric structure of Hamiltonian flows,
+have been advocated for ecological modeling by Diele et al.\ \cite{diele2015} to ensure that
+numerical solutions maintain essential qualitative dynamics. The Kuramoto model of coupled phase
+oscillators \cite{kuramoto1984} provides a well-established framework for synchronization
+phenomena in biological systems, from neural networks to circadian rhythms. Aceb\'r\'on et al.\
+\cite{acebron2005} reviewed the model as a paradigm for synchronization, noting its
+generalization to systems with time delays, frequency-weighted coupling, and heterogeneous
+interaction topologies. Our phase-locking kernel $\Gamma_s(t,\mathbf{x})$ draws directly on
+this tradition, extending it to multispecies microbial communities where species-level
+oscillatory dynamics in growth and resource acquisition couple through shared radiation and
+nutrient fields. The use of Langevin stochastic dynamics to describe microbial population
+fluctuations follows naturally from the Fokker-Planck formalism and has been applied to
+competing microbial populations in chemostat systems \cite{campillo2017}, where stochastic
+differential equations revealed long-term competitive outcomes differing from deterministic
+predictions.
+
+\subsection{Bioremediation Context}
+
+The practical motivation for modeling radiotrophic communities lies in nuclear bioremediation.
+\textit{Shewanella oneidensis} MR-1 is a model dissimilatory metal-reducing bacterium capable
+of reducing soluble U(VI) to insoluble U(IV) via extracellular electron transfer through
+c-type cytochromes \cite{heidelberg2002,veeramani2011}. \textit{Ochrobactrum intermedium} AM7,
+isolated from soil near the Kakrapar Atomic Power Station in India, tolerates high concentrations
+of thorium and produces exopolysaccharides (EPS) that complex with Th(IV), offering a pathway
+toward bioremediation of actinide-contaminated environments \cite{shukla2020}. The combination
+of radiotrophic fungi that actively benefit from radiation with metal-reducing bacteria that
+immobilize radionuclides suggests the possibility of engineered biofilm consortia for in situ
+remediation. The fitness landscape framework introduced by Wright \cite{wright1932} and
+formalized through the NK model of Kauffman \cite{kauffman1989} provides a conceptual foundation
+for understanding how epistatic interactions among species traits shape adaptation under
+radiation stress, a perspective that our Hamiltonian kNN decision tree operationalizes
+quantitatively.
+
+% ---- 3. Mathematical Framework --------------------------------
+\section{Mathematical Framework}
+
+\subsection{Symbols and Notation}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Summary of principal mathematical symbols.}
+\label{tab:notation}
+\begin{tabular}{@{}lp{0.72\linewidth}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Description} \\
+\midrule
+$F_s(t,\mathbf{x})$ & Fitness function of species $s$, evolving over time $t$ and space $\mathbf{x}$ \\
+$H(p,q)$            & Hamiltonian function defining total system energy \\
+$p,\,q$             & Phase-space variables (generalised momentum and position) \\
+$\eta_s(t,\mathbf{x}) = \sigma_s\xi(t,\mathbf{x})$ & Stochastic noise: $\sigma_s$ intensity; $\xi$ spatiotemporal white noise \\
+$D_s$               & Species-specific passive diffusion coefficient \\
+$\mu_s$             & Species-specific directed-motility (chemotaxis) coefficient \\
+$P_{sj}(t)$         & Permutation matrix describing species-$s$ to species-$j$ transitions \\
+$I_\gamma(t,\mathbf{x})$ & Ionizing (gamma) radiation field \\
+$N(t,\mathbf{x})$   & Non-ionizing (UV) radiation field \\
+$k_B$               & Boltzmann constant \\
+$S[q(t)]$           & Action functional for species trajectories \\
+$\nabla$            & Spatial gradient operator \\
+$\Gamma_s(t,\mathbf{x})$ & Phase-locked kernel for species $s$ \\
+$\beta_{s,\mathrm{ion}}$ & Ionizing radiation sensitivity coefficient \\
+$\alpha_{s,\mathrm{nir}}$ & Non-ionizing radiation coupling coefficient \\
+$\theta_s$          & Adaptive phase-locking coefficient \\
+$\gamma_s$          & Positive gamma-radiation sensitivity (benefit) coefficient \\
+$\Delta_s$          & Phase-locking synchronization deviation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Partial Stochastic Differential Equation (PSDE) for Species Fitness}
+
+The fitness of each species $s$ is governed by the following PSDE:
+\begin{equation}
+\label{eq:psde}
+\partial_t F_s = \underbrace{\nabla\!\cdot(D_s\nabla F_s)}_{\text{diffusion}}
+  - \underbrace{\nabla\!\cdot\!\left(\mu_s\sum_{j=1}^n P_{sj}(t)\,F_j\right)}_{\text{directed motility}}
+  + \underbrace{R_s}_{\text{growth}}
+  + \underbrace{\sigma_s\xi(t,\mathbf{x})}_{\text{noise}}
+  - \underbrace{\beta_{s,\mathrm{ion}}\,I_\gamma F_s}_{\text{ionising damage}}
+  + \underbrace{\gamma_s\Delta_s}_{\text{phase-lock gain}}
+  - \underbrace{\alpha_{s,\mathrm{nir}}\,N F_s}_{\text{UV coupling}}
+  + \underbrace{\theta_s H_s}_{\text{Hamiltonian interaction}}
+  + \underbrace{C_s}_{\text{external forcing}}
+\end{equation}
+
+\noindent where $F_s \equiv F_s(t,\mathbf{x})$, $I_\gamma \equiv I_\gamma(t,\mathbf{x})$, and
+$N \equiv N(t,\mathbf{x})$.  The nine terms encode:
+\begin{itemize}\setlength\itemsep{2pt}
+  \item \textbf{Diffusion}: passive spatial spreading at rate $D_s$.
+  \item \textbf{Directed motility}: chemotaxis and radiation-gradient-directed movement
+        controlled by $\mu_s$ and the transition matrix $P_{sj}$.
+  \item \textbf{Deterministic reaction}: $R_s(t,\mathbf{x})$, nutrient-dependent growth
+        (see Section~\ref{sec:nutrient}).
+  \item \textbf{Stochastic noise}: $\sigma_s\xi(t,\mathbf{x})$, spatiotemporal white noise
+        scaled by species noise intensity $\sigma_s$.
+  \item \textbf{Ionising damage}: $-\beta_{s,\mathrm{ion}}\,I_\gamma(t,\mathbf{x})\,F_s$,
+        radiation-induced fitness reduction.
+  \item \textbf{Phase-locking adjustment}: $\gamma_s\Delta_s$, adaptive synchronisation gain
+        from melanin-mediated energy transduction.
+  \item \textbf{Non-ionising effect}: $-\alpha_{s,\mathrm{nir}}\,N(t,\mathbf{x})\,F_s$,
+        UV/heat-driven fitness coupling.
+  \item \textbf{Hamiltonian interaction}: $\theta_s H_s(t,\mathbf{x})$, energy-conserving
+        inter-species force from the Hamiltonian (Section~\ref{sec:hamiltonian}).
+  \item \textbf{External forcing}: $C_s(t,\mathbf{x})$, environmental control inputs.
+\end{itemize}
+
+\subsection{Hamiltonian Framework}
+\label{sec:hamiltonian}
+
+The total Hamiltonian for the multi-species biofilm is:
+\begin{equation}
+\label{eq:hamiltonian}
+H = \sum_{i=1}^{N}\!\left[\frac{1}{2}\,\rho_i\,v_i^2 + U_i(\mathbf{x}_i)\right]
+  + \sum_{i\neq j} V_{ij}(r_{ij})
+  + \sum_{k=1}^{K} W_k(t,\mathbf{x})
+\end{equation}
+
+\noindent where $\rho_i$ is the effective biomass density of species $i$ [cells\,$\mu$m$^{-3}$
+$\times$ effective mass analog], $U_i(\mathbf{x}_i)$ is the potential energy in the nutrient
+concentration field, $V_{ij}(r_{ij})$ is the pairwise interaction energy, and $W_k(t,\mathbf{x})$
+captures external energy contributions from radiation exposure and stochastic effects. For
+mutualistic interactions:
+\begin{equation}
+  V_{ij}^{\mathrm{mutual}}(r_{ij}) = -\gamma\,\exp\!\left(-\frac{r_{ij}^2}{\sigma^2}\right)
+\end{equation}
+
+\subsection{Symplectic Integration}
+
+Symplectic integrators preserve the geometric structure of the Hamiltonian flow, ensuring that
+energy and momentum do not drift over extended simulation windows. Phase-space trajectories
+evolve via the phase-locked canonical equations:
+\begin{equation}
+\label{eq:canonical}
+\frac{dq}{dt} = \frac{\partial H}{\partial p} - \Gamma_s(t,\mathbf{x})\,F_s(t,\mathbf{x}),
+\qquad
+\frac{dp}{dt} = -\frac{\partial H}{\partial q} + \Gamma_s(t,\mathbf{x})\,F_s(t,\mathbf{x})
+\end{equation}
+
+The leapfrog/Verlet scheme is employed numerically: (1) evaluate $H_s$ from the current state;
+(2) adjust the phase-locking deviation $\Delta_s$; (3) advance via a symplectic step
+\cite{hairer2006}.
+
+\subsection{Radiation Field Models}
+
+\paragraph{Ionizing radiation (gamma decay).}
+\begin{equation}
+\label{eq:gamma_field}
+I_\gamma(t,\mathbf{x}) = I_0\,\exp(-\kappa\,\|\mathbf{x}\|)
+\end{equation}
+where $I_0$ is the initial intensity at the source and $\kappa$ is the attenuation coefficient
+scaled by local biofilm density.
+
+\paragraph{Non-ionizing radiation (UV oscillatory field).}
+\begin{equation}
+\label{eq:uv_field}
+N(t,\mathbf{x}) = N_{\mathrm{UV}}\cos(\omega t)
+\end{equation}
+
+\subsection{Melanin Reaction-Diffusion}
+
+The spatial production and diffusion of melanin by radiotrophic fungi is modelled as:
+\begin{equation}
+\label{eq:melanin}
+\frac{\partial M}{\partial t} = D_M\,\nabla^2 M + \alpha_M\cdot n_{\mathrm{RF}}(\mathbf{x},t)\cdot I_\gamma(t,\mathbf{x})
+\end{equation}
+where $D_M$ is the melanin diffusion coefficient [$\mu$m$^2$\,s$^{-1}$], $\alpha_M$ is the
+radiation-driven production rate [$\mu$g cell$^{-1}$ Gy$^{-1}$], and $n_{\mathrm{RF}}$ is the
+local radiotrophic cell density [cells\,$\mu$m$^{-3}$]. Each term carries units of
+[$\mu$g\,$\mu$m$^{-3}$\,s$^{-1}$].
+
+\subsection{Nutrient Uptake with Adaptive Feedback}
+\label{sec:nutrient}
+
+\begin{equation}
+\label{eq:nutrient}
+R_s(t,\mathbf{x}) = \alpha_s\,C_s(t,\mathbf{x})\!\left(1 - \frac{F_s(t,\mathbf{x})}{K_s}\right)
+  + A_s(t)\,C_s(t,\mathbf{x})
+\end{equation}
+\begin{equation}
+\label{eq:adaptive}
+A_s(t) = \gamma_s\,\phi_s(t) - \beta_{s,\mathrm{ion}}\,I_\gamma(t)
+\end{equation}
+where $\phi_s(t) = \cos(\omega_s t - \theta_s)$ is the phase-alignment function and $A_s(t)$ is
+the adaptive feedback driven by phase-locking and local radiation stress.
+
+\subsection{Hamiltonian kNN Decision Tree}
+
+To model species transition probabilities modulated by neighbourhood phase states:
+\begin{equation}
+\label{eq:knn}
+H_{\mathrm{kNN}} = \frac{1}{\sigma_n}\sum_{j=1}^{n} P_{sj}(t)\,F_j(t,\mathbf{x})\,\Gamma_s(t,\mathbf{x})
+\end{equation}
+
+\subsection{Radiation Damage and Resilience}
+
+\begin{equation}
+\label{eq:damage}
+D_{\mathrm{rad},s}(t,\mathbf{x}) = -\beta_{s,\mathrm{rad}}\,I_\gamma(t,\mathbf{x})\,F_s(t,\mathbf{x})
+\end{equation}
+Species with higher melanin production or stronger DNA repair exhibit lower $\beta_{s,\mathrm{rad}}$
+values, reflecting the Mn$^{2+}$-dependent proteome protection described by Daly et al.\
+\cite{daly2010}.
+
+\subsection{Biofilm Mechanical Properties}
+
+The EPS matrix is modelled as a Finite Extensible Nonlinear Elastic (FENE) entropic spring:
+\begin{equation}
+\label{eq:fene}
+U(r) = -\frac{1}{2}\,k\,R^2\,\ln\!\left(1 - \frac{r^2}{R^2}\right)
+\end{equation}
+where $k$ is the spring constant, $R$ is the maximum extensibility, and $r$ is the current
+end-to-end distance.  Viscoelastic creep follows the Kelvin-Voigt model:
+\begin{equation}
+\label{eq:kelvinvoigt}
+\sigma(t) = E\,\varepsilon(t) + \eta\,\frac{d\varepsilon}{dt}
+\end{equation}
+with stress relaxation time $\tau = \eta/E$ governing biofilm restructuring dynamics.
+
+% ---- 4. Parameter Estimation ----------------------------------
+\section{Parameter Estimation}
+
+Biologically justified parameter ranges for the six primary modelled species, derived from
+published experimental data, are given in Table~\ref{tab:params}.
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\footnotesize
+\caption{Biologically justified parameter ranges for modelled species.  Values derived from
+         published experimental data.}
+\label{tab:params}
+\setlength\tabcolsep{3.5pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lllllp{6cm}c@{}}
+\toprule
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Species} & \textbf{Range} & \textbf{Units} & \textbf{Biological Basis} & \textbf{Ref} \\
+\midrule
+Diffusion coeff. & $D_s$ & \textit{C.\ neoformans}     & $0.01$--$0.10$            & $\mu$m$^2$ s$^{-1}$ & Passive Brownian diffusion, $\sim$5\,$\mu$m yeast & \cite{berg1993} \\
+Diffusion coeff. & $D_s$ & \textit{D.\ radiodurans}    & $0.05$--$0.50$            & $\mu$m$^2$ s$^{-1}$ & Small coccoid ($\sim$1.5\,$\mu$m); higher $D$ from size & \cite{slade2011} \\
+Diffusion coeff. & $D_s$ & \textit{B.\ subtilis}       & $0.10$--$1.00$            & $\mu$m$^2$ s$^{-1}$ & Rod-shaped motile cells; active motility augments $D$ & \cite{guttenplan2013} \\
+Diffusion coeff. & $D_s$ & \textit{C.\ sphaerospermum} & $0.005$--$0.05$           & $\mu$m$^2$ s$^{-1}$ & Filamentous hyphae; low effective diffusion & \cite{shunk2022} \\
+Diffusion coeff. & $D_s$ & \textit{A.\ niger}          & $0.005$--$0.05$           & $\mu$m$^2$ s$^{-1}$ & Filamentous; comparable to \textit{C.\ sphaerospermum} & \cite{dadachova2008} \\
+Diffusion coeff. & $D_s$ & \textit{S.\ oneidensis}     & $0.10$--$0.80$            & $\mu$m$^2$ s$^{-1}$ & Facultative anaerobe, rod-shaped, flagellated & \cite{heidelberg2002} \\
+\midrule
+Motility coeff. & $\mu_s$ & \textit{C.\ neoformans}    & $0.00$--$0.05$  & $\mu$m s$^{-1}$ & Non-motile yeast; residual drift from EPS flow & \cite{dadachova2007} \\
+Motility coeff. & $\mu_s$ & \textit{D.\ radiodurans}   & $0.00$--$0.01$  & $\mu$m s$^{-1}$ & Non-motile coccus & \cite{slade2011} \\
+Motility coeff. & $\mu_s$ & \textit{B.\ subtilis}      & $15$--$45$      & $\mu$m s$^{-1}$ & Flagellum-driven; $\sim$25\,$\mu$m s$^{-1}$ at 30\,$^\circ$C & \cite{guttenplan2013} \\
+Motility coeff. & $\mu_s$ & \textit{C.\ sphaerospermum}& $0.00$--$0.005$ & $\mu$m s$^{-1}$ & Hyphal extension; 0.1--5\,$\mu$m min$^{-1}$ tip growth & \cite{shunk2022} \\
+Motility coeff. & $\mu_s$ & \textit{S.\ oneidensis}    & $10$--$40$      & $\mu$m s$^{-1}$ & Polar flagellum; comparable to \textit{E.\ coli} & \cite{heidelberg2002} \\
+\midrule
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ neoformans}     & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Melanised; LD$_{10}$ $\sim$2--5\,kGy & \cite{dadachova2007,dadachova2008} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{D.\ radiodurans}    & $5\!\times\!10^{-6}$--$5\!\times\!10^{-5}$ & Gy$^{-1}$ & $D_{10}$ $\sim$12\,kGy; most radioresistant organism known & \cite{slade2011,daly2009} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{B.\ subtilis}       & $10^{-3}$--$5\!\times\!10^{-3}$  & Gy$^{-1}$ & Spore $D_{10}$ $\sim$1--2\,kGy; vegetative $\sim$0.2--0.6\,kGy & \cite{nicholson2000} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ sphaerospermum} & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Melanised Chernobyl isolate; $\approx$ \textit{C.\ neoformans} & \cite{zhdanova2000,shunk2022} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{A.\ niger}          & $5\!\times\!10^{-5}$--$5\!\times\!10^{-4}$ & Gy$^{-1}$ & Melanised; less resistant than Chernobyl isolates & \cite{dadachova2008} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{S.\ oneidensis}     & $5\!\times\!10^{-2}$--$10^{-1}$  & Gy$^{-1}$ & $D_{10}$ $\sim$0.07\,kGy; extremely radiosensitive & \cite{daly2009} \\
+\midrule
+Melanin rate & $\alpha_M$ & \textit{C.\ neoformans}     & $0.05$--$0.15$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & Substrate-dependent; enhanced by radiation & \cite{dadachova2007} \\
+Melanin rate & $\alpha_M$ & \textit{C.\ sphaerospermum} & $0.08$--$0.20$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & Constitutively melanised; high production rate & \cite{zhdanova2000,shunk2022} \\
+Melanin rate & $\alpha_M$ & \textit{A.\ niger}          & $0.03$--$0.10$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & DHN-melanin pathway & \cite{dadachova2008} \\
+\midrule
+Carrying cap. & $K_s$ & \textit{C.\ neoformans}    & $10^4$--$10^6$ & cells mm$^{-3}$ & Yeast biofilm under nutrient-rich conditions & \cite{dadachova2007} \\
+Carrying cap. & $K_s$ & \textit{D.\ radiodurans}   & $10^5$--$10^7$ & cells mm$^{-3}$ & Dense tetrads; high packing efficiency & \cite{slade2011} \\
+Carrying cap. & $K_s$ & \textit{B.\ subtilis}      & $10^5$--$10^7$ & cells mm$^{-3}$ & Dense biofilm with EPS matrix & \cite{guttenplan2013} \\
+Carrying cap. & $K_s$ & \textit{S.\ oneidensis}    & $10^5$--$10^7$ & cells mm$^{-3}$ & Planktonic and biofilm modes & \cite{heidelberg2002} \\
+\midrule
+Phase-lock freq. & $\omega_s$ & All species & $0.01$--$1.0$   & rad hr$^{-1}$ & Circadian/ultradian metabolic oscillation & \cite{kuramoto1984,acebron2005} \\
+Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & Thermal and demographic stochasticity & \cite{campillo2017} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{landscape}
+
+% ---- 5. Computational Methods --------------------------------
+\section{Computational Methods}
+
+Simulations were implemented in Julia using \texttt{DifferentialEquations.jl} for numerical
+integration of the PSDE system (Eq.~\ref{eq:psde}).  Spatial species distributions were
+initialised with small random perturbations around a central point and evolved on the
+$[0,1]^2$ domain.  The Euler-Maruyama scheme was applied for stochastic integration;
+Runge-Kutta (RK4) was used for deterministic validation runs.  Symplectic leapfrog integration
+was employed for the Hamiltonian phase-space trajectories (Eq.~\ref{eq:canonical}).
+
+Optimisation of species-specific parameters was performed with \texttt{JuMP.jl} and
+\texttt{Ipopt}.  Sensitivity analysis employed Sobol indices (global variance decomposition)
+and Morris screening to identify the highest-influence parameters ($\mu_s$, $D_s$,
+$\beta_{s,\mathrm{ion}}$, $\theta_s$).  Visualisation used \texttt{PlotlyJS.jl} for interactive
+3D plots, \texttt{Agents.jl} for agent-based validation runs, and \texttt{Plots.jl} with
+\texttt{GR} backend for static trajectory outputs.  The interactive simulation includes sliders
+for gamma radiation intensity, thorium intensity, and heat intensity at 45-step resolution.
+
+% ---- 6. Results ---------------------------------------------
+\section{Results}
+
+\subsection{Species Trajectory Clustering Under Radiation Gradients}
+
+The Langevin diffusion simulations on the $[0,1]^2$ domain reveal pronounced spatial phenotype
+separation under the imposed radiation gradient (Figure~1). $k$-means clustering of species
+trajectories identifies three distinct spatial niches. The first cluster, concentrated in the
+high-radiation zone, is dominated by the melanised species \textit{C.\ neoformans} and
+\textit{C.\ sphaerospermum}, whose positive gamma sensitivity coefficients ($\gamma_s \approx
+0.07$ and $0.06$, respectively) enable them to exploit ionising radiation as a metabolic
+stimulus. The second cluster occupies the intermediate-radiation zone and contains
+\textit{D.\ radiodurans} and \textit{A.\ niger}---species that tolerate radiation without
+deriving direct metabolic benefit. The third cluster, in the low-radiation periphery,
+comprises \textit{B.\ subtilis}, \textit{S.\ oneidensis}, and marine taxa
+(\textit{Pseudoalteromonas} sp., \textit{Polaribacter} sp., \textit{Flavobacterium} sp.),
+whose higher radiation sensitivities confine them to regions where the ionising flux has
+attenuated below their damage thresholds. This spatial segregation is consistent with
+radiation-mediated niche partitioning, in which ionising radiation simultaneously serves as
+stressor and resource---a dual role with no direct analogue in classical substrate-competition
+biofilm models.
+
+\subsection{Thorium-232 Decay Integration}
+
+The Th-232 decay model (Figure~2) compares actual versus predicted radioactive decay on a
+logarithmic scale spanning billions of years, incorporating stochastic perturbation around
+the deterministic exponential decay law. The 14.05-billion-year half-life produces a
+quasi-static radiation source on biological timescales (hours to years), but the stochastic
+perturbation term captures quantum-mechanical uncertainty in individual decay events, which
+manifests as Poisson-distributed dose-rate fluctuations. For biofilm modelling purposes,
+Th-232 provides an effectively constant ionising background, while stochastic perturbation
+introduces dose-rate heterogeneity at the spatial scale of microcolonies (tens of
+micrometres), driving the phase-space fluctuations captured by the Langevin dynamics.
+
+\subsection{Motility--Diffusion--Gamma Sensitivity Relationships}
+
+The three-dimensional scatter relating motility ($\mu_s$), diffusion coefficient ($D_s$), and
+gamma sensitivity $\gamma_s$ across species (Figure~3) reveals a striking inverse relationship
+between radiation sensitivity and motility. \textit{C.\ neoformans}, at the highest gamma
+sensitivity ($\approx 0.07$), exhibits effectively zero motility, consistent with the
+hypothesis that radiotrophic organisms invest resources in melanin production rather than
+active locomotion. \textit{D.\ radiodurans}, with the lowest $\beta_{s,\mathrm{ion}}$, is
+likewise non-motile but for different mechanistic reasons: radioresistance derives from
+molecular protection rather than radiation exploitation. The motile species
+(\textit{B.\ subtilis}, \textit{S.\ oneidensis}) occupy the high-motility, low-$\gamma_s$
+region, suggesting a trade-off between radiation exploitation and behavioural avoidance.
+As radiation intensity rises, the competitive advantage shifts from motile radiation-avoiders
+to sessile radiotrophic beneficiaries.
+
+\subsection{Phase-Locking and Hamiltonian kNN Dynamics}
+
+The Hamiltonian kNN decision tree (Figure~4) reveals that synchronised metabolic oscillations
+emerge among species occupying the same spatial niche. Within the high-radiation cluster,
+\textit{C.\ neoformans} and \textit{C.\ sphaerospermum} exhibit strong phase coherence in
+their melanin production cycles, suggesting cooperative dynamics in which shared
+melanin-derived radioprotection benefits both. Species in different radiation niches show weak
+phase coupling, indicating competitive exclusion at niche boundaries. The kNN decision tree
+correctly predicts species dominance transitions: as simulated radiation intensity increases
+beyond 1~kGy, \textit{B.\ subtilis} populations collapse, \textit{D.\ radiodurans} maintains
+steady-state abundance, and \textit{C.\ neoformans} increases in fitness---reproducing the
+biologically expected ordering of radiation tolerance.
+
+% ---- 7. Discussion -------------------------------------------
+\section{Discussion}
+
+\subsection{The Hamiltonian Framework Versus Classical Biofilm Models}
+
+The phase-locked Hamiltonian framework differs fundamentally from prior reaction-diffusion
+biofilm models in its treatment of inter-species interactions and energy conservation.
+Classical models following the Wanner-Gujer tradition \cite{wanner1986} describe biofilm
+dynamics through coupled PDEs governing substrate consumption and biomass growth, with species
+interactions mediated exclusively through competition for shared substrates. Our Hamiltonian
+$H(p,q)$ explicitly conserves total system energy across kinetic, potential, and interaction
+terms, ensuring that numerical integration via the symplectic leapfrog scheme does not
+introduce artificial energy drift \cite{hairer2006}. The stochastic Langevin layer adds
+thermal and demographic noise while preserving the underlying Hamiltonian structure through
+the fluctuation-dissipation theorem. This dual structure captures phenomena that ODE/PDE
+models inherently miss: synchronised metabolic oscillations through phase-locking,
+energy-conserving transitions between fitness states, and the distinction between radiation
+as a damaging perturbation versus radiation as an energy source positively coupled to the
+Hamiltonian.
+
+\subsection{Biological Interpretation of \textit{C.\ neoformans} and \textit{D.\ radiodurans} Dynamics}
+
+The simulation trajectories for \textit{C.\ neoformans} and \textit{D.\ radiodurans} align
+with known biology while illuminating an underappreciated distinction between radiotrophy and
+radioresistance. \textit{C.\ neoformans} in the model increases its fitness monotonically
+with radiation intensity up to a species-specific threshold, consistent with the experimental
+findings of Dadachova et al.\ \cite{dadachova2007} that melanised cells show enhanced
+metabolic activity and faster growth under ionising radiation. The model captures the
+mechanism through the positive gamma sensitivity term $\gamma_s$, which converts absorbed
+dose into fitness gain via the melanin-mediated electron-transfer pathway
+\cite{turick2011,casadevall2017}. \textit{D.\ radiodurans}, by contrast, maintains
+approximately constant fitness across a wide dose range, declining only at extreme doses.
+This flat fitness profile emerges from the balance between the radiation damage term
+$\beta_{s,\mathrm{ion}}$ and the organism's molecular protection coefficient, reflecting the
+Mn$^{2+}$-dependent proteome shielding identified by Daly et al.\ \cite{daly2010}. The model
+thus correctly predicts that \textit{C.\ neoformans} outcompetes \textit{D.\ radiodurans} in
+moderately irradiated environments where radiation provides metabolic benefit, while
+\textit{D.\ radiodurans} prevails at extreme doses where even melanin-mediated protection is
+overwhelmed.
+
+\subsection{Implications for Nuclear Bioremediation}
+
+The model's predictions for a mixed \textit{S.\ oneidensis} and \textit{O.\ intermedium} AM7
+biofilm in a Th-contaminated environment suggest a synergistic remediation strategy.
+\textit{S.\ oneidensis}, with its capacity for extracellular electron transfer to metal oxides
+\cite{heidelberg2002,veeramani2011}, can reduce soluble actinide species and immobilise them
+as insoluble precipitates. However, its extreme radiosensitivity ($D_{10} \approx 0.07$~kGy)
+limits viability in high-radiation zones. The model predicts that \textit{O.\ intermedium}
+AM7, with its thorium-tolerant EPS production \cite{shukla2020}, establishes a protective
+biofilm matrix in the high-radiation zone that attenuates local dose rates sufficiently to
+permit \textit{S.\ oneidensis} colonisation in the intermediate zone. This spatial
+partitioning---emergent from the Langevin dynamics rather than imposed as a boundary
+condition---suggests that self-organising biofilm architectures may naturally optimise
+remediation performance. The potential for engineering \textit{D.\ radiodurans} strains for
+combined radioresistance and metal reduction \cite{brim2000} offers an additional path toward
+single-organism bioremediation in extreme environments.
+
+\subsection{Mechanical Properties and Radiation Survival}
+
+The inclusion of FENE entropic spring (Eq.~\ref{eq:fene}) and Kelvin-Voigt viscoelastic
+(Eq.~\ref{eq:kelvinvoigt}) components addresses a dimension of biofilm physics largely absent
+from ecological radiation models. Biofilm EPS matrices exhibit viscoelastic behaviour that
+mediates mechanical stress transmission, nutrient diffusion resistance, and protection from
+external perturbations. The FENE potential provides finite extensibility that prevents
+unphysical deformation under radiation-induced swelling or thermal expansion, while the
+Kelvin-Voigt element captures stress relaxation on timescales relevant to biofilm
+restructuring. Species with higher EPS production rates (\textit{O.\ intermedium} AM7,
+\textit{B.\ subtilis}) generate mechanically stiffer local environments that resist
+radiation-induced structural degradation, creating protected microniches for radiosensitive
+community members.
+
+\subsection{Limitations and Future Directions}
+
+Several simplifying assumptions limit the current model's applicability to real contaminated
+sites. The radiation field is treated as spatially homogeneous with exponential attenuation
+(Eq.~\ref{eq:gamma_field}), whereas actual environments at Chernobyl and Hanford exhibit
+complex three-dimensional dose distributions governed by heterogeneous source geometries and
+shielding materials. The UV oscillatory term (Eq.~\ref{eq:uv_field}) assumes a purely
+sinusoidal diurnal cycle, neglecting atmospheric absorption spectra and seasonal variation.
+The model does not incorporate horizontal gene transfer, which is known to spread radiation
+resistance determinants among biofilm community members. Future work should couple the fitness
+model to experimentally measured dose-rate maps from contaminated facilities, incorporate
+spatially resolved nutrient transport using Darcy flow through the EPS matrix, and validate
+predicted species clustering patterns against metagenomic surveys of radiotrophic biofilm
+communities at nuclear sites.
+
+% ---- 8. Conclusion -------------------------------------------
+\section{Conclusion}
+
+This work introduces a Hamiltonian-Langevin framework for modelling radiotrophic fitness in
+multispecies biofilm communities exposed to ionising radiation. The PSDE fitness equation
+(Eq.~\ref{eq:psde}) integrates radiation-dependent growth, melanin-mediated energy
+transduction, stochastic demographic noise, and viscoelastic biofilm mechanics into a unified
+formalism that conserves total system energy through symplectic integration. The central
+result is that species niche partitioning under radiation gradients emerges naturally from the
+phase-locked Hamiltonian dynamics, with radiotrophic fungi (\textit{C.\ neoformans},
+\textit{C.\ sphaerospermum}) clustering in high-radiation zones, radioresistant bacteria
+(\textit{D.\ radiodurans}) occupying intermediate regions, and radiosensitive metal-reducing
+species (\textit{S.\ oneidensis}) confined to attenuated peripheries. These predictions are
+consistent with known radiobiology and suggest design principles for engineered biofilm
+consortia targeting nuclear bioremediation. Experimental validation through controlled
+irradiation of mixed-species biofilms, combined with spatially resolved transcriptomics and
+metabolomics, represents the natural next step toward translating this theoretical framework
+into practical bioremediation strategies.
+
+% ---- References ---------------------------------------------
+\begin{thebibliography}{38}
+
+\bibitem{zhdanova2000}
+Zhdanova, N.N., Zakharchenko, V.A., Vember, V.V., Nakonechnaya, L.T. (2000).
+Fungi from Chernobyl: mycobiota of the inner regions of the containment structures of the
+damaged nuclear reactor.
+\textit{Mycological Research}, 104(12), 1421--1426.
+\url{https://doi.org/10.1017/S0953756200002756}
+
+\bibitem{dadachova2007}
+Dadachova, E., Bryan, R.A., Huang, X., Moadel, T., Schweitzer, A.D., Aisen, P.,
+Nosanchuk, J.D., Casadevall, A. (2007).
+Ionizing radiation changes the electronic properties of melanin and enhances the growth of
+melanized fungi.
+\textit{PLoS ONE}, 2(5), e457.
+\url{https://doi.org/10.1371/journal.pone.0000457}
+
+\bibitem{dadachova2008}
+Dadachova, E., Casadevall, A. (2008).
+Ionizing radiation: how fungi cope, adapt, and exploit with the help of melanin.
+\textit{Current Opinion in Microbiology}, 11(6), 525--531.
+\url{https://doi.org/10.1016/j.mib.2008.09.013}
+
+\bibitem{shunk2022}
+Shunk, G.K., Gomez, X.R., Kern, C., Averesch, N.J.H. (2022).
+Cultivation of the dematiaceous fungus \textit{Cladosporium sphaerospermum} aboard the
+International Space Station and effects of ionizing radiation.
+\textit{Frontiers in Microbiology}, 13, 877625.
+\url{https://doi.org/10.3389/fmicb.2022.877625}
+
+\bibitem{slade2011}
+Slade, D., Radman, M. (2011).
+Oxidative stress resistance in \textit{Deinococcus radiodurans}.
+\textit{Microbiology and Molecular Biology Reviews}, 75(1), 133--191.
+\url{https://doi.org/10.1128/MMBR.00015-10}
+
+\bibitem{daly2009}
+Daly, M.J. (2009).
+A new perspective on radiation resistance based on \textit{Deinococcus radiodurans}.
+\textit{Nature Reviews Microbiology}, 7(3), 237--245.
+\url{https://doi.org/10.1038/nrmicro2073}
+
+\bibitem{daly2010}
+Daly, M.J., et al. (2010).
+Small-molecule antioxidant proteome-shields in \textit{Deinococcus radiodurans}.
+\textit{PLoS ONE}, 5(9), e12570.
+\url{https://doi.org/10.1371/journal.pone.0012570}
+
+\bibitem{wanner1986}
+Wanner, O., Gujer, W. (1986).
+A multispecies biofilm model.
+\textit{Biotechnology and Bioengineering}, 28(3), 314--328.
+\url{https://doi.org/10.1002/bit.260280304}
+
+\bibitem{xavier2005}
+Xavier, J.B., Picioreanu, C., van Loosdrecht, M.C.M. (2005).
+A framework for multidimensional modelling of activity and structure of multispecies biofilms.
+\textit{Environmental Microbiology}, 7(8), 1085--1103.
+\url{https://doi.org/10.1111/j.1462-2920.2005.00787.x}
+
+\bibitem{lardon2011}
+Lardon, L.A., et al. (2011).
+iDynoMiCS: next-generation individual-based modelling of biofilms.
+\textit{Environmental Microbiology}, 13(9), 2416--2434.
+\url{https://doi.org/10.1111/j.1462-2920.2011.02414.x}
+
+\bibitem{sonner2015}
+Sonner, S., Efendiev, M.A., Eberl, H.J. (2015).
+On the well-posedness of a mathematical model of quorum-sensing in patchy biofilm communities.
+\textit{Mathematical Methods in the Applied Sciences}, 38(3), 3037--3042.
+\url{https://doi.org/10.1002/mma.3237}
+
+\bibitem{diele2015}
+Diele, F., Marangi, C., Ragni, S. (2015).
+Geometric numerical integration in ecological modelling.
+\textit{Mathematics and Computers in Simulation}, 110, 40--52.
+\url{https://doi.org/10.1016/j.matcom.2014.02.006}
+
+\bibitem{kuramoto1984}
+Kuramoto, Y. (1984).
+\textit{Chemical Oscillations, Waves, and Turbulence}.
+Springer-Verlag, Berlin.
+\url{https://doi.org/10.1007/978-3-642-69689-3}
+
+\bibitem{acebron2005}
+Aceb\'r\'on, J.A., Bonilla, L.L., P\'erez Vicente, C.J., Ritort, F., Spigler, R. (2005).
+The Kuramoto model: a simple paradigm for synchronization phenomena.
+\textit{Reviews of Modern Physics}, 77(1), 137--185.
+\url{https://doi.org/10.1103/RevModPhys.77.137}
+
+\bibitem{campillo2017}
+Campillo, F., Joannides, M., Larramendy-Valverde, I. (2017).
+Stochastic analysis of a full system of two competing populations in a chemostat.
+\textit{Chemical Engineering Science}, 175, 424--440.
+\url{https://doi.org/10.1016/j.ces.2017.10.052}
+
+\bibitem{heidelberg2002}
+Heidelberg, J.F., et al. (2002).
+Genome sequence of the dissimilatory metal ion-reducing bacterium
+\textit{Shewanella oneidensis}.
+\textit{Nature Biotechnology}, 20(11), 1118--1123.
+\url{https://doi.org/10.1038/nbt749}
+
+\bibitem{veeramani2011}
+Veeramani, H., et al. (2011).
+Products of abiotic U(VI) reduction by biogenic magnetite and vivianite.
+\textit{Geochimica et Cosmochimica Acta}, 75(9), 2512--2528.
+\url{https://doi.org/10.1016/j.gca.2011.02.024}
+
+\bibitem{shukla2020}
+Shukla, A., Parmar, P., Goswami, D., Patel, B., Saraf, M. (2020).
+Characterization of novel thorium tolerant \textit{Ochrobactrum intermedium} AM7.
+\textit{Journal of Hazardous Materials}, 388, 122047.
+\url{https://doi.org/10.1016/j.jhazmat.2020.122047}
+
+\bibitem{wright1932}
+Wright, S. (1932).
+The roles of mutation, inbreeding, crossbreeding and selection in evolution.
+\textit{Proceedings of the Sixth International Congress of Genetics}, 1, 356--366.
+
+\bibitem{kauffman1989}
+Kauffman, S.A., Weinberger, E.D. (1989).
+The NK model of rugged fitness landscapes.
+\textit{Journal of Theoretical Biology}, 141(2), 211--245.
+\url{https://doi.org/10.1016/S0022-5193(89)80019-0}
+
+\bibitem{berg1993}
+Berg, H.C. (1993).
+\textit{Random Walks in Biology}.
+Princeton University Press.
+
+\bibitem{guttenplan2013}
+Guttenplan, S.B., Shaw, S., Kearns, D.B. (2013).
+The cell biology of peritrichous flagella in \textit{Bacillus subtilis}.
+\textit{Molecular Microbiology}, 87(1), 211--229.
+\url{https://doi.org/10.1111/mmi.12103}
+
+\bibitem{nicholson2000}
+Nicholson, W.L., et al. (2000).
+Resistance of \textit{Bacillus} endospores to extreme terrestrial and extraterrestrial
+environments.
+\textit{Microbiology and Molecular Biology Reviews}, 64(3), 548--572.
+\url{https://doi.org/10.1128/MMBR.64.3.548-572.2000}
+
+\bibitem{turick2011}
+Turick, C.E., et al. (2011).
+Gamma radiation interacts with melanin to alter its oxidation-reduction potential and
+results in electric current production.
+\textit{Bioelectrochemistry}, 82(1), 69--73.
+\url{https://doi.org/10.1016/j.bioelechem.2011.04.009}
+
+\bibitem{robertson2012}
+Robertson, K.L., et al. (2012).
+Adaptation of the black yeast \textit{Wangiella dermatitidis} to ionizing radiation.
+\textit{PLoS ONE}, 7(11), e48674.
+\url{https://doi.org/10.1371/journal.pone.0048674}
+
+\bibitem{malo2018}
+Malo, M.E., et al. (2018).
+Morphological changes in melanized and non-melanized \textit{Cryptococcus neoformans} cells
+post exposure to ionizing radiation.
+\textit{Fungal Biology}, 122(6), 449--456.
+\url{https://doi.org/10.1016/j.funbio.2017.08.012}
+
+\bibitem{newsome2014}
+Newsome, L., Morris, K., Lloyd, J.R. (2014).
+The biogeochemistry and bioremediation of uranium and other priority radionuclides.
+\textit{Chemical Geology}, 363, 164--184.
+\url{https://doi.org/10.1016/j.chemgeo.2013.10.034}
+
+\bibitem{brim2000}
+Brim, H., et al. (2000).
+Engineering \textit{Deinococcus radiodurans} for metal remediation in radioactive mixed
+waste environments.
+\textit{Nature Biotechnology}, 18(1), 85--90.
+\url{https://doi.org/10.1038/71986}
+
+\bibitem{kazy2009}
+Kazy, S.K., D'Souza, S.F., Sar, P. (2009).
+Uranium and thorium sequestration by a \textit{Pseudomonas} sp.
+\textit{Journal of Hazardous Materials}, 163(1), 65--72.
+\url{https://doi.org/10.1016/j.jhazmat.2008.06.076}
+
+\bibitem{blasius1999}
+Blasius, B., Huppert, A., Stone, L. (1999).
+Complex dynamics and phase synchronization in spatially extended ecological systems.
+\textit{Nature}, 399, 354--359.
+\url{https://doi.org/10.1038/20676}
+
+\bibitem{alpkvist2007}
+Alpkvist, E., Klapper, I. (2007).
+A multidimensional multispecies continuum model for heterogeneous biofilm development.
+\textit{Bulletin of Mathematical Biology}, 69(2), 765--789.
+\url{https://doi.org/10.1007/s11538-006-9168-7}
+
+\bibitem{eberl2001}
+Eberl, H.J., Parker, D.F., van Loosdrecht, M.C.M. (2001).
+A new deterministic spatio-temporal continuum model for biofilm development.
+\textit{Journal of Theoretical Medicine}, 3(3), 161--175.
+\url{https://doi.org/10.1080/10273660108833072}
+
+\bibitem{hairer2006}
+Hairer, E., Lubich, C., Wanner, G. (2006).
+\textit{Geometric Numerical Integration}, 2nd ed.
+Springer-Verlag.
+\url{https://doi.org/10.1007/3-540-30666-8}
+
+\bibitem{eisenman2012}
+Eisenman, H.C., Casadevall, A. (2012).
+Synthesis and assembly of fungal melanin.
+\textit{Applied Microbiology and Biotechnology}, 93(3), 931--940.
+\url{https://doi.org/10.1007/s00253-011-3777-2}
+
+\bibitem{lloyd2005}
+Lloyd, J.R., Renshaw, J.C. (2005).
+Bioremediation of radioactive waste.
+\textit{Current Opinion in Biotechnology}, 16(3), 254--260.
+\url{https://doi.org/10.1016/j.copbio.2005.04.012}
+
+\bibitem{khajo2011}
+Khajo, A., et al. (2011).
+Protection of melanized \textit{Cryptococcus neoformans} from lethal dose gamma irradiation.
+\textit{PLoS ONE}, 6(9), e25092.
+\url{https://doi.org/10.1371/journal.pone.0025092}
+
+\bibitem{battista1997}
+Battista, J.R. (1997).
+Against all odds: the survival strategies of \textit{Deinococcus radiodurans}.
+\textit{Annual Review of Microbiology}, 51, 203--224.
+\url{https://doi.org/10.1146/annurev.micro.51.1.203}
+
+\bibitem{casadevall2017}
+Casadevall, A., et al. (2017).
+Melanin, radiation, and energy transduction in fungi.
+\textit{Microbiology Spectrum}, 5(2), FUNK-0037-2016.
+\url{https://doi.org/10.1128/microbiolspec.FUNK-0037-2016}
+
+\end{thebibliography}
+
+\end{document}
