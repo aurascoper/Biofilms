@@ -28,23 +28,23 @@ Biofilms/
 
 The fitness of each species $s$ is governed by a PSDE coupling diffusion, radiation, melanin-mediated energy transduction, and Hamiltonian inter-species forces:
 
-$$
-\partial_t F_s = \nabla\!\cdot(D_s \nabla F_s)
-  - \nabla\!\cdot\!\Bigl(\mu_s \sum_j P_{sj}(t)\,F_j\Bigr)
-  + R_s + \sigma_s \xi(t,\mathbf{x})
-  - \beta_{s,\text{ion}}\,I_\gamma F_s
-  + \gamma_s \Delta_s - \alpha_{s,\text{nir}}\,N F_s
-  + \theta_s H_s + C_s
-$$
+$$\begin{aligned}
+\partial_t F_s &= \nabla\!\cdot(D_s \nabla F_s)
+  \;{-}\; \nabla\!\cdot\!\Bigl(\mu_s \sum_j P_{sj}(t)\,F_j\Bigr) \\
+&\quad {+}\; R_s + \sigma_s \xi(t,\mathbf{x})
+  \;{-}\; \beta_{s,\text{ion}}\,I_\gamma F_s \\
+&\quad {+}\; \gamma_s \Delta_s
+  \;{-}\; \alpha_{s,\text{nir}}\,N F_s
+  \;{+}\; \theta_s H_s + C_s
+\end{aligned}$$
 
 The total multi-species Hamiltonian with mutualistic pairwise interaction:
 
-$$
-H = \sum_i \Bigl[\tfrac{1}{2}\rho_i v_i^2 + U_i(\mathbf{x}_i)\Bigr]
-  + \sum_{i \neq j} V_{ij}(r_{ij}) + \sum_k W_k(t,\mathbf{x}),
-\qquad
-V_{ij}^{\text{mutual}} = -\gamma \exp\!\Bigl(-\tfrac{r_{ij}^2}{\sigma^2}\Bigr)
-$$
+$$\begin{aligned}
+H &= \sum_i \Bigl[\tfrac{1}{2}\rho_i v_i^2 + U_i(\mathbf{x}_i)\Bigr]
+  + \sum_{i \neq j} V_{ij}(r_{ij}) + \sum_k W_k(t,\mathbf{x}) \\
+V_{ij}^{\text{mutual}} &= -\gamma \exp\!\Bigl(-\tfrac{r_{ij}^2}{\sigma^2}\Bigr)
+\end{aligned}$$
 
 Radiation field (Beer–Lambert, cylindrical source):
 
@@ -65,29 +65,20 @@ $$
 Contaminant ingress through the bioreactor membrane under radiation-driven permeability change is modeled by a coupled three-equation system (§3.9 of the preprint):
 
 **Mobile contaminant** (cylindrical reaction-diffusion):
-$$
-\frac{\partial c}{\partial t}
-  = \frac{1}{r}\frac{\partial}{\partial r}\!\Bigl(r\,D_\text{eff}\frac{\partial c}{\partial r}\Bigr)
-  - (k_\text{ads}X + k_\text{red}X_\text{red})\,c + k_\text{des}\,s
-$$
+
+$$\frac{\partial c}{\partial t} = \frac{1}{r}\frac{\partial}{\partial r}\!\Bigl(r\,D_\text{eff}\frac{\partial c}{\partial r}\Bigr) {-} (k_\text{ads}X {+} k_\text{red}X_\text{red})\,c + k_\text{des}\,s$$
 
 **Immobile phase** (biosorption + bioreduction):
-$$
-\frac{\partial s}{\partial t} = (k_\text{ads}X + k_\text{red}X_\text{red})\,c - (k_\text{des} + k_\text{loss})\,s
-$$
+
+$$\frac{\partial s}{\partial t} = (k_\text{ads}X + k_\text{red}X_\text{red})\,c - (k_\text{des} + k_\text{loss})\,s$$
 
 **Membrane damage** and radiation-driven permeability:
-$$
-\frac{dm}{dt} = -k_\text{dam}\,\dot{D}(R)\,m,
-\qquad
-P_\text{eff}(t) = P_0\,\exp\!\bigl(\alpha_P\,D_\text{cum}(t)\bigr)
-$$
+
+$$\frac{dm}{dt} = -k_\text{dam}\,\dot{D}(R)\,m, \qquad P_\text{eff}(t) = P_0\,\exp\!\bigl(\alpha_P\,D_\text{cum}(t)\bigr)$$
 
 **Robin boundary condition** at the membrane wall *r = R*:
-$$
--D_\text{eff}\left.\frac{\partial c}{\partial r}\right|_{r=R}
-  = P_\text{eff}(t)\,\bigl(c(R,t) - c_\text{ext}\bigr)
-$$
+
+$$-D_\text{eff}\left.\frac{\partial c}{\partial r}\right|_{r=R} = P_\text{eff}(t)\,\bigl(c(R,t) - c_\text{ext}\bigr)$$
 
 ---
 
