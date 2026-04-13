@@ -28,23 +28,21 @@ Biofilms/
 
 The fitness of each species $s$ is governed by a PSDE coupling diffusion, radiation, melanin-mediated energy transduction, and Hamiltonian inter-species forces:
 
-$$\begin{aligned}
-\partial_t F_s &= \nabla\!\cdot(D_s \nabla F_s)
-  \;{-}\; \nabla\!\cdot\!\Bigl(\mu_s \sum_j P_{sj}(t)\,F_j\Bigr) \\
-&\quad {+}\; R_s + \sigma_s \xi(t,\mathbf{x})
-  \;{-}\; \beta_{s,\text{ion}}\,I_\gamma F_s \\
-&\quad {+}\; \gamma_s \Delta_s
-  \;{-}\; \alpha_{s,\text{nir}}\,N F_s
-  \;{+}\; \theta_s H_s + C_s
-\end{aligned}$$
+$$
+\partial_t F_s = \nabla\cdot(D_s \nabla F_s) - \nabla\cdot\!\Bigl(\mu_s \sum_j P_{sj}(t)\,F_j\Bigr) + R_s + \sigma_s \xi(t,\mathbf{x}) - \beta_{s,\text{ion}}\,I_\gamma F_s + \gamma_s \Delta_s - \alpha_{s,\text{nir}}\,N F_s + \theta_s H_s + C_s
+$$
 
-The total multi-species Hamiltonian with mutualistic pairwise interaction:
+The total multi-species Hamiltonian:
 
-$$\begin{aligned}
-H &= \sum_i \Bigl[\tfrac{1}{2}\rho_i v_i^2 + U_i(\mathbf{x}_i)\Bigr]
-  + \sum_{i \neq j} V_{ij}(r_{ij}) + \sum_k W_k(t,\mathbf{x}) \\
-V_{ij}^{\text{mutual}} &= -\gamma \exp\!\Bigl(-\tfrac{r_{ij}^2}{\sigma^2}\Bigr)
-\end{aligned}$$
+$$
+H = \sum_i \Bigl[\tfrac{1}{2}\rho_i v_i^2 + U_i(\mathbf{x}_i)\Bigr] + \sum_{i \neq j} V_{ij}(r_{ij}) + \sum_k W_k(t,\mathbf{x})
+$$
+
+Mutualistic pairwise interaction potential:
+
+$$
+V_{ij}^{\text{mutual}} = -\gamma \exp\!\Bigl(-\tfrac{r_{ij}^2}{\sigma^2}\Bigr)
+$$
 
 Radiation field (Beer–Lambert, cylindrical source):
 
