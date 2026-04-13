@@ -27,6 +27,8 @@
 \usepackage{pdflscape}
 
 % --- Graphics & colour ----------------------------------------
+\usepackage{graphicx}
+\graphicspath{{figures/}}
 \usepackage{xcolor}
 \definecolor{linkblue}{RGB}{0,70,150}
 
@@ -245,18 +247,20 @@ $\Delta_s$          & Phase-locking synchronization deviation \\
 \subsection{Partial Stochastic Differential Equation (PSDE) for Species Fitness}
 
 The fitness of each species $s$ is governed by the following PSDE:
-\begin{equation}
-\label{eq:psde}
-\partial_t F_s = \underbrace{\nabla\!\cdot(D_s\nabla F_s)}_{\text{diffusion}}
-  - \underbrace{\nabla\!\cdot\!\left(\mu_s\sum_{j=1}^n P_{sj}(t)\,F_j\right)}_{\text{directed motility}}
-  + \underbrace{R_s}_{\text{growth}}
-  + \underbrace{\sigma_s\xi(t,\mathbf{x})}_{\text{noise}}
-  - \underbrace{\beta_{s,\mathrm{ion}}\,I_\gamma F_s}_{\text{ionising damage}}
-  + \underbrace{\gamma_s\Delta_s}_{\text{phase-lock gain}}
-  - \underbrace{\alpha_{s,\mathrm{nir}}\,N F_s}_{\text{UV coupling}}
-  + \underbrace{\theta_s H_s}_{\text{Hamiltonian interaction}}
-  + \underbrace{C_s}_{\text{external forcing}}
-\end{equation}
+\begin{align}
+\partial_t F_s
+  &= \nabla\!\cdot(D_s\nabla F_s)
+   - \nabla\!\cdot\!\left(\mu_s\sum_{j=1}^n P_{sj}(t)\,F_j\right)
+   + R_s
+   + \sigma_s\xi(t,\mathbf{x}) \notag \\
+  &\quad
+   - \beta_{s,\mathrm{ion}}\,I_\gamma F_s
+   + \gamma_s\Delta_s
+   - \alpha_{s,\mathrm{nir}}\,N F_s
+   + \theta_s H_s
+   + C_s
+  \label{eq:psde}
+\end{align}
 
 \noindent where $F_s \equiv F_s(t,\mathbf{x})$, $I_\gamma \equiv I_\gamma(t,\mathbf{x})$, and
 $N \equiv N(t,\mathbf{x})$.  The nine terms encode:
@@ -391,6 +395,68 @@ end-to-end distance.  Viscoelastic creep follows the Kelvin-Voigt model:
 \end{equation}
 with stress relaxation time $\tau = \eta/E$ governing biofilm restructuring dynamics.
 
+\subsection{Radiodialysis Membrane Transport}
+\label{sec:radiodialysis}
+
+To model contaminant ingress through the bioreactor membrane under radiation-driven
+permeability change, we introduce a minimal three-equation system coupling mobile
+contaminant transport, biosorption/bioreduction, and membrane structural damage.
+
+\paragraph{Mobile contaminant --- cylindrical reaction-diffusion.}
+The concentration $c(r,t)$ of a dissolved contaminant (e.g.\ aqueous U(VI), Cs$^+$) in the
+cylindrical biofilm domain satisfies:
+\begin{equation}
+\frac{\partial c}{\partial t}
+  = \frac{1}{r}\frac{\partial}{\partial r}\!\left(r\,D_{\mathrm{eff}}\frac{\partial c}{\partial r}\right)
+  - \bigl(k_{\mathrm{ads}}X + k_{\mathrm{red}}X_{\mathrm{red}}\bigr)\,c
+  + k_{\mathrm{des}}\,s
+\label{eq:mobile}
+\end{equation}
+where $D_{\mathrm{eff}}$ is the effective diffusivity through the EPS matrix,
+$k_{\mathrm{ads}}$ and $k_{\mathrm{red}}$ are the biosorption and bioreduction rate constants,
+$X$ and $X_{\mathrm{red}}$ are the total and metal-reducing biomass densities, and $s(r,t)$
+is the immobilised contaminant concentration (sorbed or reduced phase).
+Zero-flux symmetry is imposed at $r = 0$.
+
+\paragraph{Immobile phase --- biosorption and bioreduction.}
+\begin{equation}
+\frac{\partial s}{\partial t}
+  = \bigl(k_{\mathrm{ads}}X + k_{\mathrm{red}}X_{\mathrm{red}}\bigr)\,c
+  - \bigl(k_{\mathrm{des}} + k_{\mathrm{loss}}\bigr)\,s
+\label{eq:immobile}
+\end{equation}
+where $k_{\mathrm{loss}}$ accounts for precipitation, co-precipitation, or export of the
+immobilised fraction \cite{renslow2017}.
+
+\paragraph{Membrane damage and radiation-driven permeability.}
+Radiation progressively degrades membrane structural integrity $m(t) \in [0,1]$:
+\begin{equation}
+\frac{dm}{dt} = -k_{\mathrm{dam}}\,\dot{D}(R)\,m, \qquad m(0)=1
+\label{eq:membrane_damage}
+\end{equation}
+where $\dot{D}(R)$ is the absorbed dose rate at the membrane wall ($r=R$).
+The effective permeability $P_{\mathrm{eff}}$ evolves with cumulative dose
+$D_{\mathrm{cum}}(t) = \dot{D}(R)\cdot t$:
+\begin{equation}
+P_{\mathrm{eff}}(t) = P_0\,\exp\!\bigl(\alpha_P\,D_{\mathrm{cum}}(t)\bigr)
+\label{eq:peff}
+\end{equation}
+consistent with radiation-driven permeability enhancement observed in Nafion membranes under
+ionising flux \cite{lara2023}.
+
+\paragraph{Robin boundary condition at $r = R$.}
+The membrane couples interior concentration gradient to the external reservoir $c_{\mathrm{ext}}$:
+\begin{equation}
+-D_{\mathrm{eff}}\left.\frac{\partial c}{\partial r}\right|_{r=R}
+  = P_{\mathrm{eff}}(t)\,\bigl(c(R,t) - c_{\mathrm{ext}}\bigr)
+\label{eq:robin}
+\end{equation}
+This is analogous to Donnan dialysis through a charged membrane \cite{aydogan2022,fox2009},
+with the critical distinction that $P_{\mathrm{eff}}$ is not a fixed material property but an
+evolving field driven by cumulative radiation exposure --- a self-regulating mechanism in which
+the radiation that sustains the biofilm simultaneously widens the pathway for contaminant
+uptake.
+
 % ---- 4. Parameter Estimation ----------------------------------
 \section{Parameter Estimation}
 
@@ -398,7 +464,7 @@ Biologically justified parameter ranges for the six primary modelled species, de
 published experimental data, are given in Table~\ref{tab:params}.
 
 \begin{landscape}
-\begin{table}[p]
+\begin{table}[htbp]
 \centering
 \footnotesize
 \caption{Biologically justified parameter ranges for modelled species.  Values derived from
@@ -406,7 +472,8 @@ published experimental data, are given in Table~\ref{tab:params}.
 \label{tab:params}
 \setlength\tabcolsep{3.5pt}
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}lllllp{6cm}c@{}}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}p{2.1cm}lp{3.0cm}p{3.0cm}lp{5.2cm}c@{}}
 \toprule
 \textbf{Parameter} & \textbf{Symbol} & \textbf{Species} & \textbf{Range} & \textbf{Units} & \textbf{Biological Basis} & \textbf{Ref} \\
 \midrule
@@ -442,7 +509,7 @@ Carrying cap. & $K_s$ & \textit{S.\ oneidensis}    & $10^5$--$10^7$ & cells mm$^
 Phase-lock freq. & $\omega_s$ & All species & $0.01$--$1.0$   & rad hr$^{-1}$ & Circadian/ultradian metabolic oscillation & \cite{kuramoto1984,acebron2005} \\
 Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & Thermal and demographic stochasticity & \cite{campillo2017} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 \end{landscape}
 
@@ -463,6 +530,37 @@ $\beta_{s,\mathrm{ion}}$, $\theta_s$).  Visualisation used \texttt{PlotlyJS.jl} 
 3D plots, \texttt{Agents.jl} for agent-based validation runs, and \texttt{Plots.jl} with
 \texttt{GR} backend for static trajectory outputs.  The interactive simulation includes sliders
 for gamma radiation intensity, thorium intensity, and heat intensity at 45-step resolution.
+
+\paragraph{Cylindrical bioreactor geometry.}
+A complementary agent-based simulation was implemented in R using Shiny and
+\texttt{deSolve} \cite{soetaert2010}.  Seven species are placed inside a cylindrical bioreactor
+of radius $R$ and axial length $L$; Langevin dynamics with elastic wall reflection advance
+species positions under a Beer--Lambert gamma field $I_\gamma(r) = I_0\exp(-\kappa r)$.
+Nutrient enters radially from the outer wall; radiotrophic species experience an inward
+radiation attraction force; radiosensitive species are repelled outward.  The interactive
+interface exposes sliders for $I_0$, $\kappa$, outer-wall nutrient $C_0$, and thorium intensity.
+
+\paragraph{Cellular Potts Model (CPM).}
+The CPM was implemented in pure Julia on a $60^3$ cubic lattice with cylindrical wall
+boundary ($r > N/2$ sites frozen at $-1$) \cite{graner1992}.
+The Metropolis acceptance rule uses the five-term Hamiltonian
+$H_{\mathrm{CPM}} = H_{\mathrm{adh}} + H_{\mathrm{vol}} + H_{\mathrm{rad}} + H_{\mathrm{mel}} + H_{\mathrm{pair}}$
+mapped from Eq.~\ref{eq:hamiltonian}.
+Each Monte Carlo Step (MCS) consists of $N^3$ attempted copy operations.
+Coupled fields (radiation, melanin, nutrient) are updated by explicit forward Euler after
+each MCS.  $k$-means spatial clustering ($k = 3$) of cell centres identifies emergent niches.
+Static figures were exported using \texttt{CairoMakie.jl}.
+
+\paragraph{Radiodialysis finite-volume solver.}
+The three-equation system (Eqs.~\ref{eq:mobile}--\ref{eq:robin}) was discretised on a
+one-dimensional radial grid of $N_r = 40$ points using a finite-volume method of lines.
+At $r = 0$, the L'H\^{o}pital limit reduces the cylindrical Laplacian to $2D_{\mathrm{eff}}\partial^2 c/\partial r^2$.
+At $r = R$, a ghost-point scheme enforces the Robin condition (Eq.~\ref{eq:robin}) exactly.
+The resulting ODE system was integrated with the LSODA adaptive stiff solver
+(\texttt{deSolve} in R; forward Euler in Julia for CPM coupling).
+The evolving biomass densities $X$ and $X_{\mathrm{red}}$ were extracted from the CPM lattice
+every ten MCS and passed to the radial solver, providing a one-way coupling between the
+spatial cell dynamics and the contaminant transport PDE.
 
 % ---- 6. Results ---------------------------------------------
 \section{Results}
@@ -526,6 +624,99 @@ beyond 1~kGy, \textit{B.\ subtilis} populations collapse, \textit{D.\ radioduran
 steady-state abundance, and \textit{C.\ neoformans} increases in fitness---reproducing the
 biologically expected ordering of radiation tolerance.
 
+\subsection{Cellular Potts Model: Emergent Radial Niches and Melanin Accumulation}
+
+The CPM simulation on a $40^3$ cylindrical lattice reproduces the radial niche partitioning
+predicted by the Langevin PSDE model, now resolved at the single-cell level (Figure~\ref{fig:radial}).
+After 100~MCS the two melanised radiotrophic fungi (\textit{C.~neoformans}, mean $r = 13.1$;
+\textit{C.~sphaerospermum}, mean $r = 11.5$) are displaced outward relative to the
+radiosensitive \textit{B.~subtilis} (mean $r = 9.9$).  The difference arises from the sign
+of $\beta_{\mathrm{ion}}$ in $H_{\mathrm{rad}}$: radiotrophic species lower their energy by
+moving into higher-radiation zones, while radiosensitive species minimise contact with the
+radiation field.  This stratification is an emergent consequence of the CPM Metropolis
+dynamics; it is not imposed as an initial condition.
+
+Melanin accumulates monotonically in all three melanin-producing species
+(Figure~\ref{fig:melanin}).  \textit{C.~sphaerospermum} accumulates the highest melanin
+(field value 1.44 at MCS~100), reflecting both its radiotrophic positioning near the
+high-radiation outer zone and the highest per-cell $\alpha_M$ among the three producers
+(Table~\ref{tab:params}).  \textit{A.~niger}, positioned at an intermediate radius
+(mean $r = 11.6$), accumulates at a proportionally lower rate.  The linear accumulation
+trajectory indicates that the simulation has not yet reached steady-state melanin saturation,
+consistent with the timescale of melanin biosynthesis relative to biofilm growth dynamics
+\cite{eisenman2012}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\linewidth]{fig1_radial_stratification}
+\caption{Radial stratification of seven species over 100 Monte Carlo Steps in the cylindrical
+CPM bioreactor.  Solid lines: radiotrophic species (\textit{C.~neoformans}, \textit{C.~sphaerospermum}).
+Dashed lines: remaining species.  Dashed horizontal line marks the cylinder wall ($r = R$).
+Radiotrophic species migrate toward the outer wall (higher radiation); \textit{B.~subtilis}
+retreats to the lower-radiation core.}
+\label{fig:radial}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\linewidth]{fig2_melanin_accumulation}
+\caption{Melanin field accumulation at occupied lattice sites for the three melanin-producing
+species over 100~MCS.  \textit{C.~sphaerospermum} (blue) accumulates most rapidly due to
+combined radiotrophic positioning and highest $\alpha_M$ (Table~\ref{tab:params}).
+\textit{A.~niger} (purple) and \textit{C.~neoformans} (red) accumulate at intermediate rates.}
+\label{fig:melanin}
+\end{figure}
+
+\subsection{Radiodialysis: Self-Regulating Contaminant Uptake Under Radiation Damage}
+
+The coupled CPM--radiodialysis simulation reveals a self-reinforcing remediation loop driven
+by the radiation field itself (Figures~\ref{fig:membrane}--\ref{fig:contaminant}).
+Over 100~MCS (equivalent to 50~Gy cumulative dose at the membrane), membrane structural
+integrity decays from $m = 1.0$ to $m = 0.779$ while the effective permeability increases
+2.7-fold from $P_0 = 0.01$ to $P_{\mathrm{eff}} = 0.027$~cm\,s$^{-1}$
+(Figure~\ref{fig:membrane}).  The decay follows Eq.~\ref{eq:membrane_damage} exactly; the
+permeability rise follows the radiation-damage law (Eq.~\ref{eq:peff}) established for
+Nafion membranes under ionising flux \cite{lara2023}.
+
+Despite the rising wall concentration ($c(R,t) = 0.87\,c_{\mathrm{ext}}$ at final MCS),
+the mean interior concentration remains near zero throughout ($c_{\mathrm{mean}} = 0.024$,
+Figure~\ref{fig:contaminant}).  The contaminant front is consumed within a thin annular shell
+immediately adjacent to the membrane: biofilm biosorption ($k_{\mathrm{ads}} = 0.05$~cm$^3$
+g$^{-1}$\,s$^{-1}$) and bioreduction by the \textit{S.~oneidensis} population
+($k_{\mathrm{red}} = 0.02$~cm$^3$~g$^{-1}$\,s$^{-1}$) deplete mobile $c$ faster than radial
+diffusion can replenish it.  The slowly growing sorbed phase $s_{\mathrm{mean}}$ confirms
+progressive immobilisation of sequestered contaminant (Figure~\ref{fig:contaminant},
+right axis).
+
+Notably, \textit{S.~oneidensis} (the primary metal reducer) naturally stratifies to the outer
+wall (mean $r = 12.9$, Figure~\ref{fig:radial}) without engineered positioning --- it is
+placed there by the CPM dynamics, precisely at the contaminant entry zone.  This co-localisation
+of the metal-reducing species with the highest contaminant flux is an emergent property of the
+coupled radiation-sorting and membrane-transport system, not a modelling assumption.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\linewidth]{fig3_membrane_transport}
+\caption{Membrane integrity $m(t)$ (solid, left axis) and normalised effective permeability
+$P_{\mathrm{eff}}(t)/P_0$ (dashed, right axis) over 100~MCS.  $m(t)$ decays exponentially
+per Eq.~\ref{eq:membrane_damage}; $P_{\mathrm{eff}}/P_0$ rises as radiation-driven
+permeabilisation (Eq.~\ref{eq:peff}).  At 50~Gy cumulative dose, integrity has fallen to
+$0.78$ while permeability has increased 2.7-fold.}
+\label{fig:membrane}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\linewidth]{fig4_contaminant_penetration}
+\caption{Contaminant penetration over 100~MCS.  Red solid: $c(R,t)$, mobile concentration at
+the membrane face.  Blue dashed: $c_{\mathrm{mean}}$, spatial average over the interior.
+Green dotted (right axis): $s_{\mathrm{mean}}$, sorbed/immobilised phase.  The near-zero
+interior concentration despite a high wall concentration demonstrates the effectiveness of the
+biofilm annular uptake zone.  Slow linear growth of $s_{\mathrm{mean}}$ confirms progressive
+contaminant immobilisation.}
+\label{fig:contaminant}
+\end{figure}
+
 % ---- 7. Discussion -------------------------------------------
 \section{Discussion}
 
@@ -582,6 +773,24 @@ condition---suggests that self-organising biofilm architectures may naturally op
 remediation performance. The potential for engineering \textit{D.\ radiodurans} strains for
 combined radioresistance and metal reduction \cite{brim2000} offers an additional path toward
 single-organism bioremediation in extreme environments.
+
+The radiodialysis membrane transport model (Section~\ref{sec:radiodialysis}) reveals a further
+self-regulating property with direct engineering relevance.  In a conventional passive membrane
+reactor, contaminant ingress is fixed by the membrane's baseline permeability $P_0$.  In the
+radiotrophic bioreactor modelled here, the radiation field that sustains the community also
+progressively damages the membrane (Eq.~\ref{eq:membrane_damage}), increasing $P_{\mathrm{eff}}$
+proportionally with cumulative dose (Eq.~\ref{eq:peff}).  The result is a positive feedback
+loop: higher ambient radiation $\to$ faster membrane permeabilisation $\to$ greater contaminant
+ingress $\to$ greater substrate availability for metal-reducing bacteria.  Critically, the
+CPM dynamics independently position \textit{S.~oneidensis} at the outer wall (Figure~\ref{fig:radial}),
+co-locating the primary metal-reducing agent with the highest contaminant flux zone, without
+any engineered spatial guidance.  This co-emergence of spatial positioning and membrane
+self-tuning represents a qualitatively new design principle for bioremediation: the contamination
+source provides both the metabolic substrate for radiotrophic community maintenance and the
+physical driver for membrane adaptation, requiring no external energy input.  Reactor design
+implications include prioritising membrane materials with intermediate $\alpha_P$ values
+(Eq.~\ref{eq:peff}) --- high enough to self-tune under operational dose rates but low enough
+to prevent catastrophic membrane failure \cite{fox2009,lara2023}.
 
 \subsection{Mechanical Properties and Radiation Survival}
 
@@ -868,6 +1077,42 @@ Casadevall, A., et al. (2017).
 Melanin, radiation, and energy transduction in fungi.
 \textit{Microbiology Spectrum}, 5(2), FUNK-0037-2016.
 \url{https://doi.org/10.1128/microbiolspec.FUNK-0037-2016}
+
+\bibitem{graner1992}
+Graner, F., Glazier, J.A. (1992).
+Simulation of biological cell sorting using a two-dimensional extended Potts model.
+\textit{Physical Review Letters}, 69(13), 2013--2016.
+\url{https://doi.org/10.1103/PhysRevLett.69.2013}
+
+\bibitem{fox2009}
+Fox, E.B., et al. (2009).
+Radiation effects on Nafion$^{\circledR}$ membrane properties.
+\textit{Savannah River National Laboratory Technical Report}, SRNL-STI-2009-00053.
+
+\bibitem{lara2023}
+Lara, D., et al. (2023).
+Ionizing radiation effects on proton exchange membrane permeability and selectivity.
+\textit{Membranes}, 13(4), 412.
+\url{https://doi.org/10.3390/membranes13040412}
+
+\bibitem{renslow2017}
+Renslow, R.S., et al. (2017).
+Modeling biofilm-mediated uranium immobilization in porous media.
+\textit{Water Research}, 109, 120--130.
+\url{https://doi.org/10.1016/j.watres.2016.11.038}
+
+\bibitem{aydogan2022}
+Aydogan Gokturk, P., Sujanani, R., Qian, J., Wang, L., Freyman, J.L., Bhatt, A.D.,
+Freeman, B.D., Bhave, R., Boudouris, B.W., Phillip, W.A. (2022).
+Donnan dialysis of monovalent ions across a cation exchange membrane.
+\textit{Nature Communications}, 13, 5258.
+\url{https://doi.org/10.1038/s41467-022-32930-9}
+
+\bibitem{soetaert2010}
+Soetaert, K., Petzoldt, T., Setzer, R.W. (2010).
+Solving differential equations in R: package deSolve.
+\textit{Journal of Statistical Software}, 33(9), 1--25.
+\url{https://doi.org/10.18637/jss.v033.i09}
 
 \end{thebibliography}
 
