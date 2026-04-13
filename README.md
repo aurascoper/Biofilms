@@ -1,67 +1,212 @@
-## Biofilm Dynamics Simulation under Radiation Stress
+# Modeling Radiotrophic Fitness — Simulation Suite
 
-## Introduction
+**Kinder & Faulkner (2026) · Systems Biology · bioRxiv preprint**
 
-This repository contains scripts for simulating biofilm dynamics under radiation stress, evaluating radiotrophic microbial communities, and analyzing microbial interactions under varying environmental conditions. These simulations model nutrient uptake, microbial fitness, and motility in 2D and 3D environments under both radiation exposure and nutrient gradients and heat/pressure gradients.
+A multi-scale simulation framework for radiotrophic biofilm communities in cylindrical bioreactors, spanning Langevin PSDE dynamics, 3D Cellular Potts lattice modeling, and a radiodialysis membrane transport PDE system for nuclear bioremediation design.
 
-### Mid-Level Overview
+---
 
-At the core of this model, we simulate **multi-species biofilm dynamics** under **thorium decay** and **gamma radiation**. The system models cooperative growth using a **Langevin dynamics** framework, with species-specific motility, sensitivity to radiation, and interspecies interactions. The Hamiltonian formalism is introduced to capture **phase-locking kernels** for radiation-driven microbial adaptations.
+## Repository Structure
 
-The simulations rely on **partial stochastic differential equations (PSDEs)** for microbial fitness, incorporating **diffusion coefficients**, **mutual interactions**, and **nutrient uptake efficiencies**. The **subcellular localization** data is used to map metabolic functions under these stress conditions.
+```
+Biofilms/
+├── biofilms.R                    # Flat-domain Langevin PSDE + k-means (original)
+├── biofilms_3d.R                 # Cylindrical bioreactor — Shiny interactive app
+├── biofilms_potts.jl             # 3D Cellular Potts Model + radiodialysis coupling
+├── biofilms_radiodialysis.R      # Radiodialysis PDE system — Shiny interactive app
+├── reactor_decision_tree.R       # Hamiltonian kNN reactor selection
+├── preprint/
+│   ├── modeling_radiotrophic_fitness.pdf   # 21-page preprint
+│   ├── modeling_radiotrophic_fitness.tex   # LaTeX source
+│   └── figures/                            # CairoMakie simulation figures (PDF + PNG)
+└── assets/                                 # README preview images
+```
 
-## Equations
+---
 
-The general Hamiltonian-based system is written with the factors of: 
+## Mathematical Framework
 
-Species motility, radiation sensitivity, and nutrient uptake are supervised-dynamically and updated through these Hamiltonian and Langevin, and Euler-Langrangian interactions.
+The fitness of each species $s$ is governed by a PSDE coupling diffusion, radiation, melanin-mediated energy transduction, and Hamiltonian inter-species forces:
 
 $$
-\frac{dq}{dt} = \frac{\partial H}{\partial p}, \quad \frac{dp}{dt} = -\frac{\partial H}{\partial q} + \eta(t)
+\partial_t F_s = \nabla\!\cdot(D_s \nabla F_s)
+  - \nabla\!\cdot\!\Bigl(\mu_s \sum_j P_{sj}(t)\,F_j\Bigr)
+  + R_s + \sigma_s \xi(t,\mathbf{x})
+  - \beta_{s,\text{ion}}\,I_\gamma F_s
+  + \gamma_s \Delta_s - \alpha_{s,\text{nir}}\,N F_s
+  + \theta_s H_s + C_s
 $$
 
-## Scripts
+The total multi-species Hamiltonian with mutualistic pairwise interaction:
 
-### reactor_decision_tree.R
+$$
+H = \sum_i \Bigl[\tfrac{1}{2}\rho_i v_i^2 + U_i(\mathbf{x}_i)\Bigr]
+  + \sum_{i \neq j} V_{ij}(r_{ij}) + \sum_k W_k(t,\mathbf{x}),
+\qquad
+V_{ij}^{\text{mutual}} = -\gamma \exp\!\Bigl(-\tfrac{r_{ij}^2}{\sigma^2}\Bigr)
+$$
 
-This R script can synthesize radiosympletic noise, which can be used to select a reactor model for bioenergy, particular biological product supplies, or bioremediation. It uses **radiated environments** and **decision tree analysis**. It can leverage the **thorium decay constant** and subcellular localization RNA data to model microbial fitness and metabolic activities under radiation stress.
+Radiation field (Beer–Lambert, cylindrical source):
 
-**Usage Optional**:
-1. Load the dataset (e.g., `subcellular_locations.tsv`).
-2. Run a simple decision tree analysis to analyze cellular automata that could sync or **lock phases** with microbial fitness factors under **gamma radiation** and **thorium or your own radioactive or radiodialytic interactions**.
+$$
+I_\gamma(r) = I_0\,e^{-\kappa r}
+$$
 
-The decision tree helps identify optimal survival strategies of **extremophilic microbes** by analyzing nutrient uptake, radiation resistance, and species-specific growth models.
+Melanin reaction-diffusion (radiotrophic fungi):
 
-### biofilms.R
+$$
+\frac{\partial M}{\partial t} = D_M \nabla^2 M + \alpha_M \cdot n_\text{RF}(\mathbf{x},t) \cdot I_\gamma(t,\mathbf{x})
+$$
 
-![kmeans_species_trajectory (1).gif](https://github.com/aurascoper/Biofilms/blob/b7a111904fc0d8f70b4df84e1f13eb9728e00ce5/kmeans_species_trajectory%20(1).gif)
-![biofilm_dynamics_7_species.gif](https://github.com/aurascoper/Biofilms/blob/91ded6274b16aa950569f49d9ec51f23d4f729e1/biofilm_dynamics_7_species.gif)
-![biofilm_dynamics.gif](https://github.com/aurascoper/Biofilms/blob/91ded6274b16aa950569f49d9ec51f23d4f729e1/biofilm_dynamics.gif)
-![Functor.jl Coordinate .gif](https://github.com/aurascoper/Biofilms/blob/b87615d25b630a393ea00211e73d69dfe3d196b5/12_step_24_second_animation_sped_up.gif)
+---
 
-This R script models **biofilm growth dynamics** of multiple species exposed to radiation. It incorporates:
-- **Species-specific motility**
-- **Radiation sensitivity**
-- **Nutrient uptake models**
+## Radiodialysis Membrane Transport
 
-The same can be said for the Optimization Problems that can be done with Bioreactor.jl
+Contaminant ingress through the bioreactor membrane under radiation-driven permeability change is modeled by a coupled three-equation system (§3.9 of the preprint):
 
-This Growth curve was calculated with JuMP and Cbc in Julia and is currently operating in JupyterLab. It can be interpreted as a scalar graph for scaling molecular growth rates of interes (Billions of CFUs (colony forming units)).
+**Mobile contaminant** (cylindrical reaction-diffusion):
+$$
+\frac{\partial c}{\partial t}
+  = \frac{1}{r}\frac{\partial}{\partial r}\!\Bigl(r\,D_\text{eff}\frac{\partial c}{\partial r}\Bigr)
+  - (k_\text{ads}X + k_\text{red}X_\text{red})\,c + k_\text{des}\,s
+$$
 
-![Bioreactor Growth Curves.png.png](https://github.com/aurascoper/Biofilms/blob/abcaeb99cc8d98cbae08995b925836c86cc0993c/Bioreactor%20Growth%20Curves.png.png)
+**Immobile phase** (biosorption + bioreduction):
+$$
+\frac{\partial s}{\partial t} = (k_\text{ads}X + k_\text{red}X_\text{red})\,c - (k_\text{des} + k_\text{loss})\,s
+$$
 
-**Usage**:
-1. Define the number of species and set parameters such as **growth rates**, **radiation sensitivities**, and **nutrient uptake efficiencies**.
-2. Visualize biofilm growth using **ggplot2** for 2D plots or **PlotlyJS** for interactive 3D plots.
+**Membrane damage** and radiation-driven permeability:
+$$
+\frac{dm}{dt} = -k_\text{dam}\,\dot{D}(R)\,m,
+\qquad
+P_\text{eff}(t) = P_0\,\exp\!\bigl(\alpha_P\,D_\text{cum}(t)\bigr)
+$$
 
-This model explores how different species **cooperate** or **compete** for resources, factoring in radiation-induced stress.
+**Robin boundary condition** at the membrane wall $r = R$:
+$$
+-D_\text{eff}\left.\frac{\partial c}{\partial r}\right|_{r=R}
+  = P_\text{eff}(t)\,\bigl(c(R,t) - c_\text{ext}\bigr)
+$$
 
-### biofilms_3d.R
+---
 
-This R script enables **3D visualization** of biofilm growth using **PlotlyJS**. It can also work with julia preprocessing or ML and Python as well. It simulates species interactions in a **structured 3D grid**, modeling their growth and nutrient uptake under **radiation and nutrient gradients**.
+## Simulations
 
-**Usage**:
-1. Define parameters such as species-specific **motility** and **diffusion** rates.
-2. Use **PlotlyJS** for 3D visualization of the simulation.
+### 1 · Langevin PSDE — `biofilms.R`
 
-It can incorporate **k-means clustering** and **decision tree analysis** based on a simple Hamiltonian = k-nn network, with the aim to model and help predict biofilm structures and community interactions over time.
+Original flat-domain simulation. Seven species evolve under species-specific motility, radiation sensitivity, and pairwise Hamiltonian interactions. Stochastic Langevin integration with $k$-means spatial clustering.
+
+| | |
+|---|---|
+| ![k-means trajectory animation](kmeans_species_trajectory%20(1).gif) | ![7-species biofilm dynamics](biofilm_dynamics_7_species.gif) |
+
+---
+
+### 2 · Cylindrical Bioreactor — `biofilms_3d.R`
+
+Interactive Shiny app. Langevin dynamics inside a cylindrical bioreactor of radius $R$, axial length $L$. Radiotrophic species (*C. neoformans*, *C. sphaerospermum*) are attracted toward the high-radiation central axis; radiosensitive species drift outward. Sliders: $I_0$, $\kappa$, nutrient $C_0$, thorium intensity.
+
+```r
+shiny::runApp("biofilms_3d.R")
+```
+
+![Bioreactor radial stratification and side-view trajectories](assets/preview_bioreactor_3d.png)
+
+---
+
+### 3 · Cellular Potts Model — `biofilms_potts.jl`
+
+Pure Julia. $60^3$ cylindrical lattice, Metropolis MC, 5-term Hamiltonian
+($H_\text{adh} + H_\text{vol} + H_\text{rad} + H_\text{mel} + H_\text{pair}$),
+coupled melanin/nutrient/radiation fields. Runs the radiodialysis PDE coupling
+by default; pass `--no-radiolysis` for plain CPM.
+
+```julia
+julia biofilms_potts.jl              # coupled CPM + radiodialysis
+julia biofilms_potts.jl --no-radiolysis  # CPM only
+```
+
+**Fig 1 — Radial stratification over 100 MCS.** Radiotrophic fungi migrate toward the outer wall; *B. subtilis* retreats to the low-radiation core. Spatial sorting is emergent from the CPM Metropolis dynamics, not imposed.
+
+![Fig 1 — Radial stratification](preprint/figures/fig1_radial_stratification.png)
+
+**Fig 2 — Melanin accumulation.** *C. sphaerospermum* accumulates the most melanin (field value 1.44 at MCS 100) due to its radiotrophic positioning in the high-radiation outer zone. Melanin growth is linear over the simulation window — saturation not yet reached.
+
+![Fig 2 — Melanin accumulation](preprint/figures/fig2_melanin_accumulation.png)
+
+---
+
+### 4 · Radiodialysis Membrane Transport — `biofilms_radiodialysis.R`
+
+Interactive Shiny app. Method-of-lines finite-volume solver for the three-equation radiodialysis PDE system. LSODA adaptive stiff integration (`deSolve`). Four visualization tabs: c(r,t) heatmap, s(r,t) heatmap, membrane integrity / P_eff time series, radial snapshots.
+
+```r
+shiny::runApp("biofilms_radiodialysis.R")
+# or headless:
+Rscript biofilms_radiodialysis.R
+```
+
+![Radiodialysis preview — contaminant profiles and membrane evolution](assets/preview_radiodialysis.png)
+
+**Fig 3 — Membrane damage and permeability.** Integrity $m(t)$ decays exponentially under 50 Gy cumulative dose (1.0 → 0.78). $P_\text{eff}$ rises 2.7× — the same radiation field that sustains the biofilm also opens the membrane wider, creating a self-regulating contaminant uptake loop.
+
+![Fig 3 — Membrane transport](preprint/figures/fig3_membrane_transport.png)
+
+**Fig 4 — Contaminant penetration.** Wall concentration $c(R,t)$ reaches 87% of $c_\text{ext}$ while the interior mean stays near zero — the biofilm consumes the contaminant within a thin annular zone at the membrane face. The slowly rising sorbed phase $s_\text{mean}$ confirms progressive immobilisation.
+
+![Fig 4 — Contaminant penetration](preprint/figures/fig4_contaminant_penetration.png)
+
+---
+
+## Key Results (from preprint §5)
+
+| Result | Value |
+|--------|-------|
+| Membrane integrity at 50 Gy | $m = 0.779$ |
+| P_eff increase | 2.7× baseline (0.010 → 0.027 cm s⁻¹) |
+| Interior contaminant mean | 0.024 $c_\text{ext}$ (98% depletion) |
+| Radiotrophic stratification | *C. neoformans* mean $r = 13.1$; *B. subtilis* mean $r = 9.9$ |
+| *C. sphaerospermum* melanin (MCS 100) | 1.44 (field units) |
+| Pairwise community energy | −34.4 → −41.5 (tightening cooperation) |
+| All species surviving | 42 / 42 cells (no extinctions) |
+
+The central finding is a **self-regulating remediation loop**: radiation damages the membrane → $P_\text{eff}$ increases → more contaminant enters → metal-reducing *S. oneidensis* (co-located at the outer wall by CPM dynamics) immobilises it. No external energy input required.
+
+---
+
+## Preprint
+
+**[Modeling Radiotrophic Fitness — Kinder & Faulkner (2026)](preprint/modeling_radiotrophic_fitness.pdf)**
+21 pages · Systems Biology · Hamiltonian-Langevin framework · Cellular Potts Model · Radiodialysis PDE
+
+Key sections:
+- **§3** Mathematical Framework (PSDE, Hamiltonian, radiation fields, melanin RD, radiodialysis)
+- **§4** Parameter Estimation (Table 2 — 7 species × 8 parameters, literature-justified)
+- **§5** Results (species clustering, CPM stratification, membrane transport, contaminant penetration)
+- **§6** Discussion (bioremediation implications, self-regulating loop design principle)
+
+---
+
+## Dependencies
+
+**R** (≥ 4.2)
+```r
+install.packages(c("deSolve", "shiny", "plotly", "ggplot2", "dplyr", "gridExtra"))
+```
+
+**Julia** (≥ 1.10)
+```julia
+import Pkg
+Pkg.add(["CairoMakie", "GLMakie"])   # CairoMakie for export, GLMakie for interactive
+```
+
+---
+
+## Citation
+
+```
+Kinder, H., Faulkner, B. (2026). Modeling Radiotrophic Fitness:
+A Hamiltonian-Langevin Framework for Multispecies Biofilm Communities
+under Ionising Radiation. bioRxiv preprint.
+```
