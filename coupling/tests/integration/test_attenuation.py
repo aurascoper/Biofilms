@@ -59,10 +59,12 @@ def test_transmission_is_exponential(tmp_path):
             (-0.5, 0.0, 0.0), 5.0 + t, 50.0, axis="x",
             boundary_type="reflective")
 
+        # the detector plane must bound real cells or OpenMC drops the surface
         cells = [
             openmc.Cell(region=+slab_in & -slab_a & -side.cyl),
             openmc.Cell(fill=water, region=+slab_a & -slab_b & -side.cyl),
-            openmc.Cell(region=+slab_b & -world_out & -side.cyl),
+            openmc.Cell(region=+slab_b & -detector & -side.cyl),
+            openmc.Cell(region=+detector & -world_out & -side.cyl),
         ]
         geometry = openmc.Geometry(cells)
 

@@ -20,7 +20,7 @@ def test_model_structure(snapshot, config):
 
     assert model.settings.photon_transport is True
     assert model.settings.run_mode == "fixed source"
-    assert model.settings.batches == 3
+    assert model.settings.batches == 5
     src = model.settings.source[0]
     assert src.particle == "photon"
 

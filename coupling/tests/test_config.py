@@ -26,7 +26,7 @@ def test_valid_config_loads(config):
     assert config.voxel_pitch_cm == 0.001
     assert config.membrane_statistic == "mass_weighted"
     assert set(config.materials) == {"medium", "baseline_biomass", "membrane"}
-    assert config.batches == 3
+    assert config.batches == 5
 
 
 def test_single_missing_key_is_reported():

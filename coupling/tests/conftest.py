@@ -40,8 +40,11 @@ melanin_scale = 1.0
 membrane_statistic = "mass_weighted"
 
 [transport]
-batches = 3
-particles = 1000
+# cell-scale voxels make heating extremely sparse (~3e-4 interactions per
+# 1 MeV history in an 8-um water cube) — enough histories that the smoke
+# run scores with overwhelming probability
+batches = 5
+particles = 50000
 seed = 7
 
 [materials.medium]
