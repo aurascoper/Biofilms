@@ -31,3 +31,7 @@ end
 @testset "Lifecycle, dose contract, windowed API" begin
     include("genealogy_tests.jl")
 end
+
+@testset "Exchange schemas (snapshot + restart)" begin
+    include("checkpoint_io_tests.jl")
+end
