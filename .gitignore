@@ -373,3 +373,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Machine-local Julia state (JACC is dev-pathed; backend is a local preference)
+Manifest.toml
+LocalPreferences.toml
