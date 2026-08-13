@@ -1565,26 +1565,30 @@ function export_figures(trajectory::Vector{<:Any},
                 yticks      = LinearTicks(6),
                 limits      = (nothing, (0.0, 1.15)))
 
-    # Shaded zones: inner core (radiosensitive refuge) and outer ring (radiotrophic niche)
+    # Shaded zones labeled by the radiation field only (I(r) is maximal on the
+    # axis and decays outward — see init_radiation!). Biological occupancy of
+    # each zone is an outcome of the run, not asserted here.
+    inner_zone = (0.0, 0.45)    # inner high-radiation region (r/R)
+    outer_zone = (0.65, 1.0)    # outer lower-radiation region (r/R)
     poly!(ax1,
-          Point2f[(mcs_vec[1], 0.0), (mcs_vec[end], 0.0),
-                  (mcs_vec[end], 0.45), (mcs_vec[1], 0.45)];
-          color = (:royalblue, 0.08), strokewidth = 0)
-    poly!(ax1,
-          Point2f[(mcs_vec[1], 0.65), (mcs_vec[end], 0.65),
-                  (mcs_vec[end], 1.0), (mcs_vec[1], 1.0)];
+          Point2f[(mcs_vec[1], inner_zone[1]), (mcs_vec[end], inner_zone[1]),
+                  (mcs_vec[end], inner_zone[2]), (mcs_vec[1], inner_zone[2])];
           color = (:firebrick, 0.08), strokewidth = 0)
+    poly!(ax1,
+          Point2f[(mcs_vec[1], outer_zone[1]), (mcs_vec[end], outer_zone[1]),
+                  (mcs_vec[end], outer_zone[2]), (mcs_vec[1], outer_zone[2])];
+          color = (:royalblue, 0.08), strokewidth = 0)
 
     # Dashed wall line at r/R = 1.0
     hlines!(ax1, [1.0]; color = (:black, 0.40), linestyle = :dash, linewidth = 1.5)
 
-    # Zone annotation text
+    # Zone annotation text (neutral physical labels)
     text!(ax1, mcs_vec[end] * 0.02, 0.22;
-          text = "radiosensitive\ncore", fontsize = 10,
-          color = (:royalblue, 0.70), align = (:left, :center))
-    text!(ax1, mcs_vec[end] * 0.02, 0.82;
-          text = "radiotrophic\nniche", fontsize = 10,
+          text = "inner\nhigh-radiation region", fontsize = 10,
           color = (:firebrick, 0.70), align = (:left, :center))
+    text!(ax1, mcs_vec[end] * 0.02, 0.82;
+          text = "outer\nlower-radiation region", fontsize = 10,
+          color = (:royalblue, 0.70), align = (:left, :center))
 
     line_handles = []
     for s in 1:N_SPECIES
@@ -1740,7 +1744,7 @@ function export_figures(trajectory::Vector{<:Any},
     m_final   = m_vec[end]
     Peff_final = Peff_norm[end]
     text!(ax3l, Float64(t_vec[end]) * 0.55, m_final + 0.05;
-          text    = @sprintf("m = %.3f\n(50 Gy cumulative)", m_final),
+          text    = @sprintf("m = %.3f", m_final),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
     text!(ax3r, Float64(t_vec[end]) * 0.55, Peff_final * 0.88;
           text    = @sprintf("%.1f× baseline", Peff_final),
