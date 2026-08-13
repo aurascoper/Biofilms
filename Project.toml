@@ -1,3 +1,4 @@
 [deps]
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 JACC = "0979c8fe-16a4-4796-9b82-89a9f10403ea"
