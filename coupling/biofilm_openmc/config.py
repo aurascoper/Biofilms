@@ -82,8 +82,11 @@ def load_config(path_or_str) -> Config:
     else:
         with open(path_or_str, "rb") as fh:
             raw = fh.read().decode()
-    data = tomllib.loads(raw)
+    return config_from_dict(tomllib.loads(raw), raw)
 
+
+def config_from_dict(data: dict, raw: str = "") -> Config:
+    """Validate an already-parsed config dict (used by scenario overrides)."""
     problems: list[str] = []
 
     def get(section, key):
