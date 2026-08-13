@@ -1,0 +1,94 @@
+# Physical coupling configuration — TEMPLATE.
+#
+# Every REQUIRED key ships UNSET (commented out). Nothing in this repository
+# defines these values and none may be invented (docs/audit_biofilms_potts.md
+# §5): the loaders enumerate every missing key in one loud error and refuse
+# to proceed. Fill them in from your experiment/design, with units as stated.
+
+schema_version = 1
+
+[geometry]
+# REQUIRED — physical edge length of one CPM lattice voxel, cm
+# voxel_pitch_cm =
+
+# REQUIRED — physical position of the lattice corner (logical index 0,0,0), cm
+# origin_cm = [0.0, 0.0, 0.0]
+
+# REQUIRED — CSG cylinder that contains the biomass lattice, cm.
+# The CPM's -1 voxels mean "outside the biological domain", NOT membrane
+# material (audit §6): the membrane is modeled as a finite annulus here.
+# cylinder_radius_cm =
+# cylinder_length_cm =
+# membrane_thickness_cm =
+
+[boundaries]
+# REQUIRED — outer boundary conditions: "vacuum" or "reflective"
+# axial =
+# radial_outer =
+
+[time]
+# REQUIRED — physical seconds per CPM Monte Carlo step. This is the single
+# time authority; the radiodialysis solver derives its interval from it
+# (internal substeps chosen automatically for explicit-Euler stability).
+# seconds_per_mcs =
+
+[source]
+# REQUIRED — physical photon emission rate, photons/s
+# photons_per_second =
+
+# REQUIRED — discrete emission spectrum: line energies (eV) and
+# probabilities (same length; probabilities normalized by the loader)
+# spectrum_energies_eV = []
+# spectrum_probabilities = []
+
+# REQUIRED — spatial distribution: "line_z_axis" | "point_origin"
+# spatial =
+
+# REQUIRED — angular distribution: "isotropic"
+# angular =
+
+[normalization]
+# REQUIRED — separate transforms for the THREE consumers of radiation in the
+# CPM (audit §5): Metropolis Hamiltonian, melanin production, membrane model.
+# Linear form: signal = scale × dose_rate_Gy_s. Scales MUST come from a
+# declared calibration; no default exists.
+# hamiltonian_scale =
+# melanin_scale =
+
+# REQUIRED — statistic mapping the voxel dose field to the membrane model's
+# scalar dose rate: "mass_weighted" | "area_weighted".
+# STOP CONDITION (audit §6): even with this set, OpenMC dose must not feed
+# the radiodialysis model until the m-vs-P_eff constitutive choice is made.
+# membrane_statistic =
+
+[transport]
+# Optional Monte Carlo run controls (recorded in every result file)
+batches = 10
+particles = 10000
+seed = 1
+
+[materials]
+# REQUIRED — config-defined material class table (arbitrary names; the
+# minimum honest set is below). Each class needs density_g_cm3 and element
+# MASS fractions summing to 1. Classes are deduplicated by composition;
+# lineage/cell labels NEVER become materials.
+#
+# [materials.medium]
+# density_g_cm3 =
+#   [materials.medium.elements]
+#   H =
+#   O =
+#
+# [materials.baseline_biomass]
+# density_g_cm3 =
+#   [materials.baseline_biomass.elements]
+#   H =
+#   C =
+#   N =
+#   O =
+#
+# [materials.membrane]
+# density_g_cm3 =
+#   [materials.membrane.elements]
+#   C =
+#   H =

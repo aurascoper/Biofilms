@@ -1,0 +1,6 @@
+# Bare unit-test tier: every non-gated test passes with exactly this.
+# openmc is deliberately absent — the transport stack is the pinned conda
+# env (conda-forge openmc=0.15.3); gated tests skip when it is missing.
+numpy
+h5py
+pytest
