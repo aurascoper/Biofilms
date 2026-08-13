@@ -26,6 +26,34 @@ def julia_snapshot(tmp_path_factory):
     return out
 
 
+def test_dose_written_by_python_reads_back_in_julia(tmp_path):
+    """Return leg of the orientation chain: a logical (x,y,z) dose field
+    written by Python must read back in Julia with identical coordinates."""
+    import numpy as np
+    from biofilm_openmc.snapshot import write_dose_field
+
+    n = 6
+    x, y, z = np.meshgrid(np.arange(n), np.arange(n), np.arange(n), indexing="ij")
+    field = (x + 10 * y + 100 * z).astype(float)   # unique value per voxel
+    path = tmp_path / "dose.h5"
+    write_dose_field(path, field, field * 0.0, {"schema_version": 1})
+
+    script = f'''
+    using HDF5
+    f = h5open("{path}", "r")
+    d = read(f["mesh/dose_rate_mean_Gy_s"])
+    # logical [x,y,z] (0-based here) must equal x + 10y + 100z
+    ok = size(d) == ({n}, {n}, {n}) &&
+         d[1, 1, 1] == 0.0 && d[2, 1, 1] == 1.0 &&
+         d[1, 2, 1] == 10.0 && d[1, 1, 2] == 100.0 &&
+         d[3, 4, 5] == 2.0 + 30.0 + 400.0
+    println(ok ? "CHAIN_OK" : "CHAIN_BROKEN")
+    '''
+    out = subprocess.run([julia, f"--project={REPO}", "-e", script],
+                         capture_output=True, text=True, timeout=300)
+    assert "CHAIN_OK" in out.stdout, out.stdout + out.stderr
+
+
 def test_julia_snapshot_loads_and_probes_pass(julia_snapshot):
     from biofilm_openmc.snapshot import load_snapshot
     snap = load_snapshot(julia_snapshot)  # probe verification happens inside
