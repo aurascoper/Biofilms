@@ -27,3 +27,7 @@ end
 @testset "Deterministic radiation response" begin
     include("deterministic_radiation.jl")
 end
+
+@testset "Lifecycle, dose contract, windowed API" begin
+    include("genealogy_tests.jl")
+end

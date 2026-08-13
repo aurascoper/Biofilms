@@ -115,6 +115,11 @@ Base.@kwdef struct CPMParams
     # --- Number of cells per species at initialization ---
     n_cells_per_species::Int = 8
 
+    # --- Physical time contract (REQUIRED for any physical coupling).
+    #     NaN = undefined: dose accrual and physical-time tracking refuse to
+    #     run. Never default this to a number — see audit §5. ---
+    seconds_per_mcs::Float64 = NaN
+
     # --- Snapshot interval ---
     snapshot_interval::Int = 10
 end
@@ -173,6 +178,56 @@ mutable struct CellInfo
     species::Int          # 1..7
     volume::Int           # number of occupied lattice sites
     com::Vector{Float64}  # center of mass [x, y, z]
+    # --- genealogy labels (biological identity; NEVER a material identity) ---
+    lineage_id::Int       # founder's cell id, inherited through divisions
+    parent_id::Int        # 0 for founders
+    generation::Int       # 0 for founders
+    birth_mcs::Int
+    lifetime_dose_Gy::Float64   # accrued while alive; finalized at division/death
+end
+
+# Legacy 3-arg form (founder-agnostic; genealogy fields zeroed)
+CellInfo(species::Int, volume::Int, com::Vector{Float64}) =
+    CellInfo(species, volume, com, 0, 0, 0, 0, 0.0)
+
+# ---- Lifecycle event records (typed, archival) ----------------
+# Division is binary fission: the parent identity ENDS and two daughters
+# with fresh IDs are created. No automatic scheduler exists — see §12b.
+
+struct DivisionEvent
+    mcs::Int
+    physical_time_s::Float64      # NaN until seconds_per_mcs is configured
+    parent_id::Int
+    daughter_a_id::Int
+    daughter_b_id::Int
+    lineage_id::Int
+    parent_generation::Int
+    daughter_generation::Int
+    parent_volume::Int
+    daughter_a_volume::Int
+    daughter_b_volume::Int
+end
+
+struct DeathEvent
+    mcs::Int
+    physical_time_s::Float64
+    cell_id::Int
+    species::Int
+    lineage_id::Int
+    generation::Int
+    lifetime_dose_Gy::Float64
+end
+
+struct ArchivedCell
+    id::Int
+    species::Int
+    lineage_id::Int
+    parent_id::Int
+    generation::Int
+    birth_mcs::Int
+    end_mcs::Int
+    fate::Symbol                  # :divided | :died
+    lifetime_dose_Gy::Float64
 end
 
 mutable struct CPMState
@@ -198,6 +253,31 @@ mutable struct CPMState
 
     # Adhesion matrix
     J::Matrix{Float64}
+
+    # --- Simulation clock (single time authority; see audit §5) ---
+    current_mcs::Int              # incremented by mcs_step!
+    physical_time_s::Float64      # NaN until seconds_per_mcs is configured
+
+    # --- Lifecycle archive ---
+    division_log::Vector{DivisionEvent}
+    death_log::Vector{DeathEvent}
+    archive::Vector{ArchivedCell}
+
+    # --- Physical dose contract (Gy); inactive until a dose field is imported.
+    #     `radiation` above remains the dimensionless Hamiltonian signal;
+    #     physical dose is NEVER stored into it implicitly. ---
+    dose_active::Bool
+    dose_rate_mean_Gy_s::Array{Float64, 3}
+    dose_rate_sd_Gy_s::Array{Float64, 3}
+    dose_increment_Gy::Array{Float64, 3}
+    accumulated_dose_Gy::Array{Float64, 3}
+    membrane_dose_rate_Gy_s::Float64   # NaN until the m-vs-P_eff coupling is
+                                       # declared (audit §6 STOP CONDITION)
+
+    # --- Per-consumer signal split: melanin production reads its own drive
+    #     field (initialized identical to `radiation`, so legacy behavior is
+    #     bit-for-bit unchanged until a transform is explicitly imported) ---
+    melanin_drive::Array{Float64, 3}
 end
 
 # ============================================================
@@ -301,8 +381,9 @@ function init_state(params::CPMParams; seed::Int = 42)
                     cid = Int32(next_id)
                     vol = place_cell!(lattice, interior, cid, cx, cy, cz, radius, N)
                     if vol > 0
+                        # founder: lineage = own id, generation 0
                         cells[next_id] = CellInfo(s, vol,
-                            Float64[cx, cy, cz])
+                            Float64[cx, cy, cz], next_id, 0, 0, 0, 0.0)
                         next_id += 1
                         placed = true
                     end
@@ -320,10 +401,18 @@ function init_state(params::CPMParams; seed::Int = 42)
     J = build_J_matrix()
 
     state = CPMState(lattice, cells, radiation, melanin, nutrient,
-                     interior, next_id, params, J)
+                     interior, next_id, params, J,
+                     0, NaN,                                 # clock
+                     DivisionEvent[], DeathEvent[], ArchivedCell[],
+                     false,                                  # dose_active
+                     zeros(Float64, N, N, N), zeros(Float64, N, N, N),
+                     zeros(Float64, N, N, N), zeros(Float64, N, N, N),
+                     NaN,                                    # membrane dose rate
+                     zeros(Float64, N, N, N))                # melanin_drive
 
     init_radiation!(state)
     init_nutrient!(state)
+    copyto!(state.melanin_drive, state.radiation)  # legacy: identical signals
 
     return state
 end
@@ -466,6 +555,7 @@ function mcs_step!(state::CPMState, rng::AbstractRNG)
     N = p.N
     lat = state.lattice
     n_attempts = N^3
+    state.current_mcs += 1
 
     for _ in 1:n_attempts
         # 1. Pick random source site inside cylinder
@@ -520,9 +610,17 @@ function mcs_step!(state::CPMState, rng::AbstractRNG)
         end
     end
 
-    # Clean up dead cells (volume = 0)
+    # Clean up dead cells (volume = 0) — archived, never silently dropped
     for (id, cell) in state.cells
         if cell.volume <= 0
+            push!(state.death_log,
+                  DeathEvent(state.current_mcs, state.physical_time_s, id,
+                             cell.species, cell.lineage_id, cell.generation,
+                             cell.lifetime_dose_Gy))
+            push!(state.archive,
+                  ArchivedCell(id, cell.species, cell.lineage_id,
+                               cell.parent_id, cell.generation, cell.birth_mcs,
+                               state.current_mcs, :died, cell.lifetime_dose_Gy))
             delete!(state.cells, id)
         end
     end
@@ -597,7 +695,7 @@ function update_melanin!(state::CPMState)
             sp = state.cells[Int(σ)].species
             α = p.α_M_species[sp]
         end
-        prod = α * n_rf * state.radiation[x, y, z]
+        prod = α * n_rf * state.melanin_drive[x, y, z]
         M_new[x, y, z] = max(0.0, M[x, y, z] + dt * (diff + prod))
     end
 
@@ -1106,9 +1204,24 @@ end
 
 """
 Advance the radiodialysis PDE system by one time step dt.
-Equations (1)–(3) with ghost-point Robin BC at r = R.
+Substeps automatically if dt exceeds the explicit-Euler diffusion stability
+bound (0.4·dr²/2D_eff); with the legacy defaults n_sub = 1, so legacy
+trajectories are bit-for-bit unchanged.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
+    dr = rd.r_grid[2] - rd.r_grid[1]
+    dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
+    n_sub = max(1, ceil(Int, dt / dt_stable))
+    dt_sub = dt / n_sub
+    for _ in 1:n_sub
+        _step_radiolysis_euler!(rd, dt_sub)
+    end
+end
+
+"""
+One forward-Euler step of equations (1)–(3) with ghost-point Robin BC at r = R.
+"""
+function _step_radiolysis_euler!(rd::RadiolysisState, dt::Float64)
     rp  = rd.params
     Nr  = rp.Nr
     dr  = rd.r_grid[2] - rd.r_grid[1]
@@ -1453,6 +1566,252 @@ function main_coupled()
     export_figures(traj, traj, params)
 
     return state, rd, traj
+end
+
+# ============================================================
+#  12b. Coupling foundation: dose contract, lifecycle primitive,
+#       windowed simulation API   (feat/openmc-dose-coupling)
+#
+#  - Physical dose (Gy) is stored in dedicated CPMState fields and is
+#    NEVER written into the dimensionless `radiation` Hamiltonian signal
+#    or the melanin drive except through an explicitly supplied
+#    transform (import_dose_field!). See docs/audit_biofilms_potts.md §5.
+#  - divide_cell! is a MANUALLY INVOKED demonstration primitive. There
+#    is deliberately no automatic division scheduler: the CPM has no
+#    growth dynamics from which biological generations could be claimed
+#    (audit §2).
+# ============================================================
+
+"""
+    import_dose_field!(state, dose_mean_Gy_s, dose_sd_Gy_s;
+                       hamiltonian_transform = nothing,
+                       melanin_transform = nothing)
+
+Install a physical dose-rate field (Gy/s, CPM lattice shape). The
+Hamiltonian signal (`state.radiation`) and melanin drive are updated
+ONLY if the corresponding transform is supplied — passing `nothing`
+keeps the legacy dimensionless signals untouched, so importing dose
+never silently changes the dynamics.
+"""
+function import_dose_field!(state::CPMState,
+                            dose_mean_Gy_s::Array{Float64, 3},
+                            dose_sd_Gy_s::Array{Float64, 3};
+                            hamiltonian_transform = nothing,
+                            melanin_transform = nothing)
+    size(dose_mean_Gy_s) == size(state.lattice) ||
+        error("import_dose_field!: dose field shape $(size(dose_mean_Gy_s)) ≠ lattice $(size(state.lattice))")
+    copyto!(state.dose_rate_mean_Gy_s, dose_mean_Gy_s)
+    copyto!(state.dose_rate_sd_Gy_s, dose_sd_Gy_s)
+    if hamiltonian_transform !== nothing
+        state.radiation .= hamiltonian_transform.(dose_mean_Gy_s)
+    end
+    if melanin_transform !== nothing
+        state.melanin_drive .= melanin_transform.(dose_mean_Gy_s)
+    end
+    state.dose_active = true
+    return state
+end
+
+"""
+    accrue_dose!(state)
+
+Per-MCS dose attribution: ΔD_v = Ḋ_v · seconds_per_mcs accrued to the
+CURRENT voxel labels (cells move between transport solves; attributing
+only at transport checkpoints would misassign the interval's exposure to
+endpoint geometry). Cell lifetime dose accrues the unweighted site-mean
+increment.
+"""
+function accrue_dose!(state::CPMState)
+    state.dose_active || return state
+    dt = state.params.seconds_per_mcs
+    isnan(dt) &&
+        error("accrue_dose!: seconds_per_mcs is not configured (physical unit contract, audit §5)")
+    N = state.params.N
+    # ponytail: unweighted site-mean cell dose — equal voxel masses assumed
+    # until the material config supplies densities; replace with mass weights then.
+    @inbounds for z in 1:N, y in 1:N, x in 1:N
+        ΔD = state.dose_rate_mean_Gy_s[x, y, z] * dt
+        state.dose_increment_Gy[x, y, z] = ΔD
+        state.accumulated_dose_Gy[x, y, z] += ΔD
+        σ = state.lattice[x, y, z]
+        if σ > 0
+            c = get(state.cells, Int(σ), nothing)
+            if c !== nothing
+                c.lifetime_dose_Gy += ΔD / max(c.volume, 1)
+            end
+        end
+    end
+    return state
+end
+
+# ---- 26-connectivity check for daughter integrity -------------
+
+function _is_connected_26(sites::Vector{NTuple{3, Int}})
+    isempty(sites) && return false
+    site_set = Set(sites)
+    seen = Set{NTuple{3, Int}}()
+    stack = [sites[1]]
+    push!(seen, sites[1])
+    while !isempty(stack)
+        (x, y, z) = pop!(stack)
+        for (dx, dy, dz) in NEIGHBORS_26
+            nb = (x + dx, y + dy, z + dz)
+            if nb in site_set && !(nb in seen)
+                push!(seen, nb)
+                push!(stack, nb)
+            end
+        end
+    end
+    return length(seen) == length(sites)
+end
+
+"""
+    divide_cell!(state, id; min_daughter_volume = 8)
+        -> DivisionEvent | Symbol
+
+Binary fission of cell `id`: the parent identity ENDS (archived with
+fate `:divided`, lifetime dose finalized) and two daughters with fresh
+IDs are created (generation = parent + 1, lineage inherited, exposure
+records start at zero).
+
+Deterministic and RNG-free: the center of mass and second-moment matrix
+are computed FRESH from the current lattice sites (stored COM may be
+stale mid-MCS), and the split plane passes through the COM perpendicular
+to the principal axis (largest eigenvalue of the symmetric second-moment
+matrix). Sites exactly on the plane go to daughter A.
+
+Fails WITHOUT mutating state, returning a reason Symbol:
+`:no_such_cell`, `:below_min_volume`, `:empty_daughter`,
+`:disconnected_daughter` (26-connectivity on each daughter).
+"""
+function divide_cell!(state::CPMState, id::Int; min_daughter_volume::Int = 8)
+    haskey(state.cells, id) || return :no_such_cell
+    parent = state.cells[id]
+    N = state.params.N
+
+    sites = NTuple{3, Int}[]
+    for z in 1:N, y in 1:N, x in 1:N
+        state.lattice[x, y, z] == Int32(id) && push!(sites, (x, y, z))
+    end
+    isempty(sites) && return :no_such_cell
+
+    com = [mean(s[1] for s in sites),
+           mean(s[2] for s in sites),
+           mean(s[3] for s in sites)]
+    S = zeros(3, 3)
+    for s in sites
+        d = [s[1] - com[1], s[2] - com[2], s[3] - com[3]]
+        S .+= d * d'
+    end
+    # eigen(Symmetric) returns ascending eigenvalues; principal axis is last.
+    axis = eigen(Symmetric(S)).vectors[:, 3]
+
+    a = NTuple{3, Int}[]
+    b = NTuple{3, Int}[]
+    for s in sites
+        proj = (s[1] - com[1]) * axis[1] + (s[2] - com[2]) * axis[2] +
+               (s[3] - com[3]) * axis[3]
+        proj >= 0 ? push!(a, s) : push!(b, s)
+    end
+
+    (isempty(a) || isempty(b)) && return :empty_daughter
+    (length(a) < min_daughter_volume || length(b) < min_daughter_volume) &&
+        return :below_min_volume
+    (_is_connected_26(a) && _is_connected_26(b)) || return :disconnected_daughter
+
+    # ---- Commit point: mutate state ----
+    da = state.next_id
+    db = state.next_id + 1
+    state.next_id += 2
+
+    for s in a
+        state.lattice[s...] = Int32(da)
+    end
+    for s in b
+        state.lattice[s...] = Int32(db)
+    end
+
+    gen = parent.generation + 1
+    mcs = state.current_mcs
+    state.cells[da] = CellInfo(parent.species, length(a),
+        [mean(s[1] for s in a), mean(s[2] for s in a), mean(s[3] for s in a)],
+        parent.lineage_id, id, gen, mcs, 0.0)
+    state.cells[db] = CellInfo(parent.species, length(b),
+        [mean(s[1] for s in b), mean(s[2] for s in b), mean(s[3] for s in b)],
+        parent.lineage_id, id, gen, mcs, 0.0)
+
+    push!(state.archive,
+          ArchivedCell(id, parent.species, parent.lineage_id, parent.parent_id,
+                       parent.generation, parent.birth_mcs, mcs, :divided,
+                       parent.lifetime_dose_Gy))
+    delete!(state.cells, id)
+
+    event = DivisionEvent(mcs, state.physical_time_s, id, da, db,
+                          parent.lineage_id, parent.generation, gen,
+                          length(sites), length(a), length(b))
+    push!(state.division_log, event)
+    return event
+end
+
+# ---- Windowed simulation API (RNG ownership; restart foundation) ----
+# The simulation struct owns the exact stochastic state. Mirrors
+# run_simulation_coupled's initialization and per-MCS call order exactly,
+# so an unbroken legacy run and a windowed run produce identical
+# trajectories (tested in tests/genealogy_tests.jl).
+
+mutable struct CoupledSimulation
+    state::CPMState
+    rd::RadiolysisState
+    contaminant::Array{Float64, 3}
+    rng::MersenneTwister
+    mcs::Int
+    physical_time_s::Float64
+end
+
+function init_coupled_simulation(params::CPMParams, rp::RadiolysisParams;
+                                 seed::Int = 42)
+    rng = MersenneTwister(seed)
+    state = init_state(params; seed = seed)
+    rd = init_radiolysis(rp; R = Float64(params.N) / 2.0)
+    contaminant = zeros(Float64, params.N, params.N, params.N)
+    update_centers_of_mass!(state)
+    return CoupledSimulation(state, rd, contaminant, rng, 0, 0.0)
+end
+
+function advance_window!(sim::CoupledSimulation, n_mcs::Int)
+    state = sim.state
+    rd = sim.rd
+    N = state.params.N
+    for _ in 1:n_mcs
+        sim.mcs += 1
+        mcs = sim.mcs
+
+        mcs_step!(state, sim.rng)
+
+        if mcs % 10 == 1
+            X_tot, X_rd = compute_radial_biomass(state, rd.params.Nr)
+            rp = rd.params
+            rd.params = RadiolysisParams(
+                Nr = rp.Nr, D_eff = rp.D_eff, k_ads = rp.k_ads,
+                k_red = rp.k_red, k_des = rp.k_des, k_loss = rp.k_loss,
+                X_total = mean(X_tot), X_red = mean(X_rd),
+                P0 = rp.P0, alpha_P = rp.alpha_P, k_dam = rp.k_dam,
+                Ddot_R = rp.Ddot_R, c_ext = rp.c_ext, dt_rd = rp.dt_rd)
+        end
+        step_radiolysis!(rd, rd.params.dt_rd)
+        radial_to_3d!(sim.contaminant, rd.c, rd.r_grid, state.interior, N)
+        update_melanin!(state)
+        update_nutrient_coupled!(state, rd.m)
+        update_centers_of_mass!(state)
+
+        state.dose_active && accrue_dose!(state)
+        spm = state.params.seconds_per_mcs
+        if !isnan(spm)
+            sim.physical_time_s += spm
+            state.physical_time_s = sim.physical_time_s
+        end
+    end
+    return sim
 end
 
 # ============================================================
