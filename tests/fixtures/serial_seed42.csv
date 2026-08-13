@@ -1,0 +1,11 @@
+# Golden serial CSV contract — validate_serial.jl seed 42 at baseline ec8929d.
+# Pinned to the Julia 1.12 MersenneTwister stream; regenerating under a different
+# Julia minor version may legitimately change bytes (regenerate + note here if so).
+CSV,42,1,698,6,0.97333,1
+CSV,42,2,703,6,0.29857,1
+CSV,42,3,698,6,1.43716,1
+CSV,42,4,701,6,0.31209,1
+CSV,42,5,698,6,0.93862,1
+CSV,42,6,698,6,0.11972,1
+CSV,42,7,692,6,0.13249,1
+CSVTOT,42,42,0.77856
