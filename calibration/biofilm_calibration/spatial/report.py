@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..schema import SchemaError, read_table
+from ..acquisition import BASELINE_CONDITION
 from .schema import (BIOFILM_STRUCTURE, ENTITY_SEMANTICS, OBJECT_MORPHOLOGY,
                      SAMPLE_METADATA)
 from .time_observable import TIME_OBSERVABLE
@@ -125,6 +126,29 @@ def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
             blockers.append(
                 "no sample is designated held_out — a pitch fitted and "
                 "validated on the same stacks has not been validated")
+
+    # A surrogate exercises the harness and cannot clear the target gate,
+    # and no campaign may be designed without an institutional approval id.
+    baseline, err_b = _load(data_dir.parent / "baseline_condition.csv",
+                            BASELINE_CONDITION)
+    if err_b:
+        blockers.append(f"baseline_condition unreadable: {err_b}")
+    elif not baseline:
+        blockers.append(
+            "no baseline condition declared — every calibration value inherits "
+            "the conditions it was measured under")
+    else:
+        for r in baseline:
+            if not (r.get("institutional_approval_id") or "").strip():
+                blockers.append(
+                    f"growth condition {r['growth_condition_id']!r} has no "
+                    "institutional_approval_id — biosafety follows strains, not "
+                    "species, and the approval must precede culturing")
+            if r.get("is_target_system") != "true":
+                blockers.append(
+                    f"growth condition {r['growth_condition_id']!r} is not the "
+                    "target system: a surrogate exercises the harness but "
+                    "cannot clear the gate for the seven-species consortium")
 
     # READY_FOR_TIME_CALIBRATION asserts the time calibration can BEGIN, and
     # dt_MCS = a^2 * S_sim / S_exp needs both a pitch and an observable the

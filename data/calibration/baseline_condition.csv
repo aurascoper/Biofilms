@@ -7,6 +7,12 @@
 # the cubic lattice reproduce a full apparatus.
 # A single-species or surrogate specimen exercises the harness but
 # cannot clear the gate for the seven-species target system.
+# BIOSAFETY FOLLOWS STRAINS, NOT SPECIES. Several components are
+# commonly BSL-1 while C. neoformans strains are commonly BSL-2, and
+# collection material under one species name can carry different
+# assigned levels. Current guidance is protocol-driven risk assessment
+# rather than a level label, so the chain is: exact strain IDs ->
+# institutional review -> containment decision -> approved procedures.
 # UNIQUENESS KEY: growth_condition_id
 # Blank numeric cells mean NOT MEASURED. They are never read as zero.
-growth_condition_id,consortium_or_surrogate,strain_identities,growth_medium,temperature_C,pH,oxygen_condition,substrate_or_membrane,biofilm_age_h,flow_condition,irradiation,domain_semantics,is_target_system,evidence_basis,source_id,status,notes
+growth_condition_id,consortium_or_surrogate,strain_identities,biosafety_level_by_strain,institutional_approval_id,containment_facility,risk_assessment_reference,growth_medium,temperature_C,pH,oxygen_condition,substrate_or_membrane,biofilm_age_h,flow_condition,irradiation,domain_semantics,is_target_system,evidence_basis,source_id,status,notes
