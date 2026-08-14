@@ -1,7 +1,8 @@
 # Physical reference system
 
-**Date:** 2026-08-14 · **Status:** A0 partially ready, C evidence-only, B/D declared ·
-**Ledger:** `data/parameter_provenance.csv` · **Source registry:** `data/sources.csv`
+**Date:** 2026-08-14 · **Status:** A0 **buildable** (`config/reference_a0_water_phantom.toml`),
+C evidence-only, A1/B/D declared · **Ledger:** `data/parameter_provenance.csv` ·
+**Source registry:** `data/sources.csv`
 
 Nothing in this repository defines a physical system. The legacy R visualization uses
 normalized `R = 1`, `L = 2`, so no value in it can be converted to centimetres by assigning a
@@ -53,9 +54,20 @@ permeability law is scientifically ready while the software has no key to put it
 > on the cylinder axis) irradiating liquid water at 20 °C inside the modeled cylinder, with
 > vacuum outer boundaries, run to validate geometry → tally → normalization only.
 
-The only reference system the current code can build. It validates the transport chain — CSG,
-lattice orientation, mesh congruence, spectrum handling, and the eV/source → Gy/s conversion —
-with no biology and no membrane feedback.
+The only reference system the current code can build, and as of 2026-08-14 it actually builds:
+`config/reference_a0_water_phantom.toml`, a 15 cm radius × 30 cm water cylinder (a little over
+one attenuation length at 661.7 keV, where the mean free path in water is roughly 11.6 cm). The
+scale is the point — at cell scale a photon crosses the whole domain without interacting, which
+reproduces the 75%-zero-score sparsity and validates nothing.
+
+It validates the transport chain — CSG, mesh congruence, spectrum handling, and the eV/source
+normalization — with no biology and no membrane feedback. Three checks run against it in
+`coupling/tests/integration/test_water_phantom.py`: an energy balance with reflective boundaries
+(nothing escapes, so summed heating must recover the emitted energy per source particle), a
+radial falloff shape, and invariance of total deposited energy across nested mesh resolutions.
+The energy balance deliberately does *not* validate the mass denominator — mass cancels in
+`sum(field × mass)` — so the denominator is pinned separately, and the coarsening trap is pinned
+by `tests/test_mesh.py`.
 
 Two declared simplifications, both recorded in the ledger rather than hidden:
 
@@ -215,32 +227,68 @@ The feasibility run reported 75 % of occupied bins unscored at the 10 µm demo t
 median relative error ≈ 1 on the rest. That is a statement about tally statistics, not about
 biology.
 
-`geometry.voxel_pitch_cm` is therefore a **numerical parameter** to be chosen by a
-resolution/history sweep. The CPM lattice pitch is a **separate, still-blocked** quantity: it
-follows from what a CPM ID represents (a literal cell, a fungal compartment, or a coarse biomass
-parcel) and from `a = (V_physical,s / V_target,s)^(1/3)`, which needs microscopy under the
-intended growth conditions. The 10 µm feasibility mesh must never silently become the biological
-pitch — at 120 sites it would imply a 120 000 µm³ target volume, a sphere about 61 µm across.
+This is now enforced rather than merely asserted. The tally mesh used to be welded to the
+lattice — dimension `(n,n,n)` over an extent of `n · voxel_pitch_cm` — so changing the pitch to
+sweep resolution also changed the size of the modeled apparatus, and no convergence study could
+separate discretization error from a change in geometry. Resolution now moves independently:
 
-Because every metric in the sensitivity comparison is a ratio, the sweep can now run at the
+```toml
+[transport.mesh]
+base_dimension = [48, 48, 48]   # phantom only; the biofilm inherits n from the snapshot
+coarsening_factor = 1           # mesh dimension = base / factor
+```
+
+The factor must divide the base exactly, so meshes are **nested by construction** and a fine
+result can be aggregated onto a coarse grid for comparison. Aggregation is a block **sum**,
+because deposited energy and mass are extensive; coarsening each and dividing afterwards
+reproduces the mass-weighted mean of the fine dose. The trap this replaced is worth naming:
+taking the dose denominator from `voxel_pitch_cm` after coarsening understates every dose by
+exactly the coarsening factor cubed, with no shape mismatch to reveal it. `tests/test_mesh.py`
+pins both the invariant and that failure mode.
+
+The **CPM lattice pitch** remains a separate, still-blocked quantity: it follows from what a CPM
+ID represents (a literal cell, a fungal compartment, or a coarse biomass parcel) and from
+`a = (V_physical,s / V_target,s)^(1/3)`, which needs microscopy under the intended growth
+conditions. The 10 µm feasibility mesh must never silently become the biological pitch — at 120
+sites it would imply a 120 000 µm³ target volume, a sphere about 61 µm across.
+
+Because every metric in the sensitivity comparison is a ratio, the sweep can run at the
 `transport` stage in Gy per source particle, before any source activity or biological
-calibration exists.
+calibration exists. Under coarsening, lineage attribution still happens at lattice resolution:
+dose *rate* is intensive, so each voxel carries its coarse bin's rate and labels keep their
+meaning.
 
 ---
 
-## 5. Why there is still no populated configuration TOML
+## 5. The water-phantom gap — CLOSED 2026-08-14
 
-Even A0 — the one `direct` reference system — cannot be built end to end, for a reason
-independent of the staged loader: `required_classes()` hard-requires `medium`,
-`baseline_biomass`, and `membrane` for every model, so a pure water phantom would need
-fabricated biomass and membrane entries just to satisfy the biofilm builder.
+`required_classes()` used to hard-require `medium`, `baseline_biomass`, and `membrane` for
+every model, so a pure water phantom would have needed fabricated biomass and membrane entries
+just to satisfy the biofilm builder. Route 1 of the two recorded here was taken: **a separate
+water-phantom builder**, with the required class set as a parameter.
 
-**Do not add fake biomass to make it build.** Two honest routes, neither taken here:
+```
+build_water_phantom_model(config)              # medium only, no snapshot
+build_biofilm_cylinder_model(snapshot, config) # medium + biomass + membrane
+```
 
-1. a separate water-phantom model builder; or
-2. a geometry-kind discriminator with stage- and geometry-specific required materials.
+The model kind is chosen by which builder you call — and mirrored by which `kind=` the loader
+was given — exactly as the stage is chosen by which loader you call. It is never declared in
+the TOML, so a declared kind can never contradict the builder that actually ran; each builder
+asserts the config was loaded for it and refuses otherwise. Required keys are now
+kind-dependent too: a phantom is not asked for a lattice pitch or a membrane thickness it has
+no use for.
 
-Until one exists, A0's `materials.baseline_biomass.*` and `materials.membrane.*` rows stay
-`blocked`, and `source.photons_per_second` stays `blocked` pending an assay certificate with a
-reference date. A per-source transport TOML becomes legitimate for A0 the moment the
-water-phantom question is resolved; a full-coupling TOML remains out of scope.
+The consequence for the ledger is that A0's `materials.baseline_biomass.*`,
+`materials.membrane.*`, `geometry.voxel_pitch_cm` and `geometry.membrane_thickness_cm` rows
+moved from `blocked` to **`not_applicable`** — the distinction the reviewer insisted on, and
+the reason a transport benchmark is no longer reported as missing things it never needed.
+
+`config/reference_a0_water_phantom.toml` is therefore the first populated configuration in the
+repository. It is a **transport-validation** config, not a calibration: every value in it is
+either evaluated nuclear data or a declared modeling choice. `source.photons_per_second` stays
+unset — it is a dosimetry-stage key and still needs an assay certificate with a reference date.
+A full-coupling TOML remains out of scope.
+
+Still not buildable: **A1**, which needs source-capsule CSG, and **C**, whose topology is
+inverted and whose aspect ratio no cubic isotropic lattice can hold.

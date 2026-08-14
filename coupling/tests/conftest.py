@@ -69,6 +69,48 @@ density_g_cm3 = 0.94
 """
 
 
+# Reference A0: an idealized Cs-137 point source in a water cylinder, at
+# DOSIMETRY scale (~1-3 attenuation lengths at 661.7 keV, where mu/rho gives a
+# mean free path of roughly 10 cm in water). At cell scale a photon would cross
+# the whole domain without interacting and the run would validate nothing.
+# The single 661.655 keV line is the evaluated EMISSION energy (LNE-LNHB, sec.
+# 5.2), not the 661.657 keV transition energy; a single retained line makes the
+# PMF trivially 1.0. No biomass, no membrane — that is the point.
+WATER_PHANTOM_CONFIG = """
+schema_version = 1
+
+[geometry]
+origin_cm = [0.0, 0.0, 0.0]
+cylinder_radius_cm = 15.0
+cylinder_length_cm = 30.0
+
+[boundaries]
+axial = "vacuum"
+radial_outer = "vacuum"
+
+[source]
+photons_per_second = 1.0e9
+spectrum_energies_eV = [661655.0]
+spectrum_probabilities = [1.0]
+spatial = "point_origin"
+angular = "isotropic"
+
+[transport]
+batches = 5
+particles = 2000
+seed = 7
+
+  [transport.mesh]
+  base_dimension = [12, 12, 12]
+
+[materials.medium]
+density_g_cm3 = 1.0
+  [materials.medium.elements]
+  H = 0.111894
+  O = 0.888106
+"""
+
+
 def make_snapshot_file(path, n=8, n_lineages=3, config_toml=""):
     """Write a synthetic transport snapshot in the JULIA storage layout:
     logical (x,y,z) arrays land in the file so h5py sees dims reversed —

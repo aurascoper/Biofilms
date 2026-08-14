@@ -70,6 +70,24 @@ def test_gate_decision_paths():
     assert evaluate_gate({}, 0.05)[0] == GATE_NOT_EVALUATED
 
 
+def _fake_runner_factory(n, calls):
+    def fake_runner(model, name):
+        calls.append(name)
+        hot = 2.0 if name == "denser" else 1.0
+        field = np.full((n, n, n), hot)
+        return heating_statepoint_from_logical(field, field * 0.01)
+    return fake_runner
+
+
+def _stub_build_model(monkeypatch):
+    """`_problem_ops` imports the builders at call time, so patching the module
+    attributes is enough to keep openmc out of the fake-runner path."""
+    import biofilm_openmc.model as model_mod
+    monkeypatch.setattr(model_mod, "build_biofilm_cylinder_model",
+                        lambda s, c: None)
+    monkeypatch.setattr(model_mod, "build_water_phantom_model", lambda c: None)
+
+
 def test_scan_loop_with_fake_runner(tmp_path, snapshot, config, monkeypatch):
     """Full scan loop: fake transport returns a hotter field for the denser
     scenario; identical physical state is run once (exact-hash reuse)."""
@@ -89,10 +107,7 @@ def test_scan_loop_with_fake_runner(tmp_path, snapshot, config, monkeypatch):
         return heating_statepoint_from_logical(field, field * 0.01)
 
     # build_model imports openmc — stub it out for the fake path
-    import biofilm_openmc.drivers as drv
-    monkeypatch.setattr(drv, "build_model", lambda s, c: None, raising=False)
-    import biofilm_openmc.model as model_mod
-    monkeypatch.setattr(model_mod, "build_model", lambda s, c: None)
+    _stub_build_model(monkeypatch)
 
     report = scan(snapshot, config,
                   {"denser": denser, "duplicate": same_as_base},
@@ -109,22 +124,6 @@ def test_scan_loop_with_fake_runner(tmp_path, snapshot, config, monkeypatch):
     assert (tmp_path / "transport_result_denser.h5").exists()
     assert not (tmp_path / "transport_result_duplicate.h5").exists()
     assert report["metrics"]["duplicate"]["effect_rel"] == 0.0
-
-
-def _fake_runner_factory(n, calls):
-    def fake_runner(model, name):
-        calls.append(name)
-        hot = 2.0 if name == "denser" else 1.0
-        field = np.full((n, n, n), hot)
-        return heating_statepoint_from_logical(field, field * 0.01)
-    return fake_runner
-
-
-def _stub_build_model(monkeypatch):
-    import biofilm_openmc.drivers as drv
-    monkeypatch.setattr(drv, "build_model", lambda s, c: None, raising=False)
-    import biofilm_openmc.model as model_mod
-    monkeypatch.setattr(model_mod, "build_model", lambda s, c: None)
 
 
 def test_transport_stage_scan_needs_no_source_activity(tmp_path, snapshot,
@@ -176,3 +175,68 @@ def test_activity_only_scenario_reuses_the_run_but_not_the_dose(
     assert (tmp_path / "transport_result_hotter.h5").exists()
     # twice the activity is twice the dose: effect_rel == 1.0
     assert np.isclose(report["metrics"]["hotter"]["effect_rel"], 1.0)
+
+
+def test_water_phantom_scan_needs_no_snapshot(tmp_path, monkeypatch):
+    """The water-phantom gap, closed end to end: a scan runs with no snapshot,
+    no biomass and no membrane — and reports no label attribution, because a
+    phantom has no labels."""
+    from biofilm_openmc.config import WATER_PHANTOM, load_transport_config
+
+    from conftest import WATER_PHANTOM_CONFIG
+
+    base = load_transport_config(WATER_PHANTOM_CONFIG, kind=WATER_PHANTOM)
+    denser = load_transport_config(
+        WATER_PHANTOM_CONFIG.replace("density_g_cm3 = 1.0",
+                                     "density_g_cm3 = 1.2"),
+        kind=WATER_PHANTOM)
+
+    calls = []
+    _stub_build_model(monkeypatch)
+
+    report = scan(None, base, {"denser": denser},
+                  _fake_runner_factory(12, calls), tmp_path,
+                  effect_threshold=0.05, dose_floor_Gy_s=0.0,
+                  nuclear_data_id="test", openmc_version="fake",
+                  stage="transport")
+
+    assert report["model_kind"] == WATER_PHANTOM
+    assert report["mesh_dimension"] == [12, 12, 12]
+    assert report["field_unit"] == "Gy/source-particle"
+    assert "baseline_lineage_dose" not in report
+    assert "label_state_hash" not in report
+    assert sorted(calls) == ["baseline", "denser"]
+
+
+def test_coarsening_changes_the_mesh_and_the_field_shape(tmp_path, snapshot,
+                                                         monkeypatch):
+    """Coarsening moves resolution only: the field comes back smaller while the
+    modeled geometry is untouched."""
+    from biofilm_openmc.config import load_transport_config
+
+    coarse = load_transport_config(VALID_CONFIG.replace(
+        "[transport]", "[transport]\n  [transport.mesh]\n  coarsening_factor = 2\n"))
+
+    calls = []
+    _stub_build_model(monkeypatch)
+
+    def runner(model, name):
+        calls.append(name)
+        field = np.full((4, 4, 4), 1.0)          # 8/2 = 4 bins per axis
+        return heating_statepoint_from_logical(field, field * 0.01)
+
+    report = scan(snapshot, coarse, {}, runner, tmp_path,
+                  effect_threshold=0.05, dose_floor_Gy_s=0.0,
+                  nuclear_data_id="test", openmc_version="fake",
+                  stage="transport")
+
+    assert report["mesh_dimension"] == [4, 4, 4]
+    # lineage attribution still happens at LATTICE resolution
+    assert report["baseline_lineage_dose"]
+
+
+def test_biofilm_model_requires_a_snapshot(tmp_path, capsys):
+    rc = main_scan(["--config", str(TEMPLATE), "--model", "biofilm_cylinder"])
+    out = capsys.readouterr().out
+    assert rc == 2
+    assert "--snapshot is required" in out

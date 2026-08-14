@@ -16,7 +16,21 @@
 #
 # Pick the stage by which loader you call (load_transport_config, ...) or
 # `biofilm-dose-scan --stage`. Transport needs no source activity, no CPM
-# clock and no biological scales, because build_model() reads none of them.
+# clock and no biological scales, because the builders read none of them.
+#
+# The MODEL KIND is chosen the same way — by which builder/loader you call, or
+# `biofilm-dose-scan --model` — and is never declared here, so it cannot
+# contradict the builder that runs. Required keys differ by kind:
+#
+#   biofilm_cylinder  needs geometry.voxel_pitch_cm, geometry.membrane_thickness_cm,
+#                     and the medium / baseline_biomass / membrane classes;
+#                     its tally resolution comes from the snapshot lattice.
+#   water_phantom     needs neither pitch nor membrane, and only the medium
+#                     class; its tally resolution comes from
+#                     transport.mesh.base_dimension.
+#
+# This template describes the BIOFILM model. For a worked water phantom see
+# config/reference_a0_water_phantom.toml.
 
 schema_version = 1
 
@@ -86,6 +100,18 @@ schema_version = 1
 batches = 10
 particles = 10000
 seed = 1
+
+  [transport.mesh]
+  # Tally resolution, INDEPENDENT of the physical geometry. The mesh used to be
+  # welded to the lattice, so changing the pitch to sweep resolution also
+  # changed the size of the modeled apparatus.
+  #
+  # Mesh dimension = base / coarsening_factor, and the factor must divide the
+  # base exactly, so meshes are nested and a fine result can be aggregated onto
+  # a coarse one. The biofilm model takes its base from the snapshot lattice
+  # (n,n,n); base_dimension is REQUIRED for a water phantom and unused here.
+  coarsening_factor = 1
+  # base_dimension = [48, 48, 48]   # water_phantom only
 
 [materials]
 # REQUIRED — config-defined material class table (arbitrary names; the

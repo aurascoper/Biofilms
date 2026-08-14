@@ -38,10 +38,14 @@ def _sha(*chunks: bytes) -> str:
     return h.hexdigest()
 
 
-def transport_state_hash(snapshot: Snapshot, config: TransportConfig,
-                         nuclear_data_id: str = "unset") -> str:
-    classes = voxel_class_array(snapshot, config)
-    manifest = {
+def _manifest(config: TransportConfig, nuclear_data_id: str, mesh_dimension) -> dict:
+    """Everything the OpenMC run depends on except the voxel class array.
+
+    The tally mesh dimension is included: changing the resolution changes the
+    run, so a coarsened result must never be served from a finer run's cache.
+    """
+    return {
+        "model_kind": config.model_kind,
         "materials": {name: {"density_g_cm3": mc.density_g_cm3,
                              "elements": list(mc.elements)}
                       for name, mc in sorted(config.materials.items())},
@@ -56,10 +60,34 @@ def transport_state_hash(snapshot: Snapshot, config: TransportConfig,
                    config.source_spatial, config.source_angular],
         "transport": [config.batches, config.particles, config.seed],
         "nuclear_data": nuclear_data_id,
-        "mesh": list(snapshot.cell_id.shape),
+        "mesh": list(mesh_dimension),
     }
+
+
+def transport_state_hash(snapshot: Snapshot, config: TransportConfig,
+                         nuclear_data_id: str = "unset") -> str:
+    from .mesh import resolve_mesh_dimension
+
+    classes = voxel_class_array(snapshot, config)
+    n = snapshot.cell_id.shape[0]
+    manifest = _manifest(config, nuclear_data_id,
+                         resolve_mesh_dimension((n, n, n),
+                                                config.mesh_coarsening_factor))
+    manifest["lattice"] = list(snapshot.cell_id.shape)
     class_bytes = "\x00".join(classes.ravel(order="C")).encode()
     return _sha(class_bytes, json.dumps(manifest, sort_keys=True).encode())
+
+
+def water_phantom_state_hash(config: TransportConfig,
+                             nuclear_data_id: str = "unset") -> str:
+    """Transport identity of a homogeneous phantom: the same manifest, minus
+    the voxel class array it does not have."""
+    from .mesh import resolve_mesh_dimension
+
+    manifest = _manifest(config, nuclear_data_id,
+                         resolve_mesh_dimension(config.mesh_base_dimension,
+                                                config.mesh_coarsening_factor))
+    return _sha(json.dumps(manifest, sort_keys=True).encode())
 
 
 def dose_state_hash(transport_hash: str, photons_per_second: float) -> str:
