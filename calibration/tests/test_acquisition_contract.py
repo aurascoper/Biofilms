@@ -152,3 +152,78 @@ def test_material_gate_names_unblanked_samples(tmp_path):
         "lint-free,5,21.0,120,105C,constant mass,,ok,S1\n")
     gates = material_report.evaluate(tmp_path)
     assert any("name no blank" in b for b in gates.openmc_blockers)
+
+
+# --- dynamic-observable contract -------------------------------------------
+
+def test_no_dynamic_observable_is_selected(data_dir):
+    """Choosing among the viable candidates is an experimental-design decision,
+    so the table ships with none selected and the gate says so."""
+    from biofilm_calibration.spatial.time_observable import (TIME_OBSERVABLE,
+                                                             problems, selectable)
+    rows = read_table(data_dir / "spatial" / "time_observable.csv", TIME_OBSERVABLE)
+    assert rows, "candidates must be declared"
+    assert not any(r["selected"] == "true" for r in rows)
+    assert sum(1 for r in rows if selectable(r)) >= 1
+    assert any("no dynamic observable selected" in p for p in problems(rows))
+
+
+def test_growth_dominated_observables_are_unsupported_not_blocked(data_dir):
+    """A blocked quantity awaits a measurement; an unsupported one awaits a
+    model change. No amount of thickening data calibrates a model that cannot
+    thicken."""
+    from biofilm_calibration.spatial.time_observable import TIME_OBSERVABLE
+    rows = {r["observable_id"]: r for r in
+            read_table(data_dir / "spatial" / "time_observable.csv", TIME_OBSERVABLE)}
+    for oid in ("biofilm_thickening_rate", "specific_growth_rate"):
+        assert rows[oid]["represented_by_model"] == "false", oid
+        assert rows[oid]["status"] == "unsupported_by_current_model", oid
+
+
+def test_single_cell_msd_is_semantically_incompatible(data_dir):
+    """The conventional choice, and a category mismatch under parcel
+    semantics: a cell_id is not an observable bacterium."""
+    from biofilm_calibration.spatial.time_observable import (TIME_OBSERVABLE,
+                                                             selectable)
+    rows = {r["observable_id"]: r for r in
+            read_table(data_dir / "spatial" / "time_observable.csv", TIME_OBSERVABLE)}
+    msd = rows["single_cell_msd"]
+    assert msd["represented_by_model"] == "true"
+    assert msd["measurable"] == "true"
+    assert msd["semantically_compatible_with_parcel"] == "false"
+    assert not selectable(msd)
+
+
+def test_a_selected_but_unqualified_observable_is_rejected():
+    """Selection must satisfy all three conditions, not merely be marked."""
+    from biofilm_calibration.spatial.time_observable import problems
+    bad = [{"observable_id": "x", "selected": "true",
+            "represented_by_model": "false", "measurable": "true",
+            "semantically_compatible_with_parcel": "true"}]
+    assert any("is selected but fails" in p for p in problems(bad))
+
+
+def test_spatial_gate_blocks_on_the_missing_observable(data_dir, config_dir):
+    from biofilm_calibration.spatial import report
+    gate = report.evaluate(data_dir / "spatial",
+                           config_dir / "cpm_spatial_acceptance_template.toml")
+    assert gate.verdict == report.PROVISIONAL
+    assert any("no dynamic observable selected" in b for b in gate.blockers)
+
+
+def test_unsupported_status_cannot_carry_a_value():
+    """A new status must not fall through the no-value check the way an
+    unlisted one silently would."""
+    from biofilm_calibration.schema import (NO_VALUE_STATUSES, SchemaError,
+                                            Column, TableSchema, read_table)
+    import pytest as _pt
+    assert "unsupported_by_current_model" in NO_VALUE_STATUSES
+    S = TableSchema(name="t", columns=(Column("id"), Column("v", numeric=True,
+                                                            required=False),
+                                       Column("status")), key=("id",))
+    import tempfile, pathlib as _pl
+    with tempfile.TemporaryDirectory() as td:
+        p = _pl.Path(td) / "t.csv"
+        p.write_text("id,v,status\na,1.5,unsupported_by_current_model\n")
+        with _pt.raises(SchemaError, match="has no value"):
+            read_table(p, S)
