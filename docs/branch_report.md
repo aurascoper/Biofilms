@@ -1,7 +1,9 @@
 # Branch report: feat/openmc-dose-coupling
 
-**Start:** `ec8929d` (clean master baseline) · **End:** `9e63eb7` + this report ·
-**10 commits, 44 files changed, ~3850 insertions** · 2026-08-13
+**Start:** `ec8929d` (clean master baseline) ·
+**Implementation end:** `9e63eb7` ·
+**Report/final end:** `f1ce47d` (the commit adding this report) ·
+**11 commits, 45 files changed, ~3850 insertions** · 2026-08-13
 
 Unrelated visualization WIP preserved separately on `feat/visualize-3d`.
 
