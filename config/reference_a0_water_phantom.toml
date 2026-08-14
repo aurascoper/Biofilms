@@ -57,15 +57,25 @@ angular = "isotropic"
 # with Y = 0.8501(20) for the retained line and T_half = 30.018(22) a.
 
 [transport]
-batches = 10
-particles = 25000        # 250k histories: the foundation benchmark's budget
+# Set by the A0 resolution/history sweep (2026-08-14) — see
+# docs/a0_transport_resolution_decision.md and data/a0_transport_convergence.csv.
+# 80 x 50000 = 4e6 histories: median relative error 6.7%, p90 10.1% at the
+# mesh below, in under 3 seconds.
+batches = 80
+particles = 50000
 
   [transport.mesh]
-  # Tally resolution, INDEPENDENT of the physical geometry above. 48 divides by
-  # 1, 2, 4, 8 and 16, so the resolution sweep produces nested meshes and a
-  # fine result can be aggregated onto a coarse one for comparison.
+  # Tally resolution, INDEPENDENT of the physical geometry above. 48 divides
+  # by 1, 2, 4, 8 and 16, so the sweep's meshes nest and a fine result can be
+  # aggregated onto a coarse one for comparison.
   base_dimension = [48, 48, 48]
-  coarsening_factor = 1
+  # 24^3, 1.95 cm bins, 24 across the cylinder. Holds the mass-weighted
+  # aggregate within 0.35% of the finest mesh at a tenth of the storage.
+  # HARD CEILING 4: beyond it the in-cylinder region is unresolved and
+  # aggregates drift ~11% per step for reasons unrelated to transport.
+  # Use 1 instead when the consumer is a per-bin field, not an aggregate:
+  # factor 2 already discards 17.7% of the field structure.
+  coarsening_factor = 2
 
 [materials.medium]
 # Liquid water. Stoichiometric mass fractions from standard atomic weights:
