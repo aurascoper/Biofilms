@@ -123,3 +123,25 @@ BLANKS = TableSchema(
 )
 
 ALL_TABLES = (BASELINE_CONDITION, BLANKS)
+
+
+# What a segmented volume actually encloses. This is a DIFFERENT axis from the
+# mass basis in materials/basis_conversion.py: that one says what a number is
+# measured per, this one says what a volume contains.
+SEGMENTATION_BASIS = frozenset({
+    # Stained cells only. Excludes the matrix AND the pore water between
+    # cells, so it is smaller than what a balance weighs — by whatever
+    # fraction of the biofilm is EPS and interstitial liquid.
+    "cells_only",
+    # Cells plus stained extracellular matrix. Closer, but a union of stained
+    # voxels still excludes water-filled internal voids, so it needs a declared
+    # pore fraction before it can stand in for the envelope.
+    "cells_and_matrix",
+    # The enclosing biofilm envelope, internal voids included. The only basis
+    # that matches the material a balance weighs.
+    "whole_biofilm_envelope",
+    "unresolved",
+})
+
+# The one basis that may be divided into a whole-biofilm wet mass directly.
+WHOLE_BIOFILM_BASIS = "whole_biofilm_envelope"

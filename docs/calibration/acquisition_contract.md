@@ -93,11 +93,31 @@ would give a pitch for one biofilm and a density for another, and nothing downst
 
 ## 5. Gravimetry protocol
 
-### Hydrated volume
+### Hydrated volume, and what it must enclose
 
 Preferably from the calibrated 3-D imaging over a known substrate area,
 `V_hydrated = ∫B(x,y,z) dV`. A mean-thickness × area approximation is permitted only with its
 assumptions and uncertainty recorded — `volume_method` is a required column for that reason.
+
+**The volume and the mass must describe the same material.** A balance weighs the whole biofilm:
+cells, extracellular matrix, interstitial water and retained solutes. A cell-only fluorescence
+segmentation encloses none of the last three, so `ρ_wet = m_wet / V_hydrated` computed from that
+pair is **systematically high** by whatever fraction of the biofilm is matrix and water. Both
+numbers are positive floats of plausible size, so nothing about them reveals the mismatch — the
+closest published analogue built its total biovolume from live cells, dead cells *and* EPS before
+combining it with dry mass, precisely for this reason.
+
+`segmentation_basis` (imaging) and `volume_basis` (gravimetry) therefore record what the mask
+encloses, and the converters refuse a mismatch:
+
+| Basis | Encloses | Usable as V_hydrated |
+|---|---|---|
+| `cells_only` | stained cells | **no** — omits matrix and pore water |
+| `cells_and_matrix` | cells + stained EPS | only with a declared `pore_volume_fraction`, via `V_envelope = V_stained / (1 − p)` |
+| `whole_biofilm_envelope` | the envelope, internal voids included | **yes** |
+
+A wet mass divided by a cell-only volume **fails** material calibration; the gate says so and
+`wet_bulk_density()` raises.
 
 ### Wet mass, after a reproducible surface-water procedure
 

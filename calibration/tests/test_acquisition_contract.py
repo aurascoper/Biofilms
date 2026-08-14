@@ -24,6 +24,14 @@ LINKAGE = {"culture_batch_id", "paired_sample_group", "blank_sample_id",
            "measurement_order", "growth_condition_id", "medium_batch_id"}
 
 
+def row_for(schema, **values):
+    """Build a CSV row from a schema, so adding a column cannot silently
+    shift a hand-counted fixture into the wrong fields."""
+    missing = set(values) - set(schema.names)
+    assert not missing, f"unknown column(s) for {schema.name}: {missing}"
+    return ",".join(str(values.get(c, "")) for c in schema.names)
+
+
 def test_both_branches_carry_the_same_linkage_columns():
     """Defined once, so the two branches cannot drift apart on the names."""
     assert LINKAGE <= set(SPA_SAMPLES.names)
@@ -116,9 +124,16 @@ def test_spatial_gate_blocks_on_pairing_and_held_out(tmp_path):
         write_template(src / f"{name}.csv", schema)
     # one imaged sample, unpaired and not held out
     (src / "sample_metadata.csv").write_text(
-        ",".join(SPA_SAMPLES.names) + "\n"
-        "s1,batch1,,blank1,1,gc1,med1,false,Pa,PAO1,LB,30,7.0,aerobic,"
-        "stationary,48,confocal,0.1,0.1,0.5,otsu,v1,r1,S1\n")
+        ",".join(SPA_SAMPLES.names) + "\n" + row_for(
+            SPA_SAMPLES, sample_id="s1", culture_batch_id="batch1",
+            blank_sample_id="blank1", growth_condition_id="gc1",
+            held_out="false", species="Pa", medium="LB", temperature_C="30",
+            pH="7.0", oxygen_condition="aerobic", growth_phase="stationary",
+            imaging_method="confocal", voxel_size_x_um="0.1",
+            voxel_size_y_um="0.1", voxel_size_z_um="0.5",
+            segmentation_method="otsu",
+            segmentation_basis="whole_biofilm_envelope",
+            source_id="S1") + "\n")
 
     gate = spatial_report.evaluate(src)
     joined = " ".join(gate.blockers)
@@ -147,9 +162,19 @@ def test_material_gate_names_unblanked_samples(tmp_path):
         write_template(tmp_path / f"{name}.csv", schema)
     # a bulk measurement naming no blank
     (tmp_path / "bulk_measurements.csv").write_text(
-        ",".join(BULK_MEASUREMENTS.names) + "\n"
-        "s1,r1,batch1,pair1,,1,gc1,med1,5.0,1.0,,10.0,,,,imaging,vertical,60,"
-        "lint-free,5,21.0,120,105C,constant mass,,ok,S1\n")
+        ",".join(BULK_MEASUREMENTS.names) + "\n" + row_for(
+            BULK_MEASUREMENTS, sample_id="s1", replicate_id="r1",
+            culture_batch_id="batch1", paired_sample_group="pair1",
+            growth_condition_id="gc1",
+            wet_mass_sample_plus_substrate_g="5.0",
+            dry_mass_sample_plus_substrate_g="1.0",
+            hydrated_volume_cm3="10.0", volume_method="imaging",
+            volume_basis="whole_biofilm_envelope",
+            drain_orientation="vertical", drain_time_s="60",
+            blot_material="lint-free", blot_contact_time_s="5",
+            ambient_temperature_C="21.0", time_to_weighing_s="120",
+            drying_protocol="105C", drying_endpoint="constant mass",
+            quality_flag="ok", source_id="S1") + "\n")
     gates = material_report.evaluate(tmp_path)
     assert any("name no blank" in b for b in gates.openmc_blockers)
 

@@ -112,6 +112,15 @@ def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
                 f"{len(unpaired)} imaged sample(s) have no paired_sample_group "
                 "— a pitch fitted to an unpaired stack describes a different "
                 "biofilm from the one the density was measured on")
+        unresolved_basis = [r["sample_id"] for r in samples
+                            if (r.get("segmentation_basis") or "").strip()
+                            in ("", "unresolved")]
+        if unresolved_basis:
+            blockers.append(
+                f"{len(unresolved_basis)} imaged sample(s) have no declared "
+                "segmentation_basis — V_hydrated is the integral of this field "
+                "and becomes the denominator of rho_wet, so what the mask "
+                "encloses decides whether the density is meaningful")
         if not any((r.get("held_out") or "").strip() == "true" for r in samples):
             blockers.append(
                 "no sample is designated held_out — a pitch fitted and "
