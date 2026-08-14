@@ -38,6 +38,36 @@ schema_version = 1
 # and validated on the same objects has not been validated.
 require_independent_validation_sample = true
 
+[occupancy]
+# REQUIRED — the CPM lattice is binary, so turning a coarse-grained biomass
+# fraction phi into occupied/unoccupied is part of the CALIBRATION, not an
+# implementation detail. The two available maps differ in what they conserve:
+#
+#   threshold        occupied iff phi >= tau. Deterministic, preserves
+#                    connectivity, does NOT conserve total biovolume.
+#   mass_preserving  occupied with probability phi, seeded. Conserves total
+#                    biovolume in expectation; the realisation varies by seed,
+#                    so structural observables need replicate handling.
+#
+# Neither is correct in general. apply_occupancy() refuses while this is unset.
+# mapping =
+# threshold_tau =        # threshold only, in (0, 1]
+# seed =                 # mass_preserving only; unseeded cannot be reproduced
+
+[observables]
+# REQUIRED — tolerated RELATIVE error on each declared calibration observable
+# between the full-resolution field and the coarse-grained one. An undeclared
+# tolerance cannot be passed, so select_pitch() refuses while any is unset.
+#
+# The selection rule is: the COARSEST pitch preserving every observable within
+# tolerance, on training stacks AND on held-out stacks.
+# maximum_biovolume_fraction_error =
+# maximum_porosity_error =
+# maximum_interface_area_error =
+# maximum_correlation_length_error =
+# maximum_thickness_error =
+# maximum_component_size_error =
+
 [domain]
 # REQUIRED — what the modelled cylinder claims to be. The Julia geometry is an
 # N x N x N cube containing a cylinder of radius N/2, so
