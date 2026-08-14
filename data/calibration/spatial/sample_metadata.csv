@@ -1,0 +1,7 @@
+# sample_metadata — imaging and growth conditions for one morphology sample
+# One row per imaged sample. Morphology measured under conditions other
+# than those the model represents is a near-analog at best; the columns
+# exist so that can be judged rather than assumed.
+# UNIQUENESS KEY: sample_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,species,strain,medium,temperature_C,pH,oxygen_condition,growth_phase,biofilm_age_h,imaging_method,voxel_size_x_um,voxel_size_y_um,voxel_size_z_um,segmentation_method,segmentation_version,replicate_id,source_id

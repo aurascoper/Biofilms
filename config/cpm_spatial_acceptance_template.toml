@@ -1,0 +1,50 @@
+# CPM spatial acceptance criteria — TEMPLATE.
+#
+# Every threshold ships UNSET, for the same reason the coupling config does:
+# nothing in this repository defines them, and a pitch selected because it
+# happens to fit the current N = 60 is not a calibration.
+# `scale_candidates.select()` refuses to return anything while they are unset.
+#
+# These are declared ENGINEERING TARGETS, not physical laws. Whoever fills them
+# is making a modelling decision and should be able to say why.
+
+schema_version = 1
+
+[representation]
+# REQUIRED — how many voxels the SMALLEST dimension of interest must span
+# before its shape is considered resolved. Below roughly 4 a sphere is visibly
+# faceted; below 2 nothing anisotropic survives at all.
+# minimum_minor_axis_voxels =
+
+# REQUIRED — tolerated |target_sites - exact_sites| / exact_sites when forcing
+# an entity's physical volume onto an integer site target.
+# maximum_volume_quantization_error =
+
+# REQUIRED — tolerated error in the major/minor axis ratio. NOTE: this can only
+# ever be checked against a shape the CPM can HOLD. compute_delta_H has no
+# elongation term, so anisotropic targets will fail this by construction — that
+# is a model finding, not a threshold to loosen.
+# maximum_axis_ratio_error =
+
+# REQUIRED — memory ceiling for the Int32 lattice alone. The CPM carries several
+# float64 fields of the same shape alongside it, so budget several times this.
+# maximum_memory_bytes =
+
+# REQUIRED — minimum segmented objects per species before a size distribution
+# is treated as a distribution rather than an anecdote.
+# minimum_objects_per_species =
+
+# Whether a held-out sample must reproduce the fit. Default true: a pitch fitted
+# and validated on the same objects has not been validated.
+require_independent_validation_sample = true
+
+[domain]
+# REQUIRED — what the modelled cylinder claims to be. The Julia geometry is an
+# N x N x N cube containing a cylinder of radius N/2, so
+#     R_physical = (N/2)*a,  L_physical = N*a,  and L = 2R ALWAYS.
+# There is no length field anywhere in biofilms_potts.jl. An apparatus whose
+# real aspect ratio is not 2 therefore cannot be claimed as "full_apparatus"
+# at any pitch — that is a topology fact, not a resolution one.
+#
+#   representative_segment | microvolume | full_apparatus
+# semantics =
