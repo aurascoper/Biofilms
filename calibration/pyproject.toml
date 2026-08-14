@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biofilm-calibration"
+version = "0.1.0"
+description = "Calibration contracts and analysis harnesses for the CPM biofilm model"
+requires-python = ">=3.11"
+# Deliberately numpy-only. These are schema and metric harnesses; no imaging
+# stack, no optimizer, no inference framework. Add one when a measured dataset
+# exists to justify it.
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["biofilm_calibration*"]
+
+[tool.pytest.ini_options]
+# Same rationale as coupling/: gated tests skip rather than deselect, so the
+# report always distinguishes passed / failed / SKIPPED.
+markers = [
+    "needs_measured_data: requires a measured dataset that does not exist yet",
+]

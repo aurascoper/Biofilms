@@ -39,6 +39,22 @@ jobs:
       - name: Run unit tier
         run: cd coupling && pytest -rs tests
 
+  calibration-unit:
+    # Calibration contracts and harnesses: numpy/pytest only, no transport
+    # stack. Separate package from coupling/ because it answers biological
+    # questions, and separate from the top-level tests/ directory because that
+    # one is the Julia suite.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: pip install -e "calibration[dev]"
+      - name: Run calibration tier
+        run: cd calibration && pytest -rs tests
+
   openmc-integration:
     # Manual opt-in: pinned conda-forge OpenMC + nuclear data are heavy.
     if: github.event_name == 'workflow_dispatch' && inputs.run_openmc_integration
