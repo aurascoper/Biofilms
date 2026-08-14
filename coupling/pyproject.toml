@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biofilm-openmc"
+version = "0.1.0"
+description = "CPM biofilm <-> OpenMC photon-transport coupling (offline-first)"
+requires-python = ">=3.11"
+dependencies = ["numpy", "h5py"]
+
+[project.scripts]
+biofilm-dose-scan = "biofilm_openmc.drivers:main_scan"
+
+[project.optional-dependencies]
+# The real transport stack is provided by the pinned conda env
+# (conda-forge openmc=0.15.3, see docs); this extra only documents the pin.
+openmc = ["openmc==0.15.3"]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["biofilm_openmc*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "openmc_api: needs the OpenMC Python API importable (no transport run, no nuclear data)",
+    "openmc: needs the OpenMC executable AND nuclear data (OPENMC_CROSS_SECTIONS)",
+]
+# No -m deselection: gated tests use skipif so accounting is always
+# passed/failed/SKIPPED — deselected tests hide from the report.

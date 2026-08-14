@@ -376,3 +376,10 @@ FodyWeavers.xsd
 # Machine-local Julia state (JACC is dev-pathed; backend is a local preference)
 Manifest.toml
 LocalPreferences.toml
+
+# Python coupling env/artifacts
+coupling/.venv/
+coupling/**/__pycache__/
+coupling/*.egg-info/
+coupling/biofilm_openmc.egg-info/
+.pytest_cache/

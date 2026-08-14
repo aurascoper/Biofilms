@@ -169,7 +169,7 @@ langevin_dynamics_cyl <- function(state, parameters, positions,
       F_rad <- parameters$rad_sensitivity * I_r * (-radial_unit)
     } else {
       # radiosensitive: repelled from source, force points outward
-      F_rad <- -parameters$rad_sensitivity * I_r * radial_unit
+      F_rad <- parameters$rad_sensitivity * I_r * radial_unit
     }
   }
 

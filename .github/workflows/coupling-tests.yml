@@ -1,0 +1,62 @@
+name: coupling-tests
+
+on:
+  push:
+    branches: [master, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_openmc_integration:
+        description: "Run the OpenMC integration tier (executable + nuclear data)"
+        type: boolean
+        default: false
+
+jobs:
+  julia-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - name: Instantiate
+        run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
+      - name: Run Julia test suite
+        run: julia --project=. tests/runtests.jl
+
+  python-unit:
+    # Bare tier: numpy/h5py/pytest only. openmc-gated tests report SKIPPED
+    # via importorskip — never deselected, never falsely passed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package (bare)
+        run: pip install -e "coupling[dev]"
+      - name: Run unit tier
+        run: cd coupling && pytest -rs tests
+
+  openmc-integration:
+    # Manual opt-in: pinned conda-forge OpenMC + nuclear data are heavy.
+    if: github.event_name == 'workflow_dispatch' && inputs.run_openmc_integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-name: openmc-biofilms
+          create-args: >-
+            -c conda-forge
+            openmc=0.15.3
+            h5py
+            numpy
+            pytest
+      - name: Install package
+        shell: micromamba-shell {0}
+        run: pip install -e "coupling[dev]"
+      - name: Run all tiers (no nuclear data on runner; data-gated tests skip)
+        shell: micromamba-shell {0}
+        run: cd coupling && pytest -rs tests
