@@ -90,9 +90,18 @@ def test_baseline_condition_can_declare_a_surrogate(tmp_path):
     """A surrogate exercises the harness; is_target_system records that it
     cannot clear the gate."""
     p = tmp_path / "b.csv"
-    p.write_text(",".join(BASELINE_CONDITION.names) + "\n"
-                 "gc1,P. aeruginosa surrogate,PAO1,LB,30,7.0,aerobic,glass,48,"
-                 "static,none,microvolume,false,declared,S1,provisional,pilot\n")
+    p.write_text(",".join(BASELINE_CONDITION.names) + "\n" + row_for(
+        BASELINE_CONDITION, growth_condition_id="gc1",
+        consortium_or_surrogate="P. aeruginosa surrogate",
+        strain_identities="PAO1", biosafety_level_by_strain="PAO1:BSL2",
+        institutional_approval_id="IBC-2026-001",
+        containment_facility="BSL2 core", growth_medium="LB",
+        temperature_C="30", pH="7.0", oxygen_condition="aerobic",
+        substrate_or_membrane="glass", biofilm_age_h="48",
+        flow_condition="static", irradiation="none",
+        domain_semantics="microvolume", is_target_system="false",
+        evidence_basis="declared", source_id="S1", status="provisional",
+        notes="pilot") + "\n")
     rows = read_table(p, BASELINE_CONDITION)
     assert rows[0]["is_target_system"] == "false"
     assert rows[0]["domain_semantics"] == "microvolume"
@@ -181,16 +190,17 @@ def test_material_gate_names_unblanked_samples(tmp_path):
 
 # --- dynamic-observable contract -------------------------------------------
 
-def test_no_dynamic_observable_is_selected(data_dir):
-    """Choosing among the viable candidates is an experimental-design decision,
-    so the table ships with none selected and the gate says so."""
+def test_exactly_one_dynamic_observable_is_selected(data_dir):
+    """Selected 2026-08-14 rather than left open: the choice determines whether
+    the campaign needs time-resolved stacks, and discovering that after a
+    static campaign would mean repeating it."""
     from biofilm_calibration.spatial.time_observable import (TIME_OBSERVABLE,
                                                              problems, selectable)
     rows = read_table(data_dir / "spatial" / "time_observable.csv", TIME_OBSERVABLE)
-    assert rows, "candidates must be declared"
-    assert not any(r["selected"] == "true" for r in rows)
-    assert sum(1 for r in rows if selectable(r)) >= 1
-    assert any("no dynamic observable selected" in p for p in problems(rows))
+    chosen = [r for r in rows if r["selected"] == "true"]
+    assert len(chosen) == 1, "exactly one observable defines S_exp"
+    assert selectable(chosen[0])
+    assert problems(rows) == []
 
 
 def test_growth_dominated_observables_are_unsupported_not_blocked(data_dir):
@@ -228,12 +238,14 @@ def test_a_selected_but_unqualified_observable_is_rejected():
     assert any("is selected but fails" in p for p in problems(bad))
 
 
-def test_spatial_gate_blocks_on_the_missing_observable(data_dir, config_dir):
+def test_spatial_gate_no_longer_blocks_on_the_observable(data_dir, config_dir):
+    """That half is now settled; the gate stays PROVISIONAL for the rest."""
     from biofilm_calibration.spatial import report
     gate = report.evaluate(data_dir / "spatial",
                            config_dir / "cpm_spatial_acceptance_template.toml")
     assert gate.verdict == report.PROVISIONAL
-    assert any("no dynamic observable selected" in b for b in gate.blockers)
+    assert not any("dynamic observable" in b for b in gate.blockers)
+    assert any("no baseline condition declared" in b for b in gate.blockers)
 
 
 def test_unsupported_status_cannot_carry_a_value():

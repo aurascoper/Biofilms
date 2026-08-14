@@ -18,7 +18,23 @@ consortium or surrogate      strain identities        growth medium
 temperature                  pH                       oxygen condition
 substrate / membrane         biofilm age              flow or static
 irradiation: none (baseline) domain semantics: microvolume
+biosafety level per strain   institutional approval   containment facility
 ```
+
+**Biosafety follows strains, not species.** Several components are commonly BSL-1 while
+*C. neoformans* strains are commonly BSL-2, and collection material under one species name can
+carry different assigned levels — so a species list cannot determine a facility class. Current
+guidance is protocol-driven risk assessment rather than a level label, making the chain:
+
+```
+exact strain IDs -> institutional review -> containment decision -> approved procedures
+```
+
+The gate blocks on a missing `institutional_approval_id`. A sensible staging is to validate the
+whole measurement pipeline — substrates, imaging, blank subtraction, constant-mass drying, sample
+linkage, ingestion, uncertainty — on an approved BSL-1 system first, so that scarce
+higher-containment time is not spent discovering that the hydrated membrane blank swamps the
+biofilm signal.
 
 **`domain.semantics = "microvolume"` for the first calibration.** Not `representative_segment`
 and certainly not `full_apparatus`: the CPM forces `L = 2R` (`R = N/2` recomputed as a local at
@@ -54,8 +70,29 @@ filaments lie outside the model's representational contract. It is not the pitch
 
 ## 3. Acquisition package
 
-At least three independent culture batches, with several non-overlapping 3-D volumes per batch.
-The sample count should be revised once pilot variance is observed rather than fixed here.
+**The replicate count is derived, not declared.** `n = 3` is a convention, not a calculation.
+Run a pilot of a few independent batches, estimate the between-batch, within-batch and blank
+variance components, then compute the required count with
+`precision.required_replicates(target_rel_uncertainty, mean_value, var_between_batch,
+var_within_batch, n_within, var_blank)`. It also names the **dominant** component, which is what
+says where effort belongs — the three answers are different actions:
+
+| Dominant | What buys precision |
+|---|---|
+| between-batch | more independent cultures; extra fields per coupon buy nothing |
+| within-batch | more imaging fields per coupon, which is cheaper than more cultures |
+| blank | a lighter or more reproducible substrate, worth more than either replicate |
+
+**Detectability comes first, and is a different question.** If the biofilm mass is small compared
+with the uncertainty of the blank subtracted from it, no replicate count rescues the measurement:
+replicates shrink the standard error of a mean, they do not recover a signal buried under a
+subtraction. `precision.detectability()` refuses, and the fix is more biomass per coupon or a
+substrate with a lighter, more reproducible blank.
+
+**Time-resolved stacks are required, not optional.** The dynamic observable is selected —
+`biomass_autocorrelation_decay`, with `interface_rearrangement_rate` in reserve — so a
+longitudinal subset must be part of the same campaign. Discovering this after a static campaign
+would mean repeating the culturing.
 
 The deliverables that matter are not renderings:
 

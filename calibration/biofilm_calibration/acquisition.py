@@ -68,12 +68,30 @@ BASELINE_CONDITION = TableSchema(
         "the cubic lattice reproduce a full apparatus.",
         "A single-species or surrogate specimen exercises the harness but",
         "cannot clear the gate for the seven-species target system.",
+        "BIOSAFETY FOLLOWS STRAINS, NOT SPECIES. Several components are",
+        "commonly BSL-1 while C. neoformans strains are commonly BSL-2, and",
+        "collection material under one species name can carry different",
+        "assigned levels. Current guidance is protocol-driven risk assessment",
+        "rather than a level label, so the chain is: exact strain IDs ->",
+        "institutional review -> containment decision -> approved procedures.",
     ),
     key=("growth_condition_id",),
     columns=(
         Column("growth_condition_id"),
         Column("consortium_or_surrogate"),
+        # Exact strain identity comes FIRST, because biosafety follows strains
+        # and not species: several components are commonly BSL-1 while
+        # C. neoformans strains are commonly BSL-2, so assuming one facility
+        # class from a species list is wrong.
         Column("strain_identities"),
+        Column("biosafety_level_by_strain",
+               doc="per-strain, e.g. 'SO:BSL1;CN:BSL2' — never a single level "
+                   "for the consortium"),
+        Column("institutional_approval_id",
+               doc="biosafety committee approval; gate-blocks when absent"),
+        Column("containment_facility"),
+        Column("risk_assessment_reference", required=False,
+               doc="protocol-driven assessment, not a level label alone"),
         Column("growth_medium"),
         Column("temperature_C", numeric=True),
         Column("pH", numeric=True),
