@@ -60,3 +60,32 @@ def test_activity_changes_dose_identity_but_not_transport(snapshot, config):
     assert needs_rerun(h, snapshot, hotter, "endfb-viii.0") is False
     assert dose_state_hash(h, hotter.photons_per_second) != \
         dose_state_hash(h, config.photons_per_second)
+
+
+def test_coarsening_changes_the_transport_identity(snapshot, config):
+    """Changing the tally resolution changes the run, so a coarse result must
+    never be served from a fine run's cache."""
+    from biofilm_openmc.config import load_transport_config
+
+    coarse = load_transport_config(VALID_CONFIG.replace(
+        "[transport]", "[transport]\n  [transport.mesh]\n  coarsening_factor = 2\n"))
+    assert transport_state_hash(snapshot, coarse) != \
+        transport_state_hash(snapshot, config)
+
+
+def test_water_phantom_hash_is_snapshot_free_and_mesh_sensitive():
+    from biofilm_openmc.config import WATER_PHANTOM, load_transport_config
+    from biofilm_openmc.fingerprint import water_phantom_state_hash
+
+    from conftest import WATER_PHANTOM_CONFIG
+
+    base = load_transport_config(WATER_PHANTOM_CONFIG, kind=WATER_PHANTOM)
+    h = water_phantom_state_hash(base, "endfb-viii.0")
+    assert h == water_phantom_state_hash(base, "endfb-viii.0")
+    assert water_phantom_state_hash(base, "endfb-viii.1") != h
+
+    coarse = load_transport_config(
+        WATER_PHANTOM_CONFIG.replace("base_dimension = [12, 12, 12]",
+                                     "base_dimension = [12, 12, 12]\n  coarsening_factor = 2"),
+        kind=WATER_PHANTOM)
+    assert water_phantom_state_hash(coarse, "endfb-viii.0") != h

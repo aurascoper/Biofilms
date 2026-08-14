@@ -1,10 +1,13 @@
 import numpy as np
 import pytest
 
-from biofilm_openmc.config import ConfigError, load_transport_config
+from biofilm_openmc.config import (WATER_PHANTOM, ConfigError, load_config,
+                                   load_transport_config)
+from biofilm_openmc.materials import (BIOMASS, MEDIUM, unique_material_specs,
+                                      voxel_class_array, voxel_mass_kg)
 from biofilm_openmc.model import check_lattice_congruence
 
-from conftest import VALID_CONFIG
+from conftest import VALID_CONFIG, WATER_PHANTOM_CONFIG
 
 
 def test_cylinder_must_fit_inside_the_voxel_lattice():
@@ -25,13 +28,6 @@ def test_cylinder_must_fit_inside_the_voxel_lattice():
                              "cylinder_length_cm = 110.0"))
     with pytest.raises(ConfigError, match="cylinder_length_cm"):
         check_lattice_congruence(n, too_long)
-import pytest
-
-from biofilm_openmc.config import ConfigError, load_config
-from biofilm_openmc.materials import (BIOMASS, MEDIUM, unique_material_specs,
-                                      voxel_class_array, voxel_mass_kg)
-
-from conftest import VALID_CONFIG
 
 
 def test_voxel_classes_from_occupancy_only(snapshot, config):
@@ -68,16 +64,40 @@ density_g_cm3 = 1.0
     assert len(specs) == 2  # medium==membrane composition + biomass
 
 
-def test_missing_required_class_is_loud(snapshot, config):
-    no_membrane = VALID_CONFIG.replace(
-        """[materials.membrane]
+_NO_MEMBRANE = VALID_CONFIG.replace(
+    """[materials.membrane]
 density_g_cm3 = 0.94
   [materials.membrane.elements]
   C = 0.856
   H = 0.144""", "")
-    cfg_missing = load_config(no_membrane)
+
+
+def test_missing_required_class_is_loud():
+    """The biofilm model needs all three classes, and the loader now says so
+    before a model is ever built."""
     with pytest.raises(ConfigError, match="membrane"):
-        voxel_class_array(snapshot, cfg_missing)
+        load_config(_NO_MEMBRANE)
+
+
+def test_required_classes_still_guards_a_directly_built_config(snapshot, config):
+    """Defence in depth: the loader is not the only way to make a config, so
+    the mapper keeps its own check."""
+    from dataclasses import replace
+    stripped = replace(config, materials={k: v for k, v in config.materials.items()
+                                          if k != "membrane"})
+    with pytest.raises(ConfigError, match="membrane"):
+        voxel_class_array(snapshot, stripped)
+
+
+def test_water_phantom_needs_only_the_medium():
+    """The water-phantom gap, closed: a config with no biomass and no membrane
+    loads for the phantom and is refused for the biofilm."""
+    cfg = load_transport_config(WATER_PHANTOM_CONFIG, kind=WATER_PHANTOM)
+    assert set(cfg.materials) == {"medium"}
+    with pytest.raises(ConfigError) as exc:
+        load_transport_config(WATER_PHANTOM_CONFIG, kind="biofilm_cylinder")
+    msg = str(exc.value)
+    assert "baseline_biomass" in msg and "membrane" in msg
 
 
 def test_voxel_mass_positive_and_scaled(snapshot, config):

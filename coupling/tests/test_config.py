@@ -65,12 +65,32 @@ def test_invalid_enum_value():
 # --- staged contract -------------------------------------------------------
 
 def test_required_keys_are_cumulative_across_stages():
-    prev = frozenset()
-    for stage in STAGES:
-        keys = required_keys(stage)
-        assert prev <= keys, f"{stage} dropped a key required earlier"
-        prev = keys
-    assert required_keys(STAGES[-1]) == {f.dotted for f in FIELD_SPECS}
+    from biofilm_openmc.config import MODEL_KINDS
+
+    for kind in MODEL_KINDS:
+        prev = frozenset()
+        for stage in STAGES:
+            keys = required_keys(stage, kind)
+            assert prev <= keys, f"{kind}/{stage} dropped a key required earlier"
+            prev = keys
+    # every spec is reachable from some kind, and none from none
+    union = frozenset().union(*(required_keys(STAGES[-1], k) for k in MODEL_KINDS))
+    assert union == {f.dotted for f in FIELD_SPECS}
+
+
+def test_water_phantom_drops_lattice_and_membrane_keys():
+    """A phantom has no CPM lattice and no membrane; demanding their parameters
+    would be the same artificial blocking the staged contract removed."""
+    from biofilm_openmc.config import BIOFILM_CYLINDER, WATER_PHANTOM
+
+    phantom = required_keys("transport", WATER_PHANTOM)
+    biofilm = required_keys("transport", BIOFILM_CYLINDER)
+    assert "geometry.voxel_pitch_cm" not in phantom
+    assert "geometry.membrane_thickness_cm" not in phantom
+    assert "transport.mesh.base_dimension" in phantom
+    # ... and the biofilm inherits its base resolution from the snapshot
+    assert "transport.mesh.base_dimension" not in biofilm
+    assert {"geometry.voxel_pitch_cm", "geometry.membrane_thickness_cm"} <= biofilm
 
 
 def test_transport_stage_does_not_require_time_or_biological_scales():

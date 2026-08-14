@@ -1,0 +1,76 @@
+# Reference A0 — idealized Cs-137 water phantom (TRANSPORT VALIDATION).
+#
+# Load with kind="water_phantom":
+#     load_transport_config("config/reference_a0_water_phantom.toml",
+#                           kind="water_phantom")
+#     biofilm-dose-scan --model water_phantom --stage transport --config ...
+#
+# This is a numerical-validation geometry, NOT an apparatus. Every value below
+# is either evaluated nuclear data or a DECLARED modeling choice — none of it
+# is measured, and none of it describes a real reactor. Provenance for each key
+# is in data/parameter_provenance.csv under reference_system_id
+# "A0_cs137_idealized"; the reference system itself is frozen in
+# docs/physical_reference_system.md §2.
+#
+# It contains no biomass and no membrane, which is the point: the water-phantom
+# gap is closed, so no fabricated biological material is needed to build it.
+
+schema_version = 1
+
+[geometry]
+# DECLARED. Dosimetry scale: the 661.7 keV mean free path in water is roughly
+# 11.6 cm, so a 15 cm radius is a little over one attenuation length and the
+# photons actually interact. At cell scale a photon would cross the domain
+# without interacting and the run would validate nothing.
+origin_cm = [0.0, 0.0, 0.0]
+cylinder_radius_cm = 15.0
+cylinder_length_cm = 30.0
+# NOT REQUIRED for this model kind: voxel_pitch_cm (no CPM lattice) and
+# membrane_thickness_cm (no membrane). The loader does not ask for them.
+
+[boundaries]
+# DECLARED. Vacuum is the physical choice for a bare phantom. Reflective
+# boundaries represent infinite repetition and change the problem — the
+# integration test uses them deliberately to close the geometry for an energy
+# balance, which is a different question from the one this config asks.
+axial = "vacuum"
+radial_outer = "vacuum"
+
+[source]
+# Cs-137, evaluated decay data (LNE-LNHB/CEA, §5.2 Gamma Emissions).
+# 661.655 keV is the EMISSION energy; 661.657 keV in §2.2 is the transition
+# energy, and they differ by the nuclear recoil.
+spectrum_energies_eV = [661655.0]
+# One retained line, so the PMF is trivially 1.0. DECLARED SIMPLIFICATION: this
+# omits the Ba X-rays (~7.92 photons per 100 disintegrations, 3.95-37.4 keV)
+# and the negligible 283.46 / 378.20 keV lines. Adding any of them means
+# recomputing every p_j = Y_j / sum_k Y_k.
+spectrum_probabilities = [1.0]
+# IDEALIZED: a point on the axis. There is no sealed capsule here — no active
+# core, no steel encapsulation, no self-attenuation (reference A1, unsupported).
+spatial = "point_origin"
+angular = "isotropic"
+# photons_per_second is NOT set: it is a dosimetry-stage key, and this config is
+# for the transport stage, which reports eV per source particle. Supplying it
+# needs an assay certificate with a reference date, via
+#     S = A(t) * sum_j Y_j,  A(t) = A0 * 2^(-(t - t0) / T_half)
+# with Y = 0.8501(20) for the retained line and T_half = 30.018(22) a.
+
+[transport]
+batches = 10
+particles = 25000        # 250k histories: the foundation benchmark's budget
+
+  [transport.mesh]
+  # Tally resolution, INDEPENDENT of the physical geometry above. 48 divides by
+  # 1, 2, 4, 8 and 16, so the resolution sweep produces nested meshes and a
+  # fine result can be aggregated onto a coarse one for comparison.
+  base_dimension = [48, 48, 48]
+  coarsening_factor = 1
+
+[materials.medium]
+# Liquid water. Stoichiometric mass fractions from standard atomic weights:
+# H = 2*1.00794/18.01528, O = 15.9994/18.01528.
+density_g_cm3 = 1.0
+  [materials.medium.elements]
+  H = 0.111894
+  O = 0.888106

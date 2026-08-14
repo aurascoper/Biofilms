@@ -46,35 +46,61 @@ _ALLOWED_SPATIAL = frozenset({"line_z_axis", "point_origin"})
 _ALLOWED_ANGULAR = frozenset({"isotropic"})
 _ALLOWED_MEMBRANE_STAT = frozenset({"mass_weighted", "area_weighted"})
 
+# Which model a config is loaded for. Like the stage, this is chosen by the
+# CALLER (which builder/loader you call) and never declared in the TOML, so a
+# declared kind can never contradict the builder that was actually invoked.
+WATER_PHANTOM = "water_phantom"
+BIOFILM_CYLINDER = "biofilm_cylinder"
+MODEL_KINDS = (WATER_PHANTOM, BIOFILM_CYLINDER)
+_ALL_KINDS = frozenset(MODEL_KINDS)
+
 
 @dataclass(frozen=True)
 class FieldSpec:
-    """One required TOML key: where it lives, what it becomes, when it is needed."""
+    """One required TOML key: where it lives, what it becomes, when it is needed.
+
+    `section` may be dotted (`"transport.mesh"`) to address a TOML subtable.
+    `kinds` restricts the key to particular model kinds — a water phantom has
+    no CPM lattice and no membrane, so demanding their parameters would be the
+    same artificial blocking the staged contract removed.
+    """
     section: str
     key: str
     attr: str                       # constructor kwarg on the config dataclass
-    cast: str                       # "float" | "str" | "tuple" | "float_tuple"
+    cast: str                       # "float" | "str" | "tuple" | "float_tuple" | "int_tuple"
     min_stage: str                  # first stage that requires it
     allowed: frozenset | None = None
+    kinds: frozenset = _ALL_KINDS
 
     @property
     def dotted(self) -> str:
         return f"{self.section}.{self.key}"
 
 
+_BIOFILM_ONLY = frozenset({BIOFILM_CYLINDER})
+_PHANTOM_ONLY = frozenset({WATER_PHANTOM})
+
 FIELD_SPECS: tuple[FieldSpec, ...] = (
     # --- transport ---------------------------------------------------------
-    FieldSpec("geometry", "voxel_pitch_cm", "voxel_pitch_cm", "float", "transport"),
+    # The CPM lattice pitch: a biofilm-model parameter. A water phantom has no
+    # lattice, and its tally resolution comes from transport.mesh instead.
+    FieldSpec("geometry", "voxel_pitch_cm", "voxel_pitch_cm", "float", "transport",
+              kinds=_BIOFILM_ONLY),
     FieldSpec("geometry", "origin_cm", "origin_cm", "tuple", "transport"),
     FieldSpec("geometry", "cylinder_radius_cm", "cylinder_radius_cm", "float", "transport"),
     FieldSpec("geometry", "cylinder_length_cm", "cylinder_length_cm", "float", "transport"),
-    FieldSpec("geometry", "membrane_thickness_cm", "membrane_thickness_cm", "float", "transport"),
+    FieldSpec("geometry", "membrane_thickness_cm", "membrane_thickness_cm", "float", "transport",
+              kinds=_BIOFILM_ONLY),
     FieldSpec("boundaries", "axial", "axial_bc", "str", "transport", _ALLOWED_BC),
     FieldSpec("boundaries", "radial_outer", "radial_outer_bc", "str", "transport", _ALLOWED_BC),
     FieldSpec("source", "spectrum_energies_eV", "spectrum_energies_eV", "float_tuple", "transport"),
     FieldSpec("source", "spectrum_probabilities", "spectrum_probabilities", "float_tuple", "transport"),
     FieldSpec("source", "spatial", "source_spatial", "str", "transport", _ALLOWED_SPATIAL),
     FieldSpec("source", "angular", "source_angular", "str", "transport", _ALLOWED_ANGULAR),
+    # Absolute tally resolution. Required only where there is no lattice to
+    # inherit one from; the biofilm model derives its base from the snapshot.
+    FieldSpec("transport.mesh", "base_dimension", "mesh_base_dimension", "int_tuple",
+              "transport", kinds=_PHANTOM_ONLY),
     # --- dosimetry ---------------------------------------------------------
     FieldSpec("source", "photons_per_second", "photons_per_second", "float", "dosimetry"),
     # --- cpm_feedback ------------------------------------------------------
@@ -87,6 +113,35 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class OptionalSpec:
+    """A key with a safe default, so it never blocks a run — but still a real
+    config key, and the numerical ones are exactly what a resolution/history
+    sweep varies, so the provenance ledger must be able to name them."""
+    section: str
+    key: str
+    attr: str
+    default: object
+
+    @property
+    def dotted(self) -> str:
+        return f"{self.section}.{self.key}"
+
+
+OPTIONAL_SPECS: tuple[OptionalSpec, ...] = (
+    OptionalSpec("transport", "batches", "batches", 10),
+    OptionalSpec("transport", "particles", "particles", 10000),
+    OptionalSpec("transport", "seed", "seed", 1),
+    OptionalSpec("transport.mesh", "coarsening_factor", "mesh_coarsening_factor", 1),
+)
+
+
+def known_keys() -> frozenset[str]:
+    """Every config key the loader recognises, required or defaulted."""
+    return frozenset(f.dotted for f in FIELD_SPECS) | \
+        frozenset(o.dotted for o in OPTIONAL_SPECS)
+
+
 def _stage_index(stage: str) -> int:
     try:
         return STAGES.index(stage)
@@ -94,17 +149,25 @@ def _stage_index(stage: str) -> int:
         raise ValueError(f"unknown stage {stage!r}; expected one of {list(STAGES)}") from None
 
 
-def specs_for(stage: str) -> tuple[FieldSpec, ...]:
-    """Every FieldSpec required at `stage` (cumulative)."""
+def _check_kind(kind: str) -> str:
+    if kind not in _ALL_KINDS:
+        raise ValueError(f"unknown model kind {kind!r}; expected one of {list(MODEL_KINDS)}")
+    return kind
+
+
+def specs_for(stage: str, kind: str = BIOFILM_CYLINDER) -> tuple[FieldSpec, ...]:
+    """Every FieldSpec required at `stage` for `kind` (stages are cumulative)."""
     i = _stage_index(stage)
-    return tuple(f for f in FIELD_SPECS if _stage_index(f.min_stage) <= i)
+    _check_kind(kind)
+    return tuple(f for f in FIELD_SPECS
+                 if _stage_index(f.min_stage) <= i and kind in f.kinds)
 
 
-def required_keys(stage: str) -> frozenset[str]:
-    """Dotted "section.key" paths required at `stage`. The `[materials]` class
-    table is required at every stage and is not a FieldSpec — see
-    `MATERIALS_REQUIRED_FROM_STAGE`."""
-    return frozenset(f.dotted for f in specs_for(stage))
+def required_keys(stage: str, kind: str = BIOFILM_CYLINDER) -> frozenset[str]:
+    """Dotted "section.key" paths required at `stage` for `kind`. The
+    `[materials]` class table is required at every stage and is not a FieldSpec
+    — see `MATERIALS_REQUIRED_FROM_STAGE` and `required_material_classes`."""
+    return frozenset(f.dotted for f in specs_for(stage, kind))
 
 
 MATERIALS_REQUIRED_FROM_STAGE = "transport"
@@ -119,19 +182,31 @@ class MaterialClass:
 
 @dataclass(frozen=True, kw_only=True)
 class TransportConfig:
-    """Everything `build_model()` actually reads. Sufficient for a transport
-    run reporting heating in eV per source particle."""
-    voxel_pitch_cm: float
+    """Everything a transport builder actually reads. Sufficient for a run
+    reporting heating in eV per source particle.
+
+    `model_kind` records which builder this config was loaded FOR, so a builder
+    can refuse a config prepared for the other model instead of silently
+    modeling the wrong thing. The kind-specific fields default to None and are
+    guaranteed present by the loader whenever the kind requires them.
+    """
     origin_cm: tuple
     cylinder_radius_cm: float
     cylinder_length_cm: float
-    membrane_thickness_cm: float
     axial_bc: str
     radial_outer_bc: str
     spectrum_energies_eV: tuple
     spectrum_probabilities: tuple
     source_spatial: str
     source_angular: str
+    model_kind: str = BIOFILM_CYLINDER
+    # biofilm_cylinder only
+    voxel_pitch_cm: float | None = None
+    membrane_thickness_cm: float | None = None
+    # water_phantom only
+    mesh_base_dimension: tuple | None = None
+    # tally coarsening: applies to both kinds; 1 means "as fine as the base"
+    mesh_coarsening_factor: int = 1
     materials: dict = field(default_factory=dict)  # name -> MaterialClass
     batches: int = 10
     particles: int = 10000
@@ -188,7 +263,19 @@ def _cast(spec: FieldSpec, value):
         return value
     if spec.cast == "tuple":
         return tuple(value)
+    if spec.cast == "int_tuple":
+        return tuple(int(x) for x in value)
     return tuple(float(x) for x in value)  # "float_tuple"
+
+
+def _lookup(data: dict, section: str, key: str):
+    """Read `key` from a possibly-dotted TOML section ("transport.mesh")."""
+    node = data
+    for part in section.split("."):
+        node = node.get(part, {})
+        if not isinstance(node, dict):
+            return None
+    return node.get(key)
 
 
 def _check_spectrum(energies, probabilities, problems: list[str]) -> None:
@@ -247,8 +334,22 @@ def _check_materials(data: dict, problems: list[str]) -> dict:
     return mats
 
 
-def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"):
-    """Validate an already-parsed config dict against `stage`'s requirements.
+def required_material_classes(kind: str = BIOFILM_CYLINDER) -> tuple[str, ...]:
+    """Material classes a model kind cannot be built without.
+
+    A water phantom needs only the medium. Demanding biomass and a membrane for
+    it was the water-phantom gap: it would have forced fabricated entries into a
+    config just to satisfy the biofilm builder
+    (`docs/physical_reference_system.md` §5).
+    """
+    _check_kind(kind)
+    return ("medium",) if kind == WATER_PHANTOM else (
+        "medium", "baseline_biomass", "membrane")
+
+
+def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback",
+                     kind: str = BIOFILM_CYLINDER):
+    """Validate an already-parsed config dict against `stage` and `kind`.
 
     Returns the dataclass for that stage. Every problem is collected and
     reported in one ConfigError — the loader never partially succeeds.
@@ -256,13 +357,14 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
     cls = _STAGE_TYPE[stage] if stage in _STAGE_TYPE else None
     if cls is None:
         raise ValueError(f"unknown stage {stage!r}; expected one of {list(STAGES)}")
+    _check_kind(kind)
 
     problems: list[str] = []
     values: dict[str, object] = {}
     raw_values: dict[str, object] = {}
 
-    for spec in specs_for(stage):
-        val = data.get(spec.section, {}).get(spec.key)
+    for spec in specs_for(stage, kind):
+        val = _lookup(data, spec.section, spec.key)
         raw_values[spec.dotted] = val
         if val is None:
             problems.append(f"[{spec.section}] {spec.key}  (REQUIRED, unset)")
@@ -276,15 +378,35 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
     _check_spectrum(raw_values.get("source.spectrum_energies_eV"),
                     raw_values.get("source.spectrum_probabilities"), problems)
     mats = _check_materials(data, problems)
+    missing_classes = [n for n in required_material_classes(kind) if n not in mats]
+    if mats and missing_classes:
+        problems.append(
+            f"[materials] {kind} requires the class(es): {', '.join(missing_classes)}")
+
+    coarsening = data.get("transport", {}).get("mesh", {}).get("coarsening_factor", 1)
+    if not isinstance(coarsening, int) or isinstance(coarsening, bool) or coarsening < 1:
+        problems.append(
+            f"[transport.mesh] coarsening_factor = {coarsening!r} must be an "
+            "integer >= 1 (1 means the tally mesh is as fine as its base)")
+
+    base_dim = values.get("mesh_base_dimension")
+    if base_dim is not None and (len(base_dim) != 3 or any(int(d) < 1 for d in base_dim)):
+        problems.append(
+            f"[transport.mesh] base_dimension = {list(base_dim)} must be three "
+            "positive integers")
 
     if problems:
         raise ConfigError(
             "physical coupling config is incomplete — refusing to invent values "
-            f"(audit §5). Stage: {stage}. Problems:\n  - " + "\n  - ".join(problems))
+            f"(audit §5). Stage: {stage}, model kind: {kind}. Problems:\n  - "
+            + "\n  - ".join(problems))
 
-    kwargs = {spec.attr: _cast(spec, values[spec.attr]) for spec in specs_for(stage)}
+    kwargs = {spec.attr: _cast(spec, values[spec.attr])
+              for spec in specs_for(stage, kind)}
     transport = data.get("transport", {})
     return cls(
+        model_kind=kind,
+        mesh_coarsening_factor=coarsening,
         materials=mats,
         batches=int(transport.get("batches", 10)),
         particles=int(transport.get("particles", 10000)),
@@ -294,28 +416,29 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
     )
 
 
-def load_staged(path_or_str, stage: str):
-    """Load from a file path or a raw TOML string at an explicit stage."""
+def load_staged(path_or_str, stage: str, kind: str = BIOFILM_CYLINDER):
+    """Load from a file path or a raw TOML string at an explicit stage/kind."""
     raw = _read(path_or_str)
-    return config_from_dict(tomllib.loads(raw), raw, stage)
+    return config_from_dict(tomllib.loads(raw), raw, stage, kind)
 
 
-def load_transport_config(path_or_str) -> TransportConfig:
-    return load_staged(path_or_str, "transport")
+def load_transport_config(path_or_str, kind: str = BIOFILM_CYLINDER) -> TransportConfig:
+    return load_staged(path_or_str, "transport", kind)
 
 
-def load_dose_rate_config(path_or_str) -> DoseRateConfig:
-    return load_staged(path_or_str, "dosimetry")
+def load_dose_rate_config(path_or_str, kind: str = BIOFILM_CYLINDER) -> DoseRateConfig:
+    return load_staged(path_or_str, "dosimetry", kind)
 
 
-def load_cpm_feedback_config(path_or_str) -> CPMFeedbackConfig:
-    return load_staged(path_or_str, "cpm_feedback")
+def load_cpm_feedback_config(path_or_str, kind: str = BIOFILM_CYLINDER) -> CPMFeedbackConfig:
+    return load_staged(path_or_str, "cpm_feedback", kind)
 
 
-def load_membrane_feedback_config(path_or_str) -> MembraneFeedbackConfig:
-    return load_staged(path_or_str, "membrane_feedback")
+def load_membrane_feedback_config(path_or_str,
+                                  kind: str = BIOFILM_CYLINDER) -> MembraneFeedbackConfig:
+    return load_staged(path_or_str, "membrane_feedback", kind)
 
 
 def load_config(path_or_str) -> Config:
-    """Back-compat alias for the strongest (full) contract."""
+    """Back-compat alias for the strongest (full) contract, biofilm model."""
     return load_membrane_feedback_config(path_or_str)

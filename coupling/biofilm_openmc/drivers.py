@@ -24,12 +24,15 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import (STAGES, ConfigError, TransportConfig, config_from_dict)
+from .config import (BIOFILM_CYLINDER, MODEL_KINDS, STAGES, WATER_PHANTOM,
+                     ConfigError, TransportConfig, config_from_dict)
 from .dose import (DoseResult, PerSourceResult, dose_from_per_source,
                    per_source_from_statepoint)
-from .fingerprint import dose_state_hash, label_state_hash, transport_state_hash
+from .fingerprint import (dose_state_hash, label_state_hash,
+                          transport_state_hash, water_phantom_state_hash)
 from .lineage import aggregate_by_label
-from .materials import voxel_mass_kg
+from .materials import phantom_mass_kg, voxel_mass_kg
+from .mesh import phantom_mesh_extent_cm, resolve_mesh_dimension
 from .results import write_transport_result
 from .snapshot import Snapshot, load_snapshot
 
@@ -46,13 +49,14 @@ def deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
-def scenario_config(base_toml: str, override_path, stage: str = "dosimetry"):
+def scenario_config(base_toml: str, override_path, stage: str = "dosimetry",
+                    kind: str = BIOFILM_CYLINDER):
     base = tomllib.loads(base_toml)
     with open(override_path, "rb") as fh:
         override = tomllib.load(fh)
     return config_from_dict(deep_merge(base, override),
                             raw=f"{base_toml}\n# merged: {override_path}",
-                            stage=stage)
+                            stage=stage, kind=kind)
 
 
 def compare_fields(baseline, variant, mass_kg: np.ndarray,
@@ -115,7 +119,32 @@ def _openmc_runner(outdir: Path):
     return run
 
 
-def scan(snapshot: Snapshot, base_config: TransportConfig,
+def _problem_ops(snapshot, nuclear_data_id: str):
+    """(build, mass_of, hash_of) for the model kind implied by the snapshot.
+
+    Chosen once rather than branched at each use. `mass_of` returns mass at
+    TALLY-MESH resolution — coarsened by a block SUM for the biofilm, because
+    mass is extensive and the dose denominator must match the field's shape.
+    """
+    from .mesh import coarsen_field
+    from .model import build_biofilm_cylinder_model, build_water_phantom_model
+
+    if snapshot is None:
+        return (build_water_phantom_model,
+                lambda cfg: phantom_mass_kg(
+                    cfg,
+                    resolve_mesh_dimension(cfg.mesh_base_dimension,
+                                           cfg.mesh_coarsening_factor),
+                    phantom_mesh_extent_cm(cfg)),
+                lambda cfg: water_phantom_state_hash(cfg, nuclear_data_id))
+
+    return (lambda cfg: build_biofilm_cylinder_model(snapshot, cfg),
+            lambda cfg: coarsen_field(voxel_mass_kg(snapshot, cfg),
+                                      cfg.mesh_coarsening_factor),
+            lambda cfg: transport_state_hash(snapshot, cfg, nuclear_data_id))
+
+
+def scan(snapshot: Snapshot | None, base_config: TransportConfig,
          scenarios: dict[str, TransportConfig], runner, outdir: Path, *,
          effect_threshold: float, dose_floor_Gy_s: float,
          nuclear_data_id: str, openmc_version: str,
@@ -130,19 +159,18 @@ def scan(snapshot: Snapshot, base_config: TransportConfig,
     At `stage="transport"` the results stay in Gy per source particle and no
     `transport_result.h5` is written: that schema is Gy/s.
     """
-    from .model import build_model
+    build, mass_of, hash_of = _problem_ops(snapshot, nuclear_data_id)
 
     per_source: dict[str, PerSourceResult] = {}   # transport hash -> field
     results: dict[str, object] = {}
     hashes: dict[str, str] = {}
     seen: dict[str, str] = {}
     for name, cfg in {"baseline": base_config, **scenarios}.items():
-        th = transport_state_hash(snapshot, cfg, nuclear_data_id)
+        th = hash_of(cfg)
         hashes[name] = th
         if th not in per_source:
-            sp = runner(build_model(snapshot, cfg), name)
-            per_source[th] = per_source_from_statepoint(
-                sp, voxel_mass_kg(snapshot, cfg))
+            sp = runner(build(cfg), name)
+            per_source[th] = per_source_from_statepoint(sp, mass_of(cfg))
 
         key = th if stage == "transport" else dose_state_hash(
             th, cfg.photons_per_second)
@@ -162,30 +190,50 @@ def scan(snapshot: Snapshot, base_config: TransportConfig,
             nuclear_data_id=nuclear_data_id, batches=cfg.batches,
             particles=cfg.particles, seed=cfg.seed)
 
-    mass = voxel_mass_kg(snapshot, base_config)
+    # Mass at MESH resolution, matching the field the metrics compare.
+    mass = mass_of(base_config)
     metrics = {name: compare_fields(results["baseline"], res, mass,
                                     dose_floor_Gy_s)
                for name, res in results.items() if name != "baseline"}
     gate, detail = evaluate_gate(metrics, effect_threshold)
-    return {
+    report = {
         "gate": gate,
         "gate_detail": detail,
         "stage": stage,
+        "model_kind": base_config.model_kind,
+        "mesh_dimension": list(results["baseline"].field.shape),
         "field_unit": results["baseline"].unit,
         "metrics": metrics,
         "transport_hashes": hashes,
-        "label_state_hash": label_state_hash(snapshot),
-        "baseline_lineage_dose": aggregate_by_label(
-            results["baseline"].field, snapshot.lineage_id, mass),
     }
+    if snapshot is None:
+        return report   # a phantom has no labels to attribute to
+
+    # Attribution stays at LATTICE resolution: dose rate is intensive, so each
+    # voxel carries its coarse bin's rate and lineage semantics are unchanged
+    # by coarsening.
+    from .mesh import upsample_field
+
+    f = base_config.mesh_coarsening_factor
+    report["label_state_hash"] = label_state_hash(snapshot)
+    report["baseline_lineage_dose"] = aggregate_by_label(
+        upsample_field(results["baseline"].field, f),
+        snapshot.lineage_id, voxel_mass_kg(snapshot, base_config))
+    return report
 
 
 def main_scan(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="biofilm-dose-scan",
         description="Offline immutable-snapshot dose sensitivity scan")
-    ap.add_argument("--snapshot", required=True)
+    ap.add_argument("--snapshot", default=None,
+                    help="transport snapshot; required for the biofilm model, "
+                         "meaningless for a water phantom")
     ap.add_argument("--config", required=True)
+    ap.add_argument("--model", choices=list(MODEL_KINDS), default=BIOFILM_CYLINDER,
+                    help="which model to build. The kind is chosen here, never "
+                         "declared in the TOML, so it cannot contradict the "
+                         "builder that runs.")
     ap.add_argument("--scenario", action="append", default=[],
                     metavar="NAME=OVERRIDE.toml")
     ap.add_argument("--outdir", default="dose_scan_out")
@@ -203,15 +251,21 @@ def main_scan(argv=None) -> int:
         print(f"feedback gate: {GATE_NOT_EVALUATED} — {reason}")
         return 2
 
+    if args.model == BIOFILM_CYLINDER and not args.snapshot:
+        return not_evaluated(
+            "--snapshot is required for the biofilm model (it supplies the "
+            "voxel occupancy); use --model water_phantom to run without one")
+
     try:
         with open(args.config, "rb") as fh:
             base_toml = fh.read().decode()
         base_config = config_from_dict(tomllib.loads(base_toml), base_toml,
-                                       stage=args.stage)
+                                       stage=args.stage, kind=args.model)
         scenarios = {}
         for spec in args.scenario:
             name, _, path = spec.partition("=")
-            scenarios[name] = scenario_config(base_toml, path, stage=args.stage)
+            scenarios[name] = scenario_config(base_toml, path, stage=args.stage,
+                                              kind=args.model)
     except ConfigError as e:
         return not_evaluated(f"physical config unset/invalid:\n{e}")
 
@@ -224,7 +278,7 @@ def main_scan(argv=None) -> int:
     if not xs or not Path(xs).exists():
         return not_evaluated("OPENMC_CROSS_SECTIONS not available")
 
-    snapshot = load_snapshot(args.snapshot)
+    snapshot = load_snapshot(args.snapshot) if args.snapshot else None
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     report = scan(snapshot, base_config, scenarios, _openmc_runner(outdir),
