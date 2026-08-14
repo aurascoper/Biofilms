@@ -1,0 +1,11 @@
+# voxel_binding — the integration contract: what an occupied CPM voxel is, and is made of
+# One row. It completes the sentence the two calibration branches meet
+# at, and biofilm_calibration.integration.coherence_problems() rejects
+# the combinations that contradict themselves — combinations whose
+# individual clauses each pass their own branch's gate.
+# lattice_pitch_um and density_g_cm3 are blank because neither has been
+# measured; blank means NOT MEASURED and is never read as zero.
+# UNIQUENESS KEY: binding_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+binding_id,entity_kind,lineage_semantics,material_class,material_represents,material_model_kind,density_basis,lattice_pitch_um,density_g_cm3,evidence_basis,source_id,status,notes
+occupied_voxel_v1,biomass_parcel,computational,baseline_biomass,hydrated_bulk_biofilm,hydrated_effective_medium,wet_bulk,,,declared,INTEGRATION_DECL_2026,provisional,"Coherent but incomplete. The two blanks are the whole remaining gap: the lattice pitch awaits the spatial gate (morphology + declared thresholds + domain semantics) and the density awaits the material OpenMC gate (bulk measurements + closed composition). Status is provisional, not ready, because a coherent sentence with blanks in it is still a sentence with blanks."
