@@ -252,3 +252,71 @@ def test_unsupported_status_cannot_carry_a_value():
         p.write_text("id,v,status\na,1.5,unsupported_by_current_model\n")
         with _pt.raises(SchemaError, match="has no value"):
             read_table(p, S)
+
+
+# --- dataset candidate ledger ----------------------------------------------
+
+def test_candidate_ledger_validates_and_records_rejections(data_dir):
+    """A search that records only its accepts is not a provenance trail."""
+    from biofilm_calibration.spatial.datasets import DATASET_CANDIDATES, problems
+    rows = read_table(data_dir / "spatial" / "dataset_candidates.csv",
+                      DATASET_CANDIDATES)
+    assert problems(rows) == []
+    rejected = [r for r in rows if r["verdict"] == "rejected"]
+    assert len(rejected) >= 4
+    for r in rejected:
+        assert r["rationale"].strip(), r["candidate_id"]
+
+
+def test_no_public_candidate_clears_the_target_gate(data_dir):
+    """PUBLIC_COMPONENTS_FOUND_BUT_NOT_PAIRED: a surrogate cannot clear the
+    target gate however good its data are."""
+    from biofilm_calibration.spatial.datasets import DATASET_CANDIDATES
+    rows = read_table(data_dir / "spatial" / "dataset_candidates.csv",
+                      DATASET_CANDIDATES)
+    assert not any(r["clears_target_gate"] == "true" for r in rows)
+
+
+def test_a_surrogate_claiming_the_target_gate_is_rejected():
+    """The rule is enforced, not conventional."""
+    from biofilm_calibration.spatial.datasets import problems
+    bad = [{"candidate_id": "x", "clears_target_gate": "true",
+            "target_relationship": "surrogate", "verdict": "use_first",
+            "rationale": "r", "has_3d_stacks": "true"}]
+    assert any("only the target consortium" in p for p in problems(bad))
+
+
+def test_the_verified_pilot_candidate_carries_its_evidence(data_dir):
+    """Sizes were verified against the repository API rather than transcribed."""
+    from biofilm_calibration.spatial.datasets import DATASET_CANDIDATES
+    rows = {r["candidate_id"]: r for r in read_table(
+        data_dir / "spatial" / "dataset_candidates.csv", DATASET_CANDIDATES)}
+    vc = rows["vcholerae_dryad_zcrjdfnph"]
+    assert vc["verdict"] == "use_first"
+    assert vc["size_bytes"] == 1589998422
+    assert vc["size_basis"] == "current_version"
+    assert "Dryad API" in vc["verified_via"]
+    assert vc["target_relationship"] == "surrogate"
+
+
+def test_cumulative_size_trap_is_recorded(data_dir):
+    """Dryad storageSize is cumulative across versions and overestimated the
+    B. subtilis download by 4.3x — a download budget taken from it would be
+    badly wrong."""
+    from biofilm_calibration.spatial.datasets import DATASET_CANDIDATES
+    rows = {r["candidate_id"]: r for r in read_table(
+        data_dir / "spatial" / "dataset_candidates.csv", DATASET_CANDIDATES)}
+    bs = rows["bsubtilis_dryad_f4qrfj71n"]
+    assert bs["size_basis"] == "current_version"
+    assert "215" in bs["rationale"] and "cumulative" in bs["rationale"].lower()
+
+
+def test_holographic_motility_rejection_confirms_the_observable_choice(data_dir):
+    """An excellent exact-species dataset that answers the wrong question."""
+    from biofilm_calibration.spatial.datasets import DATASET_CANDIDATES
+    rows = {r["candidate_id"]: r for r in read_table(
+        data_dir / "spatial" / "dataset_candidates.csv", DATASET_CANDIDATES)}
+    h = rows["shewanella_holographic_motility"]
+    assert h["verdict"] == "rejected"
+    assert h["target_relationship"] == "exact_species"
+    assert "parcel" in h["rationale"]
