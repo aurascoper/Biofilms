@@ -4,6 +4,19 @@
 # defines these values and none may be invented (docs/audit_biofilms_potts.md
 # §5): the loaders enumerate every missing key in one loud error and refuse
 # to proceed. Fill them in from your experiment/design, with units as stated.
+#
+# Requirements are STAGED — each key below is annotated with the first stage
+# that needs it, and the loader only demands that stage's keys:
+#
+#   transport          geometry, boundaries, source shape + spectrum,
+#                      materials       -> heating, eV per source particle
+#   dosimetry          + source.photons_per_second          -> Gy/s
+#   cpm_feedback       + time.seconds_per_mcs, normalization.*_scale
+#   membrane_feedback  + normalization.membrane_statistic
+#
+# Pick the stage by which loader you call (load_transport_config, ...) or
+# `biofilm-dose-scan --stage`. Transport needs no source activity, no CPM
+# clock and no biological scales, because build_model() reads none of them.
 
 schema_version = 1
 
@@ -33,18 +46,25 @@ schema_version = 1
 # seconds_per_mcs =
 
 [source]
-# REQUIRED — physical photon emission rate, photons/s
+# REQUIRED (dosimetry) — physical photon emission rate, photons/s. This is
+# the TOTAL emission rate S = A * sum_j Y_j, where Y_j is photons per decay
+# for line j. Not needed to run or compare transport.
 # photons_per_second =
 
-# REQUIRED — discrete emission spectrum: line energies (eV) and
-# probabilities (same length; probabilities normalized by the loader)
+# REQUIRED (transport) — discrete emission spectrum: line energies (eV) and
+# probabilities (same length). The probabilities are a normalized PMF and
+# must SUM TO 1: p_j = Y_j / sum_k Y_k. The loader does NOT normalize them —
+# it rejects anything that does not already sum to 1, so that a nuclide
+# emitting more than one photon per decay cannot be silently mis-normalized.
 # spectrum_energies_eV = []
 # spectrum_probabilities = []
 
-# REQUIRED — spatial distribution: "line_z_axis" | "point_origin"
+# REQUIRED (transport) — spatial distribution: "line_z_axis" | "point_origin".
+# Both are IDEALIZED. There is no sealed-capsule source: no active core, no
+# encapsulation, no self-attenuation. See docs/physical_reference_system.md.
 # spatial =
 
-# REQUIRED — angular distribution: "isotropic"
+# REQUIRED (transport) — angular distribution: "isotropic"
 # angular =
 
 [normalization]

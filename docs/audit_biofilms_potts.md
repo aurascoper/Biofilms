@@ -148,6 +148,20 @@ two are not interchangeable, and the intended membrane response is undeclared.
 > until the intended m-versus-P_eff coupling is explicitly selected and the membrane dose
 > statistic (mass-weighted volume average vs area-weighted surface measure) is declared.
 
+**Narrowed by declaration, 2026-08-14.** The membrane is declared **fixed** for the
+fixed-membrane stage: `m_mech = 1`, `P_j = P_j0` per solute, no dose-dependent membrane
+update (`docs/physical_reference_system.md` §3). The two quantities are separated
+conceptually — `m_mech(D, Ḋ)` is mechanical integrity, `P_j(D, Ḋ, T, hydration, pH)` is
+per-solute permeability entering the flux as `J_j = P_j (c_ext,j − K_j c_wall,j)` — so the
+eventual choice is well-posed rather than a choice between two spellings of one variable.
+
+This **removes the feedback path; it does not resolve the contradiction.** Both laws above
+still stand in the code exactly as described, and reactivate the moment feedback is wired,
+so the stop condition is retained verbatim for any dose-responsive membrane model. The
+validity envelope is material-specific and does not transfer: the SRNL Nafion-117 Co-60
+coupon study applies to Nafion, and a silicone membrane has **no** validated dose envelope,
+making its fixity a declared simplifying assumption rather than a literature-backed one.
+
 ## 7. Species registries are inconsistent across the repository
 
 | Source | Roster | Encoding |
@@ -203,9 +217,15 @@ passed.
    commit 2.
 4. `biofilms_3d.R` radiation branches identical (§4) — fixed in commit 2; committed
    figures/animations derived from the old dynamics left as-is.
-5. `m` vs `P_eff` membrane semantics (§6) — **open; formal stop condition.**
+5. `m` vs `P_eff` membrane semantics (§6) — **narrowed by declaration (2026-08-14):**
+   membrane fixed for the fixed-membrane stage, feedback deferred. Still **open in code**,
+   and the formal stop condition is retained for any dose-dependent membrane model. See
+   `docs/online_coupling_design.md` gate 1.
 6. Occupancy fractions in g cm⁻³ slots; lattice R in cm slot; two clocks (§5) — open;
    closed only by the physical config contract (REQUIRED fields, fail loudly).
+   Partially addressed 2026-08-14: requirements are now staged, so transport no longer
+   demands the CPM clock or the biological response scales it never reads, and each key's
+   evidence is tracked per stage in `data/parameter_provenance.csv`.
 7. Preprint prose species vs implemented registries (§7) — recorded; out of scope.
 
 ## 11. Tests added with this audit (commit 1)

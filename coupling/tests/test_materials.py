@@ -1,6 +1,32 @@
 import numpy as np
 import pytest
 
+from biofilm_openmc.config import ConfigError, load_transport_config
+from biofilm_openmc.model import check_lattice_congruence
+
+from conftest import VALID_CONFIG
+
+
+def test_cylinder_must_fit_inside_the_voxel_lattice():
+    """The lattice is a cube of side n*pitch; a CSG cylinder larger than it
+    would be silently padded with medium and fall outside the tally mesh."""
+    n = 8                                     # VALID_CONFIG: pitch 0.001 -> 0.008 cm
+    check_lattice_congruence(n, load_transport_config(VALID_CONFIG))
+
+    too_wide = load_transport_config(
+        VALID_CONFIG.replace("cylinder_radius_cm = 0.004",
+                             "cylinder_radius_cm = 0.010"))
+    with pytest.raises(ConfigError, match="cylinder_radius_cm"):
+        check_lattice_congruence(n, too_wide)
+
+    # a real apparatus aspect ratio (3 mm bore, 1100 mm long) cannot fit
+    too_long = load_transport_config(
+        VALID_CONFIG.replace("cylinder_length_cm = 0.008",
+                             "cylinder_length_cm = 110.0"))
+    with pytest.raises(ConfigError, match="cylinder_length_cm"):
+        check_lattice_congruence(n, too_long)
+import pytest
+
 from biofilm_openmc.config import ConfigError, load_config
 from biofilm_openmc.materials import (BIOMASS, MEDIUM, unique_material_specs,
                                       voxel_class_array, voxel_mass_kg)
