@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .config import Config, ConfigError, MaterialClass
+from .config import ConfigError, MaterialClass, TransportConfig
 from .snapshot import Snapshot
 
 # Voxel class codes (indices into the per-snapshot class list)
@@ -18,7 +18,7 @@ BIOMASS = "baseline_biomass"
 MEMBRANE = "membrane"  # CSG region, never a lattice voxel class
 
 
-def required_classes(config: Config) -> dict[str, MaterialClass]:
+def required_classes(config: TransportConfig) -> dict[str, MaterialClass]:
     """The classes this mapper needs; loud error if the config lacks one."""
     missing = [n for n in (MEDIUM, BIOMASS, MEMBRANE) if n not in config.materials]
     if missing:
@@ -27,7 +27,7 @@ def required_classes(config: Config) -> dict[str, MaterialClass]:
     return {n: config.materials[n] for n in (MEDIUM, BIOMASS, MEMBRANE)}
 
 
-def voxel_class_array(snapshot: Snapshot, config: Config) -> np.ndarray:
+def voxel_class_array(snapshot: Snapshot, config: TransportConfig) -> np.ndarray:
     """Logical (x,y,z) array of class NAMES (object dtype indexing into the
     config table). Occupied voxels -> baseline_biomass; everything else ->
     medium. Voxels outside the biological domain (cell_id == -1) get medium
@@ -40,7 +40,7 @@ def voxel_class_array(snapshot: Snapshot, config: Config) -> np.ndarray:
     return classes
 
 
-def unique_material_specs(snapshot: Snapshot, config: Config) -> list[MaterialClass]:
+def unique_material_specs(snapshot: Snapshot, config: TransportConfig) -> list[MaterialClass]:
     """Deduplicated (by frozen composition spec) materials actually present in
     the voxel array plus the CSG membrane. Bounded by the config table size —
     NEVER by cell or lineage count."""
@@ -54,7 +54,7 @@ def unique_material_specs(snapshot: Snapshot, config: Config) -> list[MaterialCl
     return list(specs.values())
 
 
-def voxel_mass_kg(snapshot: Snapshot, config: Config) -> np.ndarray:
+def voxel_mass_kg(snapshot: Snapshot, config: TransportConfig) -> np.ndarray:
     """Full-voxel masses (kg), logical (x,y,z).
 
     ponytail: full rectangular-voxel volume; bins intersected by the CSG

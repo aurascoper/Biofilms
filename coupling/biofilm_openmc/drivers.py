@@ -24,9 +24,10 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import Config, ConfigError, config_from_dict
-from .dose import DoseResult, dose_from_statepoint
-from .fingerprint import label_state_hash, transport_state_hash
+from .config import (STAGES, ConfigError, TransportConfig, config_from_dict)
+from .dose import (DoseResult, PerSourceResult, dose_from_per_source,
+                   per_source_from_statepoint)
+from .fingerprint import dose_state_hash, label_state_hash, transport_state_hash
 from .lineage import aggregate_by_label
 from .materials import voxel_mass_kg
 from .results import write_transport_result
@@ -45,25 +46,31 @@ def deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
-def scenario_config(base_toml: str, override_path) -> Config:
+def scenario_config(base_toml: str, override_path, stage: str = "dosimetry"):
     base = tomllib.loads(base_toml)
     with open(override_path, "rb") as fh:
         override = tomllib.load(fh)
     return config_from_dict(deep_merge(base, override),
-                            raw=f"{base_toml}\n# merged: {override_path}")
+                            raw=f"{base_toml}\n# merged: {override_path}",
+                            stage=stage)
 
 
-def compare_fields(baseline: DoseResult, variant: DoseResult,
-                   mass_kg: np.ndarray, dose_floor_Gy_s: float) -> dict:
+def compare_fields(baseline, variant, mass_kg: np.ndarray,
+                   dose_floor_Gy_s: float) -> dict:
     """Global effect metrics with floor + uncertainty mask (no raw max-rel-err
-    on near-zero voxels)."""
-    mask = (baseline.dose_rate_mean_Gy_s > dose_floor_Gy_s) & \
-           np.isfinite(baseline.rel_err)
+    on near-zero voxels).
+
+    Every metric here is a RATIO, so it is invariant under the global scalar
+    that converts Gy/source-particle to Gy/s. The same comparison therefore
+    decides the gate identically at the transport and dosimetry stages — which
+    is why a material-sensitivity scan needs no source activity. The floor is
+    interpreted in whichever unit the results carry.
+    """
+    mask = (baseline.field > dose_floor_Gy_s) & np.isfinite(baseline.rel_err)
     m = mass_kg[mask]
-    b = baseline.dose_rate_mean_Gy_s[mask]
-    v = variant.dose_rate_mean_Gy_s[mask]
-    sd = np.hypot(baseline.dose_rate_sd_Gy_s[mask],
-                  variant.dose_rate_sd_Gy_s[mask])
+    b = baseline.field[mask]
+    v = variant.field[mask]
+    sd = np.hypot(baseline.field_sd[mask], variant.field_sd[mask])
     if m.sum() == 0:
         return {"masked_voxels": 0, "effect_rel": float("nan"),
                 "noise_rel": float("nan"),
@@ -108,27 +115,47 @@ def _openmc_runner(outdir: Path):
     return run
 
 
-def scan(snapshot: Snapshot, base_config: Config,
-         scenarios: dict[str, Config], runner, outdir: Path, *,
+def scan(snapshot: Snapshot, base_config: TransportConfig,
+         scenarios: dict[str, TransportConfig], runner, outdir: Path, *,
          effect_threshold: float, dose_floor_Gy_s: float,
-         nuclear_data_id: str, openmc_version: str) -> dict:
-    """Core loop, runner-injectable for tests. Returns the report dict."""
+         nuclear_data_id: str, openmc_version: str,
+         stage: str = "dosimetry") -> dict:
+    """Core loop, runner-injectable for tests. Returns the report dict.
+
+    Two caches, because there are two identities. The OpenMC run is keyed on
+    the transport hash — it does not depend on the source activity. The Gy/s
+    field is keyed on the dose hash (transport + activity), so a scenario that
+    changes only the activity reuses the run and still gets its own dose.
+
+    At `stage="transport"` the results stay in Gy per source particle and no
+    `transport_result.h5` is written: that schema is Gy/s.
+    """
     from .model import build_model
 
-    results: dict[str, DoseResult] = {}
+    per_source: dict[str, PerSourceResult] = {}   # transport hash -> field
+    results: dict[str, object] = {}
     hashes: dict[str, str] = {}
     seen: dict[str, str] = {}
     for name, cfg in {"baseline": base_config, **scenarios}.items():
         th = transport_state_hash(snapshot, cfg, nuclear_data_id)
         hashes[name] = th
-        if th in seen:  # exact-match reuse only
-            results[name] = results[seen[th]]
+        if th not in per_source:
+            sp = runner(build_model(snapshot, cfg), name)
+            per_source[th] = per_source_from_statepoint(
+                sp, voxel_mass_kg(snapshot, cfg))
+
+        key = th if stage == "transport" else dose_state_hash(
+            th, cfg.photons_per_second)
+        if key in seen:  # exact-match reuse only
+            results[name] = results[seen[key]]
             continue
-        sp = runner(build_model(snapshot, cfg), name)
-        mass = voxel_mass_kg(snapshot, cfg)
-        res = dose_from_statepoint(sp, mass, cfg.photons_per_second)
+        seen[key] = name
+
+        if stage == "transport":
+            results[name] = per_source[th]
+            continue
+        res = dose_from_per_source(per_source[th], cfg.photons_per_second)
         results[name] = res
-        seen[th] = name
         write_transport_result(
             outdir / f"transport_result_{name}.h5", res,
             transport_hash=th, openmc_version=openmc_version,
@@ -143,11 +170,13 @@ def scan(snapshot: Snapshot, base_config: Config,
     return {
         "gate": gate,
         "gate_detail": detail,
+        "stage": stage,
+        "field_unit": results["baseline"].unit,
         "metrics": metrics,
         "transport_hashes": hashes,
         "label_state_hash": label_state_hash(snapshot),
         "baseline_lineage_dose": aggregate_by_label(
-            results["baseline"].dose_rate_mean_Gy_s, snapshot.lineage_id, mass),
+            results["baseline"].field, snapshot.lineage_id, mass),
     }
 
 
@@ -163,6 +192,11 @@ def main_scan(argv=None) -> int:
     ap.add_argument("--effect-threshold", type=float, default=0.05)
     ap.add_argument("--dose-floor-Gy-s", type=float, default=0.0)
     ap.add_argument("--nuclear-data-id", default="unset")
+    ap.add_argument("--stage", choices=list(STAGES), default="dosimetry",
+                    help="config contract to require. 'transport' needs no "
+                         "source activity and reports Gy per source particle; "
+                         "the gate decision is identical either way because "
+                         "every metric is a ratio.")
     args = ap.parse_args(argv)
 
     def not_evaluated(reason: str) -> int:
@@ -172,11 +206,12 @@ def main_scan(argv=None) -> int:
     try:
         with open(args.config, "rb") as fh:
             base_toml = fh.read().decode()
-        base_config = config_from_dict(tomllib.loads(base_toml), base_toml)
+        base_config = config_from_dict(tomllib.loads(base_toml), base_toml,
+                                       stage=args.stage)
         scenarios = {}
         for spec in args.scenario:
             name, _, path = spec.partition("=")
-            scenarios[name] = scenario_config(base_toml, path)
+            scenarios[name] = scenario_config(base_toml, path, stage=args.stage)
     except ConfigError as e:
         return not_evaluated(f"physical config unset/invalid:\n{e}")
 
@@ -196,8 +231,12 @@ def main_scan(argv=None) -> int:
                   outdir, effect_threshold=args.effect_threshold,
                   dose_floor_Gy_s=args.dose_floor_Gy_s,
                   nuclear_data_id=args.nuclear_data_id,
-                  openmc_version=openmc.__version__)
+                  openmc_version=openmc.__version__,
+                  stage=args.stage)
 
+    print(f"stage: {report['stage']} (fields in {report['field_unit']})")
+    if report["stage"] == "transport":
+        print("  no transport_result.h5 written — that schema is Gy/s")
     print(f"feedback gate: {report['gate']} — {report['gate_detail']}")
     for name, m in report["metrics"].items():
         print(f"  {name}: effect {m['effect_rel']:.3%}, noise {m['noise_rel']:.3%}, "

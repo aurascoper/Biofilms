@@ -5,5 +5,9 @@ Layering: config -> snapshot -> materials -> model -> dose -> lineage.
 schema/postprocessing path runs in a bare numpy+h5py environment.
 """
 
-from .config import Config, ConfigError, load_config
+from .config import (STAGES, Config, ConfigError, CPMFeedbackConfig,
+                     DoseRateConfig, MembraneFeedbackConfig, TransportConfig,
+                     load_config, load_cpm_feedback_config,
+                     load_dose_rate_config, load_membrane_feedback_config,
+                     load_transport_config, required_keys)
 from .snapshot import Snapshot, load_snapshot, to_openmc_lattice_order, from_openmc_lattice_order

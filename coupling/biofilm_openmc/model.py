@@ -10,16 +10,50 @@ from __future__ import annotations
 
 import numpy as np
 
-from .config import Config
+from .config import ConfigError, TransportConfig
 from .materials import BIOMASS, MEDIUM, MEMBRANE, required_classes, voxel_class_array
 from .snapshot import Snapshot, to_openmc_lattice_order
 
 
-def build_model(snapshot: Snapshot, config: Config):
+def check_lattice_congruence(n: int, config: TransportConfig) -> None:
+    """The lattice is cubic (n,n,n) with a single isotropic pitch, so the
+    modeled domain is a cube of side n*pitch. The CSG cylinder is configured
+    independently — if it does not fit inside that cube, the excess is filled
+    by `lattice.outer` (medium) and lies outside the tally mesh, so the run
+    silently models something other than the configured apparatus.
+
+    This is the guard that makes an apparatus of the wrong shape fail loudly.
+    An extreme aspect ratio (e.g. a 3 mm bore, 1100 mm long) satisfies
+    containment only at an infeasible voxel count: representing it needs
+    anisotropic pitch or a declared axial segment, not a bigger cube.
+    """
+    side = n * config.voxel_pitch_cm
+    problems = []
+    if config.cylinder_radius_cm > side / 2.0 * (1 + 1e-9):
+        problems.append(
+            f"cylinder_radius_cm = {config.cylinder_radius_cm} exceeds the "
+            f"lattice half-width {side / 2.0} (n={n}, pitch={config.voxel_pitch_cm})")
+    if config.cylinder_length_cm > side * (1 + 1e-9):
+        problems.append(
+            f"cylinder_length_cm = {config.cylinder_length_cm} exceeds the "
+            f"lattice extent {side} (n={n}, pitch={config.voxel_pitch_cm})")
+    if problems:
+        raise ConfigError(
+            "CSG cylinder does not fit inside the voxel lattice it contains — "
+            "the excess would be filled with medium and never tallied. "
+            "Problems:\n  - " + "\n  - ".join(problems))
+
+
+def build_model(snapshot: Snapshot, config: TransportConfig):
     """Return an `openmc.Model`: fixed photon source, photon transport on,
-    RegularMesh heating tally over the voxel lattice."""
+    RegularMesh heating tally over the voxel lattice.
+
+    Needs only a TransportConfig: the source activity, CPM clock, and
+    biological response scales are not transport inputs.
+    """
     import openmc
 
+    check_lattice_congruence(snapshot.cell_id.shape[0], config)
     classes = required_classes(config)
 
     def make_material(mc):

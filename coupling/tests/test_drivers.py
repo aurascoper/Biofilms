@@ -103,7 +103,76 @@ def test_scan_loop_with_fake_runner(tmp_path, snapshot, config, monkeypatch):
     # duplicate scenario matched baseline's transport hash: never re-run
     assert sorted(calls) == ["baseline", "denser"]
     assert report["gate"] == GATE_PASSED
+    assert report["stage"] == "dosimetry"
+    assert report["field_unit"] == "Gy/s"
     assert (tmp_path / "transport_result_baseline.h5").exists()
     assert (tmp_path / "transport_result_denser.h5").exists()
     assert not (tmp_path / "transport_result_duplicate.h5").exists()
     assert report["metrics"]["duplicate"]["effect_rel"] == 0.0
+
+
+def _fake_runner_factory(n, calls):
+    def fake_runner(model, name):
+        calls.append(name)
+        hot = 2.0 if name == "denser" else 1.0
+        field = np.full((n, n, n), hot)
+        return heating_statepoint_from_logical(field, field * 0.01)
+    return fake_runner
+
+
+def _stub_build_model(monkeypatch):
+    import biofilm_openmc.drivers as drv
+    monkeypatch.setattr(drv, "build_model", lambda s, c: None, raising=False)
+    import biofilm_openmc.model as model_mod
+    monkeypatch.setattr(model_mod, "build_model", lambda s, c: None)
+
+
+def test_transport_stage_scan_needs_no_source_activity(tmp_path, snapshot,
+                                                       monkeypatch):
+    """A material-sensitivity scan runs, and reaches the SAME gate decision,
+    with no `photons_per_second` anywhere — every metric is a ratio."""
+    from biofilm_openmc.config import load_transport_config
+
+    transport_only = VALID_CONFIG.replace("photons_per_second = 1.0e9", "")
+    base = load_transport_config(transport_only)
+    denser = load_transport_config(transport_only.replace(
+        "density_g_cm3 = 1.1", "density_g_cm3 = 1.2"))
+
+    n = snapshot.cell_id.shape[0]
+    calls = []
+    _stub_build_model(monkeypatch)
+
+    report = scan(snapshot, base, {"denser": denser},
+                  _fake_runner_factory(n, calls), tmp_path,
+                  effect_threshold=0.05, dose_floor_Gy_s=0.0,
+                  nuclear_data_id="test", openmc_version="fake",
+                  stage="transport")
+
+    assert report["stage"] == "transport"
+    assert report["field_unit"] == "Gy/source-particle"
+    assert report["gate"] == GATE_PASSED
+    # Gy/s schema files are not written for a per-source scan
+    assert not list(tmp_path.glob("transport_result_*.h5"))
+
+
+def test_activity_only_scenario_reuses_the_run_but_not_the_dose(
+        tmp_path, snapshot, config, monkeypatch):
+    """Transport is per source particle, so a hotter source must not re-run
+    OpenMC — but it must still get its own Gy/s field and result file."""
+    from biofilm_openmc.config import load_config
+
+    hotter = load_config(VALID_CONFIG.replace("photons_per_second = 1.0e9",
+                                              "photons_per_second = 2.0e9"))
+    n = snapshot.cell_id.shape[0]
+    calls = []
+    _stub_build_model(monkeypatch)
+
+    report = scan(snapshot, config, {"hotter": hotter},
+                  _fake_runner_factory(n, calls), tmp_path,
+                  effect_threshold=0.05, dose_floor_Gy_s=0.0,
+                  nuclear_data_id="test", openmc_version="fake")
+
+    assert calls == ["baseline"], "activity change must not force a re-run"
+    assert (tmp_path / "transport_result_hotter.h5").exists()
+    # twice the activity is twice the dose: effect_rel == 1.0
+    assert np.isclose(report["metrics"]["hotter"]["effect_rel"], 1.0)

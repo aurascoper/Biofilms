@@ -25,18 +25,62 @@ EV_TO_J = 1.602176634e-19
 
 @dataclass
 class DoseResult:
+    """Dosimetry-stage field: absorbed dose RATE, Gy/s."""
     dose_rate_mean_Gy_s: np.ndarray   # logical (x,y,z)
     dose_rate_sd_Gy_s: np.ndarray
     rel_err: np.ndarray               # sd/mean where mean > 0, else inf
     source_rate: float
 
+    unit = "Gy/s"
+
+    # Unit-neutral accessors so scale-invariant comparisons (effect/noise
+    # ratios) run identically on this and on PerSourceResult.
+    @property
+    def field(self) -> np.ndarray:
+        return self.dose_rate_mean_Gy_s
+
+    @property
+    def field_sd(self) -> np.ndarray:
+        return self.dose_rate_sd_Gy_s
+
+
+@dataclass
+class PerSourceResult:
+    """Transport-stage field: specific energy per source particle, Gy per
+    source particle (J/kg per source particle).
+
+    This is what transport actually yields. Multiplying by the emission rate
+    (photons/s) gives a DoseResult — so a source activity is NEVER needed to
+    run or compare transport. Do not fabricate `photons_per_second = 1.0` to
+    reach this: that would silently relabel Gy/source as Gy/s.
+    """
+    specific_energy_mean_Gy_per_src: np.ndarray
+    specific_energy_sd_Gy_per_src: np.ndarray
+    rel_err: np.ndarray
+
+    unit = "Gy/source-particle"
+
+    @property
+    def field(self) -> np.ndarray:
+        return self.specific_energy_mean_Gy_per_src
+
+    @property
+    def field_sd(self) -> np.ndarray:
+        return self.specific_energy_sd_Gy_per_src
+
+
+def specific_energy_per_source(heating_eV_per_src: np.ndarray,
+                               mass_kg: np.ndarray) -> np.ndarray:
+    """Gy per source particle. The activity-free half of the dose formula."""
+    if np.any(mass_kg <= 0):
+        raise ValueError("non-positive voxel mass — dose undefined")
+    return heating_eV_per_src * EV_TO_J / mass_kg
+
 
 def normalize_heating(heating_eV_per_src: np.ndarray, source_rate_per_s: float,
                       mass_kg: np.ndarray) -> np.ndarray:
     """The single-line formula, kept pure for exact unit tests."""
-    if np.any(mass_kg <= 0):
-        raise ValueError("non-positive voxel mass — dose undefined")
-    return heating_eV_per_src * EV_TO_J * source_rate_per_s / mass_kg
+    return specific_energy_per_source(heating_eV_per_src, mass_kg) * source_rate_per_s
 
 
 def extract_heating(statepoint, mesh_shape) -> tuple[np.ndarray, np.ndarray]:
@@ -64,10 +108,29 @@ def dose_from_statepoint(statepoint, mass_kg: np.ndarray,
     return DoseResult(mean, sd, rel, source_rate_per_s)
 
 
-def sparsity_report(result: DoseResult, occupied_mask: np.ndarray) -> dict:
+def per_source_from_statepoint(statepoint, mass_kg: np.ndarray) -> PerSourceResult:
+    """Transport-stage result: no source activity required."""
+    mean_eV, sd_eV = extract_heating(statepoint, mass_kg.shape)
+    mean = specific_energy_per_source(mean_eV, mass_kg)
+    sd = specific_energy_per_source(sd_eV, mass_kg)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel = np.where(mean > 0, sd / mean, np.inf)
+    return PerSourceResult(mean, sd, rel)
+
+
+def dose_from_per_source(result: PerSourceResult, source_rate_per_s: float) -> DoseResult:
+    """Apply the emission rate to a transport-stage field. The relative error
+    is carried over unchanged: it is scale-invariant."""
+    return DoseResult(result.field * source_rate_per_s,
+                      result.field_sd * source_rate_per_s,
+                      result.rel_err, source_rate_per_s)
+
+
+def sparsity_report(result, occupied_mask: np.ndarray) -> dict:
     """Feasibility numbers the integration benchmark must report (review
-    amendment 11): scoring sparsity and uncertainty on occupied voxels."""
-    occ = result.dose_rate_mean_Gy_s[occupied_mask]
+    amendment 11): scoring sparsity and uncertainty on occupied voxels.
+    Accepts either result type — these statistics are unit-independent."""
+    occ = result.field[occupied_mask]
     rel = result.rel_err[occupied_mask]
     finite = rel[np.isfinite(rel)]
     return {
