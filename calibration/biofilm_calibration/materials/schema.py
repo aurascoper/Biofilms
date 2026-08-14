@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..acquisition import linkage_columns
 from ..schema import EVIDENCE_BASIS, STATUS, Column, TableSchema
 
 # What a number is measured PER. Mirrors basis_conversion.BASES, plus the
@@ -29,6 +30,7 @@ SAMPLE_METADATA = TableSchema(
     key=("sample_id",),
     columns=(
         Column("sample_id"),
+        *linkage_columns(),
         Column("description"),
         Column("species_composition", required=False),
         Column("medium"),
@@ -46,27 +48,41 @@ BULK_MEASUREMENTS = TableSchema(
     name="bulk_measurements",
     doc="wet/dry/ash masses and hydrated volume",
     comments=(
-        "surface_water_removal_protocol is LOAD-BEARING: a wet mass without a",
-        "stated drainage or blotting procedure is not reproducible, and the",
-        "surface water it includes goes straight into rho_wet and w_water.",
+        "The surface-water procedure is LOAD-BEARING and is therefore six",
+        "columns rather than one free-text note: a wet mass without a stated",
+        "drain orientation, drain time, blot material, contact time, ambient",
+        "temperature and time-to-weighing is not reproducible, and the surface",
+        "water it includes goes straight into rho_wet and w_water.",
         "drying_endpoint likewise — 'dried overnight' and 'dried to constant",
         "mass' are different measurements.",
+        "Masses are AS-WEIGHED, including the substrate. The biofilm mass is",
+        "m_sample+substrate - m_blank, so the blank is part of the definition",
+        "and blank_sample_id must resolve in blanks.csv.",
     ),
     key=("sample_id", "replicate_id"),
     columns=(
         Column("sample_id"),
         Column("replicate_id"),
-        Column("wet_mass_g", numeric=True),
-        Column("dry_mass_g", numeric=True),
+        *linkage_columns(),
+        # As-weighed, INCLUDING the substrate. The biofilm mass is derived by
+        # blank subtraction, so the raw reading is what gets recorded.
+        Column("wet_mass_sample_plus_substrate_g", numeric=True),
+        Column("dry_mass_sample_plus_substrate_g", numeric=True),
         Column("ash_mass_g", numeric=True, required=False),
         Column("hydrated_volume_cm3", numeric=True),
         Column("wet_mass_uncertainty_g", numeric=True, required=False),
         Column("dry_mass_uncertainty_g", numeric=True, required=False),
         Column("volume_uncertainty_cm3", numeric=True, required=False),
         Column("volume_method"),
+        # "Wet mass" is not a measurement until the surface water is defined.
+        Column("drain_orientation"),
+        Column("drain_time_s", numeric=True),
+        Column("blot_material"),
+        Column("blot_contact_time_s", numeric=True),
+        Column("ambient_temperature_C", numeric=True),
+        Column("time_to_weighing_s", numeric=True),
         Column("drying_protocol"),
         Column("drying_endpoint"),
-        Column("surface_water_removal_protocol"),
         Column("ash_protocol", required=False),
         Column("quality_flag", vocabulary=QUALITY),
         Column("source_id"),

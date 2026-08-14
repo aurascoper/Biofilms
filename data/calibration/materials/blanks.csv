@@ -1,0 +1,13 @@
+# blanks — matched blanks, weighed through the identical procedure
+# Blank correction is the DEFINITION of a biofilm mass, not a
+# refinement:
+#   m_wet,biofilm = m_wet,sample+substrate - m_wet,blank_substrate
+# The hydrated_substrate blank is the one most easily skipped and the
+# most costly to skip: a hydrated membrane retains substantial water,
+# which would otherwise be counted as biofilm water — inflating rho_wet
+# and deflating w_water.
+# The medium_exposed_abiotic blank separates medium salts from biomass
+# ash.
+# UNIQUENESS KEY: blank_sample_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+blank_sample_id,blank_kind,culture_batch_id,growth_condition_id,substrate_or_membrane,wet_mass_g,dry_mass_g,wet_mass_uncertainty_g,dry_mass_uncertainty_g,measurement_order,source_id

@@ -4,4 +4,4 @@
 # anything.
 # UNIQUENESS KEY: sample_id
 # Blank numeric cells mean NOT MEASURED. They are never read as zero.
-sample_id,description,species_composition,medium,temperature_C,pH,oxygen_condition,growth_phase,biofilm_age_h,replicate_id,source_id
+sample_id,culture_batch_id,paired_sample_group,blank_sample_id,measurement_order,growth_condition_id,medium_batch_id,description,species_composition,medium,temperature_C,pH,oxygen_condition,growth_phase,biofilm_age_h,replicate_id,source_id

@@ -1,9 +1,14 @@
 # bulk_measurements — wet/dry/ash masses and hydrated volume
-# surface_water_removal_protocol is LOAD-BEARING: a wet mass without a
-# stated drainage or blotting procedure is not reproducible, and the
-# surface water it includes goes straight into rho_wet and w_water.
+# The surface-water procedure is LOAD-BEARING and is therefore six
+# columns rather than one free-text note: a wet mass without a stated
+# drain orientation, drain time, blot material, contact time, ambient
+# temperature and time-to-weighing is not reproducible, and the surface
+# water it includes goes straight into rho_wet and w_water.
 # drying_endpoint likewise — 'dried overnight' and 'dried to constant
 # mass' are different measurements.
+# Masses are AS-WEIGHED, including the substrate. The biofilm mass is
+# m_sample+substrate - m_blank, so the blank is part of the definition
+# and blank_sample_id must resolve in blanks.csv.
 # UNIQUENESS KEY: sample_id + replicate_id
 # Blank numeric cells mean NOT MEASURED. They are never read as zero.
-sample_id,replicate_id,wet_mass_g,dry_mass_g,ash_mass_g,hydrated_volume_cm3,wet_mass_uncertainty_g,dry_mass_uncertainty_g,volume_uncertainty_cm3,volume_method,drying_protocol,drying_endpoint,surface_water_removal_protocol,ash_protocol,quality_flag,source_id
+sample_id,replicate_id,culture_batch_id,paired_sample_group,blank_sample_id,measurement_order,growth_condition_id,medium_batch_id,wet_mass_sample_plus_substrate_g,dry_mass_sample_plus_substrate_g,ash_mass_g,hydrated_volume_cm3,wet_mass_uncertainty_g,dry_mass_uncertainty_g,volume_uncertainty_cm3,volume_method,drain_orientation,drain_time_s,blot_material,blot_contact_time_s,ambient_temperature_C,time_to_weighing_s,drying_protocol,drying_endpoint,ash_protocol,quality_flag,source_id

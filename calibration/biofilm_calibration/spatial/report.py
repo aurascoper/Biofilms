@@ -99,6 +99,19 @@ def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
         elif not table:
             blockers.append(f"{label} is empty — no measured morphology exists")
 
+    if samples:
+        unpaired = [r["sample_id"] for r in samples
+                    if not (r.get("paired_sample_group") or "").strip()]
+        if unpaired:
+            blockers.append(
+                f"{len(unpaired)} imaged sample(s) have no paired_sample_group "
+                "— a pitch fitted to an unpaired stack describes a different "
+                "biofilm from the one the density was measured on")
+        if not any((r.get("held_out") or "").strip() == "true" for r in samples):
+            blockers.append(
+                "no sample is designated held_out — a pitch fitted and "
+                "validated on the same stacks has not been validated")
+
     acceptance = None
     if acceptance_path and Path(acceptance_path).exists():
         with open(acceptance_path, "rb") as fh:
