@@ -164,3 +164,28 @@ def dry_basis_to_wet_fraction(value_per_g_dry: float,
     if not 0.0 <= w < 1.0:
         raise BasisError(f"water mass fraction {w} is outside [0, 1)")
     return Quantity(float(value_per_g_dry) * (1.0 - w), DIMENSIONLESS, "wet_bulk")
+
+
+def blank_corrected_mass(sample_plus_substrate_g: float,
+                         blank_g: float | None, *, label: str) -> float:
+    """m_biofilm = m_sample+substrate - m_blank.
+
+    Blank subtraction is the DEFINITION of a biofilm mass, not a refinement,
+    so a missing blank is refused rather than treated as zero. A hydrated
+    membrane retains substantial water; counting it as biofilm water inflates
+    rho_wet and deflates w_water, and nothing downstream would notice.
+    """
+    m = _positive(f"{label} sample+substrate mass", sample_plus_substrate_g)
+    if blank_g is None:
+        raise BasisError(
+            f"{label}: no blank mass — blank subtraction defines the biofilm "
+            "mass, and omitting it silently attributes the substrate (and any "
+            "water it retains) to the biofilm")
+    b = float(blank_g)
+    if b < 0:
+        raise BasisError(f"{label}: negative blank mass {b}")
+    if b >= m:
+        raise BasisError(
+            f"{label}: blank mass {b} is not less than the sample mass {m} — "
+            "the correction would leave no biofilm")
+    return m - b

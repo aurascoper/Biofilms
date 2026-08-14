@@ -1,0 +1,12 @@
+# baseline_condition — the one frozen calibration specimen, declared before collection
+# Ships UNSET. This is a protocol contract, not a claim about a
+# specimen that exists.
+# domain_semantics = microvolume for the first calibration: the CPM
+# forces L = 2R (R = N/2 recomputed as a local at seven sites in
+# biofilms_potts.jl, no length field anywhere), so no pitch can make
+# the cubic lattice reproduce a full apparatus.
+# A single-species or surrogate specimen exercises the harness but
+# cannot clear the gate for the seven-species target system.
+# UNIQUENESS KEY: growth_condition_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+growth_condition_id,consortium_or_surrogate,strain_identities,growth_medium,temperature_C,pH,oxygen_condition,substrate_or_membrane,biofilm_age_h,flow_condition,irradiation,domain_semantics,is_target_system,evidence_basis,source_id,status,notes

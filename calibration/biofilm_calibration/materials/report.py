@@ -75,10 +75,26 @@ def evaluate(data_dir) -> MaterialGates:
     if not tables["bulk_measurements"]:
         om.append("no bulk measurements — hydrated bulk density is undetermined")
         rd.append("no bulk measurements — X_total cannot be computed")
+    else:
+        unblanked = [r["sample_id"] for r in tables["bulk_measurements"]
+                     if not (r.get("blank_sample_id") or "").strip()]
+        if unblanked:
+            om.append(
+                f"{len(unblanked)} bulk measurement(s) name no blank — blank "
+                "subtraction defines the biofilm mass, so an unblanked sample "
+                "attributes the substrate and its retained water to the biofilm")
     if not tables["elemental_analysis"]:
         om.append("no elemental analysis — composition is undetermined")
     if not tables["sample_metadata"]:
         om.append("no sample metadata — no composition can be judged applicable")
+    else:
+        unpaired = [r["sample_id"] for r in tables["sample_metadata"]
+                    if not (r.get("paired_sample_group") or "").strip()]
+        if unpaired:
+            om.append(
+                f"{len(unpaired)} material sample(s) have no paired_sample_group "
+                "— an unpaired density describes a different biofilm from the "
+                "one the pitch was fitted to")
 
     # Radiodialysis needs strictly more, and needs it in the right units.
     metal = tables["metal_loading"]

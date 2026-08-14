@@ -8,6 +8,7 @@ every object row invites them to drift.
 
 from __future__ import annotations
 
+from ..acquisition import linkage_columns
 from ..schema import EVIDENCE_BASIS, STATUS, Column, TableSchema
 
 ENTITY_KIND = frozenset({
@@ -53,10 +54,14 @@ SAMPLE_METADATA = TableSchema(
         "One row per imaged sample. Morphology measured under conditions other",
         "than those the model represents is a near-analog at best; the columns",
         "exist so that can be judged rather than assumed.",
+        "held_out is a column, not an afterthought: a pitch fitted and",
+        "validated on the same stacks has not been validated.",
     ),
     key=("sample_id",),
     columns=(
         Column("sample_id"),
+        *linkage_columns(),
+        Column("held_out", vocabulary=BOOLEAN),
         Column("species"),
         Column("strain", required=False),
         Column("medium"),
