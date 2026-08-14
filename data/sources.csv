@@ -1,0 +1,17 @@
+# Source registry for data/parameter_provenance.csv — one row per cited document.
+#
+# The ledger cites source_id; this file pins the document. A URL can change while
+# the certified fact does not, so document_version / accessed_date / sha256 are
+# what actually identify what was read. sha256 is of the retrieved file when one
+# was retrieved; "n/a" for in-repo documents and for declarations.
+#
+# See docs/physical_reference_system.md for how these are used.
+source_id,title,publisher,document_version,url,accessed_date,sha256,notes
+LNHB_CS137,"Table de Radionucleides — 137/55 Cs 82","LNE-LNHB/CEA (Decay Data Evaluation Project)","02/12/2021 - 18/07/2023",http://www.lnhb.fr/nuclides/Cs-137_tables.pdf,2026-08-14,6d2d2df01ea0254fa06cc5a85a38e32aa115a8c81cb8872fc9942fbbac71bb00,"Primary evaluated decay data. Cite as X. Mougeot et al., Metrologia 62 (2025) 029002. Section 2.2 gives TRANSITION energies and probabilities; section 5.2 gives PHOTON EMISSION energies and yields — they differ and only 5.2 defines a source."
+NIST_WATER,"Composition of liquid water (H2O) — elemental mass fractions","NIST / ICRU stopping-power and composition data",n/a,n/a,2026-08-14,n/a,"Stoichiometric: H = 2*1.00794/18.01528, O = 15.9994/18.01528. Reproduced from the standard atomic weights, not fetched; independently checkable by arithmetic."
+DECLARED_REPO,"Declared modeling choices","this repository — docs/physical_reference_system.md",2026-08-14,n/a,2026-08-14,n/a,"Backing for rows whose evidence_basis is 'declared': choices with no external referent. Cited so that every ready row still resolves to a document."
+REPO_AUDIT,"Audit: coupling-readiness of the Biofilms repository","this repository — docs/audit_biofilms_potts.md",baseline ec8929d,n/a,2026-08-14,n/a,"Section 5 (no physical unit contract), section 6 (membrane m-vs-P_eff STOP CONDITION), section 10 (contradiction register)."
+REPO_BRANCH_REPORT,"OpenMC dose-coupling branch report","this repository — docs/branch_report.md",merge 5cd1b3f,n/a,2026-08-14,n/a,"Source of the tally sparsity result: 75% of occupied bins unscored at the 10 um demo pitch, median relative error ~1."
+SYRON_CASEY_MABR,"Coaxial single-tube membrane-aerated biofilm reactor (geometry anchor)",unidentified,NOT LOCATED,n/a,2026-08-14,n/a,"NOT LOCATED. Dimensions supplied in the project brief (3.0 mm OD silicone tube, 1 mm wall, 1100 mm active length, 18 mm ID glass outer tube, 28 C, pH 7) could not be confirmed against a primary Methods section; nearby lab MABRs report materially different geometries (e.g. 350 mm length, 4 mm OD / 3 mm ID), and a 3.0 mm OD with a 1 mm wall implies a 1 mm bore. Every row citing this source is provisional."
+SRNL_NAFION117,"Nafion-117 Co-60 irradiation study (membrane radiation stability)","Savannah River National Laboratory","SRNS-STI-2008-00060 (as supplied)",n/a,2026-08-14,n/a,"NOT VERIFIED against the primary report. Cited only as the applicable benchmark for NAFION; it establishes nothing about silicone. Its design varied atmosphere (air vs sealed with deionized water) and dose rate (1 vs 460 krad/h) independently, which is why total dose alone is an insufficient condition descriptor."
+PDMS_STOICHIOMETRY,"Polydimethylsiloxane repeat unit [Si(CH3)2O] — stoichiometric composition",standard atomic weights,n/a,n/a,2026-08-14,n/a,"Arithmetic from the repeat unit, M = 74.1539 g/mol. A PROXY only: commercial cured silicone tubing contains silica filler, curing agents and additives, so this is not a certified membrane composition."
