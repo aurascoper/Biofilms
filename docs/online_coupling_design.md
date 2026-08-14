@@ -48,14 +48,20 @@ reporting it that way hid the fact that the transport blocker was artificial.
 | 2 · Membrane dose statistic | **NOT APPLICABLE** — diagnostic only while the membrane is fixed; the config key stays required at `membrane_feedback` and unset | **BLOCKED** — `membrane_statistic` unset |
 | 3 · Transport geometry / materials / spectrum | **IN PROGRESS** — per reference system; `data/parameter_provenance.csv` tracks each key. A0 is buildable as of 2026-08-14 (`config/reference_a0_water_phantom.toml`): spectrum and geometry ready, biomass/membrane now `not_applicable` rather than blocked (water-phantom gap closed). Mesh resolution and history count are `provisional` pending the A0 sweep | Required |
 | 4 · Source activity | **NOT NEEDED** — heating is tallied per source particle and every sensitivity metric is a ratio, so `biofilm-dose-scan --stage transport` runs without it | **BLOCKED** — needs an assay certificate with a reference date; a catalogue activity range is not an activity |
-| 5 · Seconds per MCS | **NOT NEEDED** — no CPM is advanced | **BLOCKED** — must be fitted from time-lapse, never looked up |
-| 6 · Biological response transforms | **NOT NEEDED** | **BLOCKED** — four distinct response functions, none calibrated |
+| 5 · Seconds per MCS | **NOT NEEDED** — no CPM is advanced | **BLOCKED, and downstream of gate 8** — `Δt_MCS = a²·S_sim/S_exp` needs the calibrated lattice pitch, so the time calibration cannot begin until the spatial gate clears |
+| 6 · Biological response transforms | **NOT NEEDED** | **BLOCKED** — four distinct response functions, none calibrated. Each is a PER-PARCEL response, not per-organism (gate 8). `response.growth_survival` is unfittable in principle today: the CPM has no growth dynamics and `divide_cell!` has no trigger, so there is no simulated growth rate to fit against |
 | 7 · Offline feedback gate exceeds uncertainty + threshold | **NOT APPLICABLE** to transport validation | **NOT EVALUATED** — reported while gates above are open |
+| 8 · Voxel binding: what an occupied voxel is and is made of | **NOT APPLICABLE** — a water phantom has no occupied voxels | **PROVISIONAL** — the binding is declared and *coherent* (one occupied voxel is part of a hydrated computational biomass parcel, assigned the hydrated-effective-biofilm material at a wet bulk density) but both its numbers are unset. Spatial gate `PROVISIONAL`, material OpenMC gate `PROVISIONAL`, material radiodialysis gate `BLOCKED` by the site-occupancy units defect. `emit_transport_config()` refuses. See `docs/calibration/integration_contract.md` |
 
 The reason the stop condition survives the fixed-membrane declaration: fixing
 the membrane removes the feedback path, it does not choose between the two
 contradictory laws. Both still stand in `biofilms_potts.jl` and would
 reactivate the moment feedback is wired.
+
+Gate 8 is where the two calibration branches meet, and it exists because a
+binding can be incoherent in ways neither branch can detect alone: an
+organism-scale entity assigned a bulk-biofilm material passes both gates
+separately and contradicts itself jointly.
 
 Until the dose-responsive column clears, running "coupled" dynamics would mean
 cells responding to an OpenMC field while membrane integrity responds to the
