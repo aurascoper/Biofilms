@@ -1,0 +1,7 @@
+# material_sources — branch-local source registry for the material calibration
+# Branch-local: merging into data/sources.csv is the integration
+# branch's job, so the two calibration branches never touch the same
+# registry.
+# UNIQUENESS KEY: source_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+source_id,title,publisher,document_version,url,accessed_date,notes

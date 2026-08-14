@@ -1,0 +1,10 @@
+# metal_loading — sorbed, precipitated and intracellular metal, per declared basis
+# taxonomic_fraction and active_fraction are SEPARATE columns on
+# purpose. The abundance of a metal-reducing species is an upper bound
+# on the active reducer fraction, not equal to it: cells present but not
+# respiring the metal do not reduce it.
+# speciation_state distinguishes dissolved, sorbed, precipitated and
+# intracellular metal, which are not interchangeable for transport.
+# UNIQUENESS KEY: sample_id + element + speciation_state
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,element,speciation_state,basis,loading_value,loading_unit,uncertainty,taxonomic_fraction,active_fraction,analysis_method,counted_in_ash,source_id

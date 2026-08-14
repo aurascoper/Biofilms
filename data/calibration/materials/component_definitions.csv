@@ -1,0 +1,7 @@
+# component_definitions — the phases the hydrated effective medium is blended from
+# One row per component of the wet bulk. mass_fraction values must sum
+# to 1 across the components of a scenario, or a forgotten component is
+# absorbed as a silent renormalization.
+# UNIQUENESS KEY: scenario_id + component
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+scenario_id,component,mass_fraction,density_g_cm3,density_evidence,contributes_metals,material_model_kind,evidence_basis,source_id,status,notes

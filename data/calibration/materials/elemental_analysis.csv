@@ -1,0 +1,12 @@
+# elemental_analysis — elemental mass fractions, on a declared basis
+# Never mix dry-basis CHNS values with wet-basis water fractions in one
+# sum without an explicit conversion — that is what the basis column is
+# for.
+# Oxygen is usually obtained BY DIFFERENCE, which is legitimate and must
+# be recorded: by-difference oxygen absorbs the error of every other
+# element and of the ash determination.
+# These are ELEMENTS, not isotopes. An OpenMC material built by element
+# uses natural abundance.
+# UNIQUENESS KEY: sample_id + basis + element
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,basis,element,mass_fraction,uncertainty,analysis_method,detection_limit,below_detection_limit,source_id
