@@ -1,0 +1,7 @@
+# biofilm_structure — sample-level biofilm structure: thickness, coverage, porosity
+# Thickness and coverage are strongly heterogeneous across a biofilm,
+# so a single sample row is a sample statistic and needs its own
+# standard deviation, not just a mean.
+# UNIQUENESS KEY: sample_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,thickness_mean_um,thickness_sd_um,surface_coverage,porosity,biovolume_fraction,aggregate_size_median_um,radial_position_um,axial_position_um,measurement_uncertainty

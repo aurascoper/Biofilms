@@ -1,0 +1,20 @@
+# entity_semantics — what one CPM cell ID represents, per species
+# Declared in docs/calibration/cpm_entity_semantics.md.
+# literal_generation_claim_allowed is false wherever the model cannot
+# support the claim: compute_delta_H has no shape or connectivity term,
+# V_target is one global scalar for all seven species, and divide_cell!
+# has no trigger (biofilms_potts.jl:1578-1583).
+# UNIQUENESS KEY: species_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+#
+# This table is DECLARED, not measured — it records a modelling decision and
+# the code facts that force it. Every other table in this directory ships
+# header-only because no measured morphology exists.
+species_id,species_name,entity_kind,division_unit,lineage_semantics,shape_target,literal_generation_claim_allowed,evidence_basis,source_id,status,notes
+CN,C. neoformans,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"Radiotrophic melanized yeast. A yeast cell is near-isotropic, so the blob attractor is not obviously wrong for it — but V_target is shared with six other species, so the parcel reading still holds."
+DR,D. radiodurans,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"Coccus, and in reality a tetrad-forming one. Cell shape is near-isotropic; tetrad structure is not represented."
+CS,C. sphaerospermum,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"FILAMENTOUS FUNGUS. A hypha needs elongation and connectivity terms that compute_delta_H does not have, so it cannot be represented as anything but a blob. Whether a parcel here means a compartment, a conidium or a length of mycelium is UNRESOLVED and matters for any dose-per-organism claim."
+BS,B. subtilis,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"MOTILE ROD. No elongation term exists, so the rod relaxes to a blob; the per-species motility vector D_s is declared in CPMParams but never read by the acceptance test either."
+AN,A. niger,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"FILAMENTOUS FUNGUS, melanized. Same limitation as C. sphaerospermum; conidia and hyphae are not distinguished."
+SO,S. oneidensis,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"Metal-reducing rod. Load-bearing for the material branch: X_red is currently the site fraction of this species, which is neither a mass fraction nor an active-reducer fraction."
+OI,O. intermedium AM7,biomass_parcel,parcel_split,computational,isotropic_blob,false,declared,SPATIAL_DECL_2026,ready,"Thorium-tolerant EPS producer. EPS is not a separate phase in the model; a parcel bundles cells and their extracellular material together, which is what makes the hydrated-bulk material reading the compatible one."

@@ -1,0 +1,9 @@
+# object_morphology — per-segmented-object morphology, in micrometres
+# One row per segmented object. Distributions are the unit of
+# comparison, not means: a mean volume cannot distinguish a population
+# of uniform cells from a mixture of two sizes.
+# boundary_contact flags objects touching the image edge, whose volume
+# and axis lengths are truncated and must not enter a size distribution.
+# UNIQUENESS KEY: sample_id + object_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,object_id,volume_um3,surface_area_um2,equivalent_diameter_um,major_axis_um,intermediate_axis_um,minor_axis_um,aspect_ratio_major_minor,connected_components,boundary_contact,measurement_uncertainty,quality_flag
