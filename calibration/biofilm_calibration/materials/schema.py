@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..acquisition import linkage_columns
+from ..acquisition import SEGMENTATION_BASIS, linkage_columns
 from ..schema import EVIDENCE_BASIS, STATUS, Column, TableSchema
 
 # What a number is measured PER. Mirrors basis_conversion.BASES, plus the
@@ -58,6 +58,10 @@ BULK_MEASUREMENTS = TableSchema(
         "Masses are AS-WEIGHED, including the substrate. The biofilm mass is",
         "m_sample+substrate - m_blank, so the blank is part of the definition",
         "and blank_sample_id must resolve in blanks.csv.",
+        "volume_basis must equal what the balance weighed. A cells_only or",
+        "cells_and_matrix volume divided into a whole-biofilm mass inflates",
+        "rho_wet; supply pore_volume_fraction to convert, or segment the",
+        "envelope.",
     ),
     key=("sample_id", "replicate_id"),
     columns=(
@@ -74,6 +78,10 @@ BULK_MEASUREMENTS = TableSchema(
         Column("dry_mass_uncertainty_g", numeric=True, required=False),
         Column("volume_uncertainty_cm3", numeric=True, required=False),
         Column("volume_method"),
+        # What the hydrated volume ENCLOSES. Inherited from the imaged
+        # sibling's segmentation when the volume came from imaging.
+        Column("volume_basis", vocabulary=SEGMENTATION_BASIS),
+        Column("pore_volume_fraction", numeric=True, required=False),
         # "Wet mass" is not a measurement until the surface water is defined.
         Column("drain_orientation"),
         Column("drain_time_s", numeric=True),

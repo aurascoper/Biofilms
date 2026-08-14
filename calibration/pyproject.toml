@@ -14,6 +14,12 @@ dependencies = ["numpy"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# Readers for microscopy formats. The CORE NEVER IMPORTS THESE — ingest.py
+# defines a format-agnostic contract (array + voxel calibration + declared
+# segmentation basis) and readers are called by the caller. Tests that need
+# one use importorskip, so they SKIP rather than fail when it is absent,
+# exactly as the OpenMC tier does in coupling/.
+dataset = ["nd2", "tifffile"]
 
 [tool.setuptools.packages.find]
 include = ["biofilm_calibration*"]

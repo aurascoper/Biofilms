@@ -8,7 +8,7 @@ every object row invites them to drift.
 
 from __future__ import annotations
 
-from ..acquisition import linkage_columns
+from ..acquisition import SEGMENTATION_BASIS, linkage_columns
 from ..schema import EVIDENCE_BASIS, STATUS, Column, TableSchema
 
 ENTITY_KIND = frozenset({
@@ -56,6 +56,10 @@ SAMPLE_METADATA = TableSchema(
         "exist so that can be judged rather than assumed.",
         "held_out is a column, not an afterthought: a pitch fitted and",
         "validated on the same stacks has not been validated.",
+        "segmentation_basis records WHAT the mask encloses. V_hydrated is",
+        "the integral of this field, and it becomes the denominator of",
+        "rho_wet — so a cells_only mask against a whole-biofilm wet mass is",
+        "a silent, systematic error.",
     ),
     key=("sample_id",),
     columns=(
@@ -75,6 +79,10 @@ SAMPLE_METADATA = TableSchema(
         Column("voxel_size_y_um", numeric=True),
         Column("voxel_size_z_um", numeric=True),
         Column("segmentation_method"),
+        # WHAT was segmented, not how. The volume derived from this field
+        # becomes the denominator of rho_wet, and a cell-only mask does not
+        # enclose the material the balance weighs.
+        Column("segmentation_basis", vocabulary=SEGMENTATION_BASIS),
         Column("segmentation_version", required=False),
         Column("replicate_id", required=False),
         Column("source_id"),

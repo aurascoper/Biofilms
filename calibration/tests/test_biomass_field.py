@@ -261,3 +261,63 @@ def test_an_undeclared_tolerance_cannot_be_passed():
     e = evaluate_pitch(B, 0.25, 1, sample_id="s", held_out=True,
                        occupancy_mapping="threshold", tolerances=partial, tau=0.5)
     assert not e.passed
+
+
+# --- ingestion contract ----------------------------------------------------
+
+def test_ingest_requires_calibration_and_basis():
+    """An array alone is dimensionless pixels; with a voxel size it is a
+    volume; only with a basis is it a volume OF something."""
+    from biofilm_calibration.spatial.ingest import ingest
+
+    B = synthetic.slab(shape=(8, 8, 8), thickness_voxels=4)
+    ok = ingest(B, (0.1, 0.1, 0.5), "whole_biofilm_envelope",
+                sample_id="s1", source_id="SRC1")
+    assert ok.voxel_size_um == (0.1, 0.1, 0.5)
+    assert ok.voxel_volume_um3 == pytest.approx(0.005)
+
+    with pytest.raises(FieldError, match="anisotropic z-spacing"):
+        ingest(B, (0.1, 0.1), "whole_biofilm_envelope",
+               sample_id="s1", source_id="SRC1")
+    with pytest.raises(FieldError, match="unknown segmentation basis"):
+        ingest(B, 0.1, "eyeballed", sample_id="s1", source_id="SRC1")
+    with pytest.raises(FieldError, match="sample_id is required"):
+        ingest(B, 0.1, "cells_only", sample_id=" ", source_id="SRC1")
+
+
+def test_a_scalar_voxel_size_is_broadcast_but_a_pair_is_refused():
+    """Confocal z-spacing is routinely coarser than xy; silently dropping it
+    would distort every volume."""
+    from biofilm_calibration.spatial.ingest import ingest
+
+    B = synthetic.slab(shape=(4, 4, 4), thickness_voxels=2)
+    assert ingest(B, 0.25, "cells_only", sample_id="s", source_id="S"
+                  ).voxel_size_um == (0.25, 0.25, 0.25)
+
+
+def test_hydrated_volume_carries_its_basis_into_the_density():
+    """The whole point of the contract: the volume reaches wet_bulk_density
+    already tagged, so a cell-only field cannot become a density."""
+    from biofilm_calibration.materials.basis_conversion import (BasisError,
+                                                                wet_bulk_density)
+    from biofilm_calibration.spatial.ingest import ingest
+
+    B = synthetic.slab(shape=(10, 10, 10), thickness_voxels=5)   # 500 voxels
+    cells = ingest(B, 1.0, "cells_only", sample_id="s", source_id="S")
+    vol = cells.hydrated_volume_cm3()
+    assert vol.value_cm3 == pytest.approx(500 * 1e-12)
+    assert vol.segmentation_basis == "cells_only"
+    with pytest.raises(BasisError, match="excludes the extracellular"):
+        wet_bulk_density(1.0, vol)
+
+    envelope = ingest(B, 1.0, "whole_biofilm_envelope", sample_id="s",
+                      source_id="S").hydrated_volume_cm3()
+    assert wet_bulk_density(1.0, envelope).value > 0
+
+
+def test_optional_readers_are_reported_not_required():
+    """The core must work with no imaging stack installed."""
+    from biofilm_calibration.spatial.ingest import available_readers
+    readers = available_readers()
+    assert set(readers) == {"nd2", "tiff"}
+    assert all(isinstance(v, bool) for v in readers.values())

@@ -76,6 +76,18 @@ def evaluate(data_dir) -> MaterialGates:
         om.append("no bulk measurements — hydrated bulk density is undetermined")
         rd.append("no bulk measurements — X_total cannot be computed")
     else:
+        mismatched = [r["sample_id"] for r in tables["bulk_measurements"]
+                      if (r.get("volume_basis") or "").strip()
+                      not in ("whole_biofilm_envelope",)
+                      and not (r.get("pore_volume_fraction") or "").strip()]
+        if mismatched:
+            om.append(
+                f"{len(mismatched)} bulk measurement(s) have a volume_basis "
+                "that is not the whole-biofilm envelope and no declared "
+                "pore_volume_fraction — the balance weighed cells, matrix and "
+                "interstitial water, so dividing that mass by a cell-only or "
+                "stained-voxel volume inflates rho_wet systematically")
+
         unblanked = [r["sample_id"] for r in tables["bulk_measurements"]
                      if not (r.get("blank_sample_id") or "").strip()]
         if unblanked:

@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..acquisition import SEGMENTATION_BASIS, WHOLE_BIOFILM_BASIS
+
 # What a number is measured PER. Not a unit — a reference frame.
 BASES = frozenset({
     "site_occupancy",       # dimensionless lattice occupancy; never a concentration
@@ -81,15 +83,85 @@ def _positive(name: str, x: float) -> float:
     return float(x)
 
 
-def wet_bulk_density(wet_mass_g: float, hydrated_volume_cm3: float) -> Quantity:
-    """rho_wet = m_wet / V_hydrated."""
+@dataclass(frozen=True)
+class HydratedVolume:
+    """A volume that knows what it encloses.
+
+    THE MASS AND THE VOLUME MUST DESCRIBE THE SAME MATERIAL. A balance weighs
+    the whole biofilm — cells, matrix, interstitial water, retained solutes.
+    A cell-only fluorescence segmentation encloses none of the last three, so
+    dividing a whole-biofilm mass by a cell-only volume overstates rho_wet by
+    whatever fraction of the biofilm is matrix and water. Nothing about the
+    two numbers reveals the mismatch: both are positive floats of plausible
+    size, and the error is systematic rather than noisy.
+    """
+    value_cm3: float
+    segmentation_basis: str
+
+    def __post_init__(self):
+        if self.segmentation_basis not in SEGMENTATION_BASIS:
+            raise BasisError(
+                f"unknown segmentation basis {self.segmentation_basis!r}; "
+                f"expected one of {sorted(SEGMENTATION_BASIS)}")
+        if self.value_cm3 is None or self.value_cm3 <= 0:
+            raise BasisError(f"hydrated volume must be positive, got {self.value_cm3}")
+
+    def require_whole_biofilm(self) -> float:
+        """The volume, or a refusal naming what it fails to enclose."""
+        if self.segmentation_basis == WHOLE_BIOFILM_BASIS:
+            return float(self.value_cm3)
+        if self.segmentation_basis == "cells_only":
+            raise BasisError(
+                "hydrated volume was segmented as 'cells_only' but the mass is "
+                "the whole biofilm: the volume excludes the extracellular "
+                "matrix and the interstitial water that the balance weighed, so "
+                "rho_wet would be overstated by that fraction. Segment the "
+                "biofilm envelope, or supply a pore fraction via "
+                "to_whole_biofilm().")
+        if self.segmentation_basis == "cells_and_matrix":
+            raise BasisError(
+                "hydrated volume was segmented as 'cells_and_matrix': a union "
+                "of stained voxels still excludes water-filled internal voids. "
+                "Convert it with to_whole_biofilm(pore_volume_fraction=...) and "
+                "declare the pore fraction, or segment the envelope directly.")
+        raise BasisError(
+            "hydrated volume has an unresolved segmentation basis — what the "
+            "volume encloses must be declared before it can be divided into a "
+            "mass")
+
+
+def to_whole_biofilm(volume: HydratedVolume,
+                     pore_volume_fraction: float) -> HydratedVolume:
+    """Inflate a stained-voxel volume to the enclosing envelope.
+
+        V_envelope = V_stained / (1 - pore_fraction)
+
+    The pore fraction is a DECLARED measurement, not a default: it is exactly
+    the quantity that distinguishes the two volumes, so assuming it would
+    reintroduce the error this class exists to catch.
+    """
+    if volume.segmentation_basis == WHOLE_BIOFILM_BASIS:
+        return volume
+    if pore_volume_fraction is None:
+        raise BasisError(
+            "no declared pore volume fraction — it is precisely the quantity "
+            "that separates a stained-voxel volume from the biofilm envelope")
+    p = float(pore_volume_fraction)
+    if not 0.0 <= p < 1.0:
+        raise BasisError(f"pore volume fraction {p} is outside [0, 1)")
+    return HydratedVolume(float(volume.value_cm3) / (1.0 - p),
+                          WHOLE_BIOFILM_BASIS)
+
+
+def wet_bulk_density(wet_mass_g: float, hydrated_volume: HydratedVolume) -> Quantity:
+    """rho_wet = m_wet / V_hydrated, with both sides describing one material."""
     m = _positive("wet_mass_g", wet_mass_g)
-    v = _positive("hydrated_volume_cm3", hydrated_volume_cm3)
+    v = _require_volume(hydrated_volume)
     return Quantity(m / v, CONCENTRATION_UNIT, "wet_bulk")
 
 
 def dry_biomass_concentration(dry_mass_g: float,
-                              hydrated_volume_cm3: float) -> Quantity:
+                              hydrated_volume: HydratedVolume) -> Quantity:
     """X_total = m_dry / V_hydrated.
 
     Dry mass over HYDRATED volume. The mixed basis is deliberate — it is what
@@ -97,8 +169,20 @@ def dry_biomass_concentration(dry_mass_g: float,
     mass over dry volume, which is larger by roughly 1/(1 - w_water).
     """
     m = _positive("dry_mass_g", dry_mass_g)
-    v = _positive("hydrated_volume_cm3", hydrated_volume_cm3)
+    v = _require_volume(hydrated_volume)
     return Quantity(m / v, CONCENTRATION_UNIT, "wet_bulk")
+
+
+def _require_volume(hydrated_volume) -> float:
+    """A bare float is refused: an untagged volume is the untagged half of the
+    density, and the mass side has been tagged since the basis contract."""
+    if not isinstance(hydrated_volume, HydratedVolume):
+        raise BasisError(
+            f"hydrated volume must be a HydratedVolume carrying its "
+            f"segmentation basis, got {type(hydrated_volume).__name__}. A bare "
+            "number cannot say whether it encloses the same material the "
+            "balance weighed.")
+    return hydrated_volume.require_whole_biofilm()
 
 
 def water_mass_fraction(wet_mass_g: float, dry_mass_g: float) -> Quantity:

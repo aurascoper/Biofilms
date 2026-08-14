@@ -4,6 +4,10 @@
 # exist so that can be judged rather than assumed.
 # held_out is a column, not an afterthought: a pitch fitted and
 # validated on the same stacks has not been validated.
+# segmentation_basis records WHAT the mask encloses. V_hydrated is
+# the integral of this field, and it becomes the denominator of
+# rho_wet — so a cells_only mask against a whole-biofilm wet mass is
+# a silent, systematic error.
 # UNIQUENESS KEY: sample_id
 # Blank numeric cells mean NOT MEASURED. They are never read as zero.
-sample_id,culture_batch_id,paired_sample_group,blank_sample_id,measurement_order,growth_condition_id,medium_batch_id,held_out,species,strain,medium,temperature_C,pH,oxygen_condition,growth_phase,biofilm_age_h,imaging_method,voxel_size_x_um,voxel_size_y_um,voxel_size_z_um,segmentation_method,segmentation_version,replicate_id,source_id
+sample_id,culture_batch_id,paired_sample_group,blank_sample_id,measurement_order,growth_condition_id,medium_batch_id,held_out,species,strain,medium,temperature_C,pH,oxygen_condition,growth_phase,biofilm_age_h,imaging_method,voxel_size_x_um,voxel_size_y_um,voxel_size_z_um,segmentation_method,segmentation_basis,segmentation_version,replicate_id,source_id
