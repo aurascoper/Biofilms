@@ -13,6 +13,8 @@ from pathlib import Path
 from ..schema import SchemaError, read_table
 from .schema import (BIOFILM_STRUCTURE, ENTITY_SEMANTICS, OBJECT_MORPHOLOGY,
                      SAMPLE_METADATA)
+from .time_observable import TIME_OBSERVABLE
+from .time_observable import problems as observable_problems
 
 # Thresholds that must be declared before any pitch can be selected. Kept in
 # step with config/cpm_spatial_acceptance_template.toml and with
@@ -63,9 +65,12 @@ def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
     if err:
         return SpatialGate(NOT_EVALUATED, (), (f"entity semantics unreadable: {err}",))
 
+    # Explicit allowlist: any status outside these two blocks the gate,
+    # including unsupported_by_current_model.
+    usable = {"ready", "provisional"}
     unresolved = [r["species_id"] for r in entities
                   if r["entity_kind"] == "unresolved"
-                  or r["status"] not in {"ready", "provisional"}]
+                  or r["status"] not in usable]
     if unresolved:
         blockers.append(
             f"entity semantics unresolved for: {', '.join(unresolved)}")
@@ -111,6 +116,15 @@ def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
             blockers.append(
                 "no sample is designated held_out — a pitch fitted and "
                 "validated on the same stacks has not been validated")
+
+    # READY_FOR_TIME_CALIBRATION asserts the time calibration can BEGIN, and
+    # dt_MCS = a^2 * S_sim / S_exp needs both a pitch and an observable the
+    # model actually represents. A pitch alone is not enough.
+    observables, err_t = _load(data_dir / "time_observable.csv", TIME_OBSERVABLE)
+    if err_t:
+        blockers.append(f"time_observable unreadable: {err_t}")
+    else:
+        blockers.extend(observable_problems(observables))
 
     acceptance = None
     if acceptance_path and Path(acceptance_path).exists():

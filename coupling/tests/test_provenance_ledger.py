@@ -27,7 +27,11 @@ DATA = Path(__file__).resolve().parents[2] / "data"
 LEDGER = DATA / "parameter_provenance.csv"
 SOURCES = DATA / "sources.csv"
 
-STATUS = {"ready", "provisional", "blocked", "not_applicable"}
+# `unsupported_by_current_model` is distinct from `blocked`: blocked awaits a
+# measurement, unsupported awaits a model change. This ledger keeps its own
+# vocabulary, independent of the calibration package's.
+STATUS = {"ready", "provisional", "blocked", "not_applicable",
+          "unsupported_by_current_model"}
 MAPPING = {"mapped", "unmapped", "unsupported"}
 COMPAT = {"direct", "requires_transform", "unsupported"}
 PROVENANCE = {"published_replica", "certified_component", "engineered_composite",

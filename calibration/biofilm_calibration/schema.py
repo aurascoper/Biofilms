@@ -27,8 +27,18 @@ from pathlib import Path
 
 # Shared provenance vocabulary. Kept here, not duplicated per branch, so that
 # "ready" means the same thing in the spatial and material ledgers.
+# `unsupported_by_current_model` is deliberately distinct from `blocked`. A
+# blocked quantity awaits a measurement; an unsupported one awaits a MODEL
+# CHANGE, and no quantity of data will clear it. Filtering on status must be
+# able to separate "go and measure it" from "the simulation cannot represent
+# this yet".
 STATUS = frozenset({"ready", "provisional", "blocked", "unresolved",
-                    "not_applicable"})
+                    "not_applicable", "unsupported_by_current_model"})
+
+# Statuses that assert a quantity has no value. Kept explicit rather than
+# inferred, so a new status cannot silently fall through the check.
+NO_VALUE_STATUSES = frozenset({"blocked", "unresolved",
+                               "unsupported_by_current_model"})
 EVIDENCE_BASIS = frozenset({
     "direct_measurement", "manufacturer_datasheet", "primary_literature",
     "derived", "declared", "proxy", "synthetic", "unresolved",
@@ -154,7 +164,7 @@ def _provenance_problems(rows: list[dict], schema: TableSchema) -> list[str]:
         if status == "ready" and "source_id" in names \
                 and not (row.get("source_id") or "").strip():
             problems.append(f"row {i}: status=ready with no source_id")
-        if status in {"blocked", "unresolved"}:
+        if status in NO_VALUE_STATUSES:
             carried = [c for c in value_cols if row.get(c) is not None]
             if carried:
                 problems.append(
