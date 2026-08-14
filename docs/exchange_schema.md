@@ -88,3 +88,10 @@ binary-serialized because they are defined inside the dynamically created sandbo
 `dose_attribution.h5` (join of a possibly-cached field with *current* labels) are
 separate files with separate hashes — a cached transport field may be legitimately
 reused when only labels changed, without claiming the full checkpoint matched.
+
+`transport_state_hash` covers what the OpenMC **run** depends on and deliberately excludes
+`source.photons_per_second`: heating is tallied per source particle, so the activity cannot
+change the transport result and must not invalidate it. A Gy/s field is keyed on
+`fingerprint.dose_state_hash` (transport hash + activity) instead, so a scenario differing
+only in activity reuses the run and still gets its own dose. Never reuse a `DoseResult`
+across differing dose hashes.

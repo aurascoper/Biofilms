@@ -34,16 +34,30 @@ Membrane update: `membrane_dose_rate_Gy_s` is computed by the config-declared
 statistic (mass-weighted volume mean or area-weighted surface measure) and
 would replace the legacy constant `Ddot_R` — but see gate 2.
 
-## Gates (ALL must clear before implementation)
+## Gates (status by stage, 2026-08-14)
 
-| # | Gate | Status (2026-08-13) |
+Gates are reported per stage, because requirements are staged
+(`config.STAGES`: transport → dosimetry → cpm_feedback → membrane_feedback).
+A transport-only experiment is not "missing" a CPM clock it never uses, and
+reporting it that way hid the fact that the transport blocker was artificial.
+
+| Gate | Fixed-membrane / transport stage | Dose-responsive stage |
 |---|---|---|
-| 1 | Restart/window semantics proven | **CLEAR** — windowed runs bit-identical to unbroken runs; restart checkpoint resume bit-identical (tests/checkpoint_io_tests.jl) |
-| 2 | Membrane m-vs-P_eff constitutive choice declared | **BLOCKED** — open contradiction, audit §6: `P_eff` grows with dose while `m` decays; the intended coupling is undeclared. STOP CONDITION: no OpenMC dose into radiodialysis until the user selects it |
-| 3 | Membrane dose statistic declared & tested | **BLOCKED** — config key exists (`membrane_statistic`), value unset |
-| 4 | Physical inputs supplied | **BLOCKED** — voxel pitch, s/MCS, densities/compositions, spectrum, source rate all unset (intentional; audit §5) |
-| 5 | Offline feedback gate exceeded uncertainty + declared threshold | **NOT EVALUATED** — `biofilm-dose-scan` reports NOT EVALUATED while gate 4 is blocked |
+| 0 · Restart/window semantics proven | **CLEAR** — windowed runs bit-identical to unbroken runs; restart resume bit-identical (`tests/checkpoint_io_tests.jl`) | CLEAR (same evidence) |
+| 1 · Membrane constitutive choice | **CLEAR** — membrane declared fixed: `m_mech = 1`, `P_j = P_j0`, no dose→membrane update (`docs/physical_reference_system.md` §3) | **BLOCKED** — `m` vs `P_eff` unresolved in code (audit §6); **STOP CONDITION RETAINED: no OpenMC dose enters the radiodialysis model until the constitutive choice is explicitly selected** |
+| 2 · Membrane dose statistic | **NOT APPLICABLE** — diagnostic only while the membrane is fixed; the config key stays required at `membrane_feedback` and unset | **BLOCKED** — `membrane_statistic` unset |
+| 3 · Transport geometry / materials / spectrum | **IN PROGRESS** — per reference system; `data/parameter_provenance.csv` tracks each key. A0 spectrum ready; geometry provisional pending the sweep; biomass and membrane classes blocked by the water-phantom gap | Required |
+| 4 · Source activity | **NOT NEEDED** — heating is tallied per source particle and every sensitivity metric is a ratio, so `biofilm-dose-scan --stage transport` runs without it | **BLOCKED** — needs an assay certificate with a reference date; a catalogue activity range is not an activity |
+| 5 · Seconds per MCS | **NOT NEEDED** — no CPM is advanced | **BLOCKED** — must be fitted from time-lapse, never looked up |
+| 6 · Biological response transforms | **NOT NEEDED** | **BLOCKED** — four distinct response functions, none calibrated |
+| 7 · Offline feedback gate exceeds uncertainty + threshold | **NOT APPLICABLE** to transport validation | **NOT EVALUATED** — reported while gates above are open |
 
-Until gates 2–5 clear, running "coupled" dynamics would mean cells responding
-to an OpenMC field while membrane integrity responds to the hard-coded
-`Ddot_R = 1.0 Gy/s` — two incompatible radiation models in one simulation.
+The reason the stop condition survives the fixed-membrane declaration: fixing
+the membrane removes the feedback path, it does not choose between the two
+contradictory laws. Both still stand in `biofilms_potts.jl` and would
+reactivate the moment feedback is wired.
+
+Until the dose-responsive column clears, running "coupled" dynamics would mean
+cells responding to an OpenMC field while membrane integrity responds to the
+hard-coded `Ddot_R = 1.0 Gy/s` — two incompatible radiation models in one
+simulation.
