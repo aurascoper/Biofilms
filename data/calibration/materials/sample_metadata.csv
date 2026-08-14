@@ -1,0 +1,7 @@
+# material_sample_metadata — growth and handling conditions for one material sample
+# Composition varies with growth conditions and developmental stage, so
+# a composition without its conditions cannot be judged applicable to
+# anything.
+# UNIQUENESS KEY: sample_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,description,species_composition,medium,temperature_C,pH,oxygen_condition,growth_phase,biofilm_age_h,replicate_id,source_id

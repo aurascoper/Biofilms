@@ -1,0 +1,9 @@
+# bulk_measurements — wet/dry/ash masses and hydrated volume
+# surface_water_removal_protocol is LOAD-BEARING: a wet mass without a
+# stated drainage or blotting procedure is not reproducible, and the
+# surface water it includes goes straight into rho_wet and w_water.
+# drying_endpoint likewise — 'dried overnight' and 'dried to constant
+# mass' are different measurements.
+# UNIQUENESS KEY: sample_id + replicate_id
+# Blank numeric cells mean NOT MEASURED. They are never read as zero.
+sample_id,replicate_id,wet_mass_g,dry_mass_g,ash_mass_g,hydrated_volume_cm3,wet_mass_uncertainty_g,dry_mass_uncertainty_g,volume_uncertainty_cm3,volume_method,drying_protocol,drying_endpoint,surface_water_removal_protocol,ash_protocol,quality_flag,source_id

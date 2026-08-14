@@ -1,0 +1,53 @@
+# Biofilm material acceptance criteria — TEMPLATE.
+#
+# Every threshold ships UNSET, for the same reason the coupling config does.
+# The export gate refuses a proxy or declared composition regardless of what is
+# set here; these thresholds govern when a MEASURED one is good enough.
+
+schema_version = 1
+
+[model]
+# The only kind compatible with the present mapper, which assigns one material
+# class per occupied voxel (coupling/biofilm_openmc/materials.py). Representing
+# dry solid and interstitial water as separate phases would need sub-voxel
+# homogenization or extra classes, and neither exists.
+#   hydrated_effective_medium | explicit_components
+material_model_kind = "hydrated_effective_medium"
+
+[acceptance]
+# REQUIRED — tolerated relative uncertainty on the hydrated bulk density before
+# it may back an exported material.
+# maximum_density_relative_uncertainty =
+
+# REQUIRED — tolerated deviation of the summed elemental mass fractions from 1.
+# The coupling loader independently enforces its own tolerance; this one is
+# about the measurement, not the file format.
+# maximum_composition_closure_error =
+
+# REQUIRED — minimum independent replicates before a bulk measurement counts as
+# a measurement rather than an observation.
+# minimum_replicates =
+
+# REQUIRED — largest fraction of the dry mass that may be unaccounted for after
+# C, H, N, S and ash. Oxygen by difference absorbs every other element's error,
+# so a large residual means the analysis does not close.
+# maximum_unaccounted_dry_mass_fraction =
+
+# Whether oxygen obtained by difference is acceptable at all. Default true,
+# because CHNS analysers do not measure oxygen — but it must be RECORDED as
+# by_difference in elemental_analysis.analysis_method.
+allow_oxygen_by_difference = true
+
+[radiodialysis]
+# REQUIRED — how the spatial biomass field is mapped onto the radiodialysis
+# solver. NOT YET SATISFIABLE: compute_radial_biomass returns site occupancy
+# and its unweighted mean is assigned to X_total (g cm^-3) at
+# biofilms_potts.jl L1445-1446 and L1797. Declaring a rule here does not fix
+# that; the model must supply a mass concentration first.
+#   volume_weighted_radial | uniform_bulk | per_voxel
+# spatial_mapping_rule =
+
+# REQUIRED — how the ACTIVE metal-reducing fraction is obtained. Taxonomic
+# abundance of S. oneidensis is an upper bound on it, never equal to it.
+#   measured_activity | declared_activity_fraction | blocked
+# active_reducer_basis =
