@@ -34,7 +34,9 @@ import tomllib
 from dataclasses import dataclass, field
 
 from physical_contract import (ALLOWED_BOUNDARY_CONDITIONS,
-                               ALLOWED_SOURCE_ANGULAR, ALLOWED_SOURCE_SPATIAL)
+                               ALLOWED_SOURCE_ANGULAR, ALLOWED_SOURCE_SPATIAL,
+                               EVIDENCE_POLICIES, EXECUTION_CLASSES,
+                               SYSTEM_PROVENANCE)
 
 
 class ConfigError(ValueError):
@@ -89,8 +91,27 @@ class FieldSpec:
 _BIOFILM_ONLY = frozenset({BIOFILM_CYLINDER})
 _PHANTOM_ONLY = frozenset({WATER_PHANTOM})
 
+_ALLOWED_TARGET_CALIBRATION = frozenset({True, False})
+
 FIELD_SPECS: tuple[FieldSpec, ...] = (
     # --- transport ---------------------------------------------------------
+    # WHAT SYSTEM THIS IS. Required, not optional: a config that cannot say what
+    # it represents has no business building a model, and `target_calibration =
+    # false` alone cannot distinguish an A0 benchmark from a public surrogate,
+    # a synthetic fixture, an uncalibrated Reference D, or a sensitivity case.
+    # These four axes are independent — an engineered composite can hold
+    # measured, certified, derived and declared components at once, so
+    # "may this run use unmeasured values" cannot be a provenance value.
+    FieldSpec("provenance", "reference_system_id", "reference_system_id", "str",
+              "transport"),
+    FieldSpec("provenance", "system_provenance", "system_provenance", "str",
+              "transport", SYSTEM_PROVENANCE),
+    FieldSpec("provenance", "evidence_policy", "evidence_policy", "str",
+              "transport", EVIDENCE_POLICIES),
+    FieldSpec("provenance", "execution_class", "execution_class", "str",
+              "transport", EXECUTION_CLASSES),
+    FieldSpec("provenance", "target_calibration", "target_calibration", "bool",
+              "transport", _ALLOWED_TARGET_CALIBRATION),
     # The CPM lattice pitch: a biofilm-model parameter. A water phantom has no
     # lattice, and its tally resolution comes from transport.mesh instead.
     FieldSpec("geometry", "voxel_pitch_cm", "voxel_pitch_cm", "float", "transport",
@@ -142,6 +163,10 @@ OPTIONAL_SPECS: tuple[OptionalSpec, ...] = (
     OptionalSpec("transport", "particles", "particles", 10000),
     OptionalSpec("transport", "seed", "seed", 1),
     OptionalSpec("transport.mesh", "coarsening_factor", "mesh_coarsening_factor", 1),
+    # Absent means "let the builder centre it", which the biofilm builder
+    # refuses for an even lattice — so this is optional at the loader and
+    # required in practice for that kind.
+    OptionalSpec("source", "position_cm", "source_position_cm", None),
 )
 
 
@@ -199,6 +224,11 @@ class TransportConfig:
     modeling the wrong thing. The kind-specific fields default to None and are
     guaranteed present by the loader whenever the kind requires them.
     """
+    reference_system_id: str
+    system_provenance: str
+    evidence_policy: str
+    execution_class: str
+    target_calibration: bool
     origin_cm: tuple
     cylinder_radius_cm: float
     cylinder_length_cm: float
@@ -209,6 +239,11 @@ class TransportConfig:
     source_spatial: str
     source_angular: str
     model_kind: str = BIOFILM_CYLINDER
+    # Explicit source placement. Optional because the builders derive a centre
+    # when it is absent — but that derived centre lands exactly on internal
+    # lattice planes for every EVEN lattice size, so the biofilm builder
+    # requires it. See `check_source_placement`.
+    source_position_cm: tuple | None = None
     # biofilm_cylinder only
     voxel_pitch_cm: float | None = None
     membrane_thickness_cm: float | None = None
@@ -268,7 +303,7 @@ def _read(path_or_str) -> str:
 def _cast(spec: FieldSpec, value):
     if spec.cast == "float":
         return float(value)
-    if spec.cast == "str":
+    if spec.cast in ("str", "bool"):
         return value
     if spec.cast == "tuple":
         return tuple(value)
@@ -378,9 +413,17 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
         if val is None:
             problems.append(f"[{spec.section}] {spec.key}  (REQUIRED, unset)")
             continue
+        if spec.cast == "bool" and not isinstance(val, bool):
+            # `target_calibration = 1` is truthy and would pass an `in {True,
+            # False}` check, because 1 == True. A provenance flag is not a
+            # number.
+            problems.append(
+                f"[{spec.section}] {spec.key} = {val!r} must be a TOML boolean")
+            continue
         if spec.allowed is not None and val not in spec.allowed:
             problems.append(
-                f"[{spec.section}] {spec.key} = {val!r} not in {sorted(spec.allowed)}")
+                f"[{spec.section}] {spec.key} = {val!r} not in "
+                f"{sorted(spec.allowed, key=repr)}")
             continue
         values[spec.attr] = val
 
@@ -398,6 +441,12 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
             f"[transport.mesh] coarsening_factor = {coarsening!r} must be an "
             "integer >= 1 (1 means the tally mesh is as fine as its base)")
 
+    position = _lookup(data, "source", "position_cm")
+    if position is not None and (not isinstance(position, (list, tuple))
+                                 or len(position) != 3):
+        problems.append(
+            f"[source] position_cm = {position!r} must be three coordinates")
+
     base_dim = values.get("mesh_base_dimension")
     if base_dim is not None and (len(base_dim) != 3 or any(int(d) < 1 for d in base_dim)):
         problems.append(
@@ -413,8 +462,10 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
     kwargs = {spec.attr: _cast(spec, values[spec.attr])
               for spec in specs_for(stage, kind)}
     transport = data.get("transport", {})
+    position = _lookup(data, "source", "position_cm")
     return cls(
         model_kind=kind,
+        source_position_cm=None if position is None else tuple(float(v) for v in position),
         mesh_coarsening_factor=coarsening,
         materials=mats,
         batches=int(transport.get("batches", 10)),

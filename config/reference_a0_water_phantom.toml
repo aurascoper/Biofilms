@@ -17,6 +17,24 @@
 
 schema_version = 1
 
+[provenance]
+# WHAT SYSTEM THIS IS. Four independent axes, all required at the transport
+# stage: `target_calibration = false` alone cannot distinguish this benchmark
+# from a public surrogate, a synthetic fixture, or an uncalibrated Reference D.
+reference_system_id = "A0_cs137_idealized"
+# An idealized geometry — not a replica of any apparatus, not a certified
+# component. This axis says what the system IS; it does not say whether the
+# numbers were measured.
+system_provenance = "declared"
+# Strict: every value here is evaluated nuclear data or a declared modelling
+# choice, never an invented number. A0 measures nothing, but it invents nothing
+# either, so it holds the strict policy.
+evidence_policy = "measured_only"
+# Numerical validation against known physics.
+execution_class = "reference_benchmark"
+# No biomass, no membrane. Calibrates nothing biological and never may.
+target_calibration = false
+
 [geometry]
 # DECLARED. Dosimetry scale: the 661.7 keV mean free path in water is roughly
 # 11.6 cm, so a 15 cm radius is a little over one attenuation length and the

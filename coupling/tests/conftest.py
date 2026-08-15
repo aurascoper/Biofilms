@@ -13,6 +13,13 @@ import pytest
 VALID_CONFIG = """
 schema_version = 1
 
+[provenance]
+reference_system_id = "unit_test_fixture"
+system_provenance = "declared"
+evidence_policy = "synthetic"
+execution_class = "synthetic_validation"
+target_calibration = false
+
 [geometry]
 voxel_pitch_cm = 0.001
 origin_cm = [0.0, 0.0, 0.0]
@@ -33,6 +40,10 @@ spectrum_energies_eV = [1.0e6]
 spectrum_probabilities = [1.0]
 spatial = "line_z_axis"
 angular = "isotropic"
+# Half a pitch off every lattice plane. Without this the builder's derived
+# centre (n*pitch/2 = 0.004, with planes at k*0.001) sits on a plane in all
+# three dimensions — see model.check_source_placement.
+position_cm = [0.0045, 0.0045, 0.0045]
 
 [normalization]
 hamiltonian_scale = 1.0
@@ -78,6 +89,13 @@ density_g_cm3 = 0.94
 # PMF trivially 1.0. No biomass, no membrane — that is the point.
 WATER_PHANTOM_CONFIG = """
 schema_version = 1
+
+[provenance]
+reference_system_id = "A0_cs137_idealized"
+system_provenance = "declared"
+evidence_policy = "measured_only"
+execution_class = "reference_benchmark"
+target_calibration = false
 
 [geometry]
 origin_cm = [0.0, 0.0, 0.0]

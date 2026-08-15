@@ -19,6 +19,7 @@ The tally mesh is no longer welded to the lattice — see `mesh.py`.
 
 from __future__ import annotations
 
+import math
 import numpy as np
 
 from .config import (BIOFILM_CYLINDER, WATER_PHANTOM, ConfigError,
@@ -46,14 +47,27 @@ def _make_material(openmc, mc):
     return m
 
 
+def source_position_cm(config, cx, cy, z_lo, z_hi) -> tuple:
+    """Where the source actually sits: the explicit `source.position_cm` when
+    given, otherwise the geometric centre the builder derives.
+
+    Public because the placement guard and the emitting side both need the same
+    answer, and recomputing a centre in two places is how they come to disagree.
+    """
+    if config.source_position_cm is not None:
+        return tuple(float(v) for v in config.source_position_cm)
+    return (cx, cy, (z_lo + z_hi) / 2.0)
+
+
 def _photon_source(openmc, config, cx, cy, z_lo, z_hi):
+    sx, sy, sz = source_position_cm(config, cx, cy, z_lo, z_hi)
     if config.source_spatial == "line_z_axis":
         space = openmc.stats.CartesianIndependent(
-            openmc.stats.Discrete([cx], [1.0]),
-            openmc.stats.Discrete([cy], [1.0]),
+            openmc.stats.Discrete([sx], [1.0]),
+            openmc.stats.Discrete([sy], [1.0]),
             openmc.stats.Uniform(z_lo, z_hi))
     elif config.source_spatial == "point_origin":
-        space = openmc.stats.Point((cx, cy, (z_lo + z_hi) / 2.0))
+        space = openmc.stats.Point((sx, sy, sz))
     else:  # pragma: no cover — config validation forbids this
         raise ValueError(f"unknown source spatial {config.source_spatial}")
     return openmc.IndependentSource(
@@ -115,6 +129,55 @@ def check_lattice_congruence(n: int, config: TransportConfig) -> None:
             "Problems:\n  - " + "\n  - ".join(problems))
 
 
+def check_source_placement(n: int, config: TransportConfig) -> None:
+    """A source born exactly on a lattice plane is born on a surface, and which
+    cell it starts in is then decided by floating-point tie-breaking rather than
+    by the geometry. That is a real fragility, and the DEFAULT placement walks
+    straight into it: the builder centres the source at `n*pitch/2`, and lattice
+    planes fall at `k*pitch`, so for every EVEN `n` the centre coincides with a
+    plane in all three dimensions at once.
+
+    So this is not a property of one fixture. Rather than special-casing the
+    fixture, the biofilm builder demands an explicit `source.position_cm`
+    whenever the derived centre would land on a plane, and checks that whatever
+    position it gets is inside the biological domain.
+
+    The water phantom has no lattice and is not subject to any of this.
+    """
+    x0, y0, z0 = config.origin_cm
+    pitch = config.voxel_pitch_cm
+    side = n * pitch
+    cx, cy = x0 + side / 2.0, y0 + side / 2.0
+    z_lo, z_hi = z0, z0 + config.cylinder_length_cm
+    pos = source_position_cm(config, cx, cy, z_lo, z_hi)
+
+    problems = []
+    # Distance from the nearest lattice plane, per axis. `pitch/2` away is the
+    # voxel centre — the furthest a point can be from both bounding planes.
+    for axis, (p, lo) in enumerate(zip(pos, (x0, y0, z0))):
+        offset = (p - lo) % pitch
+        if min(offset, pitch - offset) <= 1e-9 * pitch:
+            problems.append(
+                f"axis {'xyz'[axis]}: source at {p} lies on a lattice plane "
+                f"(origin {lo}, pitch {pitch})")
+
+    r = math.hypot(pos[0] - cx, pos[1] - cy)
+    if r > config.cylinder_radius_cm * (1 - 1e-9):
+        problems.append(
+            f"source is {r} cm from the axis, outside the biological domain "
+            f"(radius {config.cylinder_radius_cm})")
+    if not (z_lo < pos[2] < z_hi):
+        problems.append(
+            f"source z = {pos[2]} is outside the domain [{z_lo}, {z_hi}]")
+
+    if problems:
+        raise ConfigError(
+            "source placement is degenerate — a particle born on a surface has "
+            "no well-defined starting cell. Set [source] position_cm "
+            "explicitly, off every lattice plane and inside the biological "
+            "domain. Problems:\n  - " + "\n  - ".join(problems))
+
+
 def build_water_phantom_model(config: TransportConfig):
     """Reference A0: a homogeneous water cylinder with an idealized photon
     source. No snapshot, no lattice, no membrane, no biomass.
@@ -171,6 +234,7 @@ def build_biofilm_cylinder_model(snapshot: Snapshot, config: TransportConfig):
     _check_kind(config, BIOFILM_CYLINDER)
     n = snapshot.cell_id.shape[0]
     check_lattice_congruence(n, config)
+    check_source_placement(n, config)
     classes = required_classes(config)
 
     def make_material(mc):

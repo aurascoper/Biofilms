@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 __all__ = [
     "ALLOWED_BOUNDARY_CONDITIONS", "ALLOWED_SOURCE_SPATIAL",
     "ALLOWED_SOURCE_ANGULAR", "EVIDENCE_POLICIES", "EXECUTION_CLASSES",
+    "SYSTEM_PROVENANCE",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "git_provenance",
 ]
@@ -41,6 +42,12 @@ ALLOWED_SOURCE_ANGULAR = frozenset({"isotropic"})
 # engineered composite can hold measured, certified, derived and declared
 # components at once, so "measured vs synthetic" cannot be a provenance value.
 EVIDENCE_POLICIES = frozenset({"measured_only", "synthetic"})
+
+# What kind of system this is. The ledger has enforced this vocabulary since
+# before the contract existed; it lives here now so the loader, the emitter and
+# the ledger test all read one definition.
+SYSTEM_PROVENANCE = frozenset({"published_replica", "certified_component",
+                               "engineered_composite", "declared"})
 
 # What kind of run this is. `target_calibration = false` alone cannot tell an A0
 # benchmark from a public surrogate, a synthetic fixture, an uncalibrated

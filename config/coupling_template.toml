@@ -34,6 +34,36 @@
 
 schema_version = 1
 
+[provenance]
+# REQUIRED — what system this is. Four independent axes, because
+# `target_calibration = false` alone cannot distinguish a reference benchmark
+# from a public surrogate, a synthetic fixture, or an uncalibrated target, and
+# a result whose file says only "false" cannot be told apart from any other.
+
+# REQUIRED — the reference system this config represents, matching a
+# reference_system_id in data/parameter_provenance.csv.
+# reference_system_id =
+
+# REQUIRED — what the system IS. One of: published_replica, certified_component,
+# engineered_composite, declared. This axis is NOT about whether the numbers
+# were measured: an engineered composite can hold measured, certified, derived
+# and declared components at once.
+# system_provenance =
+
+# REQUIRED — whether this run may use unmeasured values. One of: measured_only,
+# synthetic. Only "synthetic" relaxes the evidence gate, and only the evidence
+# gate — coherence, geometry, closure and units are enforced either way.
+# evidence_policy =
+
+# REQUIRED — what kind of run this is. One of: reference_benchmark,
+# surrogate_validation, synthetic_validation, target_calibration,
+# exploratory_sensitivity.
+# execution_class =
+
+# REQUIRED — whether this run calibrates the target biological system. Setting
+# it true is a claim about the data behind every value above.
+# target_calibration =
+
 [geometry]
 # REQUIRED — physical edge length of one CPM lattice voxel, cm
 # voxel_pitch_cm =
@@ -80,6 +110,13 @@ schema_version = 1
 
 # REQUIRED (transport) — angular distribution: "isotropic"
 # angular =
+
+# REQUIRED FOR biofilm_cylinder (optional at the loader) — explicit source
+# position, cm. Absent means "let the builder centre it", and the derived
+# centre lands exactly on internal lattice planes for every EVEN lattice size,
+# so a particle is born on a surface in all three dimensions. The biofilm
+# builder refuses that; see `model.check_source_placement`.
+# position_cm = [0.0, 0.0, 0.0]
 
 [normalization]
 # REQUIRED — separate transforms for the THREE consumers of radiation in the
