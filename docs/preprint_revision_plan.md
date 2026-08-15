@@ -14,7 +14,23 @@ has landed, what is deliberately deferred, and what is currently a trap for a re
 
 ## 1. Live hazards, in priority order
 
-### 1.1 The PDF is stale and must be rebuilt or withdrawn
+### 1.1 The stale PDF — RESOLVED, deleted 2026-08-15
+
+`preprint/modeling_radiotrophic_fitness.pdf` was a 21-page build of the **pre-revision** `.tex`,
+carrying the old title, the withdrawn radiotrophy claims, the fabricated Computational Methods
+section and the incorrect attribution of the radial stratification to `β_ion` — with nothing in the
+file saying so. No LaTeX toolchain exists on this machine, so rebuilding was not possible and the
+file has been **deleted** instead. That was the cheaper correct action: a PDF that no longer matches
+its source is worse than a missing one, because anyone who downloads it gets the retracted claims
+and none of the corrections.
+
+**Rebuild before sharing.** It needs a LaTeX toolchain with `booktabs`, `tabularx`, `longtable`,
+`rotating`, `pdflscape`, `microtype` and `lmodern`, plus the four figures in `preprint/figures/`,
+which were kept.
+
+<details><summary>Original hazard text</summary>
+
+
 
 `preprint/modeling_radiotrophic_fitness.pdf` is a 21-page build of the **pre-revision** `.tex`. It
 carries the old title, the withdrawn radiotrophy claims, the fabricated Computational Methods
@@ -28,6 +44,8 @@ repository is shared or linked in any form, the PDF must either be rebuilt from 
 or deleted.** Deleting it is the cheaper correct action; rebuilding it requires a LaTeX toolchain
 with `booktabs`, `tabularx`, `longtable`, `rotating`, `pdflscape`, `microtype` and `lmodern`, plus
 the four figures in `preprint/figures/`.
+
+</details>
 
 ### 1.2 The file names still say `radiotrophic`
 
@@ -161,47 +179,71 @@ transport sweep, whose four ranked rows carry `sensitivity_domain = transport_nu
 
 ---
 
-## 3. Deferred to the section-by-section revision
+## 3. The section-by-section revision — status after the 2026-08-15 pass
 
-Ordered by how much a reader is misled if it is left.
+Ordered as before, by how much a reader is misled if the item is left.
 
-1. **Figure inventory does not match the text.** §6.1–6.4 reference "Figure 1" through "Figure 4"
-   which do not exist as floats in the `.tex`; the four `\includegraphics` figures are the CPM and
-   radiodialysis outputs used by §6.5–6.6. Either produce the Langevin figures or renumber.
-2. **Table 2 rows that the audit refuted.** `α_M = 0.03–0.10 µg cell⁻¹ Gy⁻¹` for *A. niger* rests
-   on no located measurement, and a per-cell basis is not one the CPM entity semantics admit. Both
-   are now flagged in-text under Section 4; the rows themselves are unchanged and should be
-   removed or re-based.
-3. **The sign of `α_M`.** Eq. `eq:melanin` has melanin production increasing with dose. The only
-   same-species same-modality data (LAC1/LAC2 down at 1 and 3 kGy) and the only
-   pigmentation-versus-dose measurement (Bland 2022, pigmentation down under gamma) both run the
-   other way. Flagged in-text; the equation is unchanged. Changing it is a model decision.
-4. **The PSDE is specified but never integrated.** Eq. `eq:psde` governs a fitness field `F_s`. No
-   simulation in the repository integrates it — the R codes advance positions only, and the CPM is
-   a lattice Metropolis model. Sections 3.2, 3.4 and 3.7 should say which parts of the framework
-   are implemented and which are specification.
+1. ~~**Figure inventory does not match the text.**~~ **CLOSED.** Every `\ref{fig:...}` in the `.tex`
+   now resolves to one of the four real floats (`fig:radial`, `fig:melanin`, `fig:membrane`,
+   `fig:contaminant`). No dangling "Figure 1–4" references remain. The Langevin figures were never
+   produced and are not referenced.
+2. ~~**Table 2 rows that the audit refuted.**~~ **CLOSED, by re-basing in text rather than deletion.**
+   Seven of the twenty-six rows carry an *organism* denominator — three `α_M` rows in
+   µg cell⁻¹ Gy⁻¹, four `K_s` rows in cells mm⁻³ — which the parcel semantics cannot admit. Section 4
+   now states this, and states why the conversion that would re-base them does not exist: it needs a
+   cells-per-parcel mapping, which depends on the unselected lattice pitch and an unmeasured packing
+   density. The rows are retained as literature priors on an organism basis, explicitly not as
+   parameters of this model.
+3. ~~**The sign of `α_M`.**~~ **CLOSED as a decision, not a repair.** The sign stays positive and the
+   conflicting evidence is stated in §3.6: changing a model term on two contrary datapoints is a
+   larger claim than flagging it, and the melanin-dominance finding is sign-independent because it is
+   about magnitude. Resolving it needs a dose-response measurement that does not exist.
+4. ~~**The PSDE is specified but never integrated.**~~ **CLOSED.** §3.2 now carries a
+   specification-not-method marker. No source file contains a fitness field `F_s` at all. Four of the
+   nine terms are *unrepresentable* rather than merely unimplemented — `R_s` needs growth,
+   `γ_s Δ_s` needs the unexercised `H_kNN`, and `α_nir` and `C_s` have no state variable — and the
+   remaining four correspond by analogy rather than discretisation.
 5. ~~**Symplectic integration.**~~ **CLOSED** in the verification pass — demoted to stated design
    intent in §3.4 and §7.1. Implementing it remains future work, listed in §7.5.
-6. **`H_pair`.** The old Methods listed a five-term CPM Hamiltonian; `compute_delta_H` has four
-   (adhesion, volume, radiation, melanin). Methods now says four. Section 3.3's mapping should be
-   reconciled with the code.
-7. ~~**The RADIODIALYSIS results (§6.6)...**~~ **CLOSED** in the verification pass. The physical
-   units are withdrawn in-text and the dimensionless quantities are retained with their status; the
-   underlying units defect at `biofilms_potts.jl:1341-1342` and `:1445-1446`, and the hard-coded
-   `X_red = 0.3` labelled "(Shewanella proxy)" that the audit's active-reducer finding argues
-   against, are **code** defects and remain open. `RADIODIALYSIS: BLOCKED` stands.
-8. **`k = 4` versus `k = 3`.** `biofilms.R` clusters with `centers = 4`; the CPM's own
-   `kmeans_cells` uses `k = 3`. Fixed in Methods and §6.1; check every remaining mention.
-9. **Lattice size.** Struct default is `N = 60`; the reported runs use `N = 40`. Methods now says
-   both. Verify against whatever run actually produced the shipped figures.
-10. **"Notation Fixes Required Before Submission"** (the `.md`'s final section) is a to-do list
-    living inside the manuscript. Work it or move it here.
-11. **The `.md` and `.tex` have diverged in content, not only in format.** The `.md` lacks the
-    radiodialysis mathematics (§3.11 in the `.tex`) and, before this pass, lacked the CPM results
-    entirely. Decide whether the `.md` is a maintained artefact or a generated one; if generated,
-    generate it.
+6. ~~**`H_pair`.**~~ **CLOSED.** Methods states a four-term Hamiltonian, matching `compute_delta_H`
+   (adhesion, volume, radiation, melanin). Note the CPM's own stdout banner still prints the
+   five-term string — a **code** defect, still open.
+7. ~~**The radiodialysis results (§6.6).**~~ **CLOSED** in the verification pass. The underlying
+   units defect at `biofilms_potts.jl:1341-1342` and `:1445-1446`, and the hard-coded `X_red = 0.3`
+   labelled "(Shewanella proxy)", are **code** defects and remain open. `RADIODIALYSIS: BLOCKED`
+   stands.
+8. ~~**`k = 4` versus `k = 3`.**~~ **CLOSED.** `biofilms.R` clusters with `centers = 4`; the CPM's
+   `kmeans_cells` uses `k = 3` (`biofilms_potts.jl:1116`, `:1569`). Both are stated in Methods and
+   the discrepancy is discussed in §6.1.
+9. ~~**Lattice size.**~~ **CLOSED, after an error.** The shipped figures come from `main_coupled()`
+   at `N = 40`, six parcels, 100 MCS, so `R = 20` and the seeding radius is `R − 4 = 16 = 0.8R`. The
+   struct default `N = 60` is the `--no-radiolysis` path (eight parcels, 200 MCS) and did not produce
+   these figures. A revision pass briefly "corrected" the correct 0.8R figures to an N = 60 basis and
+   had to be reverted; every lattice-unit statistic in the manuscript now names the run it is read
+   against, because that is what made the error possible.
+10. **"Notation Fixes Required Before Submission"** — the `.md`'s trailing to-do list. Its two
+    substantive items are resolved in the `.tex` (undefined `m_i` → `m_i = ρ_wet·a³·V_sites`;
+    melanin dimensional consistency → one volumetric yield `Y_M`). The section itself disappears
+    when the `.md` is regenerated, since it has no counterpart in the `.tex`. **Open until then.**
+11. ~~**The `.md` and `.tex` have diverged.**~~ **RESOLVED AS POLICY, BLOCKED ON A TOOL.** The `.tex`
+    is the source of record and the `.md` is a **generated** artefact:
 
----
+        pandoc -s modeling_radiotrophic_fitness.tex -o modeling_radiotrophic_fitness.md
+
+    pandoc is not installed here, so the `.md` could not be regenerated and now carries a
+    do-not-edit header naming exactly what it is missing. **Regenerating it is a blocking step
+    before the manuscript is shared**, alongside rebuilding the PDF (§1.1).
+
+### Still open, in one place
+
+- Rebuild the PDF (§1.1) and regenerate the `.md` (item 11) — both need tooling absent here.
+- Rename both sources to `modeling_radioresistance_and_radiotropic_fitness.*`, as its own commit
+  with no content change (§1.2).
+- Resolve the posting status with the authors and state it once (§1.3).
+- Item 10 closes with the regeneration.
+- Three **code** defects surfaced by this revision and deliberately not fixed in a manuscript pass:
+  the five-term stdout banner, the radiodialysis units at `biofilms_potts.jl:1341-1342` / `:1445-1446`,
+  and the hard-coded `X_red = 0.3`.
 
 ## 4. Citations added in this pass
 

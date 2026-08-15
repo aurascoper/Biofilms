@@ -369,6 +369,28 @@ $N \equiv N(t,\mathbf{x})$.  The nine terms encode:
   \item \textbf{External forcing}: $C_s(t,\mathbf{x})$, environmental control inputs.
 \end{itemize}
 
+\paragraph{This subsection is specification, not method.}
+No program in this work integrates Eq.~\ref{eq:psde}. There is no fitness field $F_s$ in any
+source file: a case-insensitive search for it across every \texttt{.jl} and \texttt{.R} file
+returns only the manuscript title in header comments. What the three R codes advance is a set of
+particle positions under overdamped first-order Euler steps, and the CPM advances a lattice
+configuration by Metropolis acceptance --- neither is a discretisation of a field equation in
+$F_s$.
+
+Four of the nine terms are additionally unrepresentable rather than merely unimplemented. The
+deterministic reaction $R_s$ is nutrient-dependent \emph{growth}, and the CPM has none:
+\texttt{state.nutrient} is written each step but never read by \texttt{compute\_delta\_H}, and
+\texttt{divide\_cell!} has no trigger. The phase-locking adjustment $\gamma_s\Delta_s$ depends on
+the $H_{\mathrm{kNN}}$ machinery of Section~3.8, which is specified and unexercised. The
+non-ionising term $\alpha_{s,\mathrm{nir}}N$ and the external forcing $C_s$ have no counterpart in
+any state variable. Only diffusion, directed motility, noise and the ionising term have anything
+in the implemented models that corresponds to them, and even those correspond by analogy rather
+than by discretisation --- the CPM's radiation term is an acceptance bias, not a fitness sink.
+
+Eq.~\ref{eq:psde} is therefore the framework this work proposes, and the simulations reported in
+Section~\ref{sec:results} are separate, simpler models that share its vocabulary. Presenting the
+two as one system would be the central error this manuscript exists to avoid.
+
 \subsection{Hamiltonian Framework}
 \label{sec:hamiltonian}
 
@@ -588,6 +610,19 @@ basis is in any case not one this model's entity semantics admit, since a simula
 computational biomass parcel rather than an organism. The $\beta_{s,\mathrm{ion}}$ basis for
 \textit{A.\ niger} (``melanised; less resistant than Chernobyl isolates'') inherits the
 radioprotection claim withdrawn in Section~2.1.
+
+\emph{Seven of the twenty-six rows are on a per-cell basis this model cannot admit, and the
+conversion that would re-base them does not exist.} The three $\alpha_M$ rows are
+$\mu$g~cell$^{-1}$~Gy$^{-1}$ and the four $K_s$ rows are cells~mm$^{-3}$. Both denominators are
+\emph{organisms}. The simulated entity is a computational biomass parcel with no genealogy and no
+fixed organism count --- one \texttt{cell\_id} bundles cells with their water and their
+extracellular material --- so neither quantity can enter the model as written. Re-basing them
+requires a declared cells-per-parcel mapping, which is exactly the quantity the entity-semantics
+contract refuses to invent: it depends on the lattice pitch, which is unselected, and on a packing
+density, which is unmeasured. The rows are retained because they are the literature values a future
+calibration would start from, and they are marked here so that no reader mistakes a per-organism
+prior for a model parameter. They are literature priors on an organism basis, not parameters of
+this model.
 
 \begin{landscape}
 \begin{table}[htbp]

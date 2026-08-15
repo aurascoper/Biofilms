@@ -213,7 +213,8 @@ Biofilms/
 ├── tests/                         # runtests.jl, contract_csv.jl, deterministic_radiation.jl,
 │                                  #   genealogy_tests.jl, checkpoint_io_tests.jl, fixtures/
 ├── preprint/                      # .tex (source of record), .md (revised derivative),
-│                                  #   .pdf (superseded, pre-revision build), figures/ (4 × PDF + PNG)
+│                                  #   figures/ (4 × PDF + PNG). The built .pdf was REMOVED:
+│                                  #   it was a pre-revision build carrying withdrawn claims
 ├── assets/                        # preview_bioreactor_3d.png, preview_radiodialysis.png
 ├── kmeans_species_trajectory (1).gif, biofilm_dynamics_7_species.gif   # embedded below
 ├── Citations.md                   # predates data/sources.csv, unmaintained
