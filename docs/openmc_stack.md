@@ -42,6 +42,25 @@ Archive SHA-256 and the `cross_sections.xml` checksum are recorded in
 (`nuclear_data` attr). Data-gated tests skip — reported as SKIPPED, never
 passed — when `OPENMC_CROSS_SECTIONS` is unset or the file is missing.
 
+## Running anything in the transport tier
+
+The env is not on `PATH` and `OPENMC_CROSS_SECTIONS` does not persist between
+shells, so every transport command is these two lines. A session that skips
+them sees `NOT EVALUATED` gate verdicts and SKIPPED tests, which is the
+designed behaviour and is easy to misread as "OpenMC is not installed":
+
+```sh
+export OPENMC_CROSS_SECTIONS=$HOME/openmc-data/endfb-viii.0-hdf5/cross_sections.xml
+micromamba run -n openmc-biofilms <command>
+```
+
+The packages must be installed into that env too, `contract/` first because it
+is a path dependency with no PyPI presence:
+
+```sh
+micromamba run -n openmc-biofilms pip install -e contract -e "coupling[dev]"
+```
+
 ## Test tiers
 
 | tier | needs | gate |
