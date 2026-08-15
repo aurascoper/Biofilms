@@ -119,7 +119,11 @@ def _volume_raytrace_model(model, mesh):
     """
     import openmc
 
-    cells = list(model.geometry.get_all_cells().values())
+    # ROOT-universe cells only. `get_all_cells()` also returns the cells that
+    # fill lattice universes, and those carry no region — they are bounded by
+    # the lattice, not by surfaces — so unioning them raises. The nested
+    # universes still travel with the lattice fill.
+    cells = list(model.geometry.root_universe.cells.values())
     occupied = cells[0].region
     for cell in cells[1:]:
         occupied = occupied | cell.region

@@ -71,10 +71,28 @@ class PerSourceResult:
 
 def specific_energy_per_source(heating_eV_per_src: np.ndarray,
                                mass_kg: np.ndarray) -> np.ndarray:
-    """Gy per source particle. The activity-free half of the dose formula."""
-    if np.any(mass_kg <= 0):
-        raise ValueError("non-positive voxel mass — dose undefined")
-    return heating_eV_per_src * EV_TO_J / mass_kg
+    """Gy per source particle. The activity-free half of the dose formula.
+
+    An EMPTY bin — no mass and no heating — is dose zero, not an error. Exact
+    CSG masses (`materials.mesh_material_masses_kg`) produce them wherever the
+    mesh cube reaches outside the geometry, which is every corner bin. The
+    full-bin approximations never did, which is why this guard could once be
+    unconditional.
+
+    Mass with the WRONG SIGN is still refused, and so is energy deposited in a
+    bin holding nothing — that combination is a real inconsistency between the
+    tally and the geometry, and silently returning zero would hide it.
+    """
+    if np.any(mass_kg < 0):
+        raise ValueError("negative voxel mass — dose undefined")
+    empty = mass_kg == 0
+    if np.any(empty & (heating_eV_per_src != 0)):
+        raise ValueError(
+            "heating scored in a bin with zero mass — the tally and the "
+            "geometry disagree about where material is")
+    with np.errstate(divide="ignore", invalid="ignore"):
+        out = heating_eV_per_src * EV_TO_J / mass_kg
+    return np.where(empty, 0.0, out)
 
 
 def normalize_heating(heating_eV_per_src: np.ndarray, source_rate_per_s: float,

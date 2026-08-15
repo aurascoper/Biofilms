@@ -180,10 +180,17 @@ def _geometry(binding: VoxelBinding, spec: ReferenceSystemSpec) -> list[str]:
 
 
 def biomass_material(binding: VoxelBinding, spec: ReferenceSystemSpec,
-                     evidence_basis: str = "declared") -> MaterialClass:
+                     evidence_basis: str | None = None) -> MaterialClass:
     """The occupied-voxel material: composition from the spec, density from the
     BINDING. The density belongs to the binding because it is a property of what
-    a voxel is made of, not of the apparatus around it."""
+    a voxel is made of, not of the apparatus around it.
+
+    Its evidence basis follows the run's policy by default, so a synthetic
+    system cannot end up shipping one material labelled `declared` beside two
+    labelled `synthetic` and inviting the reader to believe the odd one out.
+    """
+    if evidence_basis is None:
+        evidence_basis = SYNTHETIC if spec.is_synthetic else "declared"
     return MaterialClass(
         name=binding.material_class,
         density_g_cm3=binding.density_g_cm3,

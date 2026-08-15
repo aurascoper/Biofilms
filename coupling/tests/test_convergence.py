@@ -166,3 +166,70 @@ def test_resolution_loss_is_zero_at_factor_one(cfg):
     mask = in_cylinder_mask(cfg, dim)
     assert np.isclose(
         resolution_loss(field, mass, 1, field, mass, mask), 0.0)
+
+
+def test_the_three_column_classes_cover_the_csv_exactly():
+    """A column that belongs to no class is a column nobody decided how to
+    compare — it would be silently skipped by compare_sweeps."""
+    from biofilm_openmc.convergence import (CSV_COLUMNS, DETERMINISTIC_COLUMNS,
+                                            ENVIRONMENTAL_COLUMNS,
+                                            REFERENCE_RELATIVE_COLUMNS,
+                                            STOCHASTIC_COLUMNS)
+    classes = (DETERMINISTIC_COLUMNS, STOCHASTIC_COLUMNS,
+               REFERENCE_RELATIVE_COLUMNS, ENVIRONMENTAL_COLUMNS)
+    assert set().union(*classes) == set(CSV_COLUMNS)
+    assert sum(len(c) for c in classes) == len(CSV_COLUMNS)
+
+
+def test_compare_sweeps_ignores_the_machine_and_not_the_physics():
+    from biofilm_openmc.convergence import compare_sweeps
+
+    base = {"coarsening_factor": "2", "histories": "4000000", "seed": "1",
+            "mesh_nx": "24", "mesh_ny": "24", "mesh_nz": "24",
+            "bin_volume_cm3": "7.4", "batches": "80", "particles": "50000",
+            "roi_bins": "6000", "heating_floor_eV": "1e-9",
+            "total_heating_eV_per_src": "100.0", "absorbed_fraction": "0.5",
+            "zero_score_fraction_roi": "0.0", "bins_above_floor": "6000",
+            "median_rel_err": "0.067", "p90_rel_err": "0.101",
+            "max_rel_err": "0.2", "mass_weighted_mean_dose_Gy_per_src": "1e-12",
+            "total_mass_kg": "21.2", "field_diff_vs_reference": "0.0",
+            "resolution_loss_vs_reference": "0.177",
+            "runtime_s": "2.9", "histories_per_s": "1379310",
+            "statepoint_bytes": "500000", "peak_child_rss_kb_cumulative": "80000"}
+
+    # A three-times-slower host on a bigger machine: not a difference.
+    slower = {**base, "runtime_s": "9.1", "histories_per_s": "439560",
+              "peak_child_rss_kb_cumulative": "240000",
+              "statepoint_bytes": "500123"}
+    assert compare_sweeps([base], [slower]) == []
+
+    # Monte Carlo jitter inside the tolerance: not a difference either.
+    jitter = {**base, "median_rel_err": "0.0672"}
+    assert compare_sweeps([base], [jitter]) == []
+
+    # A changed mesh IS a difference, and an exact one.
+    remeshed = {**base, "mesh_nx": "12"}
+    assert any("mesh_nx changed" in p for p in compare_sweeps([base], [remeshed]))
+
+    # So is a dose that moved more than the declared tolerance.
+    moved = {**base, "mass_weighted_mean_dose_Gy_per_src": "1.5e-12"}
+    problems = compare_sweeps([base], [moved])
+    assert any("mass_weighted_mean_dose_Gy_per_src moved" in p for p in problems)
+
+    # And a missing row is never silently tolerated.
+    assert any("missing" in p for p in compare_sweeps([base], []))
+
+
+def test_reference_relative_columns_are_only_compared_within_one_sweep():
+    """field_diff_vs_reference is computed against the sweep's OWN reference
+    row, so a sweep over factors 1,2 and one over 1,2,4,8,16 give the same row
+    different values. Measured: re-running A0's factor-1 row alone reproduces
+    every other column exactly and moves this one by 8%."""
+    from biofilm_openmc.convergence import compare_sweeps
+
+    a = {"coarsening_factor": "1", "histories": "4000000", "seed": "1",
+         "field_diff_vs_reference": "0.08960055712264413"}
+    b = {**a, "field_diff_vs_reference": "0.09700926009429321"}
+    assert compare_sweeps([a], [b]) == []
+    assert any("field_diff_vs_reference moved" in p
+               for p in compare_sweeps([a], [b], same_reference=True))
