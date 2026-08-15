@@ -176,6 +176,14 @@ the silent composite the ledger's uniqueness key
 `config_key` alone would either duplicate rows or quietly merge two incompatible systems into one
 configuration and call it reproduced.
 
+**The campaign that fills it is frozen.** `docs/calibration/reference_d_measurement_protocol.md`
+is the specification, `data/calibration/reference_d_requirements.csv` is the machine-readable
+requirement set, and `calibration/scripts/reference_d_status.py` reports the live gap. The table
+is checked against the gates and against `emit_transport_config`'s own refusal in **both**
+directions, so the protocol cannot drift from the code: a required field with no requirement
+fails, and so does a requirement justified by nothing the code refuses on. Today: 29
+requirements, 2 satisfied.
+
 ### S — synthetic_biofilm_e2e · invented, executable
 
 Not a physical system and not a candidate to become one. Reference D's two central numbers — the
