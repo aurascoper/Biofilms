@@ -19,8 +19,9 @@ The tally mesh is no longer welded to the lattice — see `mesh.py`.
 
 from __future__ import annotations
 
-import math
 import numpy as np
+
+from physical_contract import source_placement_problems
 
 from .config import (BIOFILM_CYLINDER, WATER_PHANTOM, ConfigError,
                      TransportConfig)
@@ -151,24 +152,11 @@ def check_source_placement(n: int, config: TransportConfig) -> None:
     z_lo, z_hi = z0, z0 + config.cylinder_length_cm
     pos = source_position_cm(config, cx, cy, z_lo, z_hi)
 
-    problems = []
-    # Distance from the nearest lattice plane, per axis. `pitch/2` away is the
-    # voxel centre — the furthest a point can be from both bounding planes.
-    for axis, (p, lo) in enumerate(zip(pos, (x0, y0, z0))):
-        offset = (p - lo) % pitch
-        if min(offset, pitch - offset) <= 1e-9 * pitch:
-            problems.append(
-                f"axis {'xyz'[axis]}: source at {p} lies on a lattice plane "
-                f"(origin {lo}, pitch {pitch})")
-
-    r = math.hypot(pos[0] - cx, pos[1] - cy)
-    if r > config.cylinder_radius_cm * (1 - 1e-9):
-        problems.append(
-            f"source is {r} cm from the axis, outside the biological domain "
-            f"(radius {config.cylinder_radius_cm})")
-    if not (z_lo < pos[2] < z_hi):
-        problems.append(
-            f"source z = {pos[2]} is outside the domain [{z_lo}, {z_hi}]")
+    # Shared with the emitting side: the builder must refuse a bad placement
+    # and the emitter must not write one, from one implementation.
+    problems = source_placement_problems(
+        pos, config.origin_cm, pitch, n,
+        config.cylinder_radius_cm, config.cylinder_length_cm)
 
     if problems:
         raise ConfigError(

@@ -47,8 +47,8 @@ because neither holds both halves. Only the join does:
 ## Coherent is not the same as ready
 
 The declared binding **is** coherent. It still cannot produce a configuration, because a coherent
-sentence with blanks in it is still a sentence with blanks. `emit_transport_config()` refuses, and
-running it against the repository's actual state prints:
+sentence with blanks in it is still a sentence with blanks. `evaluate()` refuses, and running it
+against the repository's actual state prints:
 
 ```
 REFUSING to emit a biofilm transport config
@@ -65,6 +65,28 @@ REFUSING to emit a biofilm transport config
 Three independent conditions, all required: the binding must be coherent, **and** both gates must
 be ready, **and** the two numbers must exist. Coherence alone was never sufficient — that is
 precisely the failure mode where a well-formed but unmeasured model gets shipped.
+
+### The binding is not the apparatus
+
+Emitting a config needs a second input, and it lives in
+`biofilm_calibration.reference_system`. The binding's subject is one voxel; the cylinder, the
+membrane thickness, the boundaries, the source and the medium are properties of the *system*, and a
+loadable `biofilm_cylinder` config requires all of them plus three material classes. Treating the
+binding as if it held the whole apparatus is why the emitter could previously produce only a pitch
+and one density — a fragment, not a configuration.
+
+`emit_transport_config(binding, spec)` now renders a complete config or refuses naming every
+missing field, and its checks come in three groups that are deliberately not interchangeable:
+
+| group | question | bypassable? |
+|---|---|---|
+| `coherence_problems` | does the binding contradict itself? | never |
+| `structural_problems` | is this physically constructible — closure, congruence, source placement, units? | never |
+| `evidence_problems` | is anyone entitled to believe these numbers? | only by `evidence_policy = "synthetic"` |
+
+A synthetic system may invent its values. It may not invent a geometry that cannot be built, a
+composition that does not close, or a source born on a lattice plane — otherwise "synthetic" becomes
+a universal escape hatch around the contracts this document exists to describe.
 
 ## What each blank waits on
 

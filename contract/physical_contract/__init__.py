@@ -24,6 +24,7 @@ __all__ = [
     "ALLOWED_SOURCE_ANGULAR", "EVIDENCE_POLICIES", "EXECUTION_CLASSES",
     "SYSTEM_PROVENANCE",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
+    "source_placement_problems",
     "git_provenance",
 ]
 
@@ -117,6 +118,45 @@ def render_material_toml(spec: MaterialSpec, class_name: str,
               f"  [materials.{class_name}.elements]"]
     lines += [f"  {el} = {frac!r}" for el, frac in sorted(spec.elements.items())]
     return "\n".join(lines) + "\n"
+
+
+# --- source placement ----------------------------------------------------
+
+def source_placement_problems(position, origin, pitch_cm: float, n: int,
+                              cylinder_radius_cm: float,
+                              cylinder_length_cm: float) -> list[str]:
+    """Why this source position is degenerate or out of bounds. Empty is fine.
+
+    Lives here because the transport builder must REFUSE a bad placement and
+    the emitting side must not WRITE one, and two implementations of "is this
+    point on a lattice plane" are two chances to disagree about it.
+
+    A point exactly on a lattice plane is a point on a surface: which cell the
+    particle starts in is then settled by floating-point tie-breaking rather
+    than by the geometry.
+    """
+    problems: list[str] = []
+    x0, y0, z0 = origin
+    side = n * pitch_cm
+    cx, cy = x0 + side / 2.0, y0 + side / 2.0
+
+    for axis, (p, lo) in enumerate(zip(position, (x0, y0, z0))):
+        offset = (p - lo) % pitch_cm
+        if min(offset, pitch_cm - offset) <= 1e-9 * pitch_cm:
+            problems.append(
+                f"axis {'xyz'[axis]}: source at {p} lies on a lattice plane "
+                f"(origin {lo}, pitch {pitch_cm})")
+
+    r = math.hypot(position[0] - cx, position[1] - cy)
+    if r > cylinder_radius_cm * (1 - 1e-9):
+        problems.append(
+            f"source is {r} cm from the axis, outside the biological domain "
+            f"(radius {cylinder_radius_cm})")
+    z_lo, z_hi = z0, z0 + cylinder_length_cm
+    if not (z_lo < position[2] < z_hi):
+        problems.append(
+            f"source z = {position[2]} is outside the domain [{z_lo}, {z_hi}]")
+    return problems
 
 
 # --- run provenance ------------------------------------------------------
