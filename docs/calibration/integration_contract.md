@@ -152,8 +152,12 @@ Two consequences. A sensitivity analysis over `β_ion` would report the radiatio
 negligible and be right about the coefficient while wrong about the mechanism. And a parameter
 that decides the headline result must not live only at its call site: it is now ledgered as
 `cpm.melanin_coupling` in `data/parameter_provenance.csv`, `status=blocked`,
-`sensitivity_rank=high` — the only row in that ledger not ranked `unknown`, because this one was
-measured here rather than awaiting the sweep.
+`sensitivity_rank=high`. It is one of five rows in that ledger not ranked `unknown`, and the only
+one outside the A0 transport sweep: `transport.mesh.base_dimension` and
+`transport.mesh.coarsening_factor` are also `high`, `transport.batches` and `transport.particles`
+`medium`, and all four carry `sensitivity_domain = transport_numerical`, which ranks numerical
+convergence rather than a biological response. Every biological-response row is still `unknown`.
+This one was measured here rather than awaiting a sweep.
 
 It also cannot be fitted alone. Only the product `α_M · k` reaches the dynamics, so
 `cpm.melanin_coupling` and `response.melanin` are jointly identifiable at best.
