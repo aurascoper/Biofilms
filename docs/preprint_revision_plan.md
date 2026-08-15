@@ -100,11 +100,11 @@ had it inverted. The fungi finish the run *further out*, which is the direction 
 their negative `β_ion` implements — a fact the corrected text now states rather than hides.
 
 **The stratification was reported as established.** §6.5 said "it is not imposed as an initial
-condition. That much stands", and the Conclusion led with it. Parcel centres are rejection-sampled
-uniformly over `r < R − 4` = 26 = 0.867R at `N = 60`, `R = 30`, whose expected mean radius is 17.3
-lattice units with a per-parcel SD of 6.1; at `n = 6` the SE on a species mean is ≈ 2.5, so the
-4.5-unit gap is ≈ 1.3 SE of the difference and *both* species means sit within one SE of the
-seeding mean (0.578R). The null is approximate anyway — parcels occupy volume and grow, so it must
+condition. That much stands", and the Conclusion led with it. The shipped figures come from `main_coupled()`
+at `N = 40`, six parcels, 100 MCS, so `R = 20`. Parcel centres are rejection-sampled uniformly over
+`r < R − 4` = 16 = 0.8R, whose expected mean radius is 10.7 lattice units with a per-parcel SD of
+3.8; at `n = 6` the SE on a species mean is ≈ 1.5, so the 3.0-unit gap is ≈ 1.4 SE of the
+difference and the *B. subtilis* value sits 0.43 SE from the seeding mean (0.533R). The null is approximate anyway — parcels occupy volume and grow, so it must
 be simulated, not derived. No multi-seed run against that null
 exists. The radial figure is now a **diagnostic**, and replicate seeds are named as the cheapest
 outstanding experiment. The melanin-dominance finding is unaffected — it is arithmetic on shipped

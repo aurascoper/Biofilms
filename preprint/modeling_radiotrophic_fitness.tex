@@ -825,12 +825,16 @@ negative $\beta_{s,\mathrm{ion}}$ biases the two fungi \emph{toward} the axis. T
 run further out than \textit{B.~subtilis}, not further in.
 
 \paragraph{And the separation is not yet distinguishable from the initial condition.}
-Parcel centres are rejection-sampled uniformly over $r < R - 4$, which at $N = 60$, $R = N/2 = 30$
-is a disk of radius $26 = 0.867R$. Its expected mean radius is $2(26)/3 = 17.3$ lattice units with
-a per-parcel standard deviation of $26/\sqrt{18} = 6.1$. At $n = 6$ parcels the standard error on a
-species mean is $\approx 2.5$ lattice units, so the 4.5-unit gap between \textit{C.~neoformans} and
-\textit{B.~subtilis} is $\approx 1.3$ standard errors of the difference, and \emph{both} species
-means sit within one standard error of the seeding mean ($0.578R$). No multi-seed run against that
+The shipped figures come from \texttt{main\_coupled()}, which runs $N = 40$ with six parcels per
+species for 100 MCS, so $R = N/2 = 20$. Parcel centres are rejection-sampled uniformly over
+$r < R - 4 = 16 = 0.8R$, whose expected mean radius is $2(16)/3 = 10.7$ lattice units with a
+per-parcel standard deviation of $16/\sqrt{18} = 3.8$. At $n = 6$ the standard error on a species
+mean is $\approx 1.5$ lattice units, so the 3.0-unit gap between \textit{C.~neoformans} and
+\textit{B.~subtilis} is $\approx 1.4$ standard errors of the difference, and the
+\textit{B.~subtilis} value sits $0.43$ standard errors from the seeding mean ($0.533R$).
+(The struct default is $N = 60$; the \texttt{-{}-no-radiolysis} path uses it with eight parcels for
+200 MCS. Every number in this paragraph scales with $R$, so it must be read against the run that
+produced the figure.) No multi-seed run against that
 uniform-seeding null exists. The null is itself approximate: parcels occupy volume and grow toward
 $V_{\mathrm{target}}$, so the mean over occupied \emph{sites} is not the mean over seed
 \emph{centres}, and the true null has to be simulated rather than derived. Figure~\ref{fig:radial}
