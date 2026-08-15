@@ -1,6 +1,9 @@
 % ============================================================
-%  Modeling Radiotrophic Fitness
+%  Modeling Radioresistance and Radiotropic Fitness
 %  Hunter Kinder & Brett Faulkner
+%  NOTE: the file name still reads modeling_radiotrophic_fitness.*; the rename
+%  is deferred to a separate commit so this revision's diff stays readable.
+%  See docs/preprint_revision_plan.md.
 %  Preprint — bioRxiv Systems Biology — April 2026
 % ============================================================
 \documentclass[11pt]{article}
@@ -37,7 +40,7 @@
             linkcolor=linkblue,
             citecolor=linkblue,
             urlcolor=linkblue,
-            pdftitle={Modeling Radiotrophic Fitness},
+            pdftitle={Modeling Radioresistance and Radiotropic Fitness},
             pdfauthor={Hunter Kinder, Brett Faulkner}]{hyperref}
 
 % --- Layout ---------------------------------------------------
@@ -62,7 +65,7 @@
 
 % ---- Title block --------------------------------------------
 \begin{center}
-  {\LARGE\bfseries Modeling Radiotrophic Fitness}\\[10pt]
+  {\LARGE\bfseries Modeling Radioresistance and Radiotropic Fitness}\\[10pt]
   {\large\bfseries Spatiotemporal Dynamics of Microbial Communities\\
    Under Ionizing Radiation Stress}\\[14pt]
   {\normalsize
@@ -81,22 +84,35 @@
 % ---- Abstract ------------------------------------------------
 \begin{abstract}
 \noindent
-This work presents a mathematical framework to describe the radiotrophic and adaptive dynamics
-of microbial communities exposed to gamma radiation. The developed model integrates Langevin
-dynamics with reaction-diffusion equations to simulate the spatial motility, growth, and nonlinear
-interactions of radiotrophic fungi, extremophiles, and radiation-sensitive averse species. In this
-framework, radiation gradients and chemical factors, such as melanin synthesis, are introduced as
-modifiable parameters to analyze their influence on biofilm growth and adaptive responses. The
-model leverages stochastic differential equations to capture complex dependencies between
-environmental conditions and microbial interactions. Numerical simulations of seven interacting
-species---including \textit{Cryptococcus neoformans}, \textit{Deinococcus radiodurans},
+This work presents a mathematical framework for the spatial and adaptive dynamics of microbial
+communities exposed to gamma radiation. The developed model integrates Langevin dynamics with
+reaction-diffusion equations to simulate the spatial motility and nonlinear interactions of
+melanized fungi, radioresistant extremophiles, and radiosensitive species. In this framework,
+radiation gradients and chemical factors, such as melanin synthesis, are introduced as modifiable
+parameters to analyze their influence on biofilm organisation. Numerical simulations of seven
+interacting species---including \textit{Cryptococcus neoformans}, \textit{Deinococcus radiodurans},
 \textit{Cladosporium sphaerospermum}, \textit{Bacillus subtilis}, \textit{Aspergillus niger},
-\textit{Shewanella oneidensis}, and \textit{Ochrobactrum intermedium} AM7---demonstrate that
-radiation gradients drive spatial niche partitioning, with melanized radiotrophic fungi
-concentrating in high-radiation zones while radiosensitive metal-reducing bacteria occupy
-attenuated peripheries. This work contributes a predictive modeling tool capable of elucidating
-the nonlinear adaptive behaviors of radiotrophic communities in extreme environments, with
-applications to nuclear bioremediation.
+\textit{Shewanella oneidensis}, and \textit{Ochrobactrum intermedium} AM7---produce radial
+structure on the Cellular Potts lattice, which we report with the qualification it needs. The
+modelled field is maximal on the cylinder axis and decays outward, so the core is the high-dose
+region; the melanized fungi end the run at \emph{larger} radius than \textit{B.~subtilis}, which is
+the direction opposite to the one their negative $\beta_{s,\mathrm{ion}}$ implements. With six
+parcels per species on a single seed the separation is not yet distinguishable from the uniform-disk
+initial condition (Section~\ref{sec:cpm_results}), and no multi-seed run against that null has been
+performed.
+
+We are explicit about which radiation phenotype this is. What the model expresses is
+\emph{radiotropism}: a directional spatial preference in a dose gradient, set by the sign of the
+per-species coefficient $\beta_{s,\mathrm{ion}}$. It is not \emph{radiotrophy} (ionizing radiation
+measurably enhancing growth or metabolism), because the simulations create no biomass, and it is
+not \emph{radioresistance} (elevated survival), because they impose no death; both are structurally
+absent rather than weakly supported. The published $D_{10}$ radioresistance evidence that anchors
+the per-species magnitudes in Table~\ref{tab:params} is therefore radioresistance evidence spent on
+a tropism coefficient, which we declare here rather than leave implicit in a sign convention.
+Radiotrophy is additionally not established for any of the seven species modelled
+(Section~\ref{sec:radiotrophy_status}). Within those limits the framework offers a route to
+reasoning about spatial self-organisation of microbial consortia under heterogeneous radiation
+fields, with applications to nuclear bioremediation.
 \end{abstract}
 \noindent\rule{\linewidth}{0.5pt}
 
@@ -104,9 +120,9 @@ applications to nuclear bioremediation.
 \section{Introduction}
 
 Microbial communities possess an extraordinary ability to adapt and survive under extreme
-environmental stressors, such as elevated radiation levels. Within such communities, radiotrophic
+environmental stressors, such as elevated radiation levels. Within such communities, melanized
 fungi and other extremophilic microorganisms have evolved specialized mechanisms that allow them
-to thrive in high-radiation environments. This study aims to develop a comprehensive mathematical
+to persist in high-radiation environments. This study aims to develop a comprehensive mathematical
 framework that captures the complex interplay between these organisms' nonlinear interactions,
 radiation sensitivities, and chemotactic behaviors within biofilm communities. By leveraging a
 combined approach that integrates Langevin dynamics, reaction-diffusion modeling, and a
@@ -115,18 +131,29 @@ communities under radiation stress and other external influences.
 
 The practical motivation for this work lies in nuclear bioremediation. Contaminated sites such
 as the Chernobyl Exclusion Zone and the Hanford Nuclear Reservation host complex microbial
-communities in which radiotrophic species coexist with metal-reducing bacteria capable of
-immobilizing radionuclides. Mathematical models that predict community dynamics under spatially
-heterogeneous radiation fields are essential for designing and optimizing bioremediation
+communities in which melanized and radioresistant species coexist with metal-reducing bacteria
+capable of immobilizing radionuclides. Mathematical models that predict community dynamics under
+spatially heterogeneous radiation fields are essential for designing and optimizing bioremediation
 strategies. The framework developed here provides the theoretical foundation for such predictions.
+
+Five phenomena travel under one loose vocabulary and they are not interchangeable: \emph{radiotropic}
+(directional growth or redistribution relative to a source), \emph{radiotrophic} (radiation
+measurably enhancing growth or metabolism), \emph{radioresistant} (elevated survival after
+exposure), \emph{melanized radioprotective} (melanin measurably altering damage, survival or
+shielding), and \emph{radiation-responsive} (any molecular, morphological or material change after
+exposure). A survival curve cannot calibrate a directional term, and a transcriptome cannot set a
+material density. Throughout this paper we use each word only for the endpoint it names. The model
+presented here expresses the first of the five, and the paper's title says so.
 
 % ---- 2. Related Work -----------------------------------------
 \section{Related Work}
 
-\subsection{Radiotrophic Organisms and Melanin-Mediated Radiotrophy}
+\subsection{Melanized Fungi, Radioresistance, and the Contested Radiotrophy Claim}
 
-The discovery that melanized fungi thrive in high-radiation environments has fundamentally
-reshaped our understanding of biological energy transduction. Zhdanova et al.\ \cite{zhdanova2000}
+The observation that melanized fungi colonise high-radiation environments prompted a proposal that
+melanin transduces ionizing radiation into metabolically usable energy. That proposal remains
+contested, and this subsection reports it as a live dispute rather than as settled background.
+Zhdanova et al.\ \cite{zhdanova2000}
 first documented the prevalence of darkly pigmented fungi within the damaged reactor at the
 Chernobyl Nuclear Power Plant, noting that species such as \textit{Cladosporium sphaerospermum}
 dominated the mycobiota of the most contaminated structures. Subsequent work by Dadachova et
@@ -137,10 +164,22 @@ times above background grew significantly faster, accumulated more biomass, and 
 three-fold more ${}^{14}$C-acetate than non-irradiated melanized cells or irradiated albino
 mutants. Dadachova and Casadevall \cite{dadachova2008} subsequently proposed the term
 ``radiosynthesis'' to describe this phenomenon, drawing an analogy to photosynthesis in which
-melanin serves a role loosely comparable to chlorophyll. More recently, Shunk et al.\
-\cite{shunk2022} cultivated \textit{C.\ sphaerospermum} aboard the International Space Station
-for 26 days, demonstrating a growth advantage of approximately 21\% under space radiation
-conditions and measurable attenuation of ionizing radiation beneath the fungal biomass.
+melanin serves a role loosely comparable to chlorophyll. Three features of the founding experiment
+are usually omitted when it is cited and are reported here: the cell arm was a $^{188}$Re beta
+field at 0.05~mGy~h$^{-1}$ rather than a photon field; the growth effects are single-digit
+percentages in dry weight; and non-irradiated non-melanized cells grew better than non-irradiated
+melanized cells in the same experiment, so the melanized/albino contrast carries a baseline
+asymmetry present before any radiation was applied \cite{audit2026}.
+
+Shunk et al.\ \cite{shunk2022} cultivated \textit{C.\ sphaerospermum} aboard the International
+Space Station for 26 days, reporting a growth ratio of $1.21 \pm 0.37$-fold against the ground
+control and lower counts beneath the fungal biomass. Neither result is a demonstration of
+radiotrophy and neither should be quoted without its interval: the stated ratio does not exclude
+unity, the attenuation comparison reached $p = 0.069$ on a single dish with one sensor pair, no
+dosimetric data were obtained (the sensors were PIN photodiodes), melanin was never measured, and
+the words ``radiotrophic'' and ``radiation-shield'' were struck from the title between preprint and
+publication \cite{audit2026}. The commonly circulated ``$2.17 \pm 0.25\%$'' attenuation figure
+appears in no version of that work.
 
 The radiation resistance of \textit{Deinococcus radiodurans} operates through fundamentally
 different mechanisms. Rather than harnessing radiation for metabolic benefit, \textit{D.\
@@ -150,10 +189,19 @@ genome copies enabling homologous recombination, and a potent manganese-based an
 that protects proteins from oxidative damage \cite{slade2011,daly2009}. Daly et al.\
 \cite{daly2010} showed that small-molecule Mn$^{2+}$-metabolite complexes specifically protect
 the proteome against radiation-induced carbonylation, establishing that protein protection, rather
-than DNA repair capacity alone, governs extreme radioresistance. \textit{Aspergillus niger},
-while not radiotrophic in the strict sense, produces melanin that confers substantial
-radioprotection, with melanized fungi generally exhibiting LD$_{10}$ values approaching or
-exceeding 1~kGy \cite{dadachova2008}.
+than DNA repair capacity alone, governs extreme radioresistance. This is the best-evidenced
+radiation phenotype in the set of species modelled here, and it is a survival phenotype.
+
+\textit{Aspergillus niger} is melanized, and an earlier draft of this work asserted that its
+melanin confers substantial radioprotection. The isogenic test contradicts that assertion and it
+is withdrawn. Cortes\~{a}o et al.\ \cite{cortesao2020} compared \textit{A.\ niger} N402 with its
+pigmentation-deficient $\Delta fwnA$ mutant MA93.1 and found LD$_{90}$ values of 366 against
+353~Gy (X-ray), 506 against 567~Gy (helium ions) and 112 against 112~Gy (iron ions) --- one pair
+running in the wrong direction and none of the three separable. What carried resistance in that
+dataset was DNA repair: the NHEJ mutant collapsed to LD$_{90}$ 57 / 55 / 50~Gy. The same null has
+been reported three times independently in \textit{Exophiala dermatitidis} wild type against its
+non-melanized \textit{pks1} mutant across gamma, alpha, proton and deuteron exposure
+\cite{audit2026}.
 
 \subsection{Mathematical Models of Biofilm Communities}
 
@@ -193,20 +241,58 @@ predictions.
 
 \subsection{Bioremediation Context}
 
-The practical motivation for modeling radiotrophic communities lies in nuclear bioremediation.
+The practical motivation for modeling these communities lies in nuclear bioremediation.
 \textit{Shewanella oneidensis} MR-1 is a model dissimilatory metal-reducing bacterium capable
 of reducing soluble U(VI) to insoluble U(IV) via extracellular electron transfer through
 c-type cytochromes \cite{heidelberg2002,veeramani2011}. \textit{Ochrobactrum intermedium} AM7,
 isolated from soil near the Kakrapar Atomic Power Station in India, tolerates high concentrations
 of thorium and produces exopolysaccharides (EPS) that complex with Th(IV), offering a pathway
 toward bioremediation of actinide-contaminated environments \cite{shukla2020}. The combination
-of radiotrophic fungi that actively benefit from radiation with metal-reducing bacteria that
+of melanized fungi that persist in the high-dose zone with metal-reducing bacteria that
 immobilize radionuclides suggests the possibility of engineered biofilm consortia for in situ
 remediation. The fitness landscape framework introduced by Wright \cite{wright1932} and
 formalized through the NK model of Kauffman \cite{kauffman1989} provides a conceptual foundation
 for understanding how epistatic interactions among species traits shape adaptation under
 radiation stress, a perspective that our Hamiltonian kNN decision tree operationalizes
 quantitatively.
+
+\subsection{Radiotrophy Is Not Established for Any Species Modelled Here}
+\label{sec:radiotrophy_status}
+
+Because this paper models seven named species, we audited the public evidence for the radiation
+phenotype of each rather than importing the labels on reputation. The audit
+\cite{audit2026} searched eleven data repositories at the API level (Dryad, Zenodo, Figshare, EBI
+BioImage Archive, BioStudies, IDR, EMPIAR, NASA OSDR, heiDATA, DepositOnce, MINDS@UW), the NCBI
+sequence and functional-genomics archives, and Europe PMC, and assigned every phenotype label from
+the endpoint actually measured. Its verdict on the phenotype in this paper's former title is
+\texttt{TARGETED\_LAB\_EXPERIMENT\_REQUIRED}, and its finding is unambiguous:
+
+\begin{quote}
+Radiotrophy is not established for any of the seven species modelled.
+\end{quote}
+
+The claim rests on a single 2007 paper covering two of the seven, and against it stand a
+same-species report of no substantial melanin protection under gamma, a same-species negative
+melanin-pathway result at 1 and 3~kGy, a same-genus null growth result under a TLD-anchored
+$^{137}$Cs field, an isogenic null in \textit{A.\ niger} across three ionizing modalities
+(Section~2.1), and a formal energy-budget critique holding that the deposited energy is
+insufficient and the media carbon sufficient to account for the observed growth
+\cite{walberg2015}. ``Not demonstrated'' is not ``disproved'', and we state it as the former.
+
+Radioresistance, by contrast, is well evidenced for several of the seven, and the
+$D_{10}$ values in Table~\ref{tab:params} are real measurements. Radiotropism has its own
+candidate --- Zhdanova et al.'s 2004 report of directed hyphal growth toward a $^{109}$Cd source,
+with \textit{C.\ sphaerospermum} 3176 among the responders --- and that record is blocked twice
+over: whether its dose gradient was measured or calculated is unverified, and directed hyphal
+elongation has no representation in a model whose agents are isotropic biomass parcels with no
+elongation or connectivity term. Three further audit verdicts bound what public data can do for
+this model at all: the CPM spatial machinery can be exercised but not calibrated on public data
+(\texttt{PUBLIC\_DATA\_CAN\_VALIDATE\_PIPELINE\_ONLY}); no public source pairs a calibrated
+hydrated volume with wet mass, dry mass and matched blanks
+(\texttt{TARGET\_WET\_BULK\_MEASUREMENT\_REQUIRED}); and no dataset anywhere pairs an exact
+modelled species with both a calibrated 3-D biomass field and a characterised radiation exposure
+(\texttt{PUBLIC\_COMPONENTS\_FOUND\_BUT\_NOT\_PAIRED}). Every parameter in Table~\ref{tab:params}
+is therefore a literature-anchored prior, and a literature prior is not a calibration.
 
 % ---- 3. Mathematical Framework --------------------------------
 \section{Mathematical Framework}
@@ -235,10 +321,10 @@ $k_B$               & Boltzmann constant \\
 $S[q(t)]$           & Action functional for species trajectories \\
 $\nabla$            & Spatial gradient operator \\
 $\Gamma_s(t,\mathbf{x})$ & Phase-locked kernel for species $s$ \\
-$\beta_{s,\mathrm{ion}}$ & Ionizing radiation sensitivity coefficient \\
+$\beta_{s,\mathrm{ion}}$ & Ionizing radiation coefficient. In the PSDE (Eq.~\ref{eq:psde}) a fitness-loss rate; in the CPM (Section~\ref{sec:methods}) a \emph{tropism} coefficient whose sign sets the direction of drift along the dose gradient. Magnitudes anchored to published $D_{10}$ radioresistance data (Table~\ref{tab:params}) \\
 $\alpha_{s,\mathrm{nir}}$ & Non-ionizing radiation coupling coefficient \\
 $\theta_s$          & Adaptive phase-locking coefficient \\
-$\gamma_s$          & Positive gamma-radiation sensitivity (benefit) coefficient \\
+$\gamma_s$          & Gamma-radiation coupling coefficient in the adaptive-feedback term (Eq.~\ref{eq:adaptive}) \\
 $\Delta_s$          & Phase-locking synchronization deviation \\
 \bottomrule
 \end{tabular}
@@ -315,9 +401,16 @@ evolve via the phase-locked canonical equations:
 \frac{dp}{dt} = -\frac{\partial H}{\partial q} + \Gamma_s(t,\mathbf{x})\,F_s(t,\mathbf{x})
 \end{equation}
 
-The leapfrog/Verlet scheme is employed numerically: (1) evaluate $H_s$ from the current state;
-(2) adjust the phase-locking deviation $\Delta_s$; (3) advance via a symplectic step
+The leapfrog/Verlet scheme is the intended numerical treatment: (1) evaluate $H_s$ from the
+current state; (2) adjust the phase-locking deviation $\Delta_s$; (3) advance via a symplectic step
 \cite{hairer2006}.
+
+\paragraph{This subsection is specification, not method.}
+No program in this work performs symplectic integration. Eq.~\ref{eq:hamiltonian} carries a kinetic
+term, but no simulation reported here holds a velocity or momentum state: the R models advance
+positions under overdamped first-order Euler steps and the CPM is a Metropolis Markov chain, which
+has no trajectory whose symplectic form could be preserved. Implementing it is listed in
+Section~\ref{sec:limitations}.
 
 \subsection{Radiation Field Models}
 
@@ -337,15 +430,23 @@ N(t,\mathbf{x}) = N_{\mathrm{UV}}\cos(\omega t)
 
 \subsection{Melanin Reaction-Diffusion}
 
-The spatial production and diffusion of melanin by radiotrophic fungi is modelled as:
+The spatial production and diffusion of melanin by the melanized fungi is modelled as:
 \begin{equation}
 \label{eq:melanin}
 \frac{\partial M}{\partial t} = D_M\,\nabla^2 M + \alpha_M\cdot n_{\mathrm{RF}}(\mathbf{x},t)\cdot I_\gamma(t,\mathbf{x})
 \end{equation}
 where $D_M$ is the melanin diffusion coefficient [$\mu$m$^2$\,s$^{-1}$], $\alpha_M$ is the
 radiation-driven production rate [$\mu$g cell$^{-1}$ Gy$^{-1}$], and $n_{\mathrm{RF}}$ is the
-local radiotrophic cell density [cells\,$\mu$m$^{-3}$]. Each term carries units of
+local melanized-fungal cell density [cells\,$\mu$m$^{-3}$]. Each term carries units of
 [$\mu$g\,$\mu$m$^{-3}$\,s$^{-1}$].
+
+The sign of $\alpha_M$ is a modelling assumption and the evidence runs against it. A same-species,
+same-modality measurement in \textit{C.\ neoformans} found the melanin-synthesis genes \textit{LAC1}
+and \textit{LAC2} \emph{down}-regulated after 1 and 3~kGy of gamma, and a two-species pigmentation
+assay found pigmentation increased under UV but decreased under gamma, both at $P < 0.001$
+\cite{audit2026}. Equation~\ref{eq:melanin} as written, with $\alpha_M > 0$, therefore encodes the
+opposite sign to the only same-modality data located. It is retained here so that the assumption is
+visible and testable, not because it is supported.
 
 \subsection{Nutrient Uptake with Adaptive Feedback}
 \label{sec:nutrient}
@@ -376,9 +477,15 @@ H_{\mathrm{kNN}} = \frac{1}{\sigma_n}\sum_{j=1}^{n} P_{sj}(t)\,F_j(t,\mathbf{x})
 \label{eq:damage}
 D_{\mathrm{rad},s}(t,\mathbf{x}) = -\beta_{s,\mathrm{rad}}\,I_\gamma(t,\mathbf{x})\,F_s(t,\mathbf{x})
 \end{equation}
-Species with higher melanin production or stronger DNA repair exhibit lower $\beta_{s,\mathrm{rad}}$
+Species with stronger DNA repair or antioxidant protection exhibit lower $\beta_{s,\mathrm{rad}}$
 values, reflecting the Mn$^{2+}$-dependent proteome protection described by Daly et al.\
-\cite{daly2010}.
+\cite{daly2010}. The parameterisation additionally assigns low $\beta_{s,\mathrm{rad}}$ to the
+melanized species. That is a modelling assumption and the isogenic evidence does not support it:
+melanin knockouts show no survival difference under ionizing radiation in \textit{A.\ niger}
+\cite{cortesao2020} or in three independent \textit{E.\ dermatitidis} studies across four
+modalities \cite{audit2026}. Where melanin measurably mattered in an evolution experiment, it
+reduced mutation accumulation without altering survival --- an effect on damage that must not be
+generalised into a survival term.
 
 \subsection{Biofilm Mechanical Properties}
 
@@ -461,7 +568,26 @@ uptake.
 \section{Parameter Estimation}
 
 Biologically justified parameter ranges for the six primary modelled species, derived from
-published experimental data, are given in Table~\ref{tab:params}.
+published experimental data, are given in Table~\ref{tab:params}. Three declarations govern how
+that table should be read.
+
+\emph{These are priors, not calibrations.} No value in Table~\ref{tab:params} was fitted to data
+from this system, and no optimisation was performed (Section~\ref{sec:methods}). A literature prior
+is not a calibration and must not be reported as one.
+
+\emph{The $\beta_{s,\mathrm{ion}}$ column spends radioresistance evidence on a tropism
+coefficient.} The ``Biological Basis'' entries are $D_{10}$ and LD$_{10}$ survival measurements,
+which are genuine and strong. In the CPM the coefficient they set does not kill anything; it
+decides which way a biomass parcel drifts in the dose gradient. That substitution is legitimate
+only as a declared modelling choice, and this is the declaration.
+
+\emph{Two entries are unsupported and are flagged rather than removed.} The
+$\alpha_M = 0.03$--$0.10~\mu$g cell$^{-1}$ Gy$^{-1}$ row for \textit{A.\ niger} rests on no located
+measurement --- the isogenic study of that species quantifies no melanin at all --- and a per-cell
+basis is in any case not one this model's entity semantics admit, since a simulated cell is a
+computational biomass parcel rather than an organism. The $\beta_{s,\mathrm{ion}}$ basis for
+\textit{A.\ niger} (``melanised; less resistant than Chernobyl isolates'') inherits the
+radioprotection claim withdrawn in Section~2.1.
 
 \begin{landscape}
 \begin{table}[htbp]
@@ -515,145 +641,283 @@ Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & 
 
 % ---- 5. Computational Methods --------------------------------
 \section{Computational Methods}
+\label{sec:methods}
 
-Simulations were implemented in Julia using \texttt{DifferentialEquations.jl} for numerical
-integration of the PSDE system (Eq.~\ref{eq:psde}).  Spatial species distributions were
-initialised with small random perturbations around a central point and evolved on the
-$[0,1]^2$ domain.  The Euler-Maruyama scheme was applied for stochastic integration;
-Runge-Kutta (RK4) was used for deterministic validation runs.  Symplectic leapfrog integration
-was employed for the Hamiltonian phase-space trajectories (Eq.~\ref{eq:canonical}).
+This section describes the code that was actually run. An earlier draft named
+\texttt{DifferentialEquations.jl}, \texttt{JuMP.jl}, \texttt{Ipopt}, \texttt{Agents.jl} and
+\texttt{PlotlyJS.jl}, and reported Sobol indices and Morris screening. None of those packages
+appears anywhere in the source repository and no sensitivity analysis or parameter optimisation was
+ever performed; those sentences are withdrawn. Four simulations exist: three in R and one in Julia.
 
-Optimisation of species-specific parameters was performed with \texttt{JuMP.jl} and
-\texttt{Ipopt}.  Sensitivity analysis employed Sobol indices (global variance decomposition)
-and Morris screening to identify the highest-influence parameters ($\mu_s$, $D_s$,
-$\beta_{s,\mathrm{ion}}$, $\theta_s$).  Visualisation used \texttt{PlotlyJS.jl} for interactive
-3D plots, \texttt{Agents.jl} for agent-based validation runs, and \texttt{Plots.jl} with
-\texttt{GR} backend for static trajectory outputs.  The interactive simulation includes sliders
-for gamma radiation intensity, thorium intensity, and heat intensity at 45-step resolution.
+\paragraph{Two-dimensional Langevin trajectories (\texttt{biofilms.R}).}
+Seven species are advanced on the $[0,1]^2$ domain by an explicit Euler--Maruyama step written out
+in base R, with Gaussian increments drawn per axis as $\mathcal{N}(0, 2D_s)$ and positions clamped
+to the unit square. \texttt{deSolve} and \texttt{stats} are loaded but no ODE solver is called; the
+integrator is the hand-written update. Species interact through a pairwise term
+$\propto q_s\,\|\mathbf{x}_j - \mathbf{x}_s\|(\mathbf{x}_j - \mathbf{x}_s)$ summed over all other
+species. The gamma field enters as a constant scalar drift $-\beta_s I_0$ added identically to both
+axes; it carries no spatial gradient in this simulation. Clustering uses base-R \texttt{kmeans}
+with $k = 4$, evaluated every ten steps. Run length 1000 steps at $dt = 0.1$, $I_0 = 0.2$. Plotting
+is base graphics.
 
-\paragraph{Cylindrical bioreactor geometry.}
-A complementary agent-based simulation was implemented in R using Shiny and
-\texttt{deSolve} \cite{soetaert2010}.  Seven species are placed inside a cylindrical bioreactor
-of radius $R$ and axial length $L$; Langevin dynamics with elastic wall reflection advance
-species positions under a Beer--Lambert gamma field $I_\gamma(r) = I_0\exp(-\kappa r)$.
-Nutrient enters radially from the outer wall; radiotrophic species experience an inward
-radiation attraction force; radiosensitive species are repelled outward.  The interactive
-interface exposes sliders for $I_0$, $\kappa$, outer-wall nutrient $C_0$, and thorium intensity.
+\paragraph{Three-dimensional cylindrical bioreactor (\texttt{biofilms\_3d.R}).}
+An interactive Shiny application with \texttt{plotly} rendering. Seven species move inside a
+cylinder of radius $R$ and axial length $L$ under an explicit Euler step with elastic wall
+reflection, in a Beer--Lambert gamma field $I_\gamma(r) = I_0\exp(-\kappa r)$. Nutrient enters
+radially from the outer wall. Each species carries a boolean \texttt{radiotropic} flag: species
+flagged true feel an inward attraction toward the high-dose axis, the remainder are repelled
+outward. The flag names a tropism and nothing more --- this simulation has no growth term and no
+death term, so it can express neither radiotrophy nor radioresistance. Sliders expose $I_0$,
+$\kappa$, outer-wall nutrient $C_0$, thorium intensity and heat intensity. \texttt{deSolve} is
+loaded here too and again not called.
 
-\paragraph{Cellular Potts Model (CPM).}
-The CPM was implemented in pure Julia on a $60^3$ cubic lattice with cylindrical wall
-boundary ($r > N/2$ sites frozen at $-1$) \cite{graner1992}.
-The Metropolis acceptance rule uses the five-term Hamiltonian
-$H_{\mathrm{CPM}} = H_{\mathrm{adh}} + H_{\mathrm{vol}} + H_{\mathrm{rad}} + H_{\mathrm{mel}} + H_{\mathrm{pair}}$
-mapped from Eq.~\ref{eq:hamiltonian}.
-Each Monte Carlo Step (MCS) consists of $N^3$ attempted copy operations.
-Coupled fields (radiation, melanin, nutrient) are updated by explicit forward Euler after
-each MCS.  $k$-means spatial clustering ($k = 3$) of cell centres identifies emergent niches.
-Static figures were exported using \texttt{CairoMakie.jl}.
+\paragraph{Radiodialysis finite-volume solver (\texttt{biofilms\_radiodialysis.R}).}
+The one simulation that does use a library solver. The three-equation system
+(Eqs.~\ref{eq:mobile}--\ref{eq:robin}) is discretised on a one-dimensional radial grid of
+$N_r = 40$ points by a finite-volume method of lines and integrated with \texttt{deSolve}'s LSODA
+adaptive stiff solver \cite{soetaert2010}. At $r = 0$ the L'H\^{o}pital limit reduces the
+cylindrical Laplacian to $2D_{\mathrm{eff}}\,\partial^2 c/\partial r^2$; at $r = R$ a ghost-point
+scheme enforces the Robin condition exactly. Shiny and \texttt{plotly} provide the interface.
 
-\paragraph{Radiodialysis finite-volume solver.}
-The three-equation system (Eqs.~\ref{eq:mobile}--\ref{eq:robin}) was discretised on a
-one-dimensional radial grid of $N_r = 40$ points using a finite-volume method of lines.
-At $r = 0$, the L'H\^{o}pital limit reduces the cylindrical Laplacian to $2D_{\mathrm{eff}}\partial^2 c/\partial r^2$.
-At $r = R$, a ghost-point scheme enforces the Robin condition (Eq.~\ref{eq:robin}) exactly.
-The resulting ODE system was integrated with the LSODA adaptive stiff solver
-(\texttt{deSolve} in R; forward Euler in Julia for CPM coupling).
-The evolving biomass densities $X$ and $X_{\mathrm{red}}$ were extracted from the CPM lattice
-every ten MCS and passed to the radial solver, providing a one-way coupling between the
-spatial cell dynamics and the contaminant transport PDE.
+\paragraph{Cellular Potts Model (\texttt{biofilms\_potts.jl}).}
+Pure Julia, depending only on \texttt{LinearAlgebra}, \texttt{Statistics}, \texttt{Random} and
+\texttt{Printf}. The lattice is $N^3$ cubic with a cylindrical wall boundary ($r > N/2$ sites
+frozen at $-1$) \cite{graner1992}; the struct default is $N = 60$ and every run reported in
+Section~6 used $N = 40$ with six biomass parcels per species. A CPM cell ID here is a
+computational biomass parcel and not an organism, so parcel counts are never comparable to cell
+counts or colony-forming units. The Metropolis acceptance rule uses the
+four-term Hamiltonian
+$H_{\mathrm{CPM}} = H_{\mathrm{adh}} + H_{\mathrm{vol}} + H_{\mathrm{rad}} + H_{\mathrm{mel}}$
+mapped from Eq.~\ref{eq:hamiltonian}, at temperature $T_{\mathrm{CPM}} = 5.0$. Each Monte Carlo
+Step (MCS) is $N^3$ attempted copy operations. Coupled fields (radiation, melanin, nutrient) are
+updated by explicit forward Euler after each MCS. Spatial niches are identified by a $k$-means
+routine implemented in the file itself ($k = 3$, Lloyd iteration, at most 50 iterations). Static
+figures were exported with \texttt{CairoMakie.jl}, which the figure-export section loads on demand.
+
+There is no growth and no death in this model: the \texttt{divide\_cell!} routine has no trigger,
+and cells are removed only when their volume reaches zero, which the volume constraint prevents
+under the reported parameters. Section~\ref{sec:cpm_results} states what follows for the results.
+
+\paragraph{Coupled CPM--radiodialysis run.}
+The Julia file also carries its own forward-Euler port of the radial system, substepped against the
+explicit diffusion stability bound $0.4\,\Delta r^2 / 2D_{\mathrm{eff}}$, so that the CPM can drive
+it directly. Biomass densities $X$ and $X_{\mathrm{red}}$ are extracted from the CPM lattice every
+ten MCS and passed to the radial solver: a one-way coupling from the spatial cell dynamics to the
+contaminant transport PDE.
+
+\paragraph{What is in \texttt{Project.toml} and why it is not here.}
+The Julia project declares \texttt{AMDGPU}, \texttt{HDF5} and \texttt{JACC}. These belong to
+\texttt{biofilms\_potts\_jacc.jl}, a portability port of the CPM kernel, and to
+\texttt{export\_checkpoint.jl}. Neither produced any figure or number reported in this paper.
 
 % ---- 6. Results ---------------------------------------------
 \section{Results}
 
 \subsection{Species Trajectory Clustering Under Radiation Gradients}
 
-The Langevin diffusion simulations on the $[0,1]^2$ domain reveal pronounced spatial phenotype
-separation under the imposed radiation gradient (Figure~1). $k$-means clustering of species
-trajectories identifies three distinct spatial niches. The first cluster, concentrated in the
-high-radiation zone, is dominated by the melanised species \textit{C.\ neoformans} and
-\textit{C.\ sphaerospermum}, whose positive gamma sensitivity coefficients ($\gamma_s \approx
-0.07$ and $0.06$, respectively) enable them to exploit ionising radiation as a metabolic
-stimulus. The second cluster occupies the intermediate-radiation zone and contains
-\textit{D.\ radiodurans} and \textit{A.\ niger}---species that tolerate radiation without
-deriving direct metabolic benefit. The third cluster, in the low-radiation periphery,
-comprises \textit{B.\ subtilis}, \textit{S.\ oneidensis}, and marine taxa
-(\textit{Pseudoalteromonas} sp., \textit{Polaribacter} sp., \textit{Flavobacterium} sp.),
-whose higher radiation sensitivities confine them to regions where the ionising flux has
-attenuated below their damage thresholds. This spatial segregation is consistent with
-radiation-mediated niche partitioning, in which ionising radiation simultaneously serves as
-stressor and resource---a dual role with no direct analogue in classical substrate-competition
-biofilm models.
+The two-dimensional Langevin simulation on the $[0,1]^2$ domain produces spatial separation of the
+seven species (Figure~1), with the trajectories grouping by species-specific drift magnitude.
+Three points must be stated before the figure is interpreted, and they revise what an earlier
+draft claimed for it.
+
+First, there is no radiation gradient in this simulation. The gamma term enters
+\texttt{biofilms.R} as the constant scalar $-\beta_s I_0$ with $I_0 = 0.2$ fixed, added identically
+to the $x$ and $y$ increments of every species, so it produces a uniform diagonal drift whose
+magnitude is $\mu_s\beta_s$ and whose sign is the same for all seven. It cannot produce a radial
+niche, because there is no radius in it. The separation visible in Figure~1 is produced by the
+pairwise interaction term, the noise, and the per-species drift magnitude.
+
+Second, no species in this simulation exploits radiation. Every $\beta_s$ enters with the same
+negative sign, and the simulation has no growth term for a metabolic gain to act on. The earlier
+description of $\gamma_s \approx 0.07$ and $0.06$ as ``positive gamma sensitivity coefficients''
+enabling \textit{C.\ neoformans} and \textit{C.\ sphaerospermum} to ``exploit ionising radiation as
+a metabolic stimulus'' is withdrawn: 0.07 is that species' \texttt{rad\_sensitivity} entry, it
+enters with a minus sign like every other, and 0.06 belongs to a species labelled ``New
+Extremophile'' in the source, not to \textit{C.\ sphaerospermum} (0.05).
+
+Third, the clustering is computed with $k = 4$, not $k = 3$, and the marine taxa named above
+(\textit{Pseudoalteromonas} sp., \textit{Polaribacter} sp., \textit{Flavobacterium} sp.) appear in
+the three-dimensional variant of the model rather than in this one.
+
+The claim that survives is narrower and is the one worth making: given per-species drift and
+pairwise coupling, spatial grouping by radiation parameter emerges without being imposed as an
+initial condition. Whether it tracks a dose gradient is a question this simulation cannot answer;
+it is answered, differently than expected, by the CPM in Section~\ref{sec:cpm_results}.
 
 \subsection{Thorium-232 Decay Integration}
 
-The Th-232 decay model (Figure~2) compares actual versus predicted radioactive decay on a
-logarithmic scale spanning billions of years, incorporating stochastic perturbation around
-the deterministic exponential decay law. The 14.05-billion-year half-life produces a
-quasi-static radiation source on biological timescales (hours to years), but the stochastic
-perturbation term captures quantum-mechanical uncertainty in individual decay events, which
-manifests as Poisson-distributed dose-rate fluctuations. For biofilm modelling purposes,
-Th-232 provides an effectively constant ionising background, while stochastic perturbation
-introduces dose-rate heterogeneity at the spatial scale of microcolonies (tens of
-micrometres), driving the phase-space fluctuations captured by the Langevin dynamics.
+An earlier draft described this subsection as a comparison of ``actual versus predicted'' Th-232
+decay. That is withdrawn, and it was the only place in the paper claiming a comparison against
+observation. There are no measured decay data in this project --- no file under \texttt{data/}
+holds any --- and no decay code exists in the repository to produce the predicted curve either.
+Nothing was compared to anything.
+
+What survives is the modelling premise, which needs no figure and is not a result: the
+14.05-billion-year half-life of Th-232 makes it an effectively constant ionising background on
+biological timescales of hours to years. That is why every simulation here treats the radiation
+field as static in time. The claim that decay stochasticity introduces dose-rate heterogeneity at
+the scale of microcolonies is likewise withdrawn: no simulation in this work samples decay events,
+and the radiation field in each is a deterministic function of position alone.
 
 \subsection{Motility--Diffusion--Gamma Sensitivity Relationships}
 
-The three-dimensional scatter relating motility ($\mu_s$), diffusion coefficient ($D_s$), and
-gamma sensitivity $\gamma_s$ across species (Figure~3) reveals a striking inverse relationship
-between radiation sensitivity and motility. \textit{C.\ neoformans}, at the highest gamma
-sensitivity ($\approx 0.07$), exhibits effectively zero motility, consistent with the
-hypothesis that radiotrophic organisms invest resources in melanin production rather than
-active locomotion. \textit{D.\ radiodurans}, with the lowest $\beta_{s,\mathrm{ion}}$, is
-likewise non-motile but for different mechanistic reasons: radioresistance derives from
-molecular protection rather than radiation exploitation. The motile species
-(\textit{B.\ subtilis}, \textit{S.\ oneidensis}) occupy the high-motility, low-$\gamma_s$
-region, suggesting a trade-off between radiation exploitation and behavioural avoidance.
-As radiation intensity rises, the competitive advantage shifts from motile radiation-avoiders
-to sessile radiotrophic beneficiaries.
+Figure~3 plots motility ($\mu_s$), diffusion coefficient ($D_s$) and the ionizing coefficient
+against each other across species. It is a scatter of the entries of Table~\ref{tab:params}, not an
+output of any simulation, and the inverse relationship it displays between radiation coefficient
+and motility is a property of the input table --- readable directly from the rows, and traceable to
+the fact that the sessile species in this set are fungi and the motile ones are flagellated
+bacteria. Reported as a summary of the parameterisation it is informative; reported as a finding it
+would be circular, and an earlier draft reported it as a finding.
+
+Two claims attached to it are withdrawn. That \textit{C.\ neoformans}'s low motility is
+``consistent with the hypothesis that radiotrophic organisms invest resources in melanin production
+rather than active locomotion'' is a hypothesis the figure cannot bear on, since both quantities
+were entered by hand. That ``as radiation intensity rises, the competitive advantage shifts from
+motile radiation-avoiders to sessile radiotrophic beneficiaries'' describes a competitive outcome
+that no simulation reported here computes: none of the four has a growth term, a death term or an
+abundance that can shift.
+
+What the figure does support is the contrast in mechanism between the two non-motile extremes,
+which is a literature statement and is cited as one: \textit{D.\ radiodurans}'s low coefficient
+reflects Mn$^{2+}$-dependent proteome protection and DNA repair \cite{daly2010,slade2011}, a
+survival mechanism, while the melanized fungi's low coefficient is anchored to melanized-isolate
+survival data \cite{zhdanova2000,shunk2022}. Both are survival evidence. Neither is evidence about
+motility or about direction of movement.
 
 \subsection{Phase-Locking and Hamiltonian kNN Dynamics}
 
-The Hamiltonian kNN decision tree (Figure~4) reveals that synchronised metabolic oscillations
-emerge among species occupying the same spatial niche. Within the high-radiation cluster,
-\textit{C.\ neoformans} and \textit{C.\ sphaerospermum} exhibit strong phase coherence in
-their melanin production cycles, suggesting cooperative dynamics in which shared
-melanin-derived radioprotection benefits both. Species in different radiation niches show weak
-phase coupling, indicating competitive exclusion at niche boundaries. The kNN decision tree
-correctly predicts species dominance transitions: as simulated radiation intensity increases
-beyond 1~kGy, \textit{B.\ subtilis} populations collapse, \textit{D.\ radiodurans} maintains
-steady-state abundance, and \textit{C.\ neoformans} increases in fitness---reproducing the
-biologically expected ordering of radiation tolerance.
+Equation~\ref{eq:knn} defines the phase-weighted neighbourhood functional $H_{\mathrm{kNN}}$. No
+simulation in this work evaluates it, and this subsection reports that rather than reporting
+results from it.
 
-\subsection{Cellular Potts Model: Emergent Radial Niches and Melanin Accumulation}
+An earlier draft stated that the kNN decision tree ``correctly predicts species dominance
+transitions'', with \textit{B.\ subtilis} populations collapsing above 1~kGy, \textit{D.\
+radiodurans} holding steady and \textit{C.\ neoformans} increasing in fitness, and that
+\textit{C.\ neoformans} and \textit{C.\ sphaerospermum} show ``strong phase coherence in their
+melanin production cycles''. Those sentences are withdrawn in full. No code in this project
+computes them. The only $k$-NN classifier that exists (\texttt{reactor\_decision\_tree.R})
+classifies four candidate fuel isotopes --- thorium, americium, curium, neptunium --- by cost and
+energy density for reactor versus RTG suitability; it contains no species, no Hamiltonian, no phase
+variable and no dose axis. Nor could the claim be produced by the models that do exist: none has a
+death term, so no population can collapse, and none has a growth term, so no fitness can increase.
+``Reproducing the biologically expected ordering of radiation tolerance'' would in any case be a
+restatement of Table~\ref{tab:params}, whose $\beta_{s,\mathrm{ion}}$ column encodes that ordering
+by construction.
 
-The CPM simulation on a $40^3$ cylindrical lattice reproduces the radial niche partitioning
-predicted by the Langevin PSDE model, now resolved at the single-cell level (Figure~\ref{fig:radial}).
-After 100~MCS the two melanised radiotrophic fungi (\textit{C.~neoformans}, mean $r = 13.1$;
-\textit{C.~sphaerospermum}, mean $r = 11.5$) are displaced outward relative to the
-radiosensitive \textit{B.~subtilis} (mean $r = 9.9$).  The difference arises from the sign
-of $\beta_{\mathrm{ion}}$ in $H_{\mathrm{rad}}$: radiotrophic species lower their energy by
-moving into higher-radiation zones, while radiosensitive species minimise contact with the
-radiation field.  This stratification is an emergent consequence of the CPM Metropolis
-dynamics; it is not imposed as an initial condition.
+$H_{\mathrm{kNN}}$ is retained in Section~3.8 as a specified but unexercised component of the
+framework. Implementing and testing it is future work, listed as such in
+Section~\ref{sec:limitations}.
+
+\subsection{Cellular Potts Model: Radial Structure, and Which Term Could Actually Produce It}
+\label{sec:cpm_results}
+
+The CPM simulation on a $40^3$ cylindrical lattice produces radial structure resolved at the
+parcel level (Figure~\ref{fig:radial}). After 100~MCS, on a single realisation with six parcels per
+species at seed 42, the two radiotropic melanized fungi sit at mean $r = 13.1$
+(\textit{C.~neoformans}) and $r = 11.5$ (\textit{C.~sphaerospermum}) in lattice units, against
+\textit{B.~subtilis} at $r = 9.9$. Two things must be said about those numbers before any mechanism
+is discussed, and an earlier draft said neither.
+
+\paragraph{The ordering is opposite to the physics the model implements.}
+The radiation field is maximal on the cylinder axis and decays monotonically outward --- pinned by
+\texttt{tests/deterministic\_radiation.jl} --- so the \emph{core} is the high-dose region. A
+negative $\beta_{s,\mathrm{ion}}$ biases the two fungi \emph{toward} the axis. They finished the
+run further out than \textit{B.~subtilis}, not further in.
+
+\paragraph{And the separation is not yet distinguishable from the initial condition.}
+Parcel centres are rejection-sampled uniformly over $r < R - 4$, which at $N = 60$, $R = N/2 = 30$
+is a disk of radius $26 = 0.867R$. Its expected mean radius is $2(26)/3 = 17.3$ lattice units with
+a per-parcel standard deviation of $26/\sqrt{18} = 6.1$. At $n = 6$ parcels the standard error on a
+species mean is $\approx 2.5$ lattice units, so the 4.5-unit gap between \textit{C.~neoformans} and
+\textit{B.~subtilis} is $\approx 1.3$ standard errors of the difference, and \emph{both} species
+means sit within one standard error of the seeding mean ($0.578R$). No multi-seed run against that
+uniform-seeding null exists. The null is itself approximate: parcels occupy volume and grow toward
+$V_{\mathrm{target}}$, so the mean over occupied \emph{sites} is not the mean over seed
+\emph{centres}, and the true null has to be simulated rather than derived. Figure~\ref{fig:radial}
+is therefore reported as a diagnostic of the coupled run and not as an established stratification
+result; establishing it needs replicate seeds against a stated null, which is a cheap experiment and
+has not been done.
+
+What the rest of this subsection reports is not the size of the displacement but which term in the
+acceptance rule is capable of producing one at all --- and that question is answered decisively and
+independently of the statistics above, because it is arithmetic on the shipped constants rather than
+an outcome of the run.
+
+An earlier draft attributed the stratification to the sign of $\beta_{\mathrm{ion}}$ in
+$H_{\mathrm{rad}}$. That
+attribution is wrong, and the correction is the more interesting result. At the shipped
+$I_0 = 1.0$ and $T_{\mathrm{CPM}} = 5.0$, the per-move energy changes and their Metropolis
+acceptance biases $\exp(-\Delta H / T_{\mathrm{CPM}})$ are:
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Magnitude of each radiation-linked term in the CPM acceptance rule, at the shipped
+constants $I_0 = 1.0$, $T_{\mathrm{CPM}} = 5.0$.}
+\label{tab:term_magnitudes}
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Term} & $\Delta H$ & \textbf{Acceptance bias} \\
+\midrule
+$\Delta H_{\mathrm{rad}}$, radiotropic species ($\beta_{\mathrm{ion}} = -5\times10^{-5}$) & $-5.0\times10^{-5}$ & $1.000010$ \\
+$\Delta H_{\mathrm{rad}}$, most radiosensitive species ($\beta_{\mathrm{ion}} = 7.5\times10^{-2}$) & $+7.5\times10^{-2}$ & $0.985$ \\
+$\Delta H_{\mathrm{mel}}$ at the observed $M = 1.44$ & $-0.720$ & $\mathbf{1.155}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\beta_{s,\mathrm{ion}}$ --- the one parameter Table~\ref{tab:params} tabulates per species, and
+the one the entire sign convention is written around --- biases acceptance by one part in $10^5$
+for precisely the species whose radial stratification is the headline result. The melanin term
+biases it by 15.5\%, four orders of magnitude more, through a coefficient of $0.5$ that was
+hard-coded at its call site and appeared in no table and no configuration file until this revision.
+
+The tropism reported here is therefore \emph{melanin-mediated}. Radiation still drives it, because
+the melanin production drive is copied from the radiation field:
+\[
+\text{radiation} \;\rightarrow\; \text{production } (\alpha_M,\ \text{tabulated})
+\;\rightarrow\; M \;\rightarrow\; \Delta H_{\mathrm{mel}}\ (\text{coefficient } 0.5)
+\;\rightarrow\; \text{tropism}.
+\]
+Two consequences follow, and both are load-bearing. A sensitivity analysis over
+$\beta_{s,\mathrm{ion}}$ would report the radiation response as negligible, and would be right
+about the coefficient while wrong about the mechanism. And only the product $\alpha_M \cdot k$ of
+the production rate and the melanin coupling reaches the dynamics, so the two are jointly
+identifiable at best and never separately --- a structural limit on calibration, not a missing
+measurement. The coupling constant is now carried in the project's parameter ledger as
+\texttt{cpm.melanin\_coupling} with status \texttt{blocked} and sensitivity rank \texttt{high}.
+
+One scale note keeps the comparison honest. Table~\ref{tab:term_magnitudes} ranks the two
+\emph{radiation-derived} terms against each other; it is not a ranking of the whole acceptance
+rule. Differences in the hand-specified adhesion matrix $J$ are $O(4\text{--}20)$ per neighbour
+pair, so $\Delta H_{\mathrm{adh}}$ remains by far the largest term and is what sets the sorting
+structure the lattice actually exhibits. The ordering is
+adhesion $\gg$ melanin $\gg$ radiation, and the finding here concerns the second and third of
+those, not the first.
 
 Melanin accumulates monotonically in all three melanin-producing species
-(Figure~\ref{fig:melanin}).  \textit{C.~sphaerospermum} accumulates the highest melanin
-(field value 1.44 at MCS~100), reflecting both its radiotrophic positioning near the
-high-radiation outer zone and the highest per-cell $\alpha_M$ among the three producers
-(Table~\ref{tab:params}).  \textit{A.~niger}, positioned at an intermediate radius
-(mean $r = 11.6$), accumulates at a proportionally lower rate.  The linear accumulation
-trajectory indicates that the simulation has not yet reached steady-state melanin saturation,
-consistent with the timescale of melanin biosynthesis relative to biofilm growth dynamics
+(Figure~\ref{fig:melanin}). \textit{C.~sphaerospermum} accumulates the most (field value 1.44 at
+MCS~100). The ordering among the three producers follows the input $\alpha_M$ and nothing else;
+position does not favour it, since it sits further from the high-dose axis than
+\textit{A.~niger}, which is at mean $r = 11.6$ and accumulates proportionally less. The accumulation is linear
+over the run, so the simulation has not reached steady state. The field value 1.44 is
+dimensionless: it is the model's melanin field in arbitrary units, it has no calibration to
+$\mu$g\,$\mu$m$^{-3}$, and it must not be reported with physical units
 \cite{eisenman2012}.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.85\linewidth]{fig1_radial_stratification}
 \caption{Radial stratification of seven species over 100 Monte Carlo Steps in the cylindrical
-CPM bioreactor.  Solid lines: radiotrophic species (\textit{C.~neoformans}, \textit{C.~sphaerospermum}).
+CPM bioreactor.  Solid lines: radiotropic species (\textit{C.~neoformans}, \textit{C.~sphaerospermum}).
 Dashed lines: remaining species.  Dashed horizontal line marks the cylinder wall ($r = R$).
-Radiotrophic species migrate toward the outer wall (higher radiation); \textit{B.~subtilis}
-retreats to the lower-radiation core.}
+The field is maximal on the axis, so the core is the high-dose region and the wall is the
+low-dose one.  Over this single seed the radiotropic species end further out and
+\textit{B.~subtilis} further in --- the direction opposite to the one their $\beta_{s,\mathrm{ion}}$
+signs implement, and within about 1.5 standard errors of the uniform-seeding null at $n = 6$
+parcels.  Whatever displacement the acceptance rule can produce comes from
+$\Delta H_{\mathrm{mel}}$ and not from $\Delta H_{\mathrm{rad}}$
+(Table~\ref{tab:term_magnitudes}).}
 \label{fig:radial}
 \end{figure}
 
@@ -661,47 +925,81 @@ retreats to the lower-radiation core.}
 \centering
 \includegraphics[width=0.78\linewidth]{fig2_melanin_accumulation}
 \caption{Melanin field accumulation at occupied lattice sites for the three melanin-producing
-species over 100~MCS.  \textit{C.~sphaerospermum} (blue) accumulates most rapidly due to
-combined radiotrophic positioning and highest $\alpha_M$ (Table~\ref{tab:params}).
+species over 100~MCS.  Field values are dimensionless model units.
+\textit{C.~sphaerospermum} (blue) accumulates most rapidly, following its highest $\alpha_M$
+(Table~\ref{tab:params}); its radial position works against it rather than for it.
 \textit{A.~niger} (purple) and \textit{C.~neoformans} (red) accumulate at intermediate rates.}
 \label{fig:melanin}
 \end{figure}
 
-\subsection{Radiodialysis: Self-Regulating Contaminant Uptake Under Radiation Damage}
+\subsection{Radiodialysis: Contaminant Transport Under a Time-Varying Wall Permeability}
 
-The coupled CPM--radiodialysis simulation reveals a self-reinforcing remediation loop driven
-by the radiation field itself (Figures~\ref{fig:membrane}--\ref{fig:contaminant}).
-Over 100~MCS (equivalent to 50~Gy cumulative dose at the membrane), membrane structural
-integrity decays from $m = 1.0$ to $m = 0.779$ while the effective permeability increases
-2.7-fold from $P_0 = 0.01$ to $P_{\mathrm{eff}} = 0.027$~cm\,s$^{-1}$
-(Figure~\ref{fig:membrane}).  The decay follows Eq.~\ref{eq:membrane_damage} exactly; the
-permeability rise follows the radiation-damage law (Eq.~\ref{eq:peff}) established for
-Nafion membranes under ionising flux \cite{lara2023}.
+\paragraph{Every number in this subsection is dimensionless.}
+The coupled run has two clocks --- the CPM's Monte Carlo Step count and the transport solver's
+seconds --- with no declared conversion between them: \texttt{seconds\_per\_mcs} ships as
+\texttt{NaN} and the dose accrual routine raises rather than substitute a default. The dose rate
+driving Eqs.~\ref{eq:membrane_damage}--\ref{eq:peff} in the coupled Julia port is a hard-coded
+placeholder $\dot{D} = 1.0$, never derived from the radiation field, and the radial coordinate fed
+to the solver is $N/2 = 20$ lattice units placed in a slot whose operator expects cm. An earlier
+draft reported this run as ``50~Gy cumulative dose'' with a permeability rising from $P_0 = 0.01$ to
+$0.027$~cm\,s$^{-1}$. Both are withdrawn: there is no gray here, and the cm\,s$^{-1}$ figure was
+the Nafion-117 literature prior $P_0$ multiplied by the dimensionless ratio below. A literature
+prior rescaled by a model output is not a calibration.
 
-Despite the rising wall concentration ($c(R,t) = 0.87\,c_{\mathrm{ext}}$ at final MCS),
-the mean interior concentration remains near zero throughout ($c_{\mathrm{mean}} = 0.024$,
-Figure~\ref{fig:contaminant}).  The contaminant front is consumed within a thin annular shell
-immediately adjacent to the membrane: biofilm biosorption ($k_{\mathrm{ads}} = 0.05$~cm$^3$
-g$^{-1}$\,s$^{-1}$) and bioreduction by the \textit{S.~oneidensis} population
-($k_{\mathrm{red}} = 0.02$~cm$^3$~g$^{-1}$\,s$^{-1}$) deplete mobile $c$ faster than radial
-diffusion can replenish it.  The slowly growing sorbed phase $s_{\mathrm{mean}}$ confirms
-progressive immobilisation of sequestered contaminant (Figure~\ref{fig:contaminant},
-right axis).
+Over 100~MCS the membrane integrity variable falls from $m = 1.0$ to $m = 0.779$ and the
+permeability ratio reaches $P_{\mathrm{eff}}/P_0 = e \approx 2.72$ (Figure~\ref{fig:membrane}).
+The decay follows Eq.~\ref{eq:membrane_damage} exactly. The ratio is exactly $e$ by construction,
+because $\alpha_P\,\dot{D}\,\Delta t_{rd}\,n_{\mathrm{MCS}} = 1$ for the four hand-set constants
+shipped; it is a closed-form consequence of the parameter choice and not a measurement of anything.
+The functional form of Eq.~\ref{eq:peff} is the one established for Nafion membranes under ionising
+flux \cite{lara2023}, and that provenance is why it was chosen, not evidence that this run
+reproduces it.
 
-Notably, \textit{S.~oneidensis} (the primary metal reducer) naturally stratifies to the outer
-wall (mean $r = 12.9$, Figure~\ref{fig:radial}) without engineered positioning --- it is
-placed there by the CPM dynamics, precisely at the contaminant entry zone.  This co-localisation
-of the metal-reducing species with the highest contaminant flux is an emergent property of the
-coupled radiation-sorting and membrane-transport system, not a modelling assumption.
+\paragraph{What the transport solution does show.}
+The PDE system is correctly derived and is solved twice independently --- \texttt{deSolve}'s LSODA
+in R and a substepped forward-Euler port in Julia --- with the two implementations in agreement.
+That much is a genuine numerical result, and permeability as an evolving field driven by cumulative
+dose, rather than as a fixed material property, is the mechanism worth taking from this work.
+At the final step the wall value is $c(R,t) = 0.87\,c_{\mathrm{ext}}$ and the interior node mean is
+$c_{\mathrm{mean}}/c_{\mathrm{ext}} = 0.024$ (Figure~\ref{fig:contaminant}).
+
+\paragraph{Three readings those two numbers do not support.}
+First, the low interior value measures \emph{non-penetration, not removal}: $c(t = 0) \equiv 0$
+everywhere inside, so the interior never held contaminant that could be depleted, and an earlier
+draft's ``the contaminant front is consumed within a thin annular shell'' asserts a spatial
+structure the model cannot produce. The radial biomass profile is collapsed by an unweighted
+\texttt{mean()} before it reaches the solver, so the uptake sink is spatially \emph{uniform}:
+there is no annular shell in this discretisation. Second, $c_{\mathrm{mean}}$ is an unweighted mean
+over radial nodes rather than a volume-weighted one, which under-weights the outer, contaminant-rich
+annulus of a cylinder. Third, $c(R,t)$ is dominated by the imposed Robin condition, so it reads the
+boundary rather than transport through the biofilm. The rate constants
+$k_{\mathrm{ads}}$ and $k_{\mathrm{red}}$ carry cm$^3$\,g$^{-1}$\,s$^{-1}$ in the R model, but in
+the coupled Julia port they multiply site-occupancy fractions rather than densities in
+g\,cm$^{-3}$, and $X_{\mathrm{red}}$ counts one species' sites over \emph{all} interior sites, so
+it is neither a biomass fraction nor a reducer fraction. The project's material gate records this
+path as \texttt{RADIODIALYSIS: BLOCKED} --- blocked by a units error in the model, not by missing
+data.
+
+\paragraph{The self-regulating loop is a design hypothesis, not a result.}
+An earlier draft opened this subsection by reporting ``a self-reinforcing remediation loop driven by
+the radiation field itself''. No such loop runs. $m$ decays and $P_{\mathrm{eff}}$ grows as
+independent open-loop functions of time and neither reads the other; $P_{\mathrm{eff}}$ is a
+function of $t$ alone; and because the biomass profile is averaged to a scalar, where a species sits
+cannot influence uptake. \textit{S.~oneidensis} does finish this run at mean $r = 12.9$, near the
+contaminant entry zone, but that is subject to the same seeding null as the rest of
+Section~\ref{sec:cpm_results} and, more decisively, it cannot matter to the transport result
+because the solver never sees a radial biomass profile. The co-localisation claim is withdrawn.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.85\linewidth]{fig3_membrane_transport}
 \caption{Membrane integrity $m(t)$ (solid, left axis) and normalised effective permeability
 $P_{\mathrm{eff}}(t)/P_0$ (dashed, right axis) over 100~MCS.  $m(t)$ decays exponentially
-per Eq.~\ref{eq:membrane_damage}; $P_{\mathrm{eff}}/P_0$ rises as radiation-driven
-permeabilisation (Eq.~\ref{eq:peff}).  At 50~Gy cumulative dose, integrity has fallen to
-$0.78$ while permeability has increased 2.7-fold.}
+per Eq.~\ref{eq:membrane_damage}; $P_{\mathrm{eff}}/P_0$ rises per Eq.~\ref{eq:peff}.  Both axes
+are dimensionless and the horizontal axis is MCS, not seconds: no MCS-to-second conversion exists,
+so no cumulative dose in gray can be assigned to this run.  At MCS~100, $m = 0.779$ and
+$P_{\mathrm{eff}}/P_0 = e \approx 2.72$, the latter exactly by construction from four hand-set
+constants.}
 \label{fig:membrane}
 \end{figure}
 
@@ -710,10 +1008,11 @@ $0.78$ while permeability has increased 2.7-fold.}
 \includegraphics[width=0.85\linewidth]{fig4_contaminant_penetration}
 \caption{Contaminant penetration over 100~MCS.  Red solid: $c(R,t)$, mobile concentration at
 the membrane face.  Blue dashed: $c_{\mathrm{mean}}$, spatial average over the interior.
-Green dotted (right axis): $s_{\mathrm{mean}}$, sorbed/immobilised phase.  The near-zero
-interior concentration despite a high wall concentration demonstrates the effectiveness of the
-biofilm annular uptake zone.  Slow linear growth of $s_{\mathrm{mean}}$ confirms progressive
-contaminant immobilisation.}
+Green dotted (right axis): $s_{\mathrm{mean}}$, sorbed/immobilised phase.  All quantities are
+dimensionless ratios to $c_{\mathrm{ext}}$ and the horizontal axis is MCS.  The near-zero interior
+value measures non-penetration and not removal, since $c(t=0) \equiv 0$ everywhere inside; the
+uptake sink is spatially uniform, so the figure shows no annular structure; and
+$c_{\mathrm{mean}}$ is an unweighted mean over radial nodes rather than a volume-weighted one.}
 \label{fig:contaminant}
 \end{figure}
 
@@ -727,118 +1026,217 @@ biofilm models in its treatment of inter-species interactions and energy conserv
 Classical models following the Wanner-Gujer tradition \cite{wanner1986} describe biofilm
 dynamics through coupled PDEs governing substrate consumption and biomass growth, with species
 interactions mediated exclusively through competition for shared substrates. Our Hamiltonian
-$H(p,q)$ explicitly conserves total system energy across kinetic, potential, and interaction
-terms, ensuring that numerical integration via the symplectic leapfrog scheme does not
-introduce artificial energy drift \cite{hairer2006}. The stochastic Langevin layer adds
-thermal and demographic noise while preserving the underlying Hamiltonian structure through
-the fluctuation-dissipation theorem. This dual structure captures phenomena that ODE/PDE
-models inherently miss: synchronised metabolic oscillations through phase-locking,
-energy-conserving transitions between fitness states, and the distinction between radiation
-as a damaging perturbation versus radiation as an energy source positively coupled to the
-Hamiltonian.
+$H(p,q)$ is written to conserve total system energy across kinetic, potential and interaction
+terms. That is a property of the formalism in Eq.~\ref{eq:hamiltonian} and not of any program
+reported here: no simulation performs symplectic integration \cite{hairer2006}, none carries a
+momentum state, and the CPM's $H$ is a Metropolis acceptance functional in arbitrary units,
+dissipated toward a minimum rather than conserved (Section~3.4). The same caution applies to the
+fluctuation-dissipation argument: the stochastic layer is intended to add thermal and demographic
+noise while preserving the Hamiltonian structure, and demonstrating that it does would require the
+integrator that does not yet exist. The structure is intended to capture phenomena that ODE/PDE
+models miss --- synchronised oscillations through phase-locking, and energy-conserving transitions
+between fitness states --- though the phase-locking component remains specified rather than
+exercised (Section~6.4).
+
+An earlier draft claimed a further distinction: ``between radiation as a damaging perturbation
+versus radiation as an energy source positively coupled to the Hamiltonian''. That is withdrawn.
+The CPM Hamiltonian is a Metropolis acceptance functional in arbitrary units, not an energy budget,
+and a negative $\beta_{\mathrm{ion}}$ in it is a spatial preference, not a metabolic gain: the
+model creates no biomass for such a gain to act on. What the sign of $\beta_{\mathrm{ion}}$ buys is
+a directional response, which is a real and useful thing for a spatial model to express, and it
+should be claimed as that and not as energy transduction.
 
 \subsection{Biological Interpretation of \textit{C.\ neoformans} and \textit{D.\ radiodurans} Dynamics}
 
-The simulation trajectories for \textit{C.\ neoformans} and \textit{D.\ radiodurans} align
-with known biology while illuminating an underappreciated distinction between radiotrophy and
-radioresistance. \textit{C.\ neoformans} in the model increases its fitness monotonically
-with radiation intensity up to a species-specific threshold, consistent with the experimental
-findings of Dadachova et al.\ \cite{dadachova2007} that melanised cells show enhanced
-metabolic activity and faster growth under ionising radiation. The model captures the
-mechanism through the positive gamma sensitivity term $\gamma_s$, which converts absorbed
-dose into fitness gain via the melanin-mediated electron-transfer pathway
-\cite{turick2011,casadevall2017}. \textit{D.\ radiodurans}, by contrast, maintains
-approximately constant fitness across a wide dose range, declining only at extreme doses.
-This flat fitness profile emerges from the balance between the radiation damage term
-$\beta_{s,\mathrm{ion}}$ and the organism's molecular protection coefficient, reflecting the
-Mn$^{2+}$-dependent proteome shielding identified by Daly et al.\ \cite{daly2010}. The model
-thus correctly predicts that \textit{C.\ neoformans} outcompetes \textit{D.\ radiodurans} in
-moderately irradiated environments where radiation provides metabolic benefit, while
-\textit{D.\ radiodurans} prevails at extreme doses where even melanin-mediated protection is
-overwhelmed.
+The contrast between \textit{C.\ neoformans} and \textit{D.\ radiodurans} in this framework
+illuminates a distinction that the loose vocabulary of the field routinely collapses, and getting
+it right constrains what the model may be said to show.
+
+\textit{D.\ radiodurans} is radioresistant. That is a survival phenotype, measured as $D_{10}$, and
+it is the best-evidenced radiation phenotype among the seven species here, resting on
+Mn$^{2+}$-dependent proteome shielding and efficient double-strand break repair
+\cite{daly2010,slade2011}. \textit{C.\ neoformans} is melanized, and melanin measurably alters
+several radiation responses; whether it enhances growth under a photon field is contested
+(Section~2.1), and whether it protects survival under sparsely-ionizing photons is not established
+even in the one study that reports melanin protection under deuterons, where the same species'
+X-ray result is hedged \cite{audit2026}.
+
+Neither phenotype is what this model computes. The simulations reported here have no death term, so
+they cannot express radioresistance, and no growth term, so they cannot express radiotrophy; both
+are structurally absent rather than weakly supported, and no quantity of additional data changes
+that without a model revision. An earlier draft stated that \textit{C.\ neoformans} ``increases its
+fitness monotonically with radiation intensity'', that $\gamma_s$ ``converts absorbed dose into
+fitness gain via the melanin-mediated electron-transfer pathway'', and that the model ``correctly
+predicts that \textit{C.\ neoformans} outcompetes \textit{D.\ radiodurans} in moderately irradiated
+environments''. All three are withdrawn: the first two describe Eq.~\ref{eq:psde} as written rather
+than any simulation performed, and the third describes a competitive outcome that nothing here
+computes.
+
+What the model does express is that the two species occupy different positions in the dose field
+for different parameterised reasons, and it separates the mechanisms cleanly enough that the
+distinction is visible in the spatial output. That is a modest claim and it is defensible. The
+electron-transfer literature \cite{turick2011,casadevall2017} motivates the melanin term; it does
+not calibrate it.
 
 \subsection{Implications for Nuclear Bioremediation}
 
-The model's predictions for a mixed \textit{S.\ oneidensis} and \textit{O.\ intermedium} AM7
-biofilm in a Th-contaminated environment suggest a synergistic remediation strategy.
-\textit{S.\ oneidensis}, with its capacity for extracellular electron transfer to metal oxides
-\cite{heidelberg2002,veeramani2011}, can reduce soluble actinide species and immobilise them
-as insoluble precipitates. However, its extreme radiosensitivity ($D_{10} \approx 0.07$~kGy)
-limits viability in high-radiation zones. The model predicts that \textit{O.\ intermedium}
-AM7, with its thorium-tolerant EPS production \cite{shukla2020}, establishes a protective
-biofilm matrix in the high-radiation zone that attenuates local dose rates sufficiently to
-permit \textit{S.\ oneidensis} colonisation in the intermediate zone. This spatial
-partitioning---emergent from the Langevin dynamics rather than imposed as a boundary
-condition---suggests that self-organising biofilm architectures may naturally optimise
-remediation performance. The potential for engineering \textit{D.\ radiodurans} strains for
-combined radioresistance and metal reduction \cite{brim2000} offers an additional path toward
-single-organism bioremediation in extreme environments.
+This subsection is a design hypothesis. It is stated as one because no simulation reported here
+computes any part of it, and an earlier draft stated it as a model prediction.
 
-The radiodialysis membrane transport model (Section~\ref{sec:radiodialysis}) reveals a further
-self-regulating property with direct engineering relevance.  In a conventional passive membrane
-reactor, contaminant ingress is fixed by the membrane's baseline permeability $P_0$.  In the
-radiotrophic bioreactor modelled here, the radiation field that sustains the community also
-progressively damages the membrane (Eq.~\ref{eq:membrane_damage}), increasing $P_{\mathrm{eff}}$
-proportionally with cumulative dose (Eq.~\ref{eq:peff}).  The result is a positive feedback
-loop: higher ambient radiation $\to$ faster membrane permeabilisation $\to$ greater contaminant
-ingress $\to$ greater substrate availability for metal-reducing bacteria.  Critically, the
-CPM dynamics independently position \textit{S.~oneidensis} at the outer wall (Figure~\ref{fig:radial}),
-co-locating the primary metal-reducing agent with the highest contaminant flux zone, without
-any engineered spatial guidance.  This co-emergence of spatial positioning and membrane
-self-tuning represents a qualitatively new design principle for bioremediation: the contamination
-source provides both the metabolic substrate for radiotrophic community maintenance and the
-physical driver for membrane adaptation, requiring no external energy input.  Reactor design
-implications include prioritising membrane materials with intermediate $\alpha_P$ values
-(Eq.~\ref{eq:peff}) --- high enough to self-tune under operational dose rates but low enough
-to prevent catastrophic membrane failure \cite{fox2009,lara2023}.
+The hypothesis: in a Th-contaminated environment, \textit{S.\ oneidensis}, with its capacity for
+extracellular electron transfer to metal oxides \cite{heidelberg2002,veeramani2011}, reduces
+soluble actinide species and immobilises them as insoluble precipitates, but its extreme
+radiosensitivity ($D_{10} \approx 0.07$~kGy) limits viability in high-dose zones;
+\textit{O.\ intermedium} AM7, with its thorium-tolerant EPS production \cite{shukla2020},
+establishes a matrix that attenuates local dose sufficiently to permit \textit{S.\ oneidensis}
+colonisation further in. That would be a synergy worth engineering for.
+
+Nothing here tests it, and three specific gaps say why. \textbf{No model in this work attenuates
+radiation by biomass.} The gamma field is initialised once from Beer--Lambert geometry
+(Eq.~\ref{eq:gamma_field}) and never updated; biomass occupancy is not a term in it and no feedback
+runs from the community back to the field, so a protective matrix cannot exist in these simulations
+even in principle. \textbf{The dose-response that would make attenuation matter is absent.} There
+is no death term anywhere (Section~\ref{sec:limitations}), so a species cannot be excluded from a
+zone by dose, and a lower local dose cannot permit a colonisation that a higher one prevented.
+\textbf{And \textit{O.\ intermedium} AM7 is not in the Langevin models at all} --- it appears in
+the Julia CPM registry only, so the earlier draft's ``emergent from the Langevin dynamics''
+attribution named a simulation that never instantiated the organism. Adding a dose-dependent
+survival term and a two-way radiation field are the two model changes that would make this
+hypothesis testable; both are listed in Section~\ref{sec:limitations}. The potential for
+engineering \textit{D.\ radiodurans} strains for combined radioresistance and metal reduction
+\cite{brim2000} is likewise cited as literature, not as an output.
+
+A second design hypothesis follows from the membrane model
+(Section~\ref{sec:radiodialysis}), and it is the more interesting of the two. In a conventional
+passive membrane reactor, contaminant ingress is fixed by the membrane's baseline permeability
+$P_0$. Treating permeability instead as a field driven by cumulative dose
+(Eq.~\ref{eq:peff}) proposes a loop: higher ambient radiation $\to$ faster membrane
+permeabilisation $\to$ greater contaminant ingress $\to$ greater substrate availability for
+metal-reducing bacteria, with the contamination source supplying both the chemical substrate and
+the physical driver, and requiring no external energy input.
+
+\textbf{Every arrow in that chain is currently open, and the code says so.}
+$m$ and $P_{\mathrm{eff}}$ are independent laws in the implementation and neither reads the other;
+$P_{\mathrm{eff}}$ is a function of $t$ alone, so it is open-loop even with respect to the dose it
+is supposed to integrate; the radial biomass profile is averaged to a scalar before reaching the
+transport solver, so where a species sits cannot influence uptake; and no feedback runs from biology
+to the radiation field or to the membrane anywhere in this work. The project retains an explicit
+stop condition on exactly this point: no transported dose enters the radiodialysis model until the
+constitutive choice between the decaying $m$ and the growing $P_{\mathrm{eff}}$ is selected, because
+wiring the loop before that choice would hard-code an unexamined assumption about how damage maps to
+permeability. This is therefore a hypothesis the framework was built to make testable, and it is not
+yet tested. Reactor design implications --- prioritising membrane materials with intermediate
+$\alpha_P$ (Eq.~\ref{eq:peff}), high enough to self-tune under operational dose rates but low
+enough to prevent catastrophic failure \cite{fox2009,lara2023} --- follow from the proposal and not
+from any result reported here.
 
 \subsection{Mechanical Properties and Radiation Survival}
 
-The inclusion of FENE entropic spring (Eq.~\ref{eq:fene}) and Kelvin-Voigt viscoelastic
-(Eq.~\ref{eq:kelvinvoigt}) components addresses a dimension of biofilm physics largely absent
-from ecological radiation models. Biofilm EPS matrices exhibit viscoelastic behaviour that
-mediates mechanical stress transmission, nutrient diffusion resistance, and protection from
-external perturbations. The FENE potential provides finite extensibility that prevents
-unphysical deformation under radiation-induced swelling or thermal expansion, while the
-Kelvin-Voigt element captures stress relaxation on timescales relevant to biofilm
-restructuring. Species with higher EPS production rates (\textit{O.\ intermedium} AM7,
-\textit{B.\ subtilis}) generate mechanically stiffer local environments that resist
-radiation-induced structural degradation, creating protected microniches for radiosensitive
-community members.
+\textbf{Both components of Section~3.10 are specification.} A case-insensitive search of every
+source file in this project returns no FENE potential and no Kelvin-Voigt element; neither
+Eq.~\ref{eq:fene} nor Eq.~\ref{eq:kelvinvoigt} is evaluated by any simulation, and no stress,
+strain or modulus is a state variable anywhere. What follows is the motivation for carrying them in
+the formalism, not a description of model behaviour.
+
+Biofilm EPS matrices exhibit viscoelastic behaviour that mediates mechanical stress transmission,
+nutrient diffusion resistance and protection from external perturbations --- a dimension of biofilm
+physics largely absent from ecological radiation models. A FENE potential would supply the finite
+extensibility that prevents unphysical deformation under radiation-induced swelling or thermal
+expansion; a Kelvin-Voigt element would capture stress relaxation on timescales relevant to biofilm
+restructuring. The mechanism this would let the framework express --- species with higher EPS
+production rates (\textit{O.\ intermedium} AM7, \textit{B.\ subtilis}) generating stiffer local
+environments and so protected microniches for radiosensitive community members --- is a hypothesis
+about a model that has not been built. An earlier draft asserted it as a property of this one.
 
 \subsection{Limitations and Future Directions}
+\label{sec:limitations}
 
-Several simplifying assumptions limit the current model's applicability to real contaminated
-sites. The radiation field is treated as spatially homogeneous with exponential attenuation
-(Eq.~\ref{eq:gamma_field}), whereas actual environments at Chernobyl and Hanford exhibit
-complex three-dimensional dose distributions governed by heterogeneous source geometries and
-shielding materials. The UV oscillatory term (Eq.~\ref{eq:uv_field}) assumes a purely
-sinusoidal diurnal cycle, neglecting atmospheric absorption spectra and seasonal variation.
-The model does not incorporate horizontal gene transfer, which is known to spread radiation
-resistance determinants among biofilm community members. Future work should couple the fitness
-model to experimentally measured dose-rate maps from contaminated facilities, incorporate
-spatially resolved nutrient transport using Darcy flow through the EPS matrix, and validate
-predicted species clustering patterns against metagenomic surveys of radiotrophic biofilm
-communities at nuclear sites.
+\paragraph{What the model structurally cannot express.}
+There is no birth and no death anywhere in the four simulations. Radiotrophy requires growth and
+radioresistance requires death, so neither is representable here at any parameter value: they are
+structurally absent, not weakly supported, and the distinction matters because the remedy is a
+model revision rather than a measurement. Adding a dose-dependent survival term is the single
+change that would let this framework consume the excellent $D_{10}$ literature as calibration data
+rather than as motivation for a tropism coefficient. Directed hyphal elongation --- the one
+measured radiotropism candidate in the literature --- is likewise unrepresentable while agents are
+isotropic biomass parcels with no elongation or connectivity term.
+
+\paragraph{Identifiability.}
+Only the product of the melanin production rate $\alpha_M$ and the melanin coupling constant
+reaches the CPM dynamics (Section~\ref{sec:cpm_results}), so the two cannot be fitted separately
+however much data arrives. This is a structural limit and it should be stated wherever either
+parameter is quoted.
+
+\paragraph{Nothing here is calibrated.}
+No value in Table~\ref{tab:params} is fitted to data from this system; the lattice pitch, the
+biomass density, the seconds-per-Monte-Carlo-Step conversion and the Hamiltonian and melanin
+normalisations are all unpopulated. Consequently the CPM's spatial and temporal outputs are
+dimensionless model quantities and are reported as such. No public dataset can currently close this
+gap: no source pairs an exact modelled species with both a calibrated 3-D biomass field and a
+characterised radiation exposure, and none pairs a calibrated hydrated volume with wet mass, dry
+mass and matched blanks for any organism \cite{audit2026}. Those measurements must be acquired, not
+retrieved.
+
+\paragraph{Physical simplifications.}
+The radiation field is treated as radially symmetric with exponential attenuation
+(Eq.~\ref{eq:gamma_field}), whereas actual environments at Chernobyl and Hanford exhibit complex
+three-dimensional dose distributions governed by heterogeneous source geometries and shielding
+materials. The UV oscillatory term (Eq.~\ref{eq:uv_field}) assumes a purely sinusoidal diurnal
+cycle, neglecting atmospheric absorption spectra and seasonal variation. The model does not
+incorporate horizontal gene transfer, which is known to spread radiation resistance determinants
+among biofilm community members.
+
+\paragraph{Future directions.}
+Implement and test the phase-locking kernel $H_{\mathrm{kNN}}$ (Eq.~\ref{eq:knn}), which is
+currently specified but unexercised. Add growth and death so that the framework can represent
+radiotrophy and radioresistance rather than only radiotropism. Run the sensitivity analysis this
+paper does not have --- noting that a sweep over $\beta_{s,\mathrm{ion}}$ alone would miss the
+mechanism entirely (Section~\ref{sec:cpm_results}). Couple the model to measured dose-rate maps
+from contaminated facilities. Incorporate spatially resolved nutrient transport by Darcy flow
+through the EPS matrix. And acquire the paired experiment the evidence audit specifies: on one
+system under one growth condition, replicate-level wet and dry mass with matched blanks, a
+hydrated volume on a whole-biofilm-envelope basis, closed elemental composition on a wet-bulk
+basis, a calibrated 3-D stack of the same specimen, and a characterised dose field with a measured
+gradient.
 
 % ---- 8. Conclusion -------------------------------------------
 \section{Conclusion}
 
-This work introduces a Hamiltonian-Langevin framework for modelling radiotrophic fitness in
+This work introduces a Hamiltonian-Langevin framework for modelling radiotropic spatial fitness in
 multispecies biofilm communities exposed to ionising radiation. The PSDE fitness equation
-(Eq.~\ref{eq:psde}) integrates radiation-dependent growth, melanin-mediated energy
-transduction, stochastic demographic noise, and viscoelastic biofilm mechanics into a unified
-formalism that conserves total system energy through symplectic integration. The central
-result is that species niche partitioning under radiation gradients emerges naturally from the
-phase-locked Hamiltonian dynamics, with radiotrophic fungi (\textit{C.\ neoformans},
-\textit{C.\ sphaerospermum}) clustering in high-radiation zones, radioresistant bacteria
-(\textit{D.\ radiodurans}) occupying intermediate regions, and radiosensitive metal-reducing
-species (\textit{S.\ oneidensis}) confined to attenuated peripheries. These predictions are
-consistent with known radiobiology and suggest design principles for engineered biofilm
-consortia targeting nuclear bioremediation. Experimental validation through controlled
-irradiation of mixed-species biofilms, combined with spatially resolved transcriptomics and
-metabolomics, represents the natural next step toward translating this theoretical framework
-into practical bioremediation strategies.
+(Eq.~\ref{eq:psde}) couples radiation-dependent terms, melanin reaction-diffusion, stochastic
+demographic noise, and viscoelastic biofilm mechanics into a single formalism, and the Cellular
+Potts implementation resolves it at the level of biomass parcels on a cylindrical lattice.
+
+The central result of this revision is not the radial pattern but an accounting of the acceptance
+rule that could produce one. Within the radiation-derived pathway the melanin term dominates the
+per-species $\beta_{s,\mathrm{ion}}$ that Table~\ref{tab:params} tabulates and that the entire sign
+convention is written around: at the shipped constants the two differ in Metropolis acceptance bias
+by four orders of magnitude (Table~\ref{tab:term_magnitudes}), 15.5\% against one part in $10^5$.
+Radiation therefore reaches the dynamics indirectly, through melanin production, and only the
+product of the two melanin coefficients is identifiable at all. That finding is arithmetic on
+shipped constants and does not depend on any run.
+
+The radial pattern itself is reported as a diagnostic and not as an established result. On one seed
+with six parcels per species the melanized fungi (\textit{C.\ neoformans},
+\textit{C.\ sphaerospermum}) finish further from the axis than \textit{B.\ subtilis} --- the
+direction opposite to the one their negative $\beta_{s,\mathrm{ion}}$ implements, since the field is
+maximal on the axis and the core is the high-dose region --- and the gap is about 1.5 standard
+errors of the uniform-seeding null (Section~\ref{sec:cpm_results}). Replicate seeds against that
+null are the cheapest outstanding experiment in this work.
+
+One further qualification travels with all of it: the phenotype expressed is radiotropism alone.
+With no growth and no death in the model, radiotrophy and radioresistance are structurally absent,
+and the strong published $D_{10}$ evidence that anchors the coefficient magnitudes is
+radioresistance evidence spent on a tropism term.
+
+Radiotrophy, moreover, is not established for any of the seven species modelled
+(Section~\ref{sec:radiotrophy_status}); radioresistance is. Nothing in this framework is calibrated
+against a measurement of the system it models, and no public dataset can currently supply that
+calibration. The natural next steps are therefore two, and they are separable: add growth and
+survival so the framework can consume the radiobiology literature as data rather than as
+motivation, and acquire the paired morphology-plus-dosimetry experiment that would let its spatial
+outputs be reported in physical units.
 
 % ---- References ---------------------------------------------
 \begin{thebibliography}{38}
@@ -1113,6 +1511,30 @@ Soetaert, K., Petzoldt, T., Setzer, R.W. (2010).
 Solving differential equations in R: package deSolve.
 \textit{Journal of Statistical Software}, 33(9), 1--25.
 \url{https://doi.org/10.18637/jss.v033.i09}
+
+\bibitem{cortesao2020}
+Cortes\~{a}o, M., et al. (2020).
+Aspergillus niger spores are highly resistant to space radiation.
+\textit{Frontiers in Microbiology}, 11, article 560.
+(LD$_{90}$ values for N402 and the pigmentation-deficient $\Delta fwnA$ mutant MA93.1 under
+X-ray, He-ion and Fe-ion exposure; open access, CC BY 4.0.)
+
+\bibitem{walberg2015}
+Walberg, K. (2015).
+Assessment of the evidence for radiosynthesis in melanized fungi.
+Undergraduate thesis, University of Wisconsin--La Crosse. \texttt{handle:1793/73406}.
+(Licence not specified in the repository record. Contains no new measurement; the argument is a
+closed energy budget plus a media-carbon confounder.)
+
+\bibitem{audit2026}
+Kinder, H., Faulkner, B. (2026).
+Radiotrophic compatibility audit: public evidence for the radiation phenotypes of seven modelled
+species. Project technical record, \texttt{docs/research/radiotrophic\_compatibility\_audit.md},
+commits \texttt{904b9a4} and \texttt{a03bc32}, repository revision \texttt{5d1b777}.
+(Eleven data repositories, the NCBI archives and Europe PMC searched at API level; every phenotype
+label assigned from the endpoint actually measured; every unverified quantity recorded as
+unverified. Four verdicts, quoted in Section~\ref{sec:radiotrophy_status}. This record populates no
+parameter.)
 
 \end{thebibliography}
 
