@@ -1,0 +1,92 @@
+{
+  "reference_system_id": "public_vcholerae_surrogate",
+  "target_calibration": false,
+  "source_id": "DRYAD_ZCRJDFNPH",
+  "identifier": "doi:10.5061/dryad.zcrjdfnph",
+  "generated_utc": "2026-08-15T06:18:44.341945+00:00",
+  "input": {
+    "path": "/home/aurascoper/biofilm-pilot-data/Dataset_3_Fig3c_VPS-Bap1.nd2",
+    "name": "Dataset_3_Fig3c_VPS-Bap1.nd2",
+    "size_bytes": 592023552,
+    "sha256": "11aa538173d6dbac45ccb7b140c597afae5007091a400b42479882de0e0675ab",
+    "sha256_verified": true,
+    "manifest": "/home/aurascoper/Developer/Biofilms/data/calibration/spatial/dataset_candidates.sha256"
+  },
+  "reader": {
+    "nd2_version": "0.11.3",
+    "sizes": {
+      "Z": 94,
+      "C": 3,
+      "Y": 1024,
+      "X": 1024
+    },
+    "dtype": "uint16",
+    "is_legacy": false,
+    "is_rgb": false,
+    "voxel_size_um": [
+      0.065,
+      0.065,
+      0.13
+    ],
+    "voxel_calibrated": [
+      true,
+      true,
+      true
+    ],
+    "channel_names": [
+      "488 nm",
+      "561 nm",
+      "640 nm"
+    ],
+    "n_frames": 94,
+    "nbytes": 591396864,
+    "channel": 0,
+    "timepoint": null,
+    "position": null,
+    "transform": [
+      "smoke_minmax_per_frame",
+      null,
+      null
+    ]
+  },
+  "declaration": {
+    "segmentation_basis": "unresolved",
+    "segmentation_basis_source": "operator_declared_cli",
+    "segmentation_method": "smoke_minmax_per_frame",
+    "transform": [
+      "smoke_minmax_per_frame",
+      null,
+      null
+    ]
+  },
+  "parameters": {
+    "occupancy_mapping": "threshold",
+    "tau": 0.5,
+    "seed": 1,
+    "factors": [
+      1,
+      2
+    ],
+    "tolerance": 0.05,
+    "tolerances": {
+      "maximum_biovolume_fraction_error": 0.05,
+      "maximum_porosity_error": 0.05,
+      "maximum_interface_area_error": 0.05,
+      "maximum_correlation_length_error": 0.05,
+      "maximum_thickness_error": 0.05,
+      "maximum_component_size_error": 0.05
+    },
+    "max_timepoints": 8
+  },
+  "temporal": null,
+  "provenance": {
+    "git_commit": "6a1ddc1331e845c933c7d6408cce68b449593682",
+    "git_dirty": false,
+    "python": "3.14.4",
+    "numpy": "2.5.2"
+  },
+  "outputs": {
+    "spatial_csv": "data/calibration/spatial/pilot_vcholerae.csv",
+    "n_rows": 2
+  }
+}
