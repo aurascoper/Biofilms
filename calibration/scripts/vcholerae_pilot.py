@@ -114,8 +114,12 @@ def git_provenance() -> dict:
         head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True,
                               ).stdout.strip()
+        # Tracked modifications only. Untracked files are not a difference
+        # between the code and the commit — and this script writes some of
+        # them, so counting them would make every run self-report as dirty.
         dirty = bool(subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain"],
+            ["git", "-C", str(root), "status", "--porcelain",
+             "--untracked-files=no"],
             capture_output=True, text=True, check=True).stdout.strip())
     except (OSError, subprocess.CalledProcessError):
         return {"git_commit": None, "git_dirty": None}
