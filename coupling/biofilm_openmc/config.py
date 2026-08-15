@@ -33,6 +33,9 @@ import math
 import tomllib
 from dataclasses import dataclass, field
 
+from physical_contract import (ALLOWED_BOUNDARY_CONDITIONS,
+                               ALLOWED_SOURCE_ANGULAR, ALLOWED_SOURCE_SPATIAL)
+
 
 class ConfigError(ValueError):
     """Raised with the complete list of missing/invalid keys."""
@@ -41,9 +44,15 @@ class ConfigError(ValueError):
 # Ordered and cumulative: a field required at stage i is required at every j > i.
 STAGES = ("transport", "dosimetry", "cpm_feedback", "membrane_feedback")
 
-_ALLOWED_BC = frozenset({"vacuum", "reflective"})
-_ALLOWED_SPATIAL = frozenset({"line_z_axis", "point_origin"})
-_ALLOWED_ANGULAR = frozenset({"isotropic"})
+# Shared with calibration/ via `physical_contract`, which owns them: the
+# emitting side must validate against the same vocabulary the loader enforces,
+# and it cannot reach into another package's private names to do it. Aliased
+# here so no call site in this package moves.
+_ALLOWED_BC = ALLOWED_BOUNDARY_CONDITIONS
+_ALLOWED_SPATIAL = ALLOWED_SOURCE_SPATIAL
+_ALLOWED_ANGULAR = ALLOWED_SOURCE_ANGULAR
+# Not shared: nothing on the calibration side emits a membrane statistic, and
+# the m-vs-P_eff stop condition means nothing should until it is resolved.
 _ALLOWED_MEMBRANE_STAT = frozenset({"mass_weighted", "area_weighted"})
 
 # Which model a config is loaded for. Like the stage, this is chosen by the

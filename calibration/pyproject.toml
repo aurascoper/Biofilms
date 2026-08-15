@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 # Deliberately numpy-only. These are schema and metric harnesses; no imaging
 # stack, no optimizer, no inference framework. Add one when a measured dataset
 # exists to justify it.
-dependencies = ["numpy"]
+dependencies = ["numpy", "biofilm-contract"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

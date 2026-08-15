@@ -48,7 +48,6 @@ import argparse
 import csv
 import hashlib
 import json
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +55,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from physical_contract import git_provenance as _git_provenance
 
 from biofilm_calibration.acquisition import SEGMENTATION_BASIS
 from biofilm_calibration.spatial.pitch_selection import (OBSERVABLE_TOLERANCES,
@@ -104,26 +105,10 @@ def verify_digest(path: Path, manifest: Path) -> str:
 
 
 def git_provenance() -> dict:
-    """The commit this ran at, and whether the tree was dirty.
-
-    A dirty tree recorded as a clean commit is a false provenance claim, so the
-    marker is part of the string rather than a separate field somebody can drop.
-    """
-    root = Path(__file__).resolve().parents[2]
-    try:
-        head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
-                              capture_output=True, text=True, check=True,
-                              ).stdout.strip()
-        # Tracked modifications only. Untracked files are not a difference
-        # between the code and the commit — and this script writes some of
-        # them, so counting them would make every run self-report as dirty.
-        dirty = bool(subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain",
-             "--untracked-files=no"],
-            capture_output=True, text=True, check=True).stdout.strip())
-    except (OSError, subprocess.CalledProcessError):
-        return {"git_commit": None, "git_dirty": None}
-    return {"git_commit": head + ("-dirty" if dirty else ""), "git_dirty": dirty}
+    """Run provenance, from the shared contract so the coupling side records it
+    identically. Kept as a named function here because the metadata sidecar's
+    key names are part of this script's committed output."""
+    return _git_provenance(str(Path(__file__).resolve().parents[2]))
 
 
 def spatial_pass(field, factors, *, occupancy_mapping, tau, seed, tolerances,
