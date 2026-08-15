@@ -554,6 +554,16 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
     #  again a spatial preference, not energy transduction)
     ΔH_mel = 0.0
     M_local = state.melanin[tx, ty, tz]
+    # THE 0.5 BELOW IS THE COEFFICIENT THAT ACTUALLY MOVES THIS MODEL, and it is
+    # hard-coded here rather than tabulated. At the shipped I0 = 1.0 and
+    # T_cpm = 5.0, the radiation term for a radiotropic species is
+    # β_ion·I = -5e-5, an acceptance bias of 1.000010 — one part in 1e5. This
+    # term at the reported M = 1.44 is -0.72, a bias of 1.155. Four orders of
+    # magnitude. The radial stratification is therefore melanin-mediated, not
+    # β_ion-mediated. Radiation still drives it, but only indirectly:
+    # melanin_drive is copied from the radiation field, so
+    #   radiation -> production (α_M, tabulated) -> M -> here -> tropism.
+    # Ledgered as cpm.melanin_coupling in data/parameter_provenance.csv.
     if σ_source > 0 && cells[Int(σ_source)].species in RADIOTROPIC
         ΔH_mel -= 0.5 * M_local  # melanin-rich site preferred
     end

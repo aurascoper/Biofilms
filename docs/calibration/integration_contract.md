@@ -124,6 +124,40 @@ Radiotrophy additionally fails on evidence, not only on representability: it is 
 for any of the seven species. See `docs/research/radiotrophic_compatibility_audit.md`, verdict
 `TARGETED_LAB_EXPERIMENT_REQUIRED`.
 
+### …and the tropism is not driven by the term that is tabulated
+
+Naming the radiation term correctly is not the end of it. At the shipped `I0 = 1.0` and
+`T_cpm = 5.0`:
+
+| term | ΔH | Metropolis acceptance bias |
+|------|-----|---------------------------|
+| `ΔH_rad`, radiotropic species (β = −5e-5) | −5.0e-5 | 1.000010 |
+| `ΔH_rad`, most radiosensitive species (β = 7.5e-2) | +7.5e-2 | 0.985 |
+| `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
+
+`β_ion` — the one parameter Table 2 tabulates per species, and the one the sign convention is
+written around — biases acceptance by **one part in 10⁵** for exactly the species whose radial
+stratification is the headline result. The melanin term biases it by 15.5%, four orders of
+magnitude more, through a coefficient of `0.5` hard-coded at its call site and appearing in no
+table and no configuration file.
+
+So the model's tropism is **melanin-mediated**. Radiation still drives it, but indirectly:
+`melanin_drive` is copied from the radiation field, giving
+
+```
+radiation → production (α_M, tabulated) → M → ΔH_mel (0.5, untabulated) → tropism
+```
+
+Two consequences. A sensitivity analysis over `β_ion` would report the radiation response as
+negligible and be right about the coefficient while wrong about the mechanism. And a parameter
+that decides the headline result must not live only at its call site: it is now ledgered as
+`cpm.melanin_coupling` in `data/parameter_provenance.csv`, `status=blocked`,
+`sensitivity_rank=high` — the only row in that ledger not ranked `unknown`, because this one was
+measured here rather than awaiting the sweep.
+
+It also cannot be fitted alone. Only the product `α_M · k` reaches the dynamics, so
+`cpm.melanin_coupling` and `response.melanin` are jointly identifiable at best.
+
 ## What this branch merged
 
 Both branch-local source registries are folded into `data/sources.csv` (only `SPATIAL_DECL_2026`
