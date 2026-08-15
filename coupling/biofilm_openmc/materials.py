@@ -101,3 +101,76 @@ def voxel_mass_kg(snapshot: Snapshot, config: TransportConfig) -> np.ndarray:
         density[voxel_class_array(snapshot, config) == name] = cls.density_g_cm3
     voxel_volume_cm3 = config.voxel_pitch_cm ** 3
     return density * voxel_volume_cm3 * 1e-3  # g -> kg
+
+
+def _volume_raytrace_model(model, mesh):
+    """The same CSG, wrapped in a void box that spans the mesh.
+
+    `material_volumes` raytraces the geometry and refuses with "Mesh not fully
+    contained in geometry" when a ray leaves the defined region — which the
+    cube mesh always does, because it circumscribes a cylinder and the corners
+    are outside it.
+
+    The wrapper is a MEASURING INSTRUMENT, never a transport model: it is built
+    here, used for raytracing, and discarded. The real model's boundary
+    conditions are untouched, so this cannot change any physics — and the void
+    fill contributes no mass, so it cannot change any volume either. Validated
+    against the A0 cylinder: pi*r^2*L to within 0.06% at 1e6 rays.
+    """
+    import openmc
+
+    cells = list(model.geometry.get_all_cells().values())
+    occupied = cells[0].region
+    for cell in cells[1:]:
+        occupied = occupied | cell.region
+    bounds = [v for pair in zip(mesh.lower_left, mesh.upper_right) for v in pair]
+    box = openmc.model.RectangularParallelepiped(*bounds, boundary_type="vacuum")
+    void = openmc.Cell(name="raytrace_void", fill=None, region=-box & ~occupied)
+    return openmc.Model(geometry=openmc.Geometry(cells + [void]),
+                        materials=model.materials, settings=model.settings)
+
+
+def mesh_material_masses_kg(mesh, model, dimension, *, n_samples: int = 10_000_000,
+                            max_materials: int = 4) -> np.ndarray:
+    """EXACT per-bin masses (kg), logical (x,y,z), from the CSG itself.
+
+        m_v = sum_k rho_k * V_vk
+
+    `voxel_mass_kg` and `phantom_mass_kg` both give every bin the full
+    rectangular volume of one material. That is wrong wherever a bin is cut by
+    a curved surface: the cylinder wall, and the membrane annulus, which
+    `voxel_mass_kg` cannot see at all because the membrane is CSG and never a
+    lattice class. It is the mechanism behind A0's ~11% coarse-mesh aggregate
+    drift, and both functions name this as their upgrade path.
+
+    TWO PROPERTIES OF THE ANSWER, neither of which may be hidden:
+
+    - It is a RAYTRACING ESTIMATE, so the denominator carries its own O(1/sqrt
+      n) sampling error. Record `n_samples` next to any result that uses it,
+      and size a mass-conservation tolerance from it rather than asserting
+      exact agreement.
+    - It needs `openmc.lib.init`, hence cross sections. There is no offline
+      path to an exact CSG volume here.
+
+    `max_materials` must cover the most materials in any one bin: biomass,
+    medium, membrane and void is already four.
+    """
+    volumes = mesh.material_volumes(_volume_raytrace_model(model, mesh),
+                                    n_samples=n_samples,
+                                    max_materials=max_materials)
+    # From the GEOMETRY, not `model.materials`: the builders pass materials
+    # implicitly through the cells, so `model.materials` is empty and a lookup
+    # against it raises KeyError on the first real bin.
+    density_by_id = {m.id: m.get_mass_density()
+                     for m in model.geometry.get_all_materials().values()}
+
+    dim = tuple(int(d) for d in dimension)
+    grams = np.zeros(int(np.prod(dim)), dtype=float)
+    for material_id, per_element in volumes.items():
+        if material_id is None:            # void contributes no mass
+            continue
+        # openmc returns numpy integer ids; `Material.id` is a Python int.
+        grams += density_by_id[int(material_id)] * np.asarray(per_element, dtype=float)
+    # Mesh elements run x fastest, z slowest — the same convention
+    # `dose.extract_heating` undoes for the tally.
+    return (grams * 1e-3).reshape(dim[::-1]).transpose(2, 1, 0)

@@ -5,3 +5,4 @@ biofilm_contract.egg-info/dependency_links.txt
 biofilm_contract.egg-info/requires.txt
 biofilm_contract.egg-info/top_level.txt
 physical_contract/__init__.py
+tests/test_physical_contract.py
