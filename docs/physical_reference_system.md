@@ -167,7 +167,7 @@ primary source, and nearby lab MABRs report materially different geometries (e.g
 not obviously consistent with those. Every C row is therefore `provisional` with a
 `source_locator` of `NOT LOCATED`, pending the original Methods section.
 
-### D — engineered radiotrophic composite · declared, unfilled
+### D — engineered radiotropic composite · declared, unfilled
 
 Where a certified source and a cylindrical biofilm reactor could legitimately meet — and the
 **only** place they may. Combining A's source with C's reactor anywhere else produces exactly

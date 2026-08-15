@@ -1,7 +1,16 @@
 #!/usr/bin/env julia
 # ============================================================
-#  Cellular Potts Model (CPM) for Radiotrophic Biofilm System
-#  Based on: "Modeling Radiotrophic Fitness" (Kinder & Faulkner, 2026)
+#  Cellular Potts Model (CPM) for a Radiotropic Biofilm System
+#  Based on: "Modeling Radioresistance and Radiotropic Fitness"
+#  (Kinder & Faulkner, 2026)
+#
+#  PHENOTYPE, PRECISELY. This model represents RADIOTROPISM: a directional
+#  spatial preference in a dose gradient, expressed as the sign and magnitude
+#  of beta_ion. It does NOT represent radiotrophy (radiation measurably
+#  ENHANCING growth or metabolism) and it does NOT represent radioresistance
+#  (elevated SURVIVAL), because it has neither growth nor death: divide_cell!
+#  has no trigger and no cell is ever removed. Radioresistance evidence
+#  motivates the per-species magnitudes below; it is not what the term computes.
 #
 #  Maps the paper's Hamiltonian (Eq. 2, Section 3.3) to CPM energy:
 #    H_CPM = H_adhesion + H_volume + H_radiation + H_pairwise + H_melanin
@@ -19,9 +28,9 @@ using LinearAlgebra, Statistics, Random, Printf
 # ============================================================
 
 const SPECIES_NAMES = [
-    "C. neoformans",       # 1 — radiotrophic yeast, melanized
+    "C. neoformans",       # 1 — melanized yeast, radiotropic in this model
     "D. radiodurans",      # 2 — extreme radioresistant coccus
-    "C. sphaerospermum",   # 3 — radiotrophic filamentous fungus
+    "C. sphaerospermum",   # 3 — melanized filamentous fungus, radiotropic here
     "B. subtilis",         # 4 — motile rod, moderate radiosensitivity
     "A. niger",            # 5 — melanized filamentous fungus
     "S. oneidensis",       # 6 — metal-reducing bacterium, radiosensitive
@@ -34,17 +43,24 @@ const N_SPECIES = 7
 const CN = 1; const DR = 2; const CS = 3; const BS = 4
 const AN = 5; const SO = 6; const OI = 7
 
-# Radiotrophic species (produce melanin, benefit from radiation)
-const RADIOTROPHIC = Set([CN, CS])
+# Species drawn TOWARD the source (negative beta_ion). A tropism, not a
+# metabolism: occupying a high-dose site lowers this cell's Hamiltonian, which
+# is a Metropolis acceptance functional in arbitrary units, not an energy budget.
+const RADIOTROPIC = Set([CN, CS])
 
-# Melanin-producing species (produce melanin but may not be radiotrophic)
+# Melanin-producing species (a superset: producing melanin does not imply
+# being drawn toward the source)
 const MELANIN_PRODUCERS = Set([CN, CS, AN])
 
 """
 Parameters struct — values from Table 2 where available.
-β_ion: ionizing radiation sensitivity (Gy⁻¹) — Table 2
-  For radiotrophic species (CN, CS), we use negative effective β in H_radiation
-  to represent metabolic energy *gain* from radiation (Dadachova et al. 2007).
+β_ion: TROPISM coefficient, per species — sign sets direction, magnitude sets
+  strength. Negative beta means high-dose sites lower the Hamiltonian, so the
+  cell drifts up the dose gradient; positive beta means it drifts down.
+  The magnitudes are anchored to published radioresistance (D10) evidence, but
+  the quantity the model computes is a DIRECTIONAL PREFERENCE, not survival and
+  not growth. Units are nominally Gy⁻¹ from Table 2, but no dose calibration
+  exists, so beta is dimensionless in practice — see the calibration contracts.
 α_M: melanin production rate (μg cell⁻¹ Gy⁻¹) — Table 2
 D_s: diffusion coefficient (μm² s⁻¹) → mapped to CPM motility temperature
 """
@@ -70,13 +86,18 @@ Base.@kwdef struct CPMParams
     C_wall::Float64 = 1.0                # nutrient concentration at wall boundary
 
     # --- Species-specific β_ion (Table 2, midpoint of range) ---
-    # Sign convention: positive = damage, negative = radiotrophic benefit
+    # Sign convention: positive = drifts DOWN the dose gradient (away from the
+    # source), negative = drifts UP it (toward the source). Not damage, not
+    # benefit: the model has no death and no growth to express either in.
     β_ion::Vector{Float64} = [
-        -5e-5,   # CN: radiotrophic — net energy gain (Dadachova 2007)
-         2.5e-5, # DR: extremely radioresistant
-        -5e-5,   # CS: radiotrophic — net energy gain (Zhdanova 2000, Shunk 2022)
+        -5e-5,   # CN: drawn toward the source. CONTESTED — see
+                 #     docs/research/radiotrophic_compatibility_audit.md;
+                 #     radiotrophy is not established for this species.
+         2.5e-5, # DR: radioresistant evidence -> weak avoidance here
+        -5e-5,   # CS: drawn toward the source. CONTESTED on the same grounds;
+                 #     Zhdanova bears on radioTROPISM, which is this term.
          3e-3,   # BS: moderate radiosensitivity (Nicholson 2000)
-         2.5e-4, # AN: melanized but not radiotrophic
+         2.5e-4, # AN: melanized, drifts away from the source
          7.5e-2, # SO: extremely radiosensitive (Daly 2009)
          1e-2,   # OI: moderate (estimated, not in Table 2)
     ]
@@ -516,7 +537,7 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
     end
 
     # ---- H_radiation: β_{s,ion} * I_γ(r) per site ----
-    # (Eq. 5 + Table 2: negative β for radiotrophic = energy gain)
+    # (Eq. 5 + Table 2: negative β = drawn up the dose gradient)
     ΔH_rad = 0.0
     I_local = state.radiation[tx, ty, tz]
     if σ_source > 0
@@ -529,13 +550,14 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
     end
 
     # ---- H_melanin: α_M * M(x) modulates local energy ----
-    # (Eq. 7: melanin field benefits radiotrophic species)
+    # (Eq. 7: melanin-rich sites are preferred by the radiotropic species —
+    #  again a spatial preference, not energy transduction)
     ΔH_mel = 0.0
     M_local = state.melanin[tx, ty, tz]
-    if σ_source > 0 && cells[Int(σ_source)].species in RADIOTROPHIC
-        ΔH_mel -= 0.5 * M_local  # melanin reduces energy for radiotrophic
+    if σ_source > 0 && cells[Int(σ_source)].species in RADIOTROPIC
+        ΔH_mel -= 0.5 * M_local  # melanin-rich site preferred
     end
-    if σ_target > 0 && cells[Int(σ_target)].species in RADIOTROPHIC
+    if σ_target > 0 && cells[Int(σ_target)].species in RADIOTROPIC
         ΔH_mel += 0.5 * M_local  # losing a melanin-rich site costs
     end
 
@@ -647,8 +669,8 @@ function laplacian_3d(field::Array{Float64, 3}, x, y, z, N)
 end
 
 """
-Count cells of radiotrophic species at site (x,y,z).
-Returns 1.0 if a radiotrophic cell occupies the site, else 0.0.
+Count cells of radiotropic species at site (x,y,z).
+Returns 1.0 if a radiotropic cell occupies the site, else 0.0.
 """
 @inline function rf_density(lattice, cells, x, y, z)
     σ = lattice[x, y, z]
@@ -1051,7 +1073,7 @@ Run 200 MCS with default parameters and print cluster analysis.
 """
 function main()
     println("="^72)
-    println("  Cellular Potts Model — Radiotrophic Biofilm System")
+    println("  Cellular Potts Model — Radiotropic Biofilm System")
     println("  Based on Kinder & Faulkner (2026)")
     println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_pair + H_mel")
     println("="^72)
@@ -1821,7 +1843,7 @@ end
 #
 #  Fig 1 — Radial stratification over MCS
 #           Line plot: mean radial distance per species vs. MCS.
-#           Shows radiotrophic species drifting toward the axis,
+#           Shows radiotropic species drifting toward the axis,
 #           radiosensitive species drifting toward the outer wall.
 #
 #  Fig 2 — Melanin accumulation
@@ -2027,16 +2049,16 @@ function export_figures(trajectory::Vector{<:Any},
               align    = (:left, :center))
     end
 
-    # Mark radiotrophic species with a label in the legend title
+    # Mark radiotropic species with a label in the legend title
     Legend(fig2[1,2], ax2;
            labelsize    = 11,
            rowgap       = 4,
            framevisible = false,
-           title        = "Melanin producers\n(★ radiotrophic)",
+           title        = "Melanin producers\n(★ radiotropic)",
            titlesize    = 11)
     # Override first two labels to add star
     text!(ax2, mcs_vec[1], -0.05;
-          text = "★ C. neoformans, C. sphaerospermum are radiotrophic (melanin-mediated energy gain)",
+          text = "★ C. neoformans, C. sphaerospermum drift toward the source (radiotropic)",
           fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
 
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)

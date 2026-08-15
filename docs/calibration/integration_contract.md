@@ -91,6 +91,39 @@ constraint has to be declared.
 - Every response is a **per-parcel** response, not a per-organism one, because that is what a cell
   ID is.
 
+## Which radiation phenotype this model actually represents
+
+Five phenomena travel under one loose word, and they are not interchangeable. A survival curve
+cannot calibrate a directional term, and a transcriptome cannot set a material density.
+
+| phenotype | what it means | represented here? |
+|-----------|---------------|-------------------|
+| **radiotropic** | directional growth or redistribution toward or away from a source | **yes** — this is `response.hamiltonian` |
+| radiotrophic | ionizing radiation measurably **enhances growth or metabolism** | no — requires growth |
+| radioresistant | elevated **survival** after exposure | no — requires death |
+| melanized_radioprotective | melanin measurably alters damage, survival or shielding | no — requires damage |
+| radiation_responsive | molecular, morphological or material change after exposure | partly — `response.melanin` |
+
+`compute_delta_H` has four terms: adhesion, volume, radiation, melanin. The radiation term adds
+`β_ion[s]·I_γ` when a parcel gains a site, so the sign of `β_ion` decides whether that parcel
+drifts up or down the dose gradient. **That is a tropism.** The Hamiltonian is a Metropolis
+acceptance functional in arbitrary units, not an energy budget, so a negative `β_ion` is a spatial
+preference and not metabolic gain — the model creates no biomass for such gain to act on.
+
+Radiotrophy and radioresistance are therefore not weakly supported here; they are **structurally
+absent**, for the same reason `response.growth_survival` is `unsupported_by_current_model`. A
+model with no birth and no death cannot express either, and no quantity of data changes that
+without a model revision.
+
+This matters beyond bookkeeping. The published D10 evidence — which is strong, and is what anchors
+the per-species `β_ion` magnitudes — is *radioresistance* evidence being spent on a *tropism*
+coefficient. That substitution is legitimate only as a declared modelling choice, and it is
+declared here rather than left implicit in a sign convention.
+
+Radiotrophy additionally fails on evidence, not only on representability: it is not established
+for any of the seven species. See `docs/research/radiotrophic_compatibility_audit.md`, verdict
+`TARGETED_LAB_EXPERIMENT_REQUIRED`.
+
 ## What this branch merged
 
 Both branch-local source registries are folded into `data/sources.csv` (only `SPATIAL_DECL_2026`

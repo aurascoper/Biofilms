@@ -35,7 +35,8 @@ const AN = 5; const SO = 6; const OI = 7
 const BETA_ION = Float32[-5e-5, 2.5e-5, -5e-5, 3e-3, 2.5e-4, 7.5e-2, 1e-2]
 const ALPHA_M  = Float32[0.10, 0.0, 0.14, 0.0, 0.065, 0.0, 0.0]
 const UPTAKE   = Float32[0.01, 0.02, 0.01, 0.03, 0.01, 0.03, 0.02]
-# 0.5 melanin-energy coupling for radiotrophic species (CN, CS), else 0
+# 0.5 melanin coupling for the RADIOTROPIC species (CN, CS), else 0 —
+# a spatial preference for melanin-rich sites, not energy transduction
 const MEL_COEF = Float32[0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0]
 
 function build_J_matrix()
