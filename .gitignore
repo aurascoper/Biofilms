@@ -384,3 +384,8 @@ coupling/*.egg-info/
 coupling/biofilm_openmc.egg-info/
 .pytest_cache/
 calibration/*.egg-info/
+
+# Public microscopy datasets are large and are never committed.
+*.nd2
+*.tif
+*.tiff

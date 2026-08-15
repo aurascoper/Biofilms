@@ -19,7 +19,7 @@ both are required here rather than looked up later.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -37,6 +37,10 @@ class BiomassField:
     source_id: str
     reader: str = "in_memory"
     notes: str = ""
+    # Structured reader provenance. `notes` is free text for a human; this is
+    # what the pilot's provenance sidecar reads back, so a run can be
+    # reconstructed from its own output rather than from scrollback.
+    meta: dict = field(default_factory=dict)
 
     @property
     def voxel_volume_um3(self) -> float:
@@ -65,7 +69,7 @@ class BiomassField:
 
 def ingest(values, voxel_size_um, segmentation_basis: str, *,
            sample_id: str, source_id: str, reader: str = "in_memory",
-           notes: str = "") -> BiomassField:
+           notes: str = "", meta: dict | None = None) -> BiomassField:
     """Validate an array, its calibration and its basis together."""
     arr = check_field(values)
 
@@ -94,7 +98,7 @@ def ingest(values, voxel_size_um, segmentation_basis: str, *,
     return BiomassField(values=arr, voxel_size_um=tuple(float(x) for x in v),
                         segmentation_basis=segmentation_basis,
                         sample_id=sample_id, source_id=source_id,
-                        reader=reader, notes=notes)
+                        reader=reader, notes=notes, meta=dict(meta or {}))
 
 
 def available_readers() -> dict:
