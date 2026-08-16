@@ -107,6 +107,29 @@ def evaluate(data_dir, acceptance_path=None) -> MaterialGates:
                 f"{len(unblanked)} bulk measurement(s) name no blank — blank "
                 "subtraction defines the biofilm mass, so an unblanked sample "
                 "attributes the substrate and its retained water to the biofilm")
+
+        # rho_wet = m/V needs numerator and denominator to describe the same
+        # material. volume_basis says what the volume ENCLOSES; this says what
+        # it COVERS, and a field of view divided into a whole-coupon mass is
+        # wrong however well the envelope was segmented.
+        unsupported = [r["sample_id"] for r in tables["bulk_measurements"]
+                       if (r.get("volume_support") or "").strip()
+                       in ("", "unresolved")]
+        if unsupported:
+            om.append(
+                f"{len(unsupported)} bulk measurement(s) have no resolved "
+                "volume_support — whether the hydrated volume covers the whole "
+                "coupon, an excised region, or a scaled set of fields decides "
+                "whether it may be divided into the weighed mass at all")
+        unscaled = [r["sample_id"] for r in tables["bulk_measurements"]
+                    if (r.get("volume_support") or "").strip()
+                    in ("stereological_scaling", "sibling_batch_model")
+                    and not (r.get("scaling_method") or "").strip()]
+        if unscaled:
+            om.append(
+                f"{len(unscaled)} bulk measurement(s) scale a partial volume to "
+                "the weighed mass with no declared scaling_method — an "
+                "undeclared extrapolation is not a measurement")
     if not tables["elemental_analysis"]:
         om.append("no elemental analysis — composition is undetermined")
     if not tables["sample_metadata"]:
