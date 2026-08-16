@@ -144,3 +144,64 @@ def occupancy_biovolume_error(phi: np.ndarray, mapping: str, *,
     if target == 0.0:
         return float("nan")
     return (got - target) / target
+
+
+def occupancy_topology_report(phi: np.ndarray, mapping: str, *,
+                              tau: float | None = None,
+                              seed: int | None = None,
+                              reference_tau: float = 1e-12) -> dict:
+    """What the occupancy map did to the field's CONNECTIVITY.
+
+    The template used to say `threshold` "preserves connectivity". It does not.
+    A majority threshold can sever a thin bridge, delete a narrow filament, and
+    split two regions joined only by sub-block structure — all while conserving
+    the biovolume fraction to within its own tolerance. Connectivity is
+    therefore an OUTPUT of the declared mapping, measured here, never a property
+    asserted of it.
+
+    The reference is the field's own support (phi > ~0), because that is the
+    topology the continuous field carries before any binarisation. Reported and
+    not corrected, for the same reason `occupancy_biovolume_error` is: the size
+    of the distortion is a property of the declared mapping that the
+    calibration record has to carry.
+    """
+    from .structure import components_26
+
+    a = check_field(phi)
+    before = components_26(a > reference_tau)
+    after_mask = apply_occupancy(a, mapping, tau=tau, seed=seed)
+    after = components_26(after_mask)
+
+    n_before, n_after = len(before), len(after)
+    vol_before, vol_after = float(sum(before)), float(sum(after))
+    largest_before = float(max(before)) if before else 0.0
+    largest_after = float(max(after)) if after else 0.0
+
+    def _rel(new, old):
+        return float("nan") if old == 0 else (new - old) / old
+
+    # Biomass that left the largest component: either deleted outright or
+    # stranded in a fragment. Both are connectivity loss, and the sign of the
+    # count change alone cannot tell them apart.
+    largest_share_before = largest_before / vol_before if vol_before else float("nan")
+    largest_share_after = largest_after / vol_after if vol_after else float("nan")
+
+    return {
+        "n_components_before": n_before,
+        "n_components_after": n_after,
+        "n_components_rel_change": _rel(n_after, n_before),
+        "largest_component_voxels_before": largest_before,
+        "largest_component_voxels_after": largest_after,
+        "largest_component_rel_change": _rel(largest_after, largest_before),
+        # Fraction of the retained biomass that is NOT in the largest
+        # component, before and after. A rise means the field fragmented.
+        "fragmented_fraction_before": (float("nan") if vol_before == 0
+                                       else 1.0 - largest_share_before),
+        "fragmented_fraction_after": (float("nan") if vol_after == 0
+                                      else 1.0 - largest_share_after),
+        "occupied_voxels_before": vol_before,
+        "occupied_voxels_after": vol_after,
+        # Declared future metric: an Euler characteristic would separate a
+        # severed bridge from a deleted blob, which component counts cannot.
+        "euler_characteristic": None,
+    }

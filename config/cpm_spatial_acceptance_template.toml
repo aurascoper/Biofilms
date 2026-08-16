@@ -43,8 +43,13 @@ require_independent_validation_sample = true
 # fraction phi into occupied/unoccupied is part of the CALIBRATION, not an
 # implementation detail. The two available maps differ in what they conserve:
 #
-#   threshold        occupied iff phi >= tau. Deterministic, preserves
-#                    connectivity, does NOT conserve total biovolume.
+#   threshold        occupied iff phi >= tau. Deterministic and local,
+#                    introduces no mapping seed, does NOT conserve total
+#                    biovolume. CONNECTIVITY IS NOT GUARANTEED: a majority
+#                    threshold can sever thin bridges, delete narrow filaments
+#                    and split regions joined by sub-block structure. Topology
+#                    loss is an OUTPUT to be measured (field.occupancy_topology_
+#                    report), never an assumption.
 #   mass_preserving  occupied with probability phi, seeded. Conserves total
 #                    biovolume in expectation; the realisation varies by seed,
 #                    so structural observables need replicate handling.
@@ -64,7 +69,11 @@ require_independent_validation_sample = true
 # maximum_biovolume_fraction_error =
 # maximum_porosity_error =
 # maximum_interface_area_error =
-# maximum_correlation_length_error =
+# Renamed from maximum_correlation_length_error: this is a DISTANCE measured
+# within one frame, not the decay of the temporal autocorrelation. The selected
+# time observable's own criteria cannot be written until the dynamic dataset and
+# physical timestamps exist.
+# maximum_spatial_correlation_length_error =
 # maximum_thickness_error =
 # maximum_component_size_error =
 

@@ -29,7 +29,7 @@ OBSERVABLE_TOLERANCES = {
     "biovolume_fraction": "maximum_biovolume_fraction_error",
     "porosity": "maximum_porosity_error",
     "specific_interface_area_per_um": "maximum_interface_area_error",
-    "correlation_length_um": "maximum_correlation_length_error",
+    "correlation_length_um": "maximum_spatial_correlation_length_error",
     "thickness_mean_um": "maximum_thickness_error",
     "component_size_q50_um3": "maximum_component_size_error",
 }
