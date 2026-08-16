@@ -1,0 +1,69 @@
+# Reference D — biofilm material acceptance, FROZEN.
+#
+# Declared before any assay exists. The export gate refuses a proxy or declared
+# composition regardless of what is set here; these thresholds govern when a
+# MEASURED one is good enough.
+
+schema_version = 1
+
+[policy]
+acceptance_policy_id = "reference_d_acceptance_v1"
+declared_utc = "2026-08-15T00:00:00+00:00"
+declared_before_target_data = true
+
+[enforcement]
+# Until this file was wired into materials/report.py these four numbers were
+# prose: nothing in the codebase loaded the template, so any values satisfied
+# the code. They are now read and blocked on.
+maximum_density_relative_uncertainty = "hard"
+maximum_composition_closure_error = "hard"
+minimum_replicates = "hard"
+maximum_unaccounted_dry_mass_fraction = "hard"
+allow_oxygen_by_difference = "advisory"
+
+[model]
+# The only kind compatible with the present mapper, which assigns ONE material
+# class per occupied voxel. Representing dry solid and interstitial water as
+# separate phases needs sub-voxel homogenization, which does not exist.
+material_model_kind = "hydrated_effective_medium"
+
+[acceptance]
+# House style follows precision.py's declared minimum_ratio = 10.0: a 10%
+# contribution is the point at which a term stops being negligible.
+maximum_density_relative_uncertainty = 0.10
+
+# The MEASUREMENT tolerance, distinct from the loader's 1e-6 file-format
+# closure in physical_contract.closed_composition_problems.
+maximum_composition_closure_error = 0.02
+
+# Above precision.py's arithmetic floor of 2, which is a floor and not a design
+# ("a variance estimate needs at least two batches").
+minimum_replicates = 3
+
+# FOUR DIFFERENT THINGS, and only the last is what this bounds:
+#
+#   analytical_mass_balance_residual     what the assays failed to account for
+#   oxygen_by_difference                 ACCOUNTED FOR, with large uncertainty
+#   explicit_unknown_or_other_component  accounted for, as a bounded declared
+#                                        component with an assigned composition
+#   unaccounted_mass                     genuinely unidentified  <- this key
+#
+# Set to 0.02 to be consistent with the 0.02 closure error. A material cannot
+# be called closed to 2% while 10% of its dry mass is unassigned. Anything
+# larger must be carried as an explicit bounded `other` component, which makes
+# it accounted for. RENORMALISING KNOWN ELEMENTS TO 100% AND ERASING AN
+# UNIDENTIFIED FRACTION IS NUMERICAL CLOSURE, NOT COMPOSITIONAL CLOSURE.
+maximum_unaccounted_dry_mass_fraction = 0.02
+
+# CHNS analysers do not measure oxygen. Allowed, but the fraction must be
+# RECORDED as analysis_method = by_difference in elemental_analysis.csv, or a
+# closure that was assumed reads as a closure that was measured.
+allow_oxygen_by_difference = true
+
+[radiodialysis]
+# NOT YET SATISFIABLE, and no value here changes that: compute_radial_biomass
+# returns site occupancy and its unweighted mean is assigned to X_total
+# (g cm^-3) at biofilms_potts.jl L1445-1446 and L1797. The model must supply a
+# mass concentration first. Left unset deliberately.
+# spatial_mapping_rule =
+# active_reducer_basis =

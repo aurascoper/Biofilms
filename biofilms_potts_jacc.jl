@@ -35,7 +35,8 @@ const AN = 5; const SO = 6; const OI = 7
 const BETA_ION = Float32[-5e-5, 2.5e-5, -5e-5, 3e-3, 2.5e-4, 7.5e-2, 1e-2]
 const ALPHA_M  = Float32[0.10, 0.0, 0.14, 0.0, 0.065, 0.0, 0.0]
 const UPTAKE   = Float32[0.01, 0.02, 0.01, 0.03, 0.01, 0.03, 0.02]
-# 0.5 melanin-energy coupling for radiotrophic species (CN, CS), else 0
+# 0.5 melanin coupling for the RADIOTROPIC species (CN, CS), else 0 —
+# a spatial preference for melanin-rich sites, not energy transduction
 const MEL_COEF = Float32[0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0]
 
 function build_J_matrix()
@@ -281,7 +282,34 @@ function init_radiolysis(rp::RadiolysisParams; R::Float64 = 1.0)
     RadiolysisState(r_grid, zeros(rp.Nr), zeros(rp.Nr), 1.0, 0.0, rp)
 end
 
+"""
+Advance the radiodialysis PDE system by one time step dt.
+
+MIRRORS biofilms_potts.jl:1243 EXACTLY, and must continue to. Without this
+wrapper the JACC port took a single raw forward-Euler step at dt_rd = 0.5 while
+the serial port substepped, so the two would silently disagree the moment the
+explicit-Euler diffusion bound was exceeded — and validate_serial.jl exists to
+compare them.
+
+Today both ports are saved by the same thing: every call site passes
+R = N/2 in LATTICE units, giving dr = 0.513 and dt_stable = 52.6 at N = 40, so
+n_sub = 1 and no trajectory moves. That safety is an artifact of the documented
+r-in-lattice-units error (RADIODIALYSIS: BLOCKED), not of the time step being
+small. Correct the units to R = 1.0 cm and dt_stable becomes 0.132, n_sub = 4 —
+at which point a port without this guard diverges.
+"""
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
+    dr = rd.r_grid[2] - rd.r_grid[1]
+    dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
+    n_sub = max(1, ceil(Int, dt / dt_stable))
+    dt_sub = dt / n_sub
+    for _ in 1:n_sub
+        _step_radiolysis_euler!(rd, dt_sub)
+    end
+end
+
+"""One forward-Euler step; the guard lives in step_radiolysis! above."""
+function _step_radiolysis_euler!(rd::RadiolysisState, dt::Float64)
     rp = rd.params
     Nr = rp.Nr
     dr = rd.r_grid[2] - rd.r_grid[1]

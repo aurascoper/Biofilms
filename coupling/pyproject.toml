@@ -7,7 +7,7 @@ name = "biofilm-openmc"
 version = "0.1.0"
 description = "CPM biofilm <-> OpenMC photon-transport coupling (offline-first)"
 requires-python = ">=3.11"
-dependencies = ["numpy", "h5py"]
+dependencies = ["numpy", "h5py", "biofilm-contract"]
 
 [project.scripts]
 biofilm-dose-scan = "biofilm_openmc.drivers:main_scan"

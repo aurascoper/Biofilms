@@ -1,6 +1,6 @@
 # Deterministic tests of the radiation response direction.
 # Pins the implemented semantics recorded in docs/audit_biofilms_potts.md §3:
-# field maximal on the axis, sign(ΔH_rad) = sign(β_ion), radiotrophs drawn
+# field maximal on the axis, sign(ΔH_rad) = sign(β_ion), negative-β cells drawn
 # inward / radiosensitive species outward.
 
 using Statistics: mean
@@ -66,7 +66,7 @@ end
 
 # ---------- (c) Multi-seed drift with amplified synthetic β ----------
 # Production β values are far too small to produce a stable short-run signal, so
-# this uses a deliberately amplified SYNTHETIC coefficient (radiotroph-signed for
+# this uses a deliberately amplified SYNTHETIC coefficient (negative-signed for
 # CN, radiosensitive-signed for SO, zero elsewhere) and averages across seeds.
 # This tests the direction of the coupling, not calibrated biology.
 
@@ -83,7 +83,7 @@ end
 
 let
     β_syn = zeros(7)
-    β_syn[SR.CN] = -20.0        # amplified radiotroph sign
+    β_syn[SR.CN] = -20.0        # amplified negative (toward-source) sign
     β_syn[SR.SO] = +20.0        # amplified radiosensitive sign
     N = 24
     n_mcs = 60
@@ -104,6 +104,6 @@ let
         push!(drift_so, mean_radius(st, SR.SO, N) - r0_so)
     end
 
-    @test mean(drift_cn) < 0    # radiotroph-signed cell moves toward the axis
+    @test mean(drift_cn) < 0    # negative-β cell moves toward the axis: a TROPISM
     @test mean(drift_so) > 0    # radiosensitive-signed cell moves outward
 end

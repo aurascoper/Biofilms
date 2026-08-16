@@ -1,0 +1,59 @@
+{
+  "nd2_version": "0.11.3",
+  "sizes": {
+    "Z": 94,
+    "C": 3,
+    "Y": 1024,
+    "X": 1024
+  },
+  "dtype": "uint16",
+  "is_legacy": false,
+  "is_rgb": false,
+  "voxel_size_um": [
+    0.065,
+    0.065,
+    0.13
+  ],
+  "voxel_calibrated": [
+    true,
+    true,
+    true
+  ],
+  "channel_names": [
+    "488 nm",
+    "561 nm",
+    "640 nm"
+  ],
+  "n_frames": 94,
+  "nbytes": 591396864,
+  "path": "/home/aurascoper/biofilm-pilot-data/Dataset_3_Fig3c_VPS-Bap1.nd2",
+  "axes": [
+    "Z",
+    "C",
+    "Y",
+    "X"
+  ],
+  "axes_interpretation": [
+    "distance",
+    "distance",
+    "distance"
+  ],
+  "n_timepoints": null,
+  "n_z": 94,
+  "n_channels": 3,
+  "n_positions": null,
+  "experiment": [
+    [
+      "XYPosLoop",
+      1
+    ],
+    [
+      "ZStackLoop",
+      94
+    ]
+  ],
+  "is_3d": true,
+  "has_time_axis": false,
+  "frame_times_s": null,
+  "time_metadata_source": "absent"
+}

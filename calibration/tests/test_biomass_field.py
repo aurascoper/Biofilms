@@ -321,3 +321,41 @@ def test_optional_readers_are_reported_not_required():
     readers = available_readers()
     assert set(readers) == {"nd2", "tiff"}
     assert all(isinstance(v, bool) for v in readers.values())
+
+
+def test_threshold_occupancy_does_not_preserve_connectivity():
+    """The template asserted that `threshold` "preserves connectivity". It does
+    not, and the whole reason the Reference D declaration measures topology loss
+    instead of claiming its absence is that a majority threshold severs exactly
+    this: two blobs joined by a bridge whose local fraction sits below tau."""
+    from biofilm_calibration.spatial.field import occupancy_topology_report
+
+    phi = np.zeros((9, 5, 5))
+    phi[:3] = 1.0
+    phi[6:] = 1.0
+    phi[3:6, 2, 2] = 0.4            # the bridge, below tau
+
+    report = occupancy_topology_report(phi, "threshold", tau=0.5)
+    assert report["n_components_before"] == 1
+    assert report["n_components_after"] == 2
+    assert report["largest_component_rel_change"] < -0.4
+    # Half the surviving biomass is now outside the largest component.
+    assert report["fragmented_fraction_after"] == pytest.approx(0.5, abs=0.01)
+
+    # A tau below the bridge keeps it, which is what makes tau a calibration
+    # decision rather than an implementation detail.
+    kept = occupancy_topology_report(phi, "threshold", tau=0.3)
+    assert kept["n_components_after"] == 1
+    assert kept["fragmented_fraction_after"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_topology_report_declares_euler_characteristic_as_future():
+    """Component counts cannot separate a severed bridge from a deleted blob.
+    The field is present and null rather than absent, so the gap is visible."""
+    from biofilm_calibration.spatial.field import occupancy_topology_report
+
+    phi = np.zeros((4, 4, 4))
+    phi[:2] = 1.0
+    report = occupancy_topology_report(phi, "threshold", tau=0.5)
+    assert "euler_characteristic" in report
+    assert report["euler_characteristic"] is None

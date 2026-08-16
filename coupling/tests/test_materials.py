@@ -5,7 +5,7 @@ from biofilm_openmc.config import (WATER_PHANTOM, ConfigError, load_config,
                                    load_transport_config)
 from biofilm_openmc.materials import (BIOMASS, MEDIUM, unique_material_specs,
                                       voxel_class_array, voxel_mass_kg)
-from biofilm_openmc.model import check_lattice_congruence
+from biofilm_openmc.model import check_lattice_congruence, check_source_placement
 
 from conftest import VALID_CONFIG, WATER_PHANTOM_CONFIG
 
@@ -28,6 +28,40 @@ def test_cylinder_must_fit_inside_the_voxel_lattice():
                              "cylinder_length_cm = 110.0"))
     with pytest.raises(ConfigError, match="cylinder_length_cm"):
         check_lattice_congruence(n, too_long)
+
+
+def test_derived_source_centre_is_refused_because_it_sits_on_lattice_planes():
+    """The builder centres the source at n*pitch/2 and lattice planes fall at
+    k*pitch, so the DEFAULT placement is degenerate for every even n — and the
+    z axis is degenerate independently of n, because its centre comes from
+    cylinder_length_cm rather than from the lattice. A particle born on a
+    surface has no well-defined starting cell, so this must fail loudly rather
+    than be resolved by floating-point tie-breaking."""
+    n = 8
+    no_position = load_transport_config(
+        "\n".join(l for l in VALID_CONFIG.splitlines()
+                  if not l.startswith("position_cm")))
+    with pytest.raises(ConfigError, match="lies on a lattice plane") as exc:
+        check_source_placement(n, no_position)
+    assert exc.value.args[0].count("lies on a lattice plane") == 3   # x, y and z
+
+    # VALID_CONFIG places it half a pitch off every plane.
+    check_source_placement(n, load_transport_config(VALID_CONFIG))
+
+
+def test_source_outside_the_biological_domain_is_refused():
+    n = 8
+    outside = load_transport_config(
+        VALID_CONFIG.replace("position_cm = [0.0045, 0.0045, 0.0045]",
+                             "position_cm = [0.0405, 0.0045, 0.0045]"))
+    with pytest.raises(ConfigError, match="outside the biological domain"):
+        check_source_placement(n, outside)
+
+    below = load_transport_config(
+        VALID_CONFIG.replace("position_cm = [0.0045, 0.0045, 0.0045]",
+                             "position_cm = [0.0045, 0.0045, -0.0005]"))
+    with pytest.raises(ConfigError, match="outside the domain"):
+        check_source_placement(n, below)
 
 
 def test_voxel_classes_from_occupancy_only(snapshot, config):

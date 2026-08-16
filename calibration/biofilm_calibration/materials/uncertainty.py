@@ -16,7 +16,7 @@ import numpy as np
 
 
 def propagate(fn, inputs: dict, *, seed: int, draws: int = 20000,
-              quantiles=(0.025, 0.5, 0.975)) -> dict:
+              quantiles=(0.025, 0.5, 0.975), invalid_if=None) -> dict:
     """Propagate independent Gaussian uncertainties through `fn`.
 
     `inputs` maps a name to (value, sigma). A sigma of 0 or None is treated as
@@ -36,12 +36,25 @@ def propagate(fn, inputs: dict, *, seed: int, draws: int = 20000,
 
     out = np.array([fn(**{n: samples[n][i] for n in names}) for i in range(draws)])
     finite = out[np.isfinite(out)]
+
+    # A draw can be perfectly finite and still physically impossible — a blank
+    # exceeding its own sample gives a NEGATIVE biofilm mass, which would sail
+    # through the finiteness filter and out the other side as a negative
+    # density. That is information about the measurement, not noise to discard:
+    # it says the distribution crosses zero, which no number of replicates can
+    # fix. `invalid_if` names the impossibility; the fraction is reported.
+    invalid_fraction = 0.0
+    if invalid_if is not None and finite.size:
+        invalid_fraction = float(np.mean([bool(invalid_if(v)) for v in finite]))
+
     if finite.size == 0:
-        return {"n_valid": 0}
+        return {"n_valid": 0, "n_rejected": int(draws),
+                "invalid_fraction": float("nan")}
     qs = np.quantile(finite, quantiles)
     return {
         "n_valid": int(finite.size),
         "n_rejected": int(draws - finite.size),
+        "invalid_fraction": invalid_fraction,
         "mean": float(finite.mean()),
         "sd": float(finite.std(ddof=1)) if finite.size > 1 else 0.0,
         **{f"q{int(q * 1000):03d}": float(v) for q, v in zip(quantiles, qs)},

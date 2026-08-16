@@ -167,7 +167,7 @@ primary source, and nearby lab MABRs report materially different geometries (e.g
 not obviously consistent with those. Every C row is therefore `provisional` with a
 `source_locator` of `NOT LOCATED`, pending the original Methods section.
 
-### D — engineered radiotrophic composite · declared, unfilled
+### D — engineered radiotropic composite · declared, unfilled
 
 Where a certified source and a cylindrical biofilm reactor could legitimately meet — and the
 **only** place they may. Combining A's source with C's reactor anywhere else produces exactly
@@ -175,6 +175,52 @@ the silent composite the ledger's uniqueness key
 `(reference_system_id, required_for_stage, config_key)` exists to prevent: a ledger keyed on
 `config_key` alone would either duplicate rows or quietly merge two incompatible systems into one
 configuration and call it reproduced.
+
+**The campaign that fills it is frozen.** `docs/calibration/reference_d_measurement_protocol.md`
+is the specification, `data/calibration/reference_d_requirements.csv` is the machine-readable
+requirement set, and `calibration/scripts/reference_d_status.py` reports the live gap. The table
+is checked against the gates and against `emit_transport_config`'s own refusal in **both**
+directions, so the protocol cannot drift from the code: a required field with no requirement
+fails, and so does a requirement justified by nothing the code refuses on. Today: 29
+requirements, 2 satisfied.
+
+### S — synthetic_biofilm_e2e · invented, executable
+
+Not a physical system and not a candidate to become one. Reference D's two central numbers — the
+CPM lattice pitch and the wet bulk biofilm density — are unmeasured, so the target dose path
+cannot run; but the **software** path downstream of those numbers had never run either, on
+anything. This system supplies invented values so the whole chain executes while a failure is
+free, rather than first meeting the pipeline on the day expensive paired measurements arrive.
+
+```
+system_provenance  = declared
+evidence_policy    = synthetic          <- the ONLY axis that relaxes a check
+execution_class    = synthetic_validation
+target_calibration = false
+```
+
+It appears in **no ledger**. Its values live in
+`calibration/scripts/emit_synthetic_reference_config.py` and nowhere else — not in
+`data/parameter_provenance.csv`, not in `data/calibration/voxel_binding.csv`, whose two blanks
+stay blank. Precedent: `public_vcholerae_surrogate` never entered the ledger either.
+
+**Its pitch is 1.2 cm and is not a biofilm pitch.** Two constraints force it.
+`check_lattice_congruence` requires the CSG cylinder inside the cube of side `n·pitch`; and at a
+real biofilm pitch (10 µm, n = 20) the domain is 200 µm across, where a 661.7 keV photon leaves
+without interacting, heating is numerically zero, and every downstream check becomes untestable.
+So the pitch is declared at **dosimetry scale for the same reason A0 is a 15 cm phantom** — a
+number chosen to make the software path exercisable, not an estimate of anything biological.
+
+What a successful run licenses:
+
+> the one-way physical biofilm-dose architecture executed end to end under a synthetic,
+> non-calibrating reference system
+
+and never *the target biofilm was calibrated or dosed*. The run stops at
+`import_dose_field!` with both transforms `nothing`; the Hamiltonian, melanin production,
+membrane damage and CPM time advancement are not applied, and `accrue_dose!` remains blocked on
+`seconds_per_mcs = NaN`. Attribution happens on the Python side precisely because
+mass-weighted aggregation needs no clock.
 
 ---
 

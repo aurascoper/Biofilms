@@ -13,6 +13,7 @@ result, not a failure of the branch.
 
 from __future__ import annotations
 
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,17 @@ READY_RADIODIALYSIS = "READY_FOR_RADIODIALYSIS_MAPPING"
 PROVISIONAL = "PROVISIONAL"
 BLOCKED = "BLOCKED"
 NOT_EVALUATED = "NOT_EVALUATED"
+
+# Declared before the assays are read, exactly as the spatial gate demands its
+# five. Until this file was consumed, these four numbers lived only in a
+# template nothing loaded — so any values satisfied the code and the thresholds
+# were prose. `evaluate` now blocks on them.
+REQUIRED_ACCEPTANCE = (
+    "maximum_density_relative_uncertainty",
+    "maximum_composition_closure_error",
+    "minimum_replicates",
+    "maximum_unaccounted_dry_mass_fraction",
+)
 
 
 @dataclass(frozen=True)
@@ -54,7 +66,7 @@ def _load(path, schema):
         return None, str(e)
 
 
-def evaluate(data_dir) -> MaterialGates:
+def evaluate(data_dir, acceptance_path=None) -> MaterialGates:
     data_dir = Path(data_dir)
     reasons: list[str] = []
     om: list[str] = []
@@ -95,6 +107,29 @@ def evaluate(data_dir) -> MaterialGates:
                 f"{len(unblanked)} bulk measurement(s) name no blank — blank "
                 "subtraction defines the biofilm mass, so an unblanked sample "
                 "attributes the substrate and its retained water to the biofilm")
+
+        # rho_wet = m/V needs numerator and denominator to describe the same
+        # material. volume_basis says what the volume ENCLOSES; this says what
+        # it COVERS, and a field of view divided into a whole-coupon mass is
+        # wrong however well the envelope was segmented.
+        unsupported = [r["sample_id"] for r in tables["bulk_measurements"]
+                       if (r.get("volume_support") or "").strip()
+                       in ("", "unresolved")]
+        if unsupported:
+            om.append(
+                f"{len(unsupported)} bulk measurement(s) have no resolved "
+                "volume_support — whether the hydrated volume covers the whole "
+                "coupon, an excised region, or a scaled set of fields decides "
+                "whether it may be divided into the weighed mass at all")
+        unscaled = [r["sample_id"] for r in tables["bulk_measurements"]
+                    if (r.get("volume_support") or "").strip()
+                    in ("stereological_scaling", "sibling_batch_model")
+                    and not (r.get("scaling_method") or "").strip()]
+        if unscaled:
+            om.append(
+                f"{len(unscaled)} bulk measurement(s) scale a partial volume to "
+                "the weighed mass with no declared scaling_method — an "
+                "undeclared extrapolation is not a measurement")
     if not tables["elemental_analysis"]:
         om.append("no elemental analysis — composition is undetermined")
     if not tables["sample_metadata"]:
@@ -141,6 +176,36 @@ def evaluate(data_dir) -> MaterialGates:
 
     reasons.append("basis tagging enforced: site occupancy cannot reach a "
                    "concentration slot")
+
+    # An unset threshold is an ABSENT key, not a None value — the template
+    # ships them commented out, the same convention the spatial gate reads.
+    if acceptance_path is None:
+        om.append("no material acceptance configuration supplied — the four "
+                  "thresholds govern when a MEASURED composition is good "
+                  "enough, and a gate cannot close on criteria nobody declared")
+    elif not Path(acceptance_path).exists():
+        om.append(f"material acceptance configuration not found: {acceptance_path}")
+    else:
+        with open(acceptance_path, "rb") as fh:
+            acceptance = tomllib.load(fh)
+        acc = acceptance.get("acceptance", {})
+        unset = [k for k in REQUIRED_ACCEPTANCE if acc.get(k) is None]
+        if unset:
+            om.append(f"acceptance thresholds unset in "
+                      f"{Path(acceptance_path).name}: " + ", ".join(unset))
+        else:
+            reasons.append("material acceptance thresholds declared")
+        # Closure and unaccounted mass are the same claim seen twice. A
+        # material closed to 2% cannot carry 10% of its dry mass unassigned.
+        closure = acc.get("maximum_composition_closure_error")
+        unacc = acc.get("maximum_unaccounted_dry_mass_fraction")
+        if closure is not None and unacc is not None and unacc > closure:
+            om.append(
+                f"maximum_unaccounted_dry_mass_fraction ({unacc}) exceeds "
+                f"maximum_composition_closure_error ({closure}) — a material "
+                "cannot be closed to one tolerance while more than that is "
+                "genuinely unidentified. Carry the remainder as an explicit "
+                "bounded component instead of renormalising it away")
 
     openmc = PROVISIONAL if om else READY_OPENMC
     radiodialysis = BLOCKED if rd else READY_RADIODIALYSIS

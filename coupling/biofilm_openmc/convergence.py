@@ -171,6 +171,78 @@ CSV_COLUMNS = (
 )
 
 
+# How a sweep CSV may be compared against a committed one. A byte-diff is the
+# wrong instrument: four of these columns are machine-specific, and the A0
+# report says so of its own runtimes. Partitioning them is what makes "A0 is
+# unchanged" a checkable claim rather than a hope.
+DETERMINISTIC_COLUMNS = (
+    "coarsening_factor", "mesh_nx", "mesh_ny", "mesh_nz", "bin_volume_cm3",
+    "batches", "particles", "histories", "seed", "roi_bins", "heating_floor_eV",
+)
+# Seeded Monte Carlo output. Bit-identical only for the same OpenMC build,
+# nuclear data and thread count; compare within a declared tolerance otherwise.
+STOCHASTIC_COLUMNS = (
+    "total_heating_eV_per_src", "absorbed_fraction", "zero_score_fraction_roi",
+    "bins_above_floor", "median_rel_err", "p90_rel_err", "max_rel_err",
+    "mass_weighted_mean_dose_Gy_per_src", "total_mass_kg",
+)
+# Computed against the sweep's OWN reference row, so they are a property of the
+# sweep's composition and not of the row. A sweep over factors 1,2 and a sweep
+# over 1,2,4,8,16 give the same row different values here, which is correct and
+# is why they cannot be compared across sweeps that do not share a reference.
+REFERENCE_RELATIVE_COLUMNS = (
+    "field_diff_vs_reference", "resolution_loss_vs_reference",
+)
+# Machine-specific. Never compared: they say what the host was, not what the
+# physics is.
+ENVIRONMENTAL_COLUMNS = (
+    "runtime_s", "histories_per_s", "statepoint_bytes",
+    "peak_child_rss_kb_cumulative",
+)
+
+
+def compare_sweeps(reference_rows, candidate_rows, *, rel_tol: float = 0.02,
+                   same_reference: bool = False) -> list[str]:
+    """Differences that matter between two sweep CSVs. Empty means unchanged.
+
+    Deterministic columns must match exactly; stochastic ones within `rel_tol`;
+    environmental ones are ignored entirely. The reference-relative columns are
+    compared only when `same_reference` says the two sweeps were run over the
+    same factor set — otherwise they legitimately differ and flagging them would
+    train the reader to ignore this function.
+    """
+    problems: list[str] = []
+    key = lambda r: (r["coarsening_factor"], r["histories"], r["seed"])  # noqa: E731
+    ref = {key(r): r for r in reference_rows}
+    cand = {key(r): r for r in candidate_rows}
+
+    for missing in sorted(set(ref) - set(cand)):
+        problems.append(f"row {missing} is missing from the candidate sweep")
+    for added in sorted(set(cand) - set(ref)):
+        problems.append(f"row {added} is not in the reference sweep")
+
+    for k in sorted(set(ref) & set(cand)):
+        for col in DETERMINISTIC_COLUMNS:
+            a, b = ref[k].get(col, ""), cand[k].get(col, "")
+            if str(a) != str(b):
+                problems.append(f"row {k}: {col} changed {a!r} -> {b!r}")
+        compared = STOCHASTIC_COLUMNS + (
+            REFERENCE_RELATIVE_COLUMNS if same_reference else ())
+        for col in compared:
+            a, b = ref[k].get(col, ""), cand[k].get(col, "")
+            if a in ("", None) or b in ("", None):
+                continue
+            a, b = float(a), float(b)
+            if a == 0.0:
+                if b != 0.0:
+                    problems.append(f"row {k}: {col} moved off zero -> {b!r}")
+            elif abs(b - a) / abs(a) > rel_tol:
+                problems.append(
+                    f"row {k}: {col} moved {a!r} -> {b!r} "
+                    f"({abs(b - a) / abs(a):.1%} > {rel_tol:.0%})")
+    return problems
+
+
 def row_for(config, factor: int, dimension, seed: int, metrics: dict, *,
             runtime_s: float, statepoint_bytes: int, peak_rss_kb: int,
             field_diff: float, resolution_loss_: float) -> dict:

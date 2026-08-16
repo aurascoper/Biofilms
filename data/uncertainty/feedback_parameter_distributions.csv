@@ -1,0 +1,60 @@
+# feedback_parameter_distributions — what varies in the feedback experiment, and HOW.
+#
+# THE COLUMN THAT MATTERS IS sampling_role, not distribution_family. Sampling
+# every uncertain thing from one undifferentiated Latin hypercube produces a
+# probability with no physical interpretation, because these are not the same
+# kind of uncertainty:
+#
+#   physical_measurement / biological_posterior / source_metrology
+#       genuine epistemic uncertainty. Draw from a distribution.
+#   monte_carlo_estimator
+#       the transport estimator's own variance. Nested REPLICATES, not a prior.
+#   numerical_convergence
+#       mesh, histories, ray counts. BOUNDED by convergence, never sampled: a
+#       mesh factor is an engineering decision, and giving it a probability
+#       mixes that decision into the epistemic answer.
+#   discrete_model_choice / nuclear_data_model
+#       branched as named scenarios. No defensible photo-atomic covariance
+#       package was identified, so a Gaussian "cross-section uncertainty" would
+#       be invented rather than propagated.
+#
+# physical_contract.distribution_row_problems() refuses outer_random for the
+# last three, so this rule is enforced rather than merely written down.
+#
+# CORRELATION IS NOT OPTIONAL. Wet and dry mass of one coupon share a balance
+# calibration; a closed composition has strong negative correlations by
+# construction. correlation_group names inputs that must be sampled jointly —
+# uncertainty.propagate() assumes independence and says so, so anything sharing
+# a group must be combined BEFORE it reaches the sampler.
+#
+# A physical row may only carry a distribution once its pilot cleared:
+# detectability PASS, basis PASS, pairing PASS. Converting a non-detectable
+# measurement into a very wide Gaussian is not conservatism; it is inventing
+# information. Such rows take distribution_status = NOT_IDENTIFIABLE.
+#
+# UNIQUENESS KEY: parameter_id
+# Blank cells mean NOT SUPPLIED. They are never read as zero.
+parameter_id,parameter_path,quantity_name,unit,uncertainty_type,sampling_role,distribution_family,correlation_group,conditional_on,scenario_id,gate_role,evidence_basis,distribution_status,status,notes
+wet_bulk_density,materials.baseline_biomass.density_g_cm3,hydrated bulk density,g_cm3,physical_measurement,outer_random,empirical_posterior_or_truncated_lognormal,gravimetry_coupon,detectability PASS,,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"Positive by construction, so a bare Gaussian can generate impossible draws. Shares gravimetry_coupon with the hydrated volume and the dry mass: one balance, one segmentation."
+hydrated_volume,materials.baseline_biomass.volume,hydrated volume,cm3,physical_measurement,outer_random,empirical_bootstrap,gravimetry_coupon,volume_support PASS,,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"Correlated with the density it denominates and with the segmentation that produced it. Sampling it independently would break rho_wet = m/V."
+biomass_composition,materials.baseline_biomass.elements,closed hydrated composition,mass_fraction,physical_measurement,outer_random,logistic_normal_or_dirichlet,composition_simplex,closure PASS,,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"COMPOSITIONAL DATA. Fractions must stay non-negative and sum to 1, so independent Gaussian perturbation is invalid. Oxygen-by-difference creates strong negative correlations that must survive into the transport ensemble."
+segmentation_field,spatial.biomass_field,segmented biomass field,dimensionless,physical_measurement,outer_random,mask_ensemble,segmentation_specimen,,,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"A FIELD uncertainty, not a scalar. Alternative plausible masks move biovolume, surface geometry, the selected pitch, CSG placement and per-label dose at once, so the propagation object is a set of fields sharing specimen identifiers."
+lattice_pitch,geometry.voxel_pitch_cm,selected CPM pitch,cm,physical_measurement,outer_random,discrete_posterior_over_stacks,segmentation_specimen,select_pitch returns a factor,,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"Bootstrap across independent stacks and pitch-selection outcomes, jointly with the segmentation and occupancy decisions that produced it."
+melanin_fraction,materials.melanized.mass_fraction,melanin mass fraction,dimensionless,biological_posterior,outer_random,beta_or_logit_normal,,melanized scenario,melanized,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"BOUNDED in [0,1]. Melanin radioprotection is not a universal monotonic coefficient — it varies with chemical composition, spatial arrangement, metabolic state and radiation modality — so this is a distribution over a scenario, never a fixed multiplier."
+metal_loading,materials.metal_loaded.loading,metal loading,g_cm3,biological_posterior,outer_random,lognormal_or_zero_inflated,,active_fraction declared,metal_loaded,offline,,NOT_IDENTIFIABLE,unsupported_by_current_model,"Joint with oxidation state and speciation. The radiodialysis path is blocked by a units error upstream, so measuring this does not unblock it; it is available to the offline MATERIAL screen only."
+source_activity,source.photons_per_second,source emission rate,per_s,source_metrology,outer_random,certificate_posterior,,assay certificate + reference date,,online,,NOT_IDENTIFIABLE,awaiting_measurement,"CANCELS from a relative effect, so the offline material screen runs per source particle before any certificate exists. Absolute Gy/s and any time-integrated dose get no such cancellation."
+source_placement,source.position_cm,as-built source position,cm,physical_measurement,outer_random,measured_placement,,,,offline+online,,NOT_IDENTIFIABLE,awaiting_measurement,"Once Reference D moves past an idealized line source, placement uncertainty moves the whole field."
+source_spectrum,source.spectrum_probabilities,emission spectrum,dimensionless,nuclear_data_model,scenario_branch,,,,evaluated_line,offline+online,evaluated_nuclear_data,VALID,satisfied,"Fixed evaluated data plus explicit library scenarios. Emission probabilities carry uncertainty only where a defensible evaluation supplies it."
+nuclear_data_library,transport.nuclear_data,cross-section library,n/a,nuclear_data_model,scenario_branch,,,,endfb_viii_0,offline+online,evaluated_nuclear_data,VALID,satisfied,"DO NOT INVENT A GAUSSIAN CROSS-SECTION UNCERTAINTY. No usable photo-atomic covariance package was identified. Keep the pinned library for reproducibility, check attenuation against an independent calculation, and treat a library change as a named sensitivity scenario."
+transport_seed,transport.seed,OpenMC random seed,n/a,monte_carlo_estimator,inner_transport_replicate,,,,,offline+online,derived,VALID,satisfied,"NOT a physical parameter: it estimates Var_xi(dQ|theta). Mesh bins are not independent — one history scores several — so per-label uncertainty comes from independent replicate RUNS, never from summing per-bin variances."
+transport_histories,transport.particles,history count,n/a,numerical_convergence,convergence_axis,,,,,offline+online,derived,VALID,awaiting_analysis,"Sized against uncertainty in dQ, not against a generic per-voxel criterion: A0's aggregate seed spread was ~0.013% while its median bin error was 6.7%, so an aggregate QoI converges far faster than a bin-level field."
+mesh_coarsening_factor,transport.mesh.coarsening_factor,tally coarsening,n/a,numerical_convergence,convergence_axis,,,,,offline+online,derived,VALID,awaiting_analysis,"NOT AN ALEATORY VARIABLE. A0 showed the statistical error falls with histories while resolution loss does not: factor 2 already discards 17.7% of the field structure. Carry a residual discretization BOUND from the biofilm sweep instead of sampling factors."
+material_volume_samples,transport.material_volume_n_samples,CSG raytrace ray count,n/a,numerical_convergence,convergence_axis,,,,,offline+online,derived,VALID,awaiting_analysis,"The exact CSG denominator is a raytracing ESTIMATE with its own O(1/sqrt n) error. It gets its own budget line because the mass is the denominator of every dose."
+mass_denominator_method,transport.mass_denominator,mass denominator,n/a,discrete_model_choice,scenario_branch,,,,exact_csg_raytrace,offline+online,derived,VALID,satisfied,"Production must use exact_csg_raytrace. The full-bin method overstates A0's cylinder by exactly 4/pi because it weighs the circumscribing cube — a known NEGATIVE CONTROL, not an equally weighted ensemble member."
+occupancy_mapping,spatial.occupancy.mapping,phi to binary map,n/a,discrete_model_choice,scenario_branch,,,,threshold_tau_0p5,offline+online,declared,VALID,satisfied,"Frozen as threshold at tau=0.5. A categorical modelling choice gets a named branch, never an invented categorical probability."
+hamiltonian_response,response.hamiltonian,dose to Metropolis term,dimensionless,biological_posterior,excluded,,,posterior fitted,,online,,NOT_IDENTIFIABLE,awaiting_measurement,"Online gate only. A survival curve is not evidence for a directional term; the one directional dataset measures hyphal elongation, which a parcel CPM cannot represent."
+melanin_response,response.melanin,dose to pigment production,dimensionless,biological_posterior,excluded,,melanin_product,,,online,,NOT_IDENTIFIABLE,awaiting_measurement,"STRUCTURALLY UNIDENTIFIABLE ALONE: only the PRODUCT of production and coupling reaches the dynamics. Fix one coefficient independently or reparameterize around the identifiable product; no quantity of data separates them otherwise."
+melanin_coupling,cpm.melanin_coupling,melanin to acceptance,dimensionless,biological_posterior,excluded,,melanin_product,,,online,declared,NOT_IDENTIFIABLE,awaiting_measurement,"Shares melanin_product with the row above. Hard-coded at 0.5 at its call site and dominating the tropism by four orders of magnitude over beta_ion."
+seconds_per_mcs,time.seconds_per_mcs,CPM clock,s,biological_posterior,excluded,,,pitch + dynamic observable,,online,,NOT_IDENTIFIABLE,awaiting_measurement,"Required for any time-integrated online dose. Downstream of the pitch AND the selected temporal observable."
+growth_survival_response,response.growth_survival,dose to viable biomass,dimensionless,unsupported,excluded,,,,,none,,NOT_IDENTIFIABLE,unsupported_by_current_model,"The CPM has no birth and no death, so radiotrophy as enhanced growth and radioresistance as survival are structurally absent. A model-revision problem, not a missing-data one."
+membrane_response,membrane.P_j_law,dose to permeability,dimensionless,unsupported,excluded,,,,,none,,NOT_IDENTIFIABLE,unsupported_by_current_model,"The m-versus-P_eff constitutive contradiction is unresolved. Fixed-membrane one-way dosimetry does not need it; any dose-responsive feedback does."

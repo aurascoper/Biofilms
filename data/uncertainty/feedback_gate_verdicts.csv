@@ -1,0 +1,17 @@
+# feedback_gate_verdicts — one immutable row per gate evaluation.
+#
+# Ships EMPTY. No gate has been evaluated, because no measured Reference D
+# config exists and no effect threshold has been declared. A header-only file
+# is the honest state for a decision nobody has made.
+#
+# Each row must be reproducible FROM ITSELF: the input hashes, the numerical
+# controls, the distribution ledger it sampled, and the effect policy it was
+# judged against. A verdict detached from those is a number, not a decision.
+#
+# THE DECOMPOSITION IS CARRIED IN THE ROW, not only in a companion artifact,
+# because the whole point of separating transport from calibration uncertainty
+# is to say which one to spend on next — and that guidance is what gets lost
+# first when a result is copied out of context.
+#
+# UNIQUENESS KEY: gate_run_id
+gate_run_id,reference_system_id,execution_class,effect_policy_id,qoi_id,qoi_unit,effect_definition,effect_direction,effect_threshold,threshold_basis,baseline_state_id,feedback_state_id,snapshot_sha256,transport_config_sha256,distribution_ledger_sha256,nuclear_data_library,outer_method,outer_draws,transport_seeds_per_draw,histories_per_transport,mesh_coarsening_factor,material_volume_n_samples,mass_denominator_method,effect_mean,effect_sd,effect_q001,effect_q500,effect_q990,relative_effect_mean,transport_uncertainty,numerical_uncertainty,calibration_uncertainty,biological_uncertainty,model_form_envelope,surrogate_error,probability_exceeds_threshold,transport_budget_pass,offline_effect_pass,offline_gate_verdict,biological_calibration_ready,seconds_per_mcs_ready,state_in_validity_domain,online_gate_verdict,online_feedback_enabled,target_calibration,git_commit,generated_utc,notes

@@ -201,3 +201,27 @@ def test_unsupported_rows_are_never_ready(rows):
                 "unsupported")
             assert r["applicability"].strip(), \
                 f"{r['config_key']}: unsupported with no explanation"
+
+
+def test_the_readme_counts_match_the_code(rows):
+    """The README claimed 44 ledger rows and 14 required keys while the code
+    had 49 and 21. Nothing checked, so the drift was invisible until someone
+    read both. These two numbers are DERIVED, so they can be pinned; the prose
+    around them cannot, and is not."""
+    import re
+
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(
+        encoding="utf-8")
+
+    n_rows = len(rows)
+    claimed = re.search(r"data/parameter_provenance\.csv`, (\d+) rows", readme)
+    assert claimed, "the README no longer states a ledger row count"
+    assert int(claimed.group(1)) == n_rows, (
+        f"README says {claimed.group(1)} ledger rows, the file has {n_rows}")
+
+    n_keys = len(required_keys("membrane_feedback", BIOFILM_CYLINDER))
+    claimed_keys = re.search(r"coupling_template\.toml\s+# (\d+) REQUIRED-but-unset",
+                             readme)
+    assert claimed_keys, "the README no longer states a required-key count"
+    assert int(claimed_keys.group(1)) == n_keys, (
+        f"README says {claimed_keys.group(1)} required keys, the contract has {n_keys}")

@@ -17,6 +17,17 @@ ANALYSIS_METHOD = frozenset({
 })
 QUALITY = frozenset({"ok", "suspect", "excluded"})
 BOOLEAN = frozenset({"true", "false"})
+# What material the hydrated volume COVERS. Orthogonal to volume_basis, which
+# says what it ENCLOSES: a whole-biofilm-envelope segmentation of one field of
+# view still covers only that field of view.
+VOLUME_SUPPORT = frozenset({
+    "full_coupon",                # the volume spans everything the balance weighed
+    "excised_registered_region",  # a physically excised, weighed, registered region
+    "stereological_scaling",      # representative fields scaled to the coupon area
+    "sibling_batch_model",        # linked siblings under a declared batch model
+    "unresolved",
+})
+
 MATERIAL_MODEL_KIND = frozenset({"hydrated_effective_medium", "explicit_components"})
 
 SAMPLE_METADATA = TableSchema(
@@ -82,6 +93,19 @@ BULK_MEASUREMENTS = TableSchema(
         # sibling's segmentation when the volume came from imaging.
         Column("volume_basis", vocabulary=SEGMENTATION_BASIS),
         Column("pore_volume_fraction", numeric=True, required=False),
+        # WHAT MATERIAL THE VOLUME COVERS, which is a different question from
+        # what it encloses. A confocal field of view cannot be divided into the
+        # wet mass of a whole coupon: rho_wet = m/V needs numerator and
+        # denominator to describe the SAME material, and volume_basis alone
+        # cannot say whether they do.
+        Column("volume_support", vocabulary=VOLUME_SUPPORT),
+        Column("coupon_id", required=False),
+        Column("imaged_area_cm2", numeric=True, required=False),
+        Column("weighed_area_cm2", numeric=True, required=False),
+        # Required whenever the support is a scaling rather than the whole
+        # coupon: how the imaged region was extrapolated, and how well.
+        Column("scaling_method", required=False),
+        Column("scaling_uncertainty", numeric=True, required=False),
         # "Wet mass" is not a measurement until the surface water is defined.
         Column("drain_orientation"),
         Column("drain_time_s", numeric=True),

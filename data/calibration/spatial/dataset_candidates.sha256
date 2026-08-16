@@ -1,0 +1,24 @@
+# Expected digests for the files behind rows in dataset_candidates.csv.
+#
+# Standard sha256sum format, so this file is BOTH machine-read by
+# calibration/scripts/vcholerae_pilot.py and directly usable by hand:
+#
+#     cd ~/biofilm-pilot-data
+#     sha256sum -c /path/to/dataset_candidates.sha256 --ignore-missing
+#
+# The digests previously existed only inside the free-text `rationale` column
+# of dataset_candidates.csv. Parsing a digest out of prose is not verification,
+# and a chain of custody that stops at "the ledger says so" has a gap exactly
+# where it matters. The chain is now:
+#
+#     Dryad identity -> retrieved bytes -> verified SHA-256 -> reader metadata
+#     -> declared segmentation basis -> derived output
+#
+# vcholerae_dryad_zcrjdfnph — Dryad doi:10.5061/dryad.zcrjdfnph, CC0-1.0.
+# Retrieved by browser 2026-08-15 (the download route is fronted by an Anubis
+# proof-of-work challenge aimed at automated clients, which was deliberately
+# not defeated). All four verified against the ledger on that date.
+276a689d37b28a144bd75b785981e355528f174b45b4700fe105d702947b9537  Dataset_1_Fig1b_Timecourse.nd2
+0f19ca0b2e04b583ba61dc668a62abcd300ec5e01ecc897245a0057701327748  Dataset_2_Fig4a_Timecourse.nd2
+11aa538173d6dbac45ccb7b140c597afae5007091a400b42479882de0e0675ab  Dataset_3_Fig3c_VPS-Bap1.nd2
+af49927a984c547ef139091e42c68e32a22fd13f825210bd1d64b1dc5115025f  README.md

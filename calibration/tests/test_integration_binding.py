@@ -10,8 +10,7 @@ from __future__ import annotations
 import pytest
 
 from biofilm_calibration.integration import (VoxelBinding, coherence_problems,
-                                             emit_transport_config, evaluate,
-                                             is_coherent)
+                                             evaluate, is_coherent)
 from biofilm_calibration.integration_schema import VOXEL_BINDING
 from biofilm_calibration.materials import report as material_report
 from biofilm_calibration.schema import read_table
@@ -93,22 +92,6 @@ def test_coherent_is_not_sufficient_to_emit():
     joined = " ".join(v.blockers)
     assert "spatial gate is PROVISIONAL" in joined
     assert "material OpenMC gate is PROVISIONAL" in joined
-
-
-def test_emission_refuses_and_names_every_blocker():
-    with pytest.raises(ValueError, match="refusing to emit"):
-        emit_transport_config(COHERENT, spatial_report.PROVISIONAL,
-                              material_report.PROVISIONAL)
-
-
-def test_emission_succeeds_only_when_everything_is_ready():
-    ready = VoxelBinding(**{**COHERENT.__dict__, "lattice_pitch_um": 0.5,
-                            "density_g_cm3": 1.02})
-    text = emit_transport_config(ready, spatial_report.READY,
-                                 material_report.READY_OPENMC)
-    assert "voxel_pitch_cm = 5e-05" in text
-    assert "[materials.baseline_biomass]" in text
-    assert "density_g_cm3 = 1.02" in text
 
 
 def test_unset_pitch_or_density_still_blocks_a_ready_pair_of_gates():

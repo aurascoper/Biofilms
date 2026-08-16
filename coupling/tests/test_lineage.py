@@ -25,6 +25,32 @@ def test_label_zero_is_skipped_and_labels_separate():
     assert out[5]["dose_rate_Gy_s"] == 8.0
 
 
+def test_generation_zero_is_a_founder_not_background():
+    # Four founder parcels (generation 0) and four background voxels, which
+    # also read 0. The `labels > 0` fallback drops the founders entirely; the
+    # occupancy mask is what separates the two meanings of zero.
+    cell_id = np.array([[[0, 0], [0, 0]], [[1, 2], [3, 4]]])
+    generation = np.array([[[0, 0], [0, 0]], [[0, 0], [1, 1]]])
+    dose = np.full((2, 2, 2), 5.0)
+    mass = np.ones((2, 2, 2))
+
+    assert set(aggregate_by_label(dose, generation, mass)) == {1}
+
+    occupied = cell_id > 0
+    out = aggregate_by_label(dose, generation, mass, occupied=occupied)
+    assert set(out) == {0, 1}
+    assert out[0]["n_voxels"] == 2      # the two generation-0 parcels, not the background
+    assert out[0]["dose_rate_Gy_s"] == 5.0
+
+
+def test_wall_voxels_are_refused_rather_than_miscounted():
+    dose = np.ones((1, 1, 3))
+    labels = np.array([[[-1, 0, 1]]])          # -1 is the wall sentinel
+    with pytest.raises(ValueError, match="negative label"):
+        aggregate_by_label(dose, labels, np.ones_like(dose),
+                           occupied=np.ones((1, 1, 3), dtype=bool))
+
+
 def test_replicate_uncertainty():
     r1 = {1: {"dose_rate_Gy_s": 1.0}}
     r2 = {1: {"dose_rate_Gy_s": 3.0}}

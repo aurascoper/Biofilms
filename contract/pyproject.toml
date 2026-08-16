@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biofilm-contract"
+version = "0.1.0"
+description = "Vocabulary and shapes shared by the coupling and calibration packages"
+requires-python = ">=3.11"
+# NO dependencies, deliberately — not even numpy. This package exists so that
+# calibration/ (numpy-only) and coupling/ (numpy + h5py) can agree on a
+# vocabulary without either importing the other. Adding a dependency here adds
+# it to both, which defeats the point.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["physical_contract*"]

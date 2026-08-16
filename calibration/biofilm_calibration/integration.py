@@ -211,19 +211,8 @@ def evaluate(binding: VoxelBinding, spatial_verdict: str,
         blockers=tuple(blockers), reasons=tuple(reasons))
 
 
-def emit_transport_config(binding: VoxelBinding, spatial_verdict: str,
-                          material_openmc_verdict: str) -> str:
-    """Render a provisional biofilm transport config, or refuse loudly."""
-    verdict = evaluate(binding, spatial_verdict, material_openmc_verdict)
-    if not verdict.can_emit_config:
-        raise ValueError(
-            "refusing to emit a biofilm transport config:\n  - "
-            + "\n  - ".join(verdict.blockers))
-
-    pitch_cm = binding.lattice_pitch_um * 1e-4
-    return (
-        f"# Provisional biofilm transport config.\n"
-        f"# {binding.sentence()}\n"
-        f"[geometry]\nvoxel_pitch_cm = {pitch_cm!r}\n\n"
-        f"[materials.{binding.material_class}]\n"
-        f"density_g_cm3 = {binding.density_g_cm3!r}\n")
+# `emit_transport_config` lives in `reference_system.py`, not here. It needs the
+# apparatus as well as the voxel — the membrane thickness, the cylinder, the
+# boundaries, the source and all three material classes — and this module's
+# subject is deliberately only the voxel. `evaluate()` above still answers the
+# binding-and-gates question on its own, which is what the gate reports print.

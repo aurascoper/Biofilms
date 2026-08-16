@@ -1,0 +1,10 @@
+# Public-data pilot: public_vcholerae_surrogate
+# target_calibration = false. Vibrio cholerae is NOT one of the
+# seven modelled species, so this validates the MACHINERY against a
+# named public reference system and calibrates nothing.
+# holdout_kind is never an independent sample: no frame of one
+# file is a held-out stack, so select_pitch refuses these rows.
+# source: Dryad doi:10.5061/dryad.zcrjdfnph (CC0), file Dataset_3_Fig3c_VPS-Bap1.nd2
+reference_system_id,target_calibration,sample_id,segmentation_basis,segmentation_method,temporal_calibration_eligible,holdout_kind,coarsening_factor,pitch_um,passed,err_biovolume_fraction,err_porosity,err_specific_interface_area_per_um,err_correlation_length_um,err_thickness_mean_um,err_component_size_q50_um3,coarse_biovolume_fraction,coarse_porosity,coarse_specific_interface_area_per_um,coarse_correlation_length_um,coarse_thickness_mean_um,coarse_thickness_sd_um,coarse_n_components,coarse_component_size_q50_um3,coarse_component_size_q95_um3
+public_vcholerae_surrogate,false,Dataset_3_Fig3c_VPS-Bap1,unresolved,smoke_minmax_per_frame,false,none,1,0.065,true,0.0,0.0,0.0,0.0,0.0,0.0,0.047702,0.952298,0.035335,1.59582,0.017584,0.097998,2230,0.001099,0.233184
+public_vcholerae_surrogate,false,Dataset_3_Fig3c_VPS-Bap1,unresolved,smoke_minmax_per_frame,false,none,2,0.13,false,0.0,0.0,0.46252,0.259621,0.235361,15.0,0.047702,0.952298,0.018992,2.010128,0.013445,0.091965,518,0.017576,0.547712

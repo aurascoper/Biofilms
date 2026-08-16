@@ -1,0 +1,77 @@
+# Feedback effect policy — TEMPLATE.
+#
+# What counts as an effect worth acting on. Every key ships UNSET, and the gate
+# returns NOT_EVALUATED while effect_threshold is missing, because no
+# uncertainty calculation can choose what magnitude of feedback matters. A gate
+# that supplies its own relevance threshold has decided the science it exists
+# to test.
+#
+# THE DECISION RULE, on the full joint distribution rather than on error bars:
+#
+#     q_0.01( s * dQ ) > delta        equivalently  P(s*dQ > delta) >= 0.99
+#
+# s is the declared direction (a two-sided test passes on the wrong sign) and
+# delta is the declared threshold. Quadrature over independent contributions is
+# NOT offered: several of this project's uncertainties are correlated, and
+# uncertainty.propagate says so of its own inputs.
+
+schema_version = 1
+
+[policy]
+# REQUIRED — versioned, because thresholds may be revised PROSPECTIVELY for a
+# method defect or a sensitivity result. Once target results have been
+# inspected, any revision needs a new id and a recorded reason.
+# policy_id =
+# declared_utc =
+# REQUIRED — false makes the gate refuse. A threshold chosen after the effect
+# was seen is not a threshold.
+# declared_before_results =
+
+[quantity_of_interest]
+# REQUIRED — ONE primary metric. A hierarchy is allowed, but a gate deciding on
+# whichever metric happened to pass is not a decision.
+#   absorbed_energy_rate      dQ_E = d(sum_v D_v m_v); the whole-biomass effect
+#   mass_weighted_mean_dose   interpretable per unit biomass
+#   relative_effect           cancels a common source-rate multiplier
+#   cell_dose / lineage_dose  biological localisation
+#   upper_tail_dose           a predeclared percentile; catches local effects
+#                             that a whole-system average hides
+# qoi_id =
+# qoi_unit =
+
+# REQUIRED — "increase" or "decrease".
+# effect_direction =
+
+# REQUIRED, AND THE ONE NOBODY ELSE CAN SUPPLY. What change in the quantity
+# above would matter biologically or operationally? Until this is declared the
+# production gate stays NOT_EVALUATED, which is the honest verdict.
+# effect_threshold =
+
+# NOT the acceptance rule. A tiny irrelevant effect can have a huge standardized
+# effect size when uncertainty is small, and an important one can have a modest
+# d under a wide posterior. Reported as a descriptive statistic only.
+report_standardized_effect_size = true
+
+[confidence]
+# One-sided. 0.99 is a conservative project default, not a metrological
+# constant.
+exceedance_probability = 0.99
+
+[numerical_budget]
+# The CONTROLLABLE uncertainty must be small relative to the decision margin,
+# or a pass records how well the numerics were resolved rather than what the
+# material did. Fractions of effect_threshold. Project engineering defaults.
+transport_numerical_fraction = 0.25
+material_volume_fraction = 0.10       # the CSG mass is denominator-critical
+surrogate_error_fraction = 0.10       # an emulator must be far below the margin
+
+# The production mass denominator. The full-bin method overstates A0's cylinder
+# by exactly 4/pi and is a known negative control, never an ensemble member.
+mass_denominator_method = "exact_csg_raytrace"
+
+[replication]
+# Relative error of an estimated sd is about 1/sqrt(2(r-1)): ~35% at 5 seeds,
+# ~16% at 20. Five spot a large effect; they are weak evidence for a budget.
+minimum_seeds_screening = 2
+minimum_seeds_production = 20
+minimum_outer_draws_for_tail = 10000

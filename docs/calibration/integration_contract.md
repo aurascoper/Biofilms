@@ -47,8 +47,8 @@ because neither holds both halves. Only the join does:
 ## Coherent is not the same as ready
 
 The declared binding **is** coherent. It still cannot produce a configuration, because a coherent
-sentence with blanks in it is still a sentence with blanks. `emit_transport_config()` refuses, and
-running it against the repository's actual state prints:
+sentence with blanks in it is still a sentence with blanks. `evaluate()` refuses, and running it
+against the repository's actual state prints:
 
 ```
 REFUSING to emit a biofilm transport config
@@ -65,6 +65,28 @@ REFUSING to emit a biofilm transport config
 Three independent conditions, all required: the binding must be coherent, **and** both gates must
 be ready, **and** the two numbers must exist. Coherence alone was never sufficient — that is
 precisely the failure mode where a well-formed but unmeasured model gets shipped.
+
+### The binding is not the apparatus
+
+Emitting a config needs a second input, and it lives in
+`biofilm_calibration.reference_system`. The binding's subject is one voxel; the cylinder, the
+membrane thickness, the boundaries, the source and the medium are properties of the *system*, and a
+loadable `biofilm_cylinder` config requires all of them plus three material classes. Treating the
+binding as if it held the whole apparatus is why the emitter could previously produce only a pitch
+and one density — a fragment, not a configuration.
+
+`emit_transport_config(binding, spec)` now renders a complete config or refuses naming every
+missing field, and its checks come in three groups that are deliberately not interchangeable:
+
+| group | question | bypassable? |
+|---|---|---|
+| `coherence_problems` | does the binding contradict itself? | never |
+| `structural_problems` | is this physically constructible — closure, congruence, source placement, units? | never |
+| `evidence_problems` | is anyone entitled to believe these numbers? | only by `evidence_policy = "synthetic"` |
+
+A synthetic system may invent its values. It may not invent a geometry that cannot be built, a
+composition that does not close, or a source born on a lattice plane — otherwise "synthetic" becomes
+a universal escape hatch around the contracts this document exists to describe.
 
 ## What each blank waits on
 
@@ -90,6 +112,77 @@ constraint has to be declared.
   biomass fraction nor an active-reducer fraction.
 - Every response is a **per-parcel** response, not a per-organism one, because that is what a cell
   ID is.
+
+## Which radiation phenotype this model actually represents
+
+Five phenomena travel under one loose word, and they are not interchangeable. A survival curve
+cannot calibrate a directional term, and a transcriptome cannot set a material density.
+
+| phenotype | what it means | represented here? |
+|-----------|---------------|-------------------|
+| **radiotropic** | directional growth or redistribution toward or away from a source | **yes** — this is `response.hamiltonian` |
+| radiotrophic | ionizing radiation measurably **enhances growth or metabolism** | no — requires growth |
+| radioresistant | elevated **survival** after exposure | no — requires death |
+| melanized_radioprotective | melanin measurably alters damage, survival or shielding | no — requires damage |
+| radiation_responsive | molecular, morphological or material change after exposure | partly — `response.melanin` |
+
+`compute_delta_H` has four terms: adhesion, volume, radiation, melanin. The radiation term adds
+`β_ion[s]·I_γ` when a parcel gains a site, so the sign of `β_ion` decides whether that parcel
+drifts up or down the dose gradient. **That is a tropism.** The Hamiltonian is a Metropolis
+acceptance functional in arbitrary units, not an energy budget, so a negative `β_ion` is a spatial
+preference and not metabolic gain — the model creates no biomass for such gain to act on.
+
+Radiotrophy and radioresistance are therefore not weakly supported here; they are **structurally
+absent**, for the same reason `response.growth_survival` is `unsupported_by_current_model`. A
+model with no birth and no death cannot express either, and no quantity of data changes that
+without a model revision.
+
+This matters beyond bookkeeping. The published D10 evidence — which is strong, and is what anchors
+the per-species `β_ion` magnitudes — is *radioresistance* evidence being spent on a *tropism*
+coefficient. That substitution is legitimate only as a declared modelling choice, and it is
+declared here rather than left implicit in a sign convention.
+
+Radiotrophy additionally fails on evidence, not only on representability: it is not established
+for any of the seven species. See `docs/research/radiotrophic_compatibility_audit.md`, verdict
+`TARGETED_LAB_EXPERIMENT_REQUIRED`.
+
+### …and the tropism is not driven by the term that is tabulated
+
+Naming the radiation term correctly is not the end of it. At the shipped `I0 = 1.0` and
+`T_cpm = 5.0`:
+
+| term | ΔH | Metropolis acceptance bias |
+|------|-----|---------------------------|
+| `ΔH_rad`, radiotropic species (β = −5e-5) | −5.0e-5 | 1.000010 |
+| `ΔH_rad`, most radiosensitive species (β = 7.5e-2) | +7.5e-2 | 0.985 |
+| `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
+
+`β_ion` — the one parameter Table 2 tabulates per species, and the one the sign convention is
+written around — biases acceptance by **one part in 10⁵** for exactly the species whose radial
+stratification is the headline result. The melanin term biases it by 15.5%, four orders of
+magnitude more, through a coefficient of `0.5` hard-coded at its call site and appearing in no
+table and no configuration file.
+
+So the model's tropism is **melanin-mediated**. Radiation still drives it, but indirectly:
+`melanin_drive` is copied from the radiation field, giving
+
+```
+radiation → production (α_M, tabulated) → M → ΔH_mel (0.5, untabulated) → tropism
+```
+
+Two consequences. A sensitivity analysis over `β_ion` would report the radiation response as
+negligible and be right about the coefficient while wrong about the mechanism. And a parameter
+that decides the headline result must not live only at its call site: it is now ledgered as
+`cpm.melanin_coupling` in `data/parameter_provenance.csv`, `status=blocked`,
+`sensitivity_rank=high`. It is one of five rows in that ledger not ranked `unknown`, and the only
+one outside the A0 transport sweep: `transport.mesh.base_dimension` and
+`transport.mesh.coarsening_factor` are also `high`, `transport.batches` and `transport.particles`
+`medium`, and all four carry `sensitivity_domain = transport_numerical`, which ranks numerical
+convergence rather than a biological response. Every biological-response row is still `unknown`.
+This one was measured here rather than awaiting a sweep.
+
+It also cannot be fitted alone. Only the product `α_M · k` reaches the dynamics, so
+`cpm.melanin_coupling` and `response.melanin` are jointly identifiable at best.
 
 ## What this branch merged
 

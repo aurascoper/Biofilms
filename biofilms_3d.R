@@ -7,9 +7,12 @@ library(shiny)
 # ---------------------------------------------------------------------------
 # Species parameters
 # 7-species list from the paper (Table 1).
-# radiotrophic = TRUE  -> species moves TOWARD the radiation axis (positive
+# radiotropic = TRUE  -> species moves TOWARD the radiation axis (positive
 #                         gamma sensitivity, melanin-mediated radiotropism)
-# radiotrophic = FALSE -> species moves AWAY from the axis (radiosensitive)
+# radiotropic = FALSE -> species moves AWAY from the axis (radiosensitive)
+# NB the flag names a TROPISM, which is all this model expresses: there is no
+# growth here, so it cannot represent radiotrophy, and no death, so it cannot
+# represent radioresistance. See docs/calibration/integration_contract.md.
 # ---------------------------------------------------------------------------
 species_params <- list(
   list(
@@ -18,7 +21,7 @@ species_params <- list(
     D               = 0.005,
     rad_sensitivity = 0.06,
     quad_coeff      = 0.02,
-    radiotrophic    = FALSE
+    radiotropic     = FALSE
   ),
   list(
     name            = "Shewanella oneidensis",
@@ -26,7 +29,7 @@ species_params <- list(
     D               = 0.010,
     rad_sensitivity = 0.04,
     quad_coeff      = 0.02,
-    radiotrophic    = FALSE
+    radiotropic     = FALSE
   ),
   list(
     name            = "Deinococcus radiodurans",
@@ -34,7 +37,7 @@ species_params <- list(
     D               = 0.008,
     rad_sensitivity = 0.05,
     quad_coeff      = 0.015,
-    radiotrophic    = FALSE
+    radiotropic     = FALSE
   ),
   list(
     name            = "Bacillus subtilis",
@@ -42,7 +45,7 @@ species_params <- list(
     D               = 0.009,
     rad_sensitivity = 0.03,
     quad_coeff      = 0.018,
-    radiotrophic    = FALSE
+    radiotropic     = FALSE
   ),
   list(
     name            = "Aspergillus niger",
@@ -50,7 +53,7 @@ species_params <- list(
     D               = 0.007,
     rad_sensitivity = 0.025,
     quad_coeff      = 0.012,
-    radiotrophic    = FALSE
+    radiotropic     = FALSE
   ),
   list(
     name            = "Cryptococcus neoformans",
@@ -58,7 +61,7 @@ species_params <- list(
     D               = 0.008,
     rad_sensitivity = 0.055,
     quad_coeff      = 0.020,
-    radiotrophic    = TRUE   # melanin-mediated radiotropism
+    radiotropic     = TRUE   # melanin-mediated radiotropism
   ),
   list(
     name            = "Cladosporium sphaerospermum",
@@ -66,7 +69,7 @@ species_params <- list(
     D               = 0.007,
     rad_sensitivity = 0.050,
     quad_coeff      = 0.018,
-    radiotrophic    = TRUE   # melanin-mediated radiotropism
+    radiotropic     = TRUE   # melanin-mediated radiotropism
   )
 )
 
@@ -157,15 +160,15 @@ langevin_dynamics_cyl <- function(state, parameters, positions,
   noise_z <- rnorm(1, mean = 0, sd = sqrt(2 * parameters$D))
 
   # --- Radiation force (radial vector) ---
-  # Radiotrophic: move TOWARD axis (sign = +1 inward = -radial direction
+  # Radiotropic: move TOWARD axis (sign = +1 inward = -radial direction
   #               expressed as negative of outward unit vector)
   # Radiosensitive: move AWAY from axis (sign = -1, i.e. outward)
   I_r   <- I_gamma(r, gamma_intensity, kappa)
   F_rad <- c(0, 0, 0)
   if (r > 1e-10) {
     radial_unit <- c(x / r, y / r, 0)
-    if (parameters$radiotrophic) {
-      # radiotrophic: attracted toward source (axis), so force points inward
+    if (parameters$radiotropic) {
+      # radiotropic: attracted toward source (axis), so force points inward
       F_rad <- parameters$rad_sensitivity * I_r * (-radial_unit)
     } else {
       # radiosensitive: repelled from source, force points outward
@@ -332,7 +335,7 @@ SPECIES_COLORS <- c("red", "dodgerblue", "green", "darkorchid",
                     "orange", "deeppink", "saddlebrown")
 
 ui <- fluidPage(
-  titlePanel("3D Radiotrophic Biofilm — Cylindrical Bioreactor"),
+  titlePanel("3D Radiotropic Biofilm — Cylindrical Bioreactor"),
 
   sidebarLayout(
     sidebarPanel(
@@ -436,7 +439,7 @@ server <- function(input, output, session) {
 
     # Add species trajectories
     for (i in seq_len(num_species)) {
-      label_suffix <- if (species_params[[i]]$radiotrophic) " (radiotrophic)" else ""
+      label_suffix <- if (species_params[[i]]$radiotropic) " (radiotropic)" else ""
       p <- p %>% add_trace(
         x    = traj[, i, 1],
         y    = traj[, i, 2],
@@ -447,7 +450,7 @@ server <- function(input, output, session) {
         marker = list(
           size   = 3,
           color  = SPECIES_COLORS[i],
-          symbol = if (species_params[[i]]$radiotrophic) "diamond" else "circle"
+          symbol = if (species_params[[i]]$radiotropic) "diamond" else "circle"
         ),
         name = paste0(species_params[[i]]$name, label_suffix)
       )

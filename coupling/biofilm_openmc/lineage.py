@@ -13,14 +13,28 @@ import numpy as np
 
 
 def aggregate_by_label(dose_Gy_s: np.ndarray, labels: np.ndarray,
-                       mass_kg: np.ndarray) -> dict[int, dict]:
-    """Mass-weighted mean dose rate per label value (label 0 = unlabeled,
-    skipped). Exact: sum(m_v * D_v) / sum(m_v) over each label's voxels."""
+                       mass_kg: np.ndarray,
+                       occupied: np.ndarray | None = None) -> dict[int, dict]:
+    """Mass-weighted mean dose rate per label value. Exact:
+    sum(m_v * D_v) / sum(m_v) over each label's voxels.
+
+    `occupied` is a boolean mask selecting the voxels to aggregate. Pass it
+    whenever 0 is a MEANINGFUL label value. It is, for `generation`: 0 is the
+    founder generation, and it collides with the background/unoccupied value.
+    Without the mask this function falls back to `labels > 0`, which is right
+    for `cell_id` and `lineage_id` and silently drops every founder parcel.
+    Masking the inputs beforehand does NOT fix that — survivors labelled 0 are
+    still dropped by the fallback.
+    """
     lab = labels.ravel()
     d = dose_Gy_s.ravel()
     m = mass_kg.ravel()
-    sel = lab > 0
+    sel = lab > 0 if occupied is None else occupied.ravel().astype(bool)
     lab, d, m = lab[sel], d[sel], m[sel]
+    if lab.size and lab.min() < 0:
+        raise ValueError("aggregate_by_label: negative label in the selected "
+                         f"voxels (min {lab.min()}); wall voxels (-1) must be "
+                         "excluded by `occupied`")
     out: dict[int, dict] = {}
     if lab.size == 0:
         return out

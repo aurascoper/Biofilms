@@ -1,6 +1,6 @@
 # ============================================================
 #  Radiodialysis Membrane Transport — Cylindrical Bioreactor
-#  "Modeling Radiotrophic Fitness" (Kinder & Faulkner, 2026)
+#  "Modeling Radioresistance and Radiotropic Fitness" (Kinder & Faulkner, 2026)
 #
 #  Implements the minimal 3-equation PDE system derived from
 #  the Deep Research synthesis (April 2026):

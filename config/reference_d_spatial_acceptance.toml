@@ -1,0 +1,151 @@
+# Reference D — CPM spatial acceptance, FROZEN.
+#
+# These are the modelling decisions no laboratory can supply. They are frozen
+# BEFORE any target data exists, because a threshold chosen after seeing the
+# data is not a threshold. Every value carries its reason on the line above it.
+#
+# The empirical input is data/calibration/spatial/pilot_vcholerae.csv, the only
+# real coarsening measurement in this repository (0.065 -> 0.13 um on a real
+# 3-D stack):
+#
+#   err_biovolume_fraction 0.0     err_correlation_length 0.2596
+#   err_porosity           0.0     err_thickness_mean     0.2354
+#   err_interface_area     0.4625  err_component_size_q50 15.0
+#
+# THAT DATA IS EVIDENCE, NOT A TARGET. Loosening tolerances until factor 2
+# passes on that stack would be choosing the threshold to fit the answer, which
+# is a stop condition in docs/calibration/cpm_spatial_calibration.md. A real
+# stack failing several of these at 2x is the normal outcome of a search.
+
+schema_version = 1
+
+[policy]
+acceptance_policy_id = "reference_d_acceptance_v1"
+declared_utc = "2026-08-15T00:00:00+00:00"
+# True: every target data table was header-only when these were written. Any
+# revision after target data has been inspected requires a NEW policy id and a
+# recorded reason. Prospective revision only.
+declared_before_target_data = true
+
+[enforcement]
+# Whether a consumer actually compares against each value TODAY. A gate may not
+# close on a criterion that was never evaluated, so the status machinery reads
+# this rather than assuming every declared number is load-bearing.
+#
+#   hard             a consumer compares against it
+#   advisory         reported, does not gate
+#   derived          not independent evidence; computed from another threshold
+#   not_implemented  no consumer exists; the value is a statement of intent
+minimum_minor_axis_voxels = "hard"
+maximum_volume_quantization_error = "hard"
+maximum_memory_bytes = "hard"
+maximum_axis_ratio_error = "not_implemented"
+minimum_objects_per_species = "not_implemented"
+require_independent_validation_sample = "not_implemented"
+maximum_biovolume_fraction_error = "hard"
+maximum_porosity_error = "derived"
+maximum_interface_area_error = "hard"
+maximum_spatial_correlation_length_error = "hard"
+maximum_thickness_error = "hard"
+maximum_component_size_error = "hard"
+minimum_domain_correlation_lengths = "advisory"
+
+[representation]
+# The template's own prose: below roughly 4 a sphere is visibly faceted, below 2
+# nothing anisotropic survives at all.
+minimum_minor_axis_voxels = 4.0
+
+# Tolerated |target_sites - exact_sites| / exact_sites when forcing an entity's
+# physical volume onto an integer site target.
+maximum_volume_quantization_error = 0.05
+
+# NOT IMPLEMENTED: nothing compares against this today. Recorded as intent.
+# C. sphaerospermum and A. niger are filamentous and fail this by construction
+# because compute_delta_H has no elongation term — a model finding, not a
+# threshold to loosen.
+maximum_axis_ratio_error = 0.15
+
+# 1 GiB for the Int32 lattice alone (about N = 630). The CPM carries several
+# float64 fields of the same shape alongside it, so budget several times this.
+maximum_memory_bytes = 1073741824
+
+# NOT IMPLEMENTED, and questionable under the declared semantics: pitch
+# selection operates on a coarse-grained biomass FIELD, not on segmented
+# organism objects, and mixed-consortium imaging may not separate the seven
+# species at all. Kept as a future representational diagnostic, never as a
+# Reference D pitch gate.
+minimum_objects_per_species = 100
+
+# NOT IMPLEMENTED: read by nothing. The held-out rule is enforced independently
+# in pitch_selection.py:118 and spatial/report.py:125.
+require_independent_validation_sample = true
+
+[occupancy]
+# Deterministic and local; introduces no mapping seed, so a run is reproducible
+# without one and structural observables need no replicate handling.
+# CONNECTIVITY IS NOT GUARANTEED — a majority threshold can sever thin bridges
+# and delete narrow filaments. That loss is measured by
+# field.occupancy_topology_report(), not assumed away.
+# The biovolume this does not conserve is caught by its own tolerance below.
+mapping = "threshold"
+# tau = 0.5 previously existed only as a CLI default in the V. cholerae pilot,
+# never as a considered declaration. It is declared here for the first time.
+threshold_tau = 0.5
+
+[observables]
+# Tolerated RELATIVE error between the full-resolution field and the
+# coarse-grained one. The rule is: the COARSEST pitch preserving every
+# observable within tolerance, on training AND held-out stacks.
+
+# Primary mass-carrying observable — it sets the material mass per voxel, and
+# therefore the dose denominator, directly.
+maximum_biovolume_fraction_error = 0.05
+
+# DERIVED, NOT INDEPENDENT EVIDENCE. porosity = 1 - biovolume_fraction, so
+# these constrain one quantity. At the pilot's biovolume of 0.0477 a relative
+# tolerance of 0.05 on biovolume is 0.00239 absolute, while 0.01 on porosity
+# would be 0.00952 — four times WEAKER, so biovolume would always bind and the
+# porosity rule would be decorative. 0.0025 = 0.05 * phi/(1-phi) makes it
+# exactly equivalent instead.
+# THE REAL FIX is an absolute-error criterion on biovolume in evaluate_pitch();
+# a relative error on a small fraction is fragile. Recorded as future work.
+maximum_porosity_error = 0.0025
+
+# A structurally relevant PROXY for biomass-medium contact and the most
+# sensitive indicator of coarsening loss. It does NOT calibrate J or the
+# adhesion energy: a binary biomass field cannot recover inter-parcel or
+# species-specific contact topology.
+maximum_interface_area_error = 0.10
+
+# A distance within one frame. NOT the temporal decay — the selected time
+# observable's criteria cannot be written until the dynamic dataset and
+# physical timestamps exist.
+maximum_spatial_correlation_length_error = 0.05
+
+# Primary structural descriptor.
+maximum_thickness_error = 0.10
+
+# Most quantization-sensitive: small components merge or vanish first, which is
+# why the pilot saw a 300x excursion here at a single 2x coarsening.
+maximum_component_size_error = 0.20
+
+[domain]
+# The CPM forces L = 2R (R = N/2 recomputed at seven sites, no length field),
+# so full_apparatus is topologically unreachable at any pitch.
+# representative_segment: a segment of a longer axially-uniform reactor. This
+# is the reading consistent with an axial line source and a z-invariant,
+# radially symmetric field. It is a DECLARED APPROXIMATION, not a claim that
+# such a reactor exists — none does.
+semantics = "representative_segment"
+
+# ADVISORY. A segment can be topologically allowed and statistically
+# unrepresentative, so the domain must span enough spatial correlation lengths
+# to carry bulk structure.
+minimum_domain_correlation_lengths = 5
+
+[future]
+# Named, deliberately unset. Definable only once the dynamic dataset and
+# physical timestamps exist; inventing them now would be inventing a
+# measurement.
+# maximum_temporal_autocorrelation_curve_error =
+# maximum_e_folding_time_relative_error =
