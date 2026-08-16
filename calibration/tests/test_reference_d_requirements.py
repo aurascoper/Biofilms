@@ -140,8 +140,13 @@ def test_every_modelling_decision_is_frozen(requirements):
 
 
 def test_campaign_readiness_is_separate_from_config_readiness(requirements):
-    """Three verdicts, because they gate different things. Collapsing them into
-    one flag is how "the software can do feedback" becomes "feedback matters"."""
+    """Four verdicts, because they gate different things. Collapsing them into
+    one flag is how "the software can do feedback" becomes "feedback matters".
+
+    The fourth is institutional: it gates CULTURING, which is not a question
+    about measurements at all, and it is the only one whose answer comes from
+    outside this repository.
+    """
     s = status.spatial_report.evaluate(
         status.DATA / "spatial",
         REPO / "config" / "reference_d_spatial_acceptance.toml")
@@ -150,16 +155,30 @@ def test_campaign_readiness_is_separate_from_config_readiness(requirements):
         REPO / "config" / "reference_d_material_acceptance.toml")
     verdicts = status.readiness(requirements, s.verdict, m.openmc,
                                 status.declared_binding())
-    assert set(verdicts) == {status.CAMPAIGN_READY, status.CONFIG_READY,
-                             status.SWEEP_READY}
-    # The campaign waits on an institutional approval and nothing else.
+    assert set(verdicts) == {status.AUTHORIZED, status.CAMPAIGN_READY,
+                             status.CONFIG_READY, status.SWEEP_READY}
+    # Nothing is authorised, and every criterion says why.
+    authorized_ok, authorized_blockers = verdicts[status.AUTHORIZED]
+    assert not authorized_ok
+    assert len(authorized_blockers) == len(status.AUTHORIZATION_CRITERIA) == 9
+
+    # The campaign waits on the institutional approval and nothing measured.
     campaign_ok, campaign_blockers = verdicts[status.CAMPAIGN_READY]
     assert not campaign_ok
-    assert len(campaign_blockers) == 1
-    assert "awaiting_approval" in campaign_blockers[0]
+    assert any("awaiting_approval" in b for b in campaign_blockers)
+    assert any("institutional authorization" in b for b in campaign_blockers)
+    assert not any("awaiting_measurement" in b for b in campaign_blockers), (
+        "the campaign must not be blocked by the measurements it exists to make")
     # The config waits on the measurements, which is a different threshold.
     assert not verdicts[status.CONFIG_READY][0]
     assert not verdicts[status.SWEEP_READY][0]
+
+
+def test_authorization_cannot_be_reached_without_a_baseline_row():
+    """CAMPAIGN_READY requires the institutional verdict, so the two can never
+    disagree — which is the point of deriving one from the other rather than
+    letting a reader reconcile them."""
+    assert all(not met for _, met in status.authorization_criteria([]))
 
 
 def test_criteria_with_no_consumer_are_named(requirements):

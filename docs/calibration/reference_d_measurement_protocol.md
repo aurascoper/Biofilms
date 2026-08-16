@@ -85,6 +85,54 @@ not separate the seven species at all.
 
 ---
 
+## 0.6 Institutional authorization — before any of this
+
+Everything below this line is laboratory work on live organisms, and none of it
+may begin until an institution says so. That authorization is **evidence
+produced by a biosafety process**, not a declaration anyone in this repository
+can make. It was once asserted here as the words "d approved"; that string has
+no evidentiary force, and the gate now refuses it by value.
+
+The milestone is `REFERENCE_D_CAMPAIGN_INSTITUTIONALLY_AUTHORIZED`, printed by
+`calibration/scripts/reference_d_status.py` with the date it judged against:
+
+1. exact strain identities frozen
+2. exact growth conditions frozen
+3. containment facility identified
+4. risk assessment referenced
+5. institutional biosafety approval issued, with an issuing authority
+6. approval scope matches the strains, procedures, facility and conditions
+7. approval effective before culturing began, and not expired
+8. approval provenance recorded and retrievable
+9. `baseline_condition.csv` carries the approved target row
+
+`CAMPAIGN_READY` requires it, so the two cannot disagree. A tenth criterion of
+the form "the status script agrees" would be circular and is deliberately absent.
+
+**BIOSAFETY FOLLOWS STRAINS, NOT SPECIES**, which is why criterion 1 is first:
+*C. neoformans* strains are commonly BSL-2 where the other six are commonly
+BSL-1, so a species list cannot determine a containment class.
+
+**The approval expires**, so this verdict depends on when it is asked. That is
+correct — a lapsed approval authorises nothing — and the evaluation date is
+printed rather than assumed.
+
+**What the checks cannot do.** They verify the fields a reviewer would ask for:
+that the identifier is not filler, that an authority is named, that the document
+resolves and is the right *kind* of document, that the dates bracket the
+culturing, and that the conditions on the row still match what was approved.
+They cannot verify the document is genuine. No check local to this repository
+can. The scope digest detects **drift, not forgery** — it makes an edited growth
+condition visible, which is the failure that happens by accident.
+
+Preparatory work belongs in `data/calibration/reference_d_condition_proposal.csv`
+(`authoritative_for_campaign = false`) and
+`docs/calibration/reference_d_ibc_submission_draft.md`.
+`baseline_condition.csv` stays at zero rows until an approval exists: it is an
+authoritative input, not a planning worksheet.
+
+---
+
 ## 1. The pairing discipline, which is the whole design
 
 Everything else in this protocol is ordinary laboratory work. This is the part that is easy to

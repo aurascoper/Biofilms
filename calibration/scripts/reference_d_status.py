@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from datetime import date
 import dataclasses
 import sys
 from pathlib import Path
@@ -63,6 +64,7 @@ STATUSES = (
 # question nobody had framed. So does approval, which gates culturing itself.
 _BLOCKS_CAMPAIGN = ("awaiting_declaration", "awaiting_approval")
 
+AUTHORIZED = "REFERENCE_D_CAMPAIGN_INSTITUTIONALLY_AUTHORIZED"
 CAMPAIGN_READY = "CAMPAIGN_READY"
 CONFIG_READY = "REFERENCE_D_CONFIG_READY"
 SWEEP_READY = "BIOFILM_SWEEP_READY"
@@ -138,17 +140,71 @@ def enforcement_report() -> dict[str, list[str]]:
     return out
 
 
+AUTHORIZATION_CRITERIA = (
+    "1. exact strain identities frozen",
+    "2. exact growth conditions frozen",
+    "3. containment facility identified",
+    "4. risk assessment referenced",
+    "5. institutional biosafety approval issued, with an issuing authority",
+    "6. approval scope matches the strains, procedures, facility and conditions",
+    "7. approval effective before culturing began, and not expired",
+    "8. approval provenance recorded and retrievable",
+    "9. baseline_condition.csv carries the approved TARGET row",
+)
+
+
+def authorization_criteria(baseline, sources=None, *, today=None):
+    """Each institutional criterion, with whether it is met.
+
+    Derived from `approval.problems` rather than restated, so the criteria and
+    the gate cannot drift apart: a criterion is unmet exactly when the gate has
+    something to say about it.
+    """
+    from biofilm_calibration import approval
+
+    if not baseline:
+        return [(c, False) for c in AUTHORIZATION_CRITERIA]
+    found = approval.problems(baseline, sources or [], today=today)
+    text = " ".join(found)
+    met = {
+        1: "strain_identities" not in text,
+        2: "approval_scope_hash is unset" not in text,
+        3: "containment_facility" not in text,
+        4: "risk_assessment_reference" not in text,
+        5: ("institutional_approval_id" not in text
+            and "institutional_approval_authority" not in text),
+        6: "does not match the conditions" not in text,
+        7: not any(k in text for k in ("must precede culturing", "expired",
+                                       "is not an ISO date", "is unset")),
+        8: not any(k in text for k in ("does not resolve", "not an approval",
+                                       "neither a locator nor a digest")),
+        9: "is not the target system" not in text,
+    }
+    return [(c, met[i + 1]) for i, c in enumerate(AUTHORIZATION_CRITERIA)]
+
+
 def readiness(requirements, spatial_verdict, material_verdict,
-              binding) -> dict[str, tuple[bool, list[str]]]:
-    """The three thresholds, which gate different things and must not be one
-    flag. A campaign can be ready while a config is not; a config can be ready
-    while the sweep has not run."""
+              binding, baseline=()) -> dict[str, tuple[bool, list[str]]]:
+    """The four thresholds, which gate different things and must not be one
+    flag. Institutional authorization gates culturing; a campaign can be ready
+    while a config is not; a config can be ready while the sweep has not run."""
     by_status: dict[str, list[str]] = {}
     for r in requirements:
         by_status.setdefault(r["status"], []).append(r["requirement_id"])
 
     campaign_blockers = [f"{s}: {', '.join(sorted(by_status[s]))}"
                          for s in _BLOCKS_CAMPAIGN if by_status.get(s)]
+
+    # THE INSTITUTIONAL MILESTONE. Nine substantive criteria; the tenth thing
+    # people ask for -- "reference_d_status reports CAMPAIGN_READY" -- is this
+    # verdict's own consequence, so making it a criterion would be circular.
+    # CAMPAIGN_READY requires this, so the two cannot disagree.
+    authorized_blockers = [c for c, ok in authorization_criteria(baseline)
+                           if not ok]
+    if authorized_blockers:
+        campaign_blockers.append(
+            f"institutional authorization: {len(authorized_blockers)} of "
+            f"{len(AUTHORIZATION_CRITERIA)} criteria unmet")
 
     config_blockers = []
     unsatisfied = [r["requirement_id"] for r in requirements
@@ -167,6 +223,7 @@ def readiness(requirements, spatial_verdict, material_verdict,
         "no measured Reference D config has been emitted or loaded"]
 
     return {
+        AUTHORIZED: (not authorized_blockers, authorized_blockers),
         CAMPAIGN_READY: (not campaign_blockers, campaign_blockers),
         CONFIG_READY: (not config_blockers, config_blockers),
         SWEEP_READY: (False, sweep_blockers),
@@ -330,9 +387,25 @@ def main(argv=None) -> int:
     # ledger and the contract agree, which is a different question from whether
     # the programme is ready. Conflating them made --check fail forever, since
     # BIOFILM_SWEEP_READY is false by construction until measurements exist.
+    from biofilm_calibration.schema import read_table as _read
+    from biofilm_calibration.acquisition import BASELINE_CONDITION as _BC
+    try:
+        baseline = _read(REPO / "data" / "calibration" / "baseline_condition.csv", _BC)
+    except Exception:
+        baseline = []
+
+    # AN APPROVAL EXPIRES, so this verdict depends on when it is asked. That is
+    # correct and it must be visible: printing the date makes a verdict that
+    # changes without a code or data change explainable instead of alarming.
+    today = date.today()
+    print(f"\n  institutional authorization, judged {today}:")
+    for criterion, met in authorization_criteria(baseline, today=today):
+        print(f"      [{'x' if met else ' '}] {criterion}")
+
     for verdict, (reached, blockers) in readiness(
-            requirements, spatial.verdict, material.openmc, binding).items():
-        print(f"  {verdict:<26} {'YES' if reached else 'no'}")
+            requirements, spatial.verdict, material.openmc, binding,
+            baseline).items():
+        print(f"  {verdict:<46} {'YES' if reached else 'no'}")
         for b in blockers:
             print(f"      - {b}")
 

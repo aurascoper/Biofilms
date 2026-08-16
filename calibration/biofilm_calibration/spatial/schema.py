@@ -8,6 +8,8 @@ every object row invites them to drift.
 
 from __future__ import annotations
 
+from physical_contract import APPROVAL_DOCUMENT_TYPES
+
 from ..acquisition import SEGMENTATION_BASIS, linkage_columns
 from ..schema import EVIDENCE_BASIS, STATUS, Column, TableSchema
 
@@ -140,6 +142,12 @@ BIOFILM_STRUCTURE = TableSchema(
     ),
 )
 
+# Kinds of document this registry can pin. APPROVAL_DOCUMENT_TYPES comes from
+# the contract so the vocabulary is shared rather than restated.
+DOCUMENT_TYPES = frozenset(APPROVAL_DOCUMENT_TYPES | {
+    "declaration", "publication", "dataset", "certificate", "evaluated_data"})
+
+
 SOURCES = TableSchema(
     name="spatial_sources",
     doc="branch-local source registry for the spatial calibration",
@@ -156,6 +164,17 @@ SOURCES = TableSchema(
         Column("document_version", required=False),
         Column("url", required=False),
         Column("accessed_date", required=False),
+        # WHAT KIND OF DOCUMENT THIS IS. Without it a source_id resolves happily
+        # to any registered document, so an approval field could cite a
+        # cross-section table and pass the check -- the "belongs to another
+        # protocol" failure with nothing in the data able to see it.
+        # `declaration` is the default for the in-repo declarations already
+        # registered here.
+        Column("document_type", required=False, vocabulary=DOCUMENT_TYPES),
+        # Of the retrieved file, when one was retrieved. An approval that
+        # cannot be located is not evidence, so the gate requires a url or a
+        # digest on the row it resolves to.
+        Column("sha256", required=False),
         Column("notes", required=False),
     ),
 )

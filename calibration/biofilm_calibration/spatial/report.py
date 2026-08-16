@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..schema import SchemaError, read_table
+from .. import approval
 from ..acquisition import BASELINE_CONDITION
 from .schema import (BIOFILM_STRUCTURE, ENTITY_SEMANTICS, OBJECT_MORPHOLOGY,
-                     SAMPLE_METADATA)
+                    SAMPLE_METADATA, SOURCES)
 from .time_observable import TIME_OBSERVABLE
 from .time_observable import problems as observable_problems
 
@@ -56,7 +57,7 @@ def _load(path, schema):
         return None, str(e)
 
 
-def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
+def evaluate(data_dir, acceptance_path=None, *, today=None) -> SpatialGate:
     """Evaluate the gate against whatever evidence exists on disk."""
     data_dir = Path(data_dir)
     reasons: list[str] = []
@@ -138,17 +139,14 @@ def evaluate(data_dir, acceptance_path=None) -> SpatialGate:
             "no baseline condition declared — every calibration value inherits "
             "the conditions it was measured under")
     else:
-        for r in baseline:
-            if not (r.get("institutional_approval_id") or "").strip():
-                blockers.append(
-                    f"growth condition {r['growth_condition_id']!r} has no "
-                    "institutional_approval_id — biosafety follows strains, not "
-                    "species, and the approval must precede culturing")
-            if r.get("is_target_system") != "true":
-                blockers.append(
-                    f"growth condition {r['growth_condition_id']!r} is not the "
-                    "target system: a surrogate exercises the harness but "
-                    "cannot clear the gate for the seven-species consortium")
+        # AN APPROVAL IS EVIDENCE, NOT A DECLARATION. This used to be a presence
+        # check, and since the schema already refuses a blank it was very nearly
+        # a no-op: any non-empty string cleared it, including the literal words
+        # "d approved". `approval.problems` checks what a reviewer would ask --
+        # authority, a resolvable document of the right kind, dates bracketing
+        # the culturing, and a scope digest that still matches this row.
+        sources, _ = _load(data_dir / "sources.csv", SOURCES)
+        blockers.extend(approval.problems(baseline, sources or [], today=today))
 
     # READY_FOR_TIME_CALIBRATION asserts the time calibration can BEGIN, and
     # dt_MCS = a^2 * S_sim / S_exp needs both a pitch and an observable the
