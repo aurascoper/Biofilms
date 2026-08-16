@@ -72,7 +72,8 @@ def transport_state_hash(snapshot: Snapshot, config: TransportConfig,
     n = snapshot.cell_id.shape[0]
     manifest = _manifest(config, nuclear_data_id,
                          resolve_mesh_dimension((n, n, n),
-                                                config.mesh_coarsening_factor))
+                                                config.mesh_coarsening_factor,
+                                                config.mesh_refinement_factor))
     manifest["lattice"] = list(snapshot.cell_id.shape)
     class_bytes = "\x00".join(classes.ravel(order="C")).encode()
     return _sha(class_bytes, json.dumps(manifest, sort_keys=True).encode())
@@ -86,7 +87,8 @@ def water_phantom_state_hash(config: TransportConfig,
 
     manifest = _manifest(config, nuclear_data_id,
                          resolve_mesh_dimension(config.mesh_base_dimension,
-                                                config.mesh_coarsening_factor))
+                                                config.mesh_coarsening_factor,
+                                                config.mesh_refinement_factor))
     return _sha(json.dumps(manifest, sort_keys=True).encode())
 
 

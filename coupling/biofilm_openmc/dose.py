@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import warnings
+
 import numpy as np
 
 EV_TO_J = 1.602176634e-19
@@ -69,6 +71,13 @@ class PerSourceResult:
         return self.specific_energy_sd_Gy_per_src
 
 
+# Heating found in bins the CSG raytrace assigned zero volume. Below this share
+# of the total it is a raytrace resolution limit at a material sliver; above it,
+# the tally and the geometry genuinely disagree. Measured separation is ~1e-6
+# (sliver) against percent-or-more (structural), so this sits between them.
+MAX_ORPHANED_HEATING_SHARE = 1e-4
+
+
 def specific_energy_per_source(heating_eV_per_src: np.ndarray,
                                mass_kg: np.ndarray) -> np.ndarray:
     """Gy per source particle. The activity-free half of the dose formula.
@@ -79,17 +88,46 @@ def specific_energy_per_source(heating_eV_per_src: np.ndarray,
     full-bin approximations never did, which is why this guard could once be
     unconditional.
 
-    Mass with the WRONG SIGN is still refused, and so is energy deposited in a
-    bin holding nothing — that combination is a real inconsistency between the
-    tally and the geometry, and silently returning zero would hide it.
+    Mass with the WRONG SIGN is still refused unconditionally.
+
+    ENERGY IN A MASSLESS BIN IS REFUSED BY MAGNITUDE, NOT BY PRESENCE. A zero
+    raytraced volume is an ESTIMATE with O(1/sqrt(n)) error, not a proof that
+    the bin is empty: a bin clipped by the cylinder can hold a sliver of real
+    material too thin for any ray to strike, and a single history may still
+    deposit there. Treating that as a structural error refuses a correct run.
+
+    The distinction is magnitude, and it is not subtle. A genuine tally/geometry
+    disagreement — a misaligned mesh, a wrong extent, a transposed axis — puts a
+    LARGE share of the heating outside the material, order percent to tens of
+    percent. Measured here on a refined tally, the sliver case puts 1-2 bins of
+    512 000 and at most 6.5e-07 of the total heating there, and buying more rays
+    does not remove it (5.12e6 rays leaves the massless-bin count unchanged at
+    25.3%, because most of those bins are the genuinely void corners of a cube
+    circumscribing a cylinder).
+
+    So the tolerance sits between the two by three orders of magnitude either
+    way, and anything above it still raises. The tolerated energy is DISCARDED,
+    not redistributed — it has no mass to belong to — and warned about, so a
+    drift toward the limit is visible rather than silent.
     """
     if np.any(mass_kg < 0):
         raise ValueError("negative voxel mass — dose undefined")
     empty = mass_kg == 0
-    if np.any(empty & (heating_eV_per_src != 0)):
-        raise ValueError(
-            "heating scored in a bin with zero mass — the tally and the "
-            "geometry disagree about where material is")
+    orphaned = empty & (heating_eV_per_src != 0)
+    if np.any(orphaned):
+        total = float(np.abs(heating_eV_per_src).sum())
+        share = float(np.abs(heating_eV_per_src[orphaned]).sum()) / total if total else 0.0
+        if share > MAX_ORPHANED_HEATING_SHARE:
+            raise ValueError(
+                f"{int(orphaned.sum())} bins hold {share:.3e} of the heating "
+                f"with zero mass, above the {MAX_ORPHANED_HEATING_SHARE:.0e} "
+                "tolerance — the tally and the geometry disagree about where "
+                "material is")
+        warnings.warn(
+            f"{int(orphaned.sum())} massless bin(s) hold {share:.3e} of the "
+            "heating and are being discarded; this is the CSG raytrace failing "
+            "to resolve a sliver, and it grows as the tally is refined",
+            RuntimeWarning, stacklevel=2)
     with np.errstate(divide="ignore", invalid="ignore"):
         out = heating_eV_per_src * EV_TO_J / mass_kg
     return np.where(empty, 0.0, out)

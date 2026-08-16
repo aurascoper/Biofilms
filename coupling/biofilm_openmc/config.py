@@ -163,6 +163,7 @@ OPTIONAL_SPECS: tuple[OptionalSpec, ...] = (
     OptionalSpec("transport", "particles", "particles", 10000),
     OptionalSpec("transport", "seed", "seed", 1),
     OptionalSpec("transport.mesh", "coarsening_factor", "mesh_coarsening_factor", 1),
+    OptionalSpec("transport.mesh", "refinement_factor", "mesh_refinement_factor", 1),
     # Absent means "let the builder centre it", which the biofilm builder
     # refuses for an even lattice — so this is optional at the loader and
     # required in practice for that kind.
@@ -251,6 +252,14 @@ class TransportConfig:
     mesh_base_dimension: tuple | None = None
     # tally coarsening: applies to both kinds; 1 means "as fine as the base"
     mesh_coarsening_factor: int = 1
+    # tally REFINEMENT, the opposite end of the same axis: r subvoxel tally
+    # bins per base bin. Adds transport resolution, never biological detail --
+    # the material lattice stays piecewise constant at the CPM pitch. Kept as a
+    # separate key rather than folded into the coarsening integer because
+    # mesh_coarsening_factor carries sampling_role = convergence_axis in the
+    # uncertainty ledger, and overloading it would silently redefine a declared
+    # parameter.
+    mesh_refinement_factor: int = 1
     materials: dict = field(default_factory=dict)  # name -> MaterialClass
     batches: int = 10
     particles: int = 10000
@@ -435,11 +444,24 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
         problems.append(
             f"[materials] {kind} requires the class(es): {', '.join(missing_classes)}")
 
-    coarsening = data.get("transport", {}).get("mesh", {}).get("coarsening_factor", 1)
+    _mesh = data.get("transport", {}).get("mesh", {})
+    coarsening = _mesh.get("coarsening_factor", 1)
     if not isinstance(coarsening, int) or isinstance(coarsening, bool) or coarsening < 1:
         problems.append(
             f"[transport.mesh] coarsening_factor = {coarsening!r} must be an "
             "integer >= 1 (1 means the tally mesh is as fine as its base)")
+    refinement = _mesh.get("refinement_factor", 1)
+    if not isinstance(refinement, int) or isinstance(refinement, bool) or refinement < 1:
+        problems.append(
+            f"[transport.mesh] refinement_factor = {refinement!r} must be an "
+            "integer >= 1 (1 means the tally mesh is as fine as its base)")
+    if (isinstance(coarsening, int) and isinstance(refinement, int)
+            and not isinstance(coarsening, bool) and not isinstance(refinement, bool)
+            and coarsening > 1 and refinement > 1):
+        problems.append(
+            f"[transport.mesh] coarsening_factor = {coarsening} and "
+            f"refinement_factor = {refinement} are both > 1; they are opposite "
+            "ends of one resolution axis, so declare the one you mean")
 
     position = _lookup(data, "source", "position_cm")
     if position is not None and (not isinstance(position, (list, tuple))
@@ -467,6 +489,7 @@ def config_from_dict(data: dict, raw: str = "", stage: str = "membrane_feedback"
         model_kind=kind,
         source_position_cm=None if position is None else tuple(float(v) for v in position),
         mesh_coarsening_factor=coarsening,
+        mesh_refinement_factor=refinement,
         materials=mats,
         batches=int(transport.get("batches", 10)),
         particles=int(transport.get("particles", 10000)),
