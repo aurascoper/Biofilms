@@ -45,6 +45,12 @@ _MUST_NAME_SOMETHING = (
     "containment_facility",
     "strain_identities",
     "risk_assessment_reference",
+    # WITHOUT THIS THE SCOPE DIGEST BINDS NOTHING USEFUL. `approved_protocol_version`
+    # is one of the SCOPE_COLUMNS, so a blank value simply hashes as blank and the
+    # digest still matches -- an approval could be recorded without identifying
+    # WHICH protocol the institution reviewed, which is the binding the digest
+    # exists to create.
+    "approved_protocol_version",
 )
 
 # What the approval was issued AGAINST. Editing any of these after the fact

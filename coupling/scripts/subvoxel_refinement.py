@@ -198,6 +198,18 @@ def main(argv=None) -> int:
     ratios = sorted({int(r) for r in args.ratios.split(",")})
     if ratios[0] != 1:
         raise SystemExit("ratio 1 is the reference grid and must be included")
+    # EVERY RATIO MUST DIVIDE THE FINEST, checked before any transport. The mass
+    # denominator is raytraced once at the finest ratio and coarsened by
+    # `finest // ratio`; integer division silently gives step 1 for a ratio like
+    # 3 under a finest of 4, pairing a 4x mass array with a 3x tally. The
+    # mismatch surfaces only when dose conversion combines them -- after the
+    # raytrace and the histories have been paid for.
+    bad = [r for r in ratios if ratios[-1] % r]
+    if bad:
+        raise SystemExit(
+            f"ratios {bad} do not divide the finest ratio {ratios[-1]}: the "
+            "shared mass denominator is coarsened by finest // ratio, so a "
+            "non-divisor pairs mismatched arrays and fails only after transport")
 
     started = time.perf_counter()
     runs = total_histories = statepoint_bytes = 0

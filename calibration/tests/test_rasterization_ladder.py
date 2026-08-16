@@ -20,7 +20,12 @@ from biofilm_calibration.spatial.structure import (specific_interface_area,
                                                    summarise)
 from biofilm_calibration.spatial.synthetic import PhysicalSlab, PhysicalSpheres
 
-PITCHES = (3.2, 1.6, 0.8, 0.4)
+# Pitches that TILE each declared extent exactly. They differ because the
+# objects do: the slab box is (32, 32, 64) um and the sphere box (48, 48, 24),
+# and 3.2 divides the former but leaves 7.5 voxels on the latter's short axis.
+# A pitch that cannot tile is not a coarser view of the same object.
+SLAB_PITCHES = (3.2, 1.6, 0.8, 0.4)
+SPHERE_PITCHES = (1.6, 0.8, 0.4, 0.2)
 
 
 def _rel(got, want):
@@ -33,7 +38,7 @@ def test_the_slab_is_the_same_slab_at_every_pitch():
     """The whole premise. If the physical object moved with the pitch, every
     number downstream would be measuring two things at once."""
     spec = PhysicalSlab()
-    for pitch in PITCHES:
+    for pitch in SLAB_PITCHES:
         B = spec.rasterize(pitch)
         assert B.shape == tuple(round(e / pitch) for e in spec.extent_um)
         assert B.mean() == pytest.approx(spec.true_biovolume_fraction, abs=1e-12)
@@ -42,7 +47,7 @@ def test_the_slab_is_the_same_slab_at_every_pitch():
 def test_the_sphere_lattice_keeps_its_count_and_converges_in_volume():
     spec = PhysicalSpheres()
     errors = []
-    for pitch in PITCHES:
+    for pitch in SPHERE_PITCHES:
         B = spec.rasterize(pitch)
         errors.append(_rel(B.mean(), spec.true_biovolume_fraction))
         assert summarise(B, B >= 0.5, pitch).n_components == spec.n_spheres, (
@@ -57,7 +62,7 @@ def test_an_axis_aligned_slab_is_exact_at_every_pitch():
     control: any error seen for the spheres is about curvature, not about the
     ladder machinery."""
     spec = PhysicalSlab()
-    for pitch in PITCHES:
+    for pitch in SLAB_PITCHES:
         B = spec.rasterize(pitch)
         got = summarise(B, B >= 0.5, pitch)
         assert got.biovolume_fraction == pytest.approx(
@@ -131,3 +136,23 @@ def test_the_bias_does_not_shrink_with_refinement():
         ratios.append(specific_interface_area(ball, pitch) / true)
     assert min(ratios) > 1.4, f"the bias vanished, which it must not: {ratios}"
     assert abs(ratios[-1] - 1.5) < 0.02
+
+
+def test_a_pitch_that_does_not_tile_the_extent_is_refused():
+    """A LADDER MUST HOLD THE OBJECT FIXED. Rounding the voxel count resizes the
+    box while the closed-form truth keeps dividing by the declared extent: at
+    pitch 3.2 the spheres' 24 um axis becomes 7.5 voxels, rounded to 8 = 25.6 um,
+    so a 6.7% denominator shift would be reported as rasterisation error.
+
+    That pitch was in the published default ladder and its row was contaminated.
+    """
+    from biofilm_calibration.spatial.synthetic import NonTilingPitchError
+
+    spheres = PhysicalSpheres()
+    with pytest.raises(NonTilingPitchError, match="does not tile"):
+        spheres.rasterize(3.2)
+    # and the pitches that DO tile give exactly the declared box
+    for pitch in (1.6, 0.8, 0.4):
+        B = spheres.rasterize(pitch)
+        for n, extent in zip(B.shape, spheres.extent_um):
+            assert n * pitch == pytest.approx(extent)

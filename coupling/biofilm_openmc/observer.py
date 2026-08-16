@@ -217,12 +217,28 @@ def to_image_data(path, layer_name, manifest=None):
 
 def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
                manifest=None):
-    """Draw one layer. Refuses to hide a non-quotable layer's banner.
+    """Draw one layer so its INTERIOR is visible, with its declared colour rule.
 
-    `show_banner=False` on a derived layer raises rather than warns: the banner
-    is the only thing distinguishing a real 4x dose field from a coarse field
-    broadcast to look like one, and a caller who suppresses it has removed the
-    distinction from the screen.
+    `add_mesh` on an `ImageData` renders only the exterior surface of the block.
+    For every bundle this repository produces that surface is background — the
+    cube circumscribing the cylinder is 21.5% corner void — so a naive call
+    yields an opaque shell with the biofilm hidden inside it. Two paths, chosen
+    by the layer's own semantic kind:
+
+    - CATEGORICAL and BOOLEAN layers are thresholded to drop the background
+      (`cell_id` 0 is background and -1 is the wall, per the exchange schema),
+      leaving the occupied cells as a surface that can actually be seen. A
+      species layer gets the seven fixed colours rather than a continuous
+      colormap, which is the whole point of having a palette: the same organism
+      must not change colour because a different subset is present.
+    - INTENSIVE and EXTENSIVE layers are volume-rendered, because thresholding a
+      dose field at an arbitrary value would hide exactly the structure the
+      viewer exists to show.
+
+    Refuses to suppress a non-quotable layer's banner, and shows the neutral
+    derivation note for a layer that is derived but still quotable — otherwise
+    an exact reduction is indistinguishable on screen from a native measurement
+    and silently loses its source grid.
     """
     import pyvista as pv
 
@@ -238,8 +254,27 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
 
     image = to_image_data(path, layer_name, manifest=doc)
     p = plotter or pv.Plotter()
-    p.add_mesh(image, scalars=layer_name,
-               scalar_bar_args={"title": f"{layer_name} [{layer.unit}]"})
+    title = f"{layer_name} [{layer.unit}]"
+
+    if layer.semantic_kind in (CATEGORICAL, BOOLEAN):
+        occupied = image.threshold(0.5, scalars=layer_name)
+        if layer.colour_by == "species":
+            data, _ = read_layer(path, layer_name)
+            legend = species_legend(data)
+            p.add_mesh(occupied, scalars=layer_name, show_scalar_bar=False,
+                       cmap=[colour for _, _, colour in legend],
+                       clim=(min(i for i, _, _ in legend),
+                             max(i for i, _, _ in legend)))
+            p.add_legend([(label, colour) for _, label, colour in legend])
+        else:
+            p.add_mesh(occupied, scalars=layer_name,
+                       scalar_bar_args={"title": title})
+    else:
+        p.add_volume(image, scalars=layer_name,
+                     scalar_bar_args={"title": title})
+
     if layer.banner and show_banner:
         p.add_text(layer.banner, position="upper_edge", font_size=8)
+    elif layer.derivation_note:
+        p.add_text(layer.derivation_note, position="upper_edge", font_size=7)
     return p

@@ -54,7 +54,8 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "calibration"))
 
 from biofilm_calibration.spatial.structure import summarise
-from biofilm_calibration.spatial.synthetic import PhysicalSlab, PhysicalSpheres
+from biofilm_calibration.spatial.synthetic import (NonTilingPitchError,
+                                                   PhysicalSlab, PhysicalSpheres)
 
 ACCEPTANCE = REPO / "config" / "reference_d_spatial_acceptance.toml"
 
@@ -115,7 +116,14 @@ def run_ladder(spec, pitches, tolerances) -> list[dict]:
     truth = truth_for(spec)
     rows = []
     for pitch in pitches:
-        B = spec.rasterize(pitch)
+        try:
+            B = spec.rasterize(pitch)
+        except NonTilingPitchError as err:
+            # NAMED, not silently dropped. A pitch that cannot tile this
+            # object is not a coarser view of it, and a ladder row that
+            # quietly disappeared would look like a pitch nobody tried.
+            rows.append({"pitch_um": float(pitch), "skipped": str(err)})
+            continue
         # Threshold occupancy at tau = 0.5, the frozen declared mapping. The
         # fields here are already binary, so this is an identity for them and
         # is written out anyway: an occupancy rule that appears only when it
@@ -171,7 +179,12 @@ def coarsest_passing(rows, observable) -> float | None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--outdir", type=Path, required=True)
-    ap.add_argument("--pitches", default="3.2,1.6,0.8,0.4,0.2")
+    # Defaults chosen to tile BOTH declared extents exactly -- (32,32,64) for
+    # the slab and (48,48,24) for the spheres. 3.2 was in this list and does not
+    # tile the spheres' 24 um axis (7.5 voxels), so that row was measuring a
+    # 25.6 um box against a 24 um analytic truth: a 6.7% denominator shift
+    # reported as rasterisation error.
+    ap.add_argument("--pitches", default="1.6,0.8,0.4,0.2")
     args = ap.parse_args(argv)
 
     args.outdir.mkdir(parents=True, exist_ok=True)
@@ -194,17 +207,22 @@ def main(argv=None) -> int:
             "truth": truth,
             "coarsest_passing_um": {
                 obs: coarsest_passing(rows, obs)
-                for obs in truth if f"within_{obs}" in rows[0]},
+                for obs in truth
+                if any(f"within_{obs}" in r for r in rows)},
             "rows": rows,
         }
 
         print(f"\n=== {name} ===")
         print("  truth: " + "  ".join(f"{k}={v:.5g}" for k, v in truth.items()))
-        header = [o for o in truth if f"within_{o}" in rows[0]]
+        header = [o for o in truth if any(f"within_{o}" in r for r in rows)]
         print(f"  {'pitch':>7} {'shape':>14} " +
               " ".join(f"{o[:14]:>15}" for o in header))
         for row in rows:
             cells = []
+            if row.get("skipped"):
+                print(f"  {row['pitch_um']:7.2f} {'SKIPPED':>14}  "
+                      f"does not tile this extent")
+                continue
             for obs in header:
                 mark = "ok " if row.get(f"within_{obs}") else "OVER"
                 cells.append(f"{row[f'err_{obs}']:10.2e} {mark}")

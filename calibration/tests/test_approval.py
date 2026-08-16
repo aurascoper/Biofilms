@@ -225,3 +225,13 @@ def test_the_gate_reads_only_the_authoritative_table(tmp_path):
     assert "baseline_condition.csv" in src
     assert "proposal" not in src, (
         "the gate must not read the non-authoritative proposal table")
+
+
+def test_an_approval_without_a_protocol_version_is_refused():
+    """`approved_protocol_version` is one of the SCOPE_COLUMNS, so a blank value
+    hashes as blank and the digest still matches. An approval could be recorded
+    without identifying WHICH protocol the institution reviewed — which is the
+    binding the digest exists to create."""
+    found = problems(row(approved_protocol_version=""))
+    assert any("approved_protocol_version" in p for p in found), found
+    assert any("names nothing" in p for p in found)

@@ -49,7 +49,7 @@ tolerance applied:
 
 | pitch (µm) | biovolume | porosity | **interface area** | component size |
 |---|---|---|---|---|
-| 3.2 | 1.20e-01 ✗ | 1.12e-02 ✗ | **4.06e-01 ✗** | 6.13e-02 ✓ |
+| ~~3.2~~ | *withdrawn — see below* | | | |
 | 1.6 | 6.39e-02 ✗ | 5.95e-03 ✗ | **4.99e-01 ✗** | 6.39e-02 ✓ |
 | 0.8 | 4.04e-02 ✓ | 3.77e-03 ✗ | **4.67e-01 ✗** | 4.04e-02 ✓ |
 | 0.4 | 4.55e-03 ✓ | 4.24e-04 ✓ | **4.79e-01 ✗** | 4.55e-03 ✓ |
@@ -59,10 +59,23 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 
 | observable | coarsest passing pitch |
 |---|---|
-| component size (q50) | 3.2 µm |
+| component size (q50) | 1.6 µm |
 | biovolume fraction | 0.8 µm |
 | porosity | 0.4 µm |
 | **specific interface area** | **never, at any pitch** |
+
+> **Correction — the 3.2 µm row was contaminated and is withdrawn.** An external
+> review caught it: 3.2 does not tile the spheres' 24 µm axis (7.5 voxels), and
+> `_grid_shape` rounded to 8, so that row rasterised a **25.6 µm box** while the
+> closed-form truth kept dividing by the declared 24 µm. A 6.7% denominator
+> shift was being reported as rasterisation error — in the one study whose
+> entire purpose is to hold the object fixed and move only the sampling.
+>
+> A non-tiling pitch is now **refused** rather than rounded, and the ladder names
+> the pitch it skipped instead of dropping the row silently. The only published
+> number that moves is component size, from 3.2 to **1.6 µm** — it was passing at
+> a pitch that never validly ran. Every other conclusion is unchanged, including
+> the interface-area finding, which was measured at pitches that tile.
 
 Porosity needing a 2× finer pitch than biovolume is not a surprise — it is the
 `derived` tolerance doing its job. Porosity is `1 − biovolume`, so an equal

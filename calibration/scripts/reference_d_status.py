@@ -184,7 +184,7 @@ def authorization_criteria(baseline, sources=None, *, today=None):
 
 
 def readiness(requirements, spatial_verdict, material_verdict,
-              binding, baseline=()) -> dict[str, tuple[bool, list[str]]]:
+              binding, baseline=(), sources=()) -> dict[str, tuple[bool, list[str]]]:
     """The four thresholds, which gate different things and must not be one
     flag. Institutional authorization gates culturing; a campaign can be ready
     while a config is not; a config can be ready while the sweep has not run."""
@@ -199,7 +199,7 @@ def readiness(requirements, spatial_verdict, material_verdict,
     # people ask for -- "reference_d_status reports CAMPAIGN_READY" -- is this
     # verdict's own consequence, so making it a criterion would be circular.
     # CAMPAIGN_READY requires this, so the two cannot disagree.
-    authorized_blockers = [c for c, ok in authorization_criteria(baseline)
+    authorized_blockers = [c for c, ok in authorization_criteria(baseline, sources)
                            if not ok]
     if authorized_blockers:
         campaign_blockers.append(
@@ -393,18 +393,29 @@ def main(argv=None) -> int:
         baseline = _read(REPO / "data" / "calibration" / "baseline_condition.csv", _BC)
     except Exception:
         baseline = []
+    # WITHOUT THIS THE MILESTONE CAN NEVER PASS. `approval.problems` resolves
+    # approval_source_id against this registry, so omitting it reports every
+    # approval as unregistered and criterion 8 stays unmet for a perfectly valid
+    # approval -- a gate that cannot be satisfied, which is the exact mirror of
+    # one that cannot fail and rather worse, since it blocks a legitimate
+    # campaign with no way to tell why.
+    from biofilm_calibration.spatial.schema import SOURCES as _SRC
+    try:
+        sources = _read(REPO / "data" / "calibration" / "spatial" / "sources.csv", _SRC)
+    except Exception:
+        sources = []
 
     # AN APPROVAL EXPIRES, so this verdict depends on when it is asked. That is
     # correct and it must be visible: printing the date makes a verdict that
     # changes without a code or data change explainable instead of alarming.
     today = date.today()
     print(f"\n  institutional authorization, judged {today}:")
-    for criterion, met in authorization_criteria(baseline, today=today):
+    for criterion, met in authorization_criteria(baseline, sources, today=today):
         print(f"      [{'x' if met else ' '}] {criterion}")
 
     for verdict, (reached, blockers) in readiness(
             requirements, spatial.verdict, material.openmc, binding,
-            baseline).items():
+            baseline, sources).items():
         print(f"  {verdict:<46} {'YES' if reached else 'no'}")
         for b in blockers:
             print(f"      - {b}")

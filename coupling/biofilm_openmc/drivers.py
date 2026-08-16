@@ -186,6 +186,16 @@ def scan(snapshot: Snapshot | None, base_config: TransportConfig,
     """
     build, mass_of, hash_of = _problem_ops(snapshot, nuclear_data_id)
 
+    # REFUSE BEFORE SPENDING THE HISTORIES, not after. `mass_of` is what rejects
+    # an unsupported refinement factor, and it used to be called only after
+    # `runner(build(cfg), name)` had already returned -- so the refusal arrived
+    # once the transport was paid for, which is precisely the cost it exists to
+    # avoid. Evaluating it up front on every config makes the rejection cheap
+    # and, for the configs that are fine, costs one array construction that the
+    # loop would build anyway.
+    for _name, _cfg in {"baseline": base_config, **scenarios}.items():
+        mass_of(_cfg)
+
     per_source: dict[str, PerSourceResult] = {}   # transport hash -> field
     results: dict[str, object] = {}
     hashes: dict[str, str] = {}
