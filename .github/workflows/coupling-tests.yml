@@ -2,18 +2,26 @@ name: coupling-tests
 
 on:
   push:
-    branches: [master, "feat/**"]
+    branches: [master, "feat/**", "ci/**", "research/**"]
   pull_request:
   workflow_dispatch:
     inputs:
       run_openmc_integration:
-        description: "Run the OpenMC integration tier (executable + nuclear data)"
+        description: "Run the OpenMC API tier (executable present; nuclear-data tests remain gated)"
         type: boolean
         default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coupling-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   julia-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
@@ -26,14 +34,24 @@ jobs:
         run: julia --project=. tests/runtests.jl
 
   python-unit:
-    # Bare tier: numpy/h5py/pytest only. openmc-gated tests report SKIPPED
-    # via importorskip — never deselected, never falsely passed.
+    # The Python suite contains Julia/HDF5 orientation round-trip tests.
+    # Set up and instantiate the recorded Julia project here rather than
+    # relying on whatever /usr/bin/julia happens to exist on the runner.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - name: Instantiate Julia dependencies for interop tests
+        run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: coupling/pyproject.toml
       - name: Install package (bare)
         run: pip install -e "coupling[dev]"
       - name: Run unit tier
@@ -45,20 +63,26 @@ jobs:
     # questions, and separate from the top-level tests/ directory because that
     # one is the Julia suite.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: calibration/pyproject.toml
       - name: Install package
         run: pip install -e "calibration[dev]"
       - name: Run calibration tier
         run: cd calibration && pytest -rs tests
 
   openmc-integration:
-    # Manual opt-in: pinned conda-forge OpenMC + nuclear data are heavy.
+    # Manual opt-in: pinned conda-forge OpenMC. The hosted runner does not
+    # carry the 13 GB photon library, so tests requiring nuclear data must
+    # report SKIPPED rather than being represented as passed.
     if: github.event_name == 'workflow_dispatch' && inputs.run_openmc_integration
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: mamba-org/setup-micromamba@v1
@@ -70,9 +94,14 @@ jobs:
             h5py
             numpy
             pytest
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - name: Instantiate Julia dependencies for interop tests
+        run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
       - name: Install package
         shell: micromamba-shell {0}
         run: pip install -e "coupling[dev]"
-      - name: Run all tiers (no nuclear data on runner; data-gated tests skip)
+      - name: Run API tier and report data-gated skips
         shell: micromamba-shell {0}
         run: cd coupling && pytest -rs tests
