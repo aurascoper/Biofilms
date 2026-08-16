@@ -99,8 +99,15 @@ class ThresholdPolicy:
     threshold_policy_id: str = "synthetic_gate_contract_v1"
     tier: str = "S0"
     target_calibration: bool = False
-    # The effect magnitude that would matter. At tier S0 this is a fixture
-    # constant used to exercise the logic, NOT a scientific relevance claim.
+    # WHICH METRIC THE THRESHOLDS ARE DENOMINATED IN. A threshold is meaningless
+    # without one: 0.10 declared for a relative L2 effect and 0.10 compared
+    # against a SQUARED effect differ by a factor of ten, and nothing about the
+    # number itself reveals the mistake. `decide()` refuses a mismatch rather
+    # than trusting call sites to keep them aligned.
+    metric_id: str = "relative_l2"
+    # The effect magnitude that would matter, in `metric_id`'s units. At tier S0
+    # this is a fixture constant used to exercise the logic, NOT a scientific
+    # relevance claim.
     effect_threshold: float = 0.10
     # Below this the effect is real but not worth acting on.
     practical_importance_floor: float = 0.02
@@ -114,6 +121,8 @@ class ThresholdPolicy:
             out.append("tier S0 may not carry target_calibration = true")
         if self.tier != "S0":
             out.append(f"tier {self.tier!r} is not S0")
+        if not self.metric_id:
+            out.append("a threshold with no metric_id is not interpretable")
         if not (0.0 < self.practical_importance_floor <= self.effect_threshold):
             out.append("practical_importance_floor must be in (0, effect_threshold]")
         if not 0.5 < self.credibility < 1.0:
@@ -173,8 +182,24 @@ def scenario_envelope(scenario_effects: dict[str, np.ndarray]) -> dict:
 
 
 def decide(effect_draws, budget: VarianceBudget, policy: ThresholdPolicy, *,
-           scenario_effects: dict[str, np.ndarray] | None = None) -> S0Verdict:
-    """The tier-S0 verdict. Exactly one outcome per input, by construction."""
+           scenario_effects: dict[str, np.ndarray] | None = None,
+           metric_id: str | None = None) -> S0Verdict:
+    """The tier-S0 verdict. Exactly one outcome per input, by construction.
+
+    `metric_id` names the metric the draws were computed with. Supplying it is
+    optional but strongly advised: a threshold declared for one metric compared
+    against draws from another is a silent factor-of-ten error, and it is the
+    exact mistake that moving from a relative L2 effect to a debiased SQUARED
+    effect invites.
+    """
+    if metric_id is not None and metric_id != policy.metric_id:
+        return S0Verdict(
+            NOT_EVALUATED,
+            f"draws are {metric_id!r} but the policy declares thresholds in "
+            f"{policy.metric_id!r}; a threshold is not transferable between "
+            "metrics",
+            threshold_policy_id=policy.threshold_policy_id, tier=policy.tier,
+            target_calibration=policy.target_calibration)
     problems = policy.problems()
     if problems:
         return S0Verdict(NOT_EVALUATED, "; ".join(problems),
