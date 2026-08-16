@@ -73,6 +73,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The claims-ledger guard asserts that the revision the manuscript
+          # cites actually resolves. actions/checkout defaults to a depth-1
+          # clone, where almost no commit resolves, so without full history
+          # the check fails on a fact about the CHECKOUT rather than the repo.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

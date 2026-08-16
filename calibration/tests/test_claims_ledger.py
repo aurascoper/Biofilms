@@ -148,6 +148,16 @@ def test_the_manuscript_cites_a_resolvable_revision():
     artifacts record for their own provenance."""
     import subprocess
 
+    # A SHALLOW CLONE CANNOT ANSWER THIS, so do not pretend it did. CI checks
+    # this repository out at full depth for exactly that reason; anywhere else
+    # (a fork, a `--depth 1` clone) the absence of a commit says nothing about
+    # the citation, and failing there would report a fact about the checkout.
+    shallow = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+        capture_output=True, text=True)
+    if shallow.stdout.strip() == "true":
+        pytest.skip("shallow clone: commit resolution is not decidable here")
+
     text = PREPRINT.read_text(encoding="utf-8")
     cited = set(re.findall(r"repository revision \\texttt\{([0-9a-f]{7,40})\}", text))
     cited |= set(re.findall(r"manuscript is \\texttt\{([0-9a-f]{7,40})\}", text))
