@@ -142,6 +142,10 @@ class S0Verdict:
     dominant_variance: str = ""
     variance: dict = field(default_factory=dict)
     n_draws: int = 0
+    # Residual discretisation, added to the interval on BOTH sides. A gate
+    # that reads only the finest resolution has not resolved the axis, it has
+    # stopped looking at it.
+    resolution_bound: float = 0.0
     threshold_policy_id: str = ""
     tier: str = "S0"
     target_calibration: bool = False
@@ -159,6 +163,7 @@ class S0Verdict:
             "dominant_variance": self.dominant_variance,
             "variance": {k: clean(v) for k, v in self.variance.items()},
             "n_draws": int(self.n_draws),
+            "resolution_bound": clean(self.resolution_bound),
             "threshold_policy_id": self.threshold_policy_id,
             "tier": self.tier,
             "target_calibration": bool(self.target_calibration),
@@ -183,7 +188,8 @@ def scenario_envelope(scenario_effects: dict[str, np.ndarray]) -> dict:
 
 def decide(effect_draws, budget: VarianceBudget, policy: ThresholdPolicy, *,
            scenario_effects: dict[str, np.ndarray] | None = None,
-           metric_id: str | None = None) -> S0Verdict:
+           metric_id: str | None = None,
+           resolution_bound: float = 0.0) -> S0Verdict:
     """The tier-S0 verdict. Exactly one outcome per input, by construction.
 
     `metric_id` names the metric the draws were computed with. Supplying it is
@@ -220,8 +226,26 @@ def decide(effect_draws, budget: VarianceBudget, policy: ThresholdPolicy, *,
     low = float(np.quantile(draws, tail))
     high = float(np.quantile(draws, policy.credibility))
     median = float(np.median(draws))
+
+    # THE DRAWS MUST NOT SPAN A CONVERGENCE AXIS, AND THE BOUND IS WHY.
+    #
+    # Pooling draws across tally resolutions puts a systematic, monotone
+    # discretisation trend inside a distribution the gate reads as sampling
+    # spread — and `mesh_coarsening_factor` carries sampling_role =
+    # convergence_axis in the uncertainty ledger precisely to forbid that.
+    #
+    # But feeding only the finest resolution is a RELAXATION, not a fix: it
+    # discards the spread without accounting for it, and a scenario can drop
+    # below the practical floor purely by losing its coarse rows — verdict
+    # "you may ignore this feedback", obtained by looking at less. So the
+    # caller passes the residual discretisation BOUND, in the same units, and
+    # it widens the interval symmetrically. Buying resolution narrows it;
+    # nothing narrows by averaging the axis away.
+    bound = abs(float(resolution_bound))
+    low -= bound
+    high += bound
     common.update(effect_median=median, effect_low=low, effect_high=high,
-                  n_draws=int(draws.size))
+                  n_draws=int(draws.size), resolution_bound=bound)
 
     # MODEL FORM FIRST. If two admissible scenarios sit on opposite sides of the
     # threshold, no amount of sampling within either one settles it, and the

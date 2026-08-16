@@ -33,14 +33,22 @@ parcel.
 Ratios 1×, 2×, 4× subvoxel bins per CPM voxel, fixed snapshot, fixed geometry,
 5 replicates, 3.2 × 10⁵ particles × 20 batches per run. Ω_b is defined **once**
 at the lattice resolution and upsampled, so every ratio is evaluated over an
-identical physical region by construction — 1 562 lattice voxels, 12 496 at 2×,
-99 968 at 4×, exactly ×8 and ×64.
+identical physical region by construction — 1 631 lattice voxels, 13 048 at 2×,
+104 384 at 4×, exactly ×8 and ×64.
 
 | ratio | mesh | Ω_b bins | debiased E² | z | E | sub-voxel share | median rel err |
 |---|---|---|---|---|---|---|---|
-| 1 | 20³ | 1 562 | 1.5080e-02 | 249 | 0.12280 | 0 by definition | 0.028 |
-| 2 | 40³ | 12 496 | 1.5142e-02 | 264 | 0.12305 | 0.161 | 0.079 |
-| 4 | 80³ | 99 968 | 1.1140e-02 | 148 | **0.10555** | **0.723** | 0.222 |
+| 1 | 20³ | 1 631 | 1.5082e-02 | 249 | 0.12281 | 0 by definition | 0.028 |
+| 2 | 40³ | 13 048 | 1.5144e-02 | 264 | 0.12306 | 0.161 | 0.079 |
+| 4 | 80³ | 104 384 | 1.1141e-02 | 148 | **0.10555** | **0.723** | 0.222 |
+
+Ω_b is purely geometric — biomass volume fraction ≥ 0.5 and positive mass. It
+previously also carried a dose floor taken from replicate 0, which an external
+review correctly identified as making the region a random set drawn from one of
+the replicates the estimator averages over. Removing it changed these numbers by
+**≤ 0.02%**, so nothing here rested on it; it was removed because a region that
+depends on the estimator needs an argument about magnitude, and one that does not
+needs none.
 
 The null control stays null at every resolution — `noise_floor` returns
 z = 2.0, 0.2 and −1.3, so nothing here is an artifact of the estimator losing
@@ -67,17 +75,61 @@ the noise grows sharply and the estimate does not follow it.
 A tally mesh is a histogram of the same events. With the seed independent of the
 ratio, every ratio transports **bit-identical histories**, so block-summing a
 finer histogram back to the lattice grid — heating and mass separately, divided
-afterwards — must return the coarse value exactly. It does, to nine significant
-figures:
+afterwards — must return the coarse value exactly.
 
-```
-1.5080234573e-02   1.5080234574e-02   1.5080234589e-02
-```
+> **Correction.** The first version of this section checked only the E² statistic
+> and read its agreement (nine significant figures) as proof that the dose field
+> was reproduced. It was not. **E² is a ratio in which the mass denominator
+> appears in both sums and cancels to high order**, so it agreed to nine figures
+> while the underlying dose field differed by **1.5%** — because each ratio was
+> raytracing its own mass denominator, and independent raytraces of the same
+> geometry differ by up to 3.0% per voxel. The check passed for a different
+> reason than the one given for it.
 
-The driver asserts this at 1e-6 and aborts otherwise. That single identity
-covers a lot: a non-conservative remap, an intensive quantity averaged where it
-should have been summed, or refinement perturbing the transport would each break
-it. **It is checked on every run rather than argued for once.**
+**Every ratio now shares one raytrace**, taken at the finest ratio and coarsened
+down. Mass is extensive, so coarsening the finest estimate is exact, every ratio
+gets a mutually consistent denominator by construction, and it costs one raytrace
+instead of one per ratio. With that, the field-level identity holds:
+
+| quantity | max relative difference, 4× reduced vs native 1× |
+|---|---|
+| mass | 4.8e-16 |
+| heating | 6.0e-16 |
+| **dose field** | **5.6e-16** |
+
+The driver now asserts on the **field** and aborts otherwise — the claim worth
+making, and one that only became true after the shared-raytrace fix. It covers a
+non-conservative remap, an intensive quantity averaged where it should have been
+summed, refinement perturbing the transport, and the mass inconsistency that hid
+here. **It is checked on every run rather than argued for once.**
+
+### And it immediately found a third thing
+
+At the production history count the identity does not hold to machine precision.
+Measured drift is **0 at 1×, 1.5e-13 at 2×, and 3.0e-09 at 4×**. Float
+accumulation would put the 8-term and 64-term sums about 8× apart, not four
+orders of magnitude, so that is not the explanation — and it is worth saying that
+"accumulation" was the first explanation reached for, and was wrong.
+
+It is the **orphaned-energy discard, and it is resolution-dependent.** A sliver
+bin whose raytraced volume is zero has its heating discarded. At 4× that sliver
+is its own bin and the energy is dropped; at 1× the same energy sits inside a
+coarse voxel with plenty of mass and is kept. The localisation is exact: of the
+voxels carrying drift above 1% of the maximum there is **exactly one**, and it
+holds **28 of its 64 sub-bins massless**, against 19% of the remaining voxels
+holding any at all. Mass itself conserves to 4.8e-16, so the denominator is not
+implicated.
+
+The tolerance is therefore set at 1e-7 — above a mechanism that is understood and
+bounded, five orders of magnitude below the 1.5e-02 that the mass inconsistency
+produced. The measured drift is recorded per row as
+`lattice_field_drift_vs_ratio1` rather than merely tested, so the cost of the
+sliver tolerance is visible rather than assumed.
+
+The headline numbers below are **unchanged** by that fix — 1.52847e-02 /
+1.53695e-02 / 1.11320e-02 before and after, to six digits — which is itself the
+evidence that E² is insensitive to the mass denominator, and so strengthens the
+finding rather than qualifying it.
 
 ## What it means
 
@@ -113,7 +165,7 @@ This also unifies the coarsening result: the effect rises monotonically as bins
 grow and falls as they shrink, and both are the same mechanism seen from
 opposite ends.
 
-## Two limits of the exact-CSG denominator, found here
+## Three limits of the exact-CSG denominator, found here
 
 **Massless bins are mostly correct, and refinement converges them.** They run
 11.25% at 1×, 18.8–23.0% at 2× and 25.3% at 4×, approaching the geometric truth
@@ -130,6 +182,12 @@ warning and discarding the orphaned energy rather than redistributing it. A
 genuine tally/geometry disagreement — a misaligned mesh, a transposed axis —
 puts percent-level or more there and still raises, three orders of magnitude
 above the tolerance.
+
+**Independent raytraces per resolution are a trap.** The mass denominator is an
+O(1/√n) estimate, so raytracing each ratio separately gives each one a different
+denominator — up to 3.0% per voxel here — and dose is heating over mass, so that
+lands directly in every dose field. One raytrace at the finest ratio, coarsened
+down, is both exact and cheaper.
 
 **Ray counts must be chosen, not scaled.** Each ray crosses `dim` bins along its
 axis, so `n_samples = P·dim²` gives about P samples per bin and the per-bin

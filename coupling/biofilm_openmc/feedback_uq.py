@@ -294,7 +294,32 @@ def _ratio(baseline_rows, difference_rows, weights) -> float:
 
 
 def debiased_squared_effect(baseline, feedback, mass, mask=None) -> DebiasedEffect:
-    """The gate statistic: an unbiased estimate of the SQUARED relative effect.
+    """The gate statistic: the SQUARED relative effect, with the noise removed
+    from the numerator and the denominator SEPARATELY.
+
+    THE RATIO IS NOT ITSELF UNBIASED, and saying otherwise would overstate what
+    this does. `s_hat` and `denominator` are each unbiased for their targets; a
+    ratio of two estimators is not, because E[X/Y] != E[X]/E[Y], and here the
+    two are correlated through the baseline rows they share. The leading term is
+    the usual delta-method one, Var(Den)/E[Den]^2 - Cov(S,Den)/(E[S]E[Den]), so
+    it is O(1/R) and it does not vanish at any R this study can afford.
+
+    Scale rather than a point estimate, because the point estimate depends on
+    the common-random-number correlation and on the effect size:
+
+        |bias| / SD  ~  relerr * sqrt( 2(1 - rho) / (R * B_eff) )
+
+    which is under 3e-2 across the whole envelope this pilot operates in
+    (R = 3-5, relerr 0.03-0.74, rho 0-0.9). Note B_eff, the PARTICIPATION RATIO
+    (sum w mu^2)^2 / (sum w^2 mu^4) ~ 400 here, not the bin count ~1500: a dose
+    field concentrated near a line source has far fewer effective bins than it
+    has bins, and using the bin count would understate the bias by ~2x.
+
+    NO PLUG-IN CORRECTION IS APPLIED. Both the delta-method and jackknife
+    corrections were measured and both are actively harmful at small R, turning
+    -35% into +170% in the stress regime — a correction whose own variance
+    exceeds the bias it removes makes the number worse. The honest treatment is
+    to bound it and say so.
 
     `baseline` and `feedback` are sequences of R replicate fields. Within a
     replicate the two states may share a random stream (common random numbers,

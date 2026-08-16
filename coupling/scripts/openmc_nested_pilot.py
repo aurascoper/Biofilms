@@ -3,7 +3,11 @@
 
     micromamba run -n openmc-biofilms python coupling/scripts/openmc_nested_pilot.py \
         --snapshot snap.h5 --config config/reference_synthetic_biofilm_e2e.toml \
-        --outdir artifacts/pilot
+        --outdir artifacts/pilot --levers --include-near-threshold --publish
+
+Without --publish the tables land in --outdir. --publish replaces the canonical
+tables in data/calibration/ and REQUIRES the complete scenario set, because a
+partial run must not be able to drop rows that published numbers cite.
 
 IT ADAPTS RATHER THAN EXECUTING A MATRIX. Scenarios run in a declared order:
 zero-effect first, because a false positive there invalidates everything after
@@ -94,9 +98,6 @@ POLICY = ThresholdPolicy(metric_id="debiased_relative_l2_squared",
 # The raw unsigned norm remains REPORTED, as the diagnostic it is: it is what
 # shows the N^-1/2 history scaling and what common random numbers buy.
 RAW_METRIC_ID = "relative_l2"
-# Declared BEFORE the run: a bin below this carries no usable dose information
-# and would make a relative metric a measure of the floor.
-DOSE_FLOOR_FRACTION = 1e-3
 # DIAGNOSTIC CEILING ONLY. This is deliberately no longer an Omega_b membership
 # criterion — see `omega_b` for why a statistical cut on a region definition
 # made the mesh factors incomparable.
@@ -167,35 +168,35 @@ def _seed(draw: int, rep: int, state: str, paired: bool) -> int:
 MIN_BIOMASS_VOLUME_FRACTION = 0.5
 
 
-def omega_b(dose0, mass, biomass_fraction) -> np.ndarray:
-    """Biological occupancy AND positive mass AND above the dose floor.
+def omega_b(mass, biomass_fraction) -> np.ndarray:
+    """Biological occupancy AND positive mass. TWO criteria, both GEOMETRIC.
 
     OCCUPANCY COMES FROM THE EXACT CSG VOLUMES, not from subsampling the lattice.
     Taking `occ[::factor]` picks one representative voxel per coarse bin, so a
     bin that is 12% biomass and 88% medium counts as fully biological — and the
-    two mesh factors then measure DIFFERENT regions, which shows up as
-    discretisation error that is really a definitional artifact. Asking what
-    fraction of the bin's volume is actually biomass makes the factors
-    comparable, and the volumes are already computed for the mass denominator.
+    mesh factors then measure DIFFERENT regions, which shows up as
+    discretisation error that is really a definitional artifact.
 
-    MEMBERSHIP MUST NOT DEPEND ON THE ESTIMATOR. This previously also required
-    `rel_err < MAX_REL_ERR`, which is a STATISTICAL criterion, and it bit the
-    two mesh factors unequally: at factor 1 it removed bins (983/949/968 of
-    8000 = 12.1%, median rel_err 0.1837 against a 0.25 cut), while at factor 2
-    it never bound (a constant 215/1000 = 21.5%, median 0.0837). The factors
-    were therefore compared over regions differing ~2x in fractional coverage,
-    and part of the 22% factor-1-to-2 movement previously attributed to
-    discretisation was that. Worse, the region would have SHIFTED on buying
-    more histories, so the metric's own domain moved with its precision.
+    MEMBERSHIP MUST NOT DEPEND ON THE ESTIMATOR, and this module has now had to
+    learn that twice.
 
-    `MAX_REL_ERR` survives as a reported diagnostic, not as a gate: the
-    rel_err distribution over Omega_b is recorded per record so a
-    poorly-resolved run is visible rather than silently trimmed.
+    The first version also required `rel_err < MAX_REL_ERR`, which removed about
+    a third of the bins at factor 1 and none at factor 2, and moved the region
+    with the history count.
+
+    The second still required a dose floor at 1e-3 of the peak — taken from
+    REPLICATE 0's field. That is subtler and it is the same error: the region
+    became a random set drawn from one replicate, so of the R(R-1) ordered pairs
+    the U-statistic averages, 2(R-1) of them involve a row that helped choose the
+    weights. With R = 3 that is four pairs of six, and the independence argument
+    the debiasing rests on does not hold for them.
+
+    The magnitude was small — under 1% of E^2, well inside one standard error —
+    but the floor was also doing almost no work: sub-floor biomass bins carry a
+    fraction of a percent of the weighted norm. Paying any bias for that is a bad
+    trade, and an estimator-free region needs no argument about magnitude at all.
     """
-    floor = DOSE_FLOOR_FRACTION * float(np.nanmax(dose0)) if np.isfinite(
-        np.nanmax(dose0)) else 0.0
-    return ((biomass_fraction >= MIN_BIOMASS_VOLUME_FRACTION)
-            & (mass > 0) & (dose0 > floor))
+    return ((biomass_fraction >= MIN_BIOMASS_VOLUME_FRACTION) & (mass > 0))
 
 
 def biomass_volume_fraction(volumes: dict, dimension) -> np.ndarray:
@@ -243,6 +244,10 @@ def main(argv=None) -> int:
                          "because the numerics bound over exactly two factors "
                          "is a single difference, which cannot show whether "
                          "the field has begun to converge")
+    ap.add_argument("--publish", action="store_true",
+                    help="replace the canonical tables in data/calibration/. "
+                         "Requires the complete scenario set; without it the "
+                         "tables are written under --outdir")
     ap.add_argument("--levers", action="store_true",
                     help="re-measure the material lever ranking as real "
                          "scenarios that write sample rows. The ranking used "
@@ -254,6 +259,21 @@ def main(argv=None) -> int:
                     help="add the 20%% Gd case, whose effect sits just above "
                          "the declared threshold; its verdict is a finding")
     args = ap.parse_args(argv)
+
+    # CHECKED BEFORE ANY TRANSPORT RUNS. A refusal that arrives after the
+    # histories have been paid for is a refusal that costs what it was meant to
+    # save -- the same reason the scan path rejects an unsupported refinement
+    # factor up front rather than failing on a reshape at the end.
+    if args.publish:
+        missing = [flag for flag, on in (("--levers", args.levers),
+                                         ("--include-near-threshold",
+                                          args.include_near_threshold)) if not on]
+        if missing:
+            raise SystemExit(
+                "--publish writes the canonical tables in data/calibration/, and "
+                f"this run omits {', '.join(missing)}. A partial scenario set "
+                "must not replace a complete one: the rows it would drop are the "
+                "provenance for numbers the reports cite.")
 
     from biofilm_openmc.model import build_biofilm_cylinder_model
 
@@ -393,7 +413,7 @@ def main(argv=None) -> int:
 
                 (b_fields, mass), (f_fields, _) = (per_state["baseline"],
                                                    per_state["feedback"])
-                mask = omega_b(b_fields[0].field, mass, bio_fraction)
+                mask = omega_b(mass, bio_fraction)
 
                 # THE GATE STATISTIC, one per outer draw. The U-statistic runs
                 # over ORDERED REPLICATE PAIRS r != s, so it consumes the
@@ -517,10 +537,27 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
             "numerics_n_factors": len(by_factor),
             "numerics_per_factor_mean": {str(f): v for f, v in by_factor.items()},
         }
+        # THE GATE READS ONE RESOLUTION, WIDENED BY THE BOUND FOR THE OTHERS.
+        #
+        # Pooling draws across mesh factors put a systematic, monotone
+        # discretisation trend inside a distribution the gate reads as sampling
+        # spread. It is a large trend: `clearly_detectable` runs 5.05e-2 at
+        # f = 1 to 8.09e-2 at f = 5, a 60% drift and ~71x the correct standard
+        # error, and `mesh_coarsening_factor` is declared a convergence_axis
+        # precisely so it is never drawn from.
+        #
+        # Reading only the finest factor would be a RELAXATION on its own:
+        # `lever_density_x1.35`'s 99% upper bound falls 7.59e-4 -> 7.12e-5,
+        # under the 4e-4 practical floor, turning "real but not worth acting
+        # on" into "below threshold" by looking at less. Passing the residual
+        # discretisation bound restores it. Under finest+bound no verdict in
+        # this run becomes easier and three become stricter.
+        finest = min(by_factor) if by_factor else None
         draws = np.array([x["e_squared"] for x in debiased
-                          if x["scenario"] == s and x["e_squared"] is not None],
-                         dtype=float)
-        v = (decide(draws, b, POLICY, metric_id=POLICY.metric_id)
+                          if x["scenario"] == s and x["e_squared"] is not None
+                          and x["mesh_factor"] == finest], dtype=float)
+        v = (decide(draws, b, POLICY, metric_id=POLICY.metric_id,
+                    resolution_bound=math.sqrt(numerics_bound))
              if draws.size else
              S0Verdict("NOT_EVALUATED", "no finite effects recorded"))
         verdicts[s] = {
@@ -550,27 +587,64 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
     nf = eff(lambda r: r["scenario"] == "noise_floor")
     floor = float(np.quantile(nf, 0.99)) if nf.size else float("nan")
 
-    # SIGNIFICANCE NOW COMES FROM THE ESTIMATOR'S OWN STANDARD ERROR, not from
-    # a comparison against another scenario. The debiased statistic is centred
-    # on zero when nothing changed, so "is this distinguishable from no effect"
-    # is a question about its jackknife spread — and unlike the 3x-floor rule it
-    # replaces, this needs no second scenario and acquires no status as an
-    # undeclared second threshold.
+    # SIGNIFICANCE COMES FROM THE SPREAD ACROSS OUTER DRAWS AT ONE RESOLUTION.
+    #
+    # Three separate errors were folded into the previous version.
+    #
+    # 1. It pooled rows over BOTH outer draws and mesh factors, so a systematic
+    #    resolution trend entered a quantity read as sampling spread.
+    # 2. `sqrt(mean(jackknife_var))` is the root-mean-square standard error of
+    #    ONE row. It carries no 1/sqrt(M) and no between-draw term, so it is not
+    #    the standard error of the mean it was divided into. Measured against a
+    #    cluster-on-outer-draw SE on the committed run it is CONSERVATIVE in 10
+    #    of 11 scenarios (2.1x to 10.2x) and anti-conservative in one (0.87x) —
+    #    so the old flag produced no false positives here, but it was not
+    #    measuring what its name claimed.
+    # 3. A "3 sigma" cut on M - 1 = 3 degrees of freedom is a ~94% one-sided
+    #    test wearing a 99.9% label. The t critical value is 10.21, not 3.
+    #
+    # The transport floor is kept because the between-draw SD can collapse by
+    # chance at M = 4, and it is conservative: the delete-one jackknife on a
+    # RATIO overstates the true per-row SD by roughly 1.8x at R = 3. It is a
+    # floor and is labelled as one, not an estimate of the rho -> 1 limit.
+    T_CRIT_999 = {1: 318.3, 2: 22.33, 3: 10.21, 4: 7.173, 5: 5.893}
     for s, v in verdicts.items():
+        v["raw_noise_floor_q99"] = floor if math.isfinite(floor) else None
+        fine = min({x["mesh_factor"] for x in debiased
+                    if x["scenario"] == s}, default=None)
         rows = [x for x in debiased if x["scenario"] == s
+                and x["mesh_factor"] == fine
                 and x["e_squared"] is not None
                 and x["jackknife_var"] is not None]
-        v["raw_noise_floor_q99"] = floor if math.isfinite(floor) else None
         if rows:
-            e2 = float(np.mean([x["e_squared"] for x in rows]))
-            se = float(np.sqrt(np.mean([x["jackknife_var"] for x in rows])))
+            y = np.array([x["e_squared"] for x in rows], dtype=float)
+            jack = np.array([x["jackknife_var"] for x in rows], dtype=float)
+            m = y.size
+            between = float(np.std(y, ddof=1) / math.sqrt(m)) if m > 1 else 0.0
+            transport_floor = float(math.sqrt(float(np.mean(jack)) / m))
+            se = max(between, transport_floor)
+            e2 = float(np.mean(y))
+            crit = T_CRIT_999.get(m - 1, 3.09)
             v["e_squared_mean"] = e2
             v["e_squared_standard_error"] = se
-            v["z_versus_zero"] = e2 / se if se > 0 else None
-            v["distinguishable_from_zero"] = bool(se > 0 and e2 > 3.0 * se)
+            v["standard_error_basis"] = (
+                "between_outer_draw_at_finest_mesh, floored by the mean "
+                "jackknife variance / M")
+            v["n_outer_draws"] = int(m)
+            v["t_versus_zero"] = e2 / se if se > 0 else None
+            v["t_critical_0.999"] = crit
+            v["distinguishable_from_zero"] = bool(se > 0 and e2 > crit * se)
+            # Kept because it is the right input to VarianceBudget.transport and
+            # answers "would more histories help" — but it is a per-row spread,
+            # not the standard error of anything reported here.
+            v["transport_sd_per_row_jackknife"] = float(
+                math.sqrt(float(np.mean(jack))))
         else:
-            v["e_squared_mean"] = v["e_squared_standard_error"] = None
-            v["z_versus_zero"] = v["distinguishable_from_zero"] = None
+            for key in ("e_squared_mean", "e_squared_standard_error",
+                        "t_versus_zero", "distinguishable_from_zero",
+                        "n_outer_draws", "t_critical_0.999",
+                        "transport_sd_per_row_jackknife"):
+                v[key] = None
 
     prov = git_provenance(str(REPO))
     budget_doc = {
@@ -658,7 +732,19 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
             w.writeheader()
             w.writerows(rows)
 
-    data_dir = REPO / "data" / "calibration"
+    # WRITING THE CANONICAL TABLES IS AN EXPLICIT ACT, NOT A SIDE EFFECT.
+    #
+    # These paths previously took mode "w" on every run. The documented default
+    # invocation omits --levers, so a routine rerun DELETED every lever row in
+    # data/calibration/openmc_effect_samples.csv -- the rows that are the entire
+    # provenance for the lever ranking and for the PILOT-LEV-02 claim. The
+    # symptom is silent: the file is still there, still well formed, and simply
+    # no longer contains the evidence a published table cites.
+    #
+    # Publishing now requires --publish AND the complete scenario set, so a
+    # partial run cannot replace a complete one. Everything else lands in
+    # --outdir, where overwriting costs nothing.
+    data_dir = (REPO / "data" / "calibration") if args.publish else args.outdir
     _write(data_dir / "openmc_effect_samples.csv",
            "# openmc_effect_samples — one row per transport replicate.\n"
            "# tier S0, target_calibration = false.\n"
@@ -706,10 +792,10 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
           f"  dominant={budget.dominant}")
     print(f"raw unsigned-norm bias (q99 of noise_floor): {floor:.4g}"
           "   [diagnostic]")
-    print(f"{'scenario':26} {'E^2':>11} {'+/- se':>10} {'z':>7}  verdict")
+    print(f"{'scenario':26} {'E^2':>11} {'+/- se':>10} {'t':>7}  verdict")
     for s, v in verdicts.items():
         e2, se, z = (v["e_squared_mean"], v["e_squared_standard_error"],
-                     v["z_versus_zero"])
+                     v["t_versus_zero"])
         flag = {True: "", False: "  [NOT DISTINGUISHABLE FROM ZERO]",
                 None: "  [no estimate]"}[v["distinguishable_from_zero"]]
         cells = ("%11.3e %10.1e %7.1f" % (e2, se, z)

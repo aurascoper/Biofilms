@@ -95,3 +95,66 @@ change the transport result and must not invalidate it. A Gy/s field is keyed on
 `fingerprint.dose_state_hash` (transport hash + activity) instead, so a scenario differing
 only in activity reuses the run and still gets its own dose. Never reuse a `DoseResult`
 across differing dose hashes.
+
+## `viewer_bundle.h5` — several native grids, one coordinate system
+
+Written by `biofilm_openmc.viewer.write_bundle`, produced today by
+`coupling/scripts/subvoxel_refinement.py --bundle`. Its reason for existing is a
+measured defect and its mirror image.
+
+`synthetic_e2e.py` upsamples a coarse dose field to lattice resolution **before**
+attribution, so its per-cell and per-lineage numbers are one coarse value repeated
+across every parcel in a bin. On a lattice-shaped grid that reads as per-parcel
+dose. Since the subvoxel refinement study the opposite case exists too — a native
+2× or 4× OpenMC dose field carrying structure the CPM grid cannot hold. Both are
+legitimate data; neither may be displayed as the other.
+
+```
+/                       attrs: schema_version, logical_axis_order = "xyz",
+                               dataset_axis_order_h5py = "zyx", manifest_json,
+                               + provenance_attrs()
+/grids/<grid_id>        attrs: shape_xyz, origin_cm, spacing_cm, extent_cm,
+                               material_resolution_grid, note
+/layers/<name>          3-D dataset, (z,y,x) storage as everywhere else
+                        attrs: grid_id, unit, semantic_kind, native,
+                               authoritative_for_quantitation, source_grid_id,
+                               derivation, note
+/tables/<name>          columnar; attrs: basis
+/tables/<name>/<column> attrs: unit
+```
+
+**Every grid shares one origin and one physical extent.** Grids may sample the
+volume differently; a bundle whose grids describe different volumes is two
+datasets in one file, and any overlay drawn from it misplaces things. Enforced.
+
+**`semantic_kind` decides how a layer may be resampled**, and getting it wrong is
+off by `factor³` rather than visibly broken — the same distinction
+`calibration/biofilm_calibration/spatial/field.py` states from the other side:
+
+| kind | reduce by |
+|---|---|
+| `extensive` (energy, mass) | block **sum** |
+| `intensive` (dose, volume fraction) | **mass-weighted** mean (`mesh.coarsen_ratio`), never a plain one |
+| `categorical` (cell_id, species_id) | never by arithmetic — a mean of two labels is a third label |
+| `boolean` (interior_mask, Ω_b) | any/all, declared |
+
+**The direction of resampling decides whether a layer may be quoted.**
+
+- **Upsampling** broadcasts one value across bins that were never separately
+  measured. It *invents* information, so `authoritative_for_quantitation` is
+  refused — whatever the arithmetic, and even where the result happens to be
+  exact, because a reader who learns to trust one upsampled layer will trust the
+  next one, which will be a dose field.
+- **Reduction** destroys information and invents none. A 4× dose field reduced to
+  the lattice reproduces the native lattice field to 5.6e-16, so it stays
+  quotable. A "reduction" onto a grid that is *not coarser* is refused: that label
+  is the only thing standing between upsampling and being quoted.
+
+**Attribution is a table, not a field.** Per-cell dose is a join of a field with
+labels; when that field was upsampled first, the table holds one coarse value
+repeated across every parcel in a bin. As a table with `basis` stamped on it, it
+reads as what it is.
+
+**Units are not decoration.** Transport fields are **Gy per source particle**, not
+Gy/s — they differ by the source activity, which the synthetic system does not
+have. A blank unit is never read as dimensionless; declare `"dimensionless"`.

@@ -61,44 +61,46 @@ def test_seeds_stay_distinct_across_draws_and_replicates():
     assert len(seeds) > len(distinct)  # the paired duplicates are intentional
 
 
-def test_omega_b_does_not_depend_on_transport_uncertainty():
-    """THE DEFECT THAT MADE THE MESH FACTORS INCOMPARABLE.
+def test_omega_b_takes_no_field_at_all():
+    """THE DEFECT THAT MADE THE MESH FACTORS INCOMPARABLE, AND ITS SEQUEL.
 
-    Omega_b used to require rel_err < 0.25 — a STATISTICAL cut on a REGION
-    definition. It removed about a third of the bins at factor 1 and none at
-    factor 2, so the two factors were compared over regions differing ~2x in
-    coverage, and the region would have moved on buying more histories.
+    Omega_b first required rel_err < 0.25 — a STATISTICAL cut on a REGION
+    definition, which removed about a third of the bins at factor 1 and none at
+    factor 2, so the factors covered regions differing ~2x in coverage and the
+    region moved with the history count.
 
-    The mask must be a function of geometry and dose alone. Asserted by varying
-    the uncertainty wildly and demanding the mask not move.
+    It then still required a dose floor taken from REPLICATE 0's field. Same
+    error, subtler: the region became a random set drawn from one replicate, so
+    of the R(R-1) ordered pairs the U-statistic averages, 2(R-1) involve a row
+    that helped choose the weights — four of six at R = 3 — and the
+    independence the debiasing rests on does not hold for them.
+
+    The strongest form of the guarantee is that no field is passed in at all: a
+    criterion that cannot be reached cannot be applied.
     """
+    params = pilot.omega_b.__code__.co_varnames[:pilot.omega_b.__code__.co_argcount]
+    assert params == ("mass", "biomass_fraction")
+    assert "rel_err" not in pilot.omega_b.__code__.co_varnames
+    assert not hasattr(pilot, "DOSE_FLOOR_FRACTION")
+
     rng = np.random.default_rng(0)
     shape = (4, 4, 4)
-    dose = rng.uniform(1.0, 2.0, shape)
     mass = np.full(shape, 0.5)
     frac = rng.uniform(0.0, 1.0, shape)
-
-    mask = pilot.omega_b(dose, mass, frac)
-    # omega_b takes no uncertainty argument at all — the strongest form of the
-    # guarantee, since a criterion that is not passed in cannot be applied.
-    assert "rel_err" not in pilot.omega_b.__code__.co_varnames
-    assert mask.shape == shape
+    mask = pilot.omega_b(mass, frac)
     assert np.array_equal(mask, frac >= pilot.MIN_BIOMASS_VOLUME_FRACTION)
 
 
-def test_omega_b_still_refuses_massless_and_floor_level_bins():
-    """The three PHYSICAL criteria must survive the removal of the statistical
-    one, or the metric starts measuring the dose floor."""
+def test_omega_b_still_refuses_massless_bins():
+    """The geometric criteria must survive the removal of the statistical ones,
+    or the metric starts including bins that hold nothing."""
     shape = (2, 2, 2)
     frac = np.ones(shape)
     mass = np.ones(shape)
-    dose = np.full(shape, 1.0)
-    dose[0, 0, 0] = 0.0          # at the floor
-    mass[1, 1, 1] = 0.0          # no mass
-
-    mask = pilot.omega_b(dose, mass, frac)
-    assert not mask[0, 0, 0] and not mask[1, 1, 1]
-    assert mask.sum() == 6
+    mass[1, 1, 1] = 0.0
+    mask = pilot.omega_b(mass, frac)
+    assert not mask[1, 1, 1]
+    assert mask.sum() == 7
 
 
 def test_the_lever_table_is_not_hardcoded_anywhere():
