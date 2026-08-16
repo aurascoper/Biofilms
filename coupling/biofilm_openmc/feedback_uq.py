@@ -23,10 +23,24 @@ worth the bookkeeping.
 Mesh bins are NOT independent — one history deposits in several — so per-label
 uncertainty comes from independent replicate runs, exactly as `lineage.py`
 already insists. Nothing here sums per-bin variances as if they were.
+
+A NORM OF A NOISY DIFFERENCE IS BIASED, AND ITS SCATTER WILL NOT SAY SO. This is
+the subtlest thing in this module. `relative_l2_effect` is unsigned, so with zero
+true effect it returns |noise| rather than 0, and it does so *stably* — the bias
+is systematic, so replicate variance stays small and reassuring while the
+estimate sits well above zero. The pilot measured a transport standard deviation
+of 0.0023 against a bias of 0.0545, a factor of 24, and reported only the former.
+
+`debiased_squared_effect` removes it by construction rather than by subtraction:
+across independent replicates the cross terms have no noise contribution, so the
+estimator is centred on the true squared effect and is negative about half the
+time when that effect is zero. It is what a gate should consume;
+`relative_l2_effect` is what a diagnostic should.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -175,6 +189,210 @@ def seed_sufficiency(n_seeds: int) -> dict:
         "note": ("adequate for screening, not for a tight uncertainty budget"
                  if n_seeds < 20 else "adequate for a production budget"),
     }
+
+
+def relative_l2_effect(d0, d1, mass, mask=None) -> float:
+    """Mass-weighted relative L2 field effect. THE RAW, BIASED DIAGNOSTIC.
+
+        E = sqrt( sum_b m_b (D1 - D0)^2 ) / sqrt( sum_b m_b D0^2 )
+
+    Not a raw maximum relative difference: near-zero bins would make that a
+    measure of the dose floor rather than of the material change.
+
+    IT IS AN UNSIGNED NORM, so it CANNOT return zero when the true effect is
+    zero — residual Monte Carlo noise enters as positive bias that never
+    cancels, and it does so stably, so replicate scatter never reveals it. The
+    pilot measured that floor at 0.0545 (finest mesh, 1e5 histories per run),
+    which is larger than four of six material levers of interest.
+
+    Kept because it remains the right diagnostic for three jobs: checking the
+    expected N^-1/2 history scaling, measuring what common random numbers buy,
+    and catching gross estimator regressions. For a GATE, use
+    `debiased_squared_effect` instead.
+    """
+    a = np.asarray(d0, dtype=float)
+    b = np.asarray(d1, dtype=float)
+    m = np.asarray(mass, dtype=float)
+    if mask is not None:
+        sel = np.asarray(mask, dtype=bool)
+        a, b, m = a[sel], b[sel], m[sel]
+    denom = math.sqrt(float(np.sum(m * a * a)))
+    if denom == 0.0:
+        return float("nan")
+    return math.sqrt(float(np.sum(m * (b - a) ** 2))) / denom
+
+
+def cross_replicate_inner(X, w) -> float:
+    """The U-statistic kernel: mean of x_r^T W x_s over ORDERED PAIRS r != s.
+
+        (1 / (R(R-1))) * sum_{r != s} x_r^T W x_s
+
+    Because replicates are independent, E[x_r^T W x_s] = E[x_r]^T W E[x_s] for
+    r != s, so this estimates ||E[x]||^2_W with NO noise term. The diagonal
+    r == s is exactly where the noise would enter — E[x_r^T W x_r] =
+    ||E[x]||^2_W + E[||noise||^2_W] — which is why it is excluded rather than
+    subtracted afterwards.
+
+    THE DIAGONAL IS ZEROED, NOT SUBTRACTED. `G.sum() - trace(G)` is
+    algebraically identical but forms and then cancels the large diagonal sum,
+    and near the null the off-diagonal total is tiny by comparison — precisely
+    the regime this estimator exists for. Zeroing keeps the cancellation out of
+    the arithmetic.
+
+    `X` is (R, B): one row per replicate, restricted to the region of interest.
+    `w` is the (B,) weight vector, i.e. the diagonal of W.
+    """
+    x = np.asarray(X, dtype=float)
+    weights = np.asarray(w, dtype=float)
+    if x.ndim != 2:
+        raise ValueError(f"X must be (R, B), got shape {x.shape}")
+    r = x.shape[0]
+    if r < 2:
+        return float("nan")
+    gram = (x * weights) @ x.T
+    np.fill_diagonal(gram, 0.0)
+    return float(gram.sum() / (r * (r - 1)))
+
+
+@dataclass(frozen=True)
+class DebiasedEffect:
+    """A squared effect that is zero in expectation when nothing changed."""
+    s_hat: float                # unbiased ||E[d]||^2_W, MAY BE NEGATIVE
+    denominator: float          # unbiased ||E[D0]||^2_W
+    e_squared: float            # s_hat / denominator, the gate statistic
+    n_replicates: int
+    jackknife_var: float        # delete-one-replicate variance of e_squared
+    metric_id: str = "debiased_relative_l2_squared"
+
+    @property
+    def signed_root(self) -> float:
+        """FOR HUMAN DISPLAY ONLY. Never feed this to a gate: taking a root
+        near zero reintroduces exactly the positive bias the estimator removes,
+        and the sign carries no directional meaning — it is an artifact of an
+        unbiased estimate of a non-negative quantity landing below zero."""
+        e = self.e_squared
+        if not math.isfinite(e):
+            return float("nan")
+        return math.copysign(math.sqrt(abs(e)), e)
+
+    def as_dict(self) -> dict:
+        def clean(x):
+            return None if x is None or not math.isfinite(x) else float(x)
+        return {"s_hat": clean(self.s_hat), "denominator": clean(self.denominator),
+                "e_squared": clean(self.e_squared),
+                "n_replicates": int(self.n_replicates),
+                "jackknife_var": clean(self.jackknife_var),
+                "metric_id": self.metric_id}
+
+
+def _ratio(baseline_rows, difference_rows, weights) -> float:
+    num = cross_replicate_inner(difference_rows, weights)
+    den = cross_replicate_inner(baseline_rows, weights)
+    if not math.isfinite(den) or den == 0.0:
+        return float("nan")
+    return num / den
+
+
+def debiased_squared_effect(baseline, feedback, mass, mask=None) -> DebiasedEffect:
+    """The gate statistic: an unbiased estimate of the SQUARED relative effect.
+
+    `baseline` and `feedback` are sequences of R replicate fields. Within a
+    replicate the two states may share a random stream (common random numbers,
+    which reduce Var(d_r) and are therefore welcome); ACROSS replicates they
+    must be independent, which is what makes the r != s terms unbiased.
+
+    Returned squared, and compared against delta^2, because taking a square
+    root near zero reintroduces the positive bias this exists to remove.
+
+    THE DENOMINATOR IS DEBIASED TOO. E[||D0_r||^2_W] carries the baseline's own
+    noise power, so a naive ||D0||^2 denominator is biased HIGH and would drag
+    every ratio low. The same cross-replicate construction removes it.
+    """
+    b_rows = [np.asarray(x, dtype=float).ravel() for x in baseline]
+    f_rows = [np.asarray(x, dtype=float).ravel() for x in feedback]
+    r = min(len(b_rows), len(f_rows))
+    if r < 3:
+        # 2 replicates admit the estimator but not its jackknife, and a variance
+        # nobody can estimate is not a usable gate input.
+        return DebiasedEffect(float("nan"), float("nan"), float("nan"), r,
+                              float("nan"))
+
+    m = np.asarray(mass, dtype=float).ravel()
+    if mask is None:
+        sel = slice(None)
+    else:
+        sel = np.asarray(mask, dtype=bool).ravel()
+    weights = m[sel]
+
+    d0 = np.array([row[sel] for row in b_rows[:r]])
+    d1 = np.array([row[sel] for row in f_rows[:r]])
+    diff = d1 - d0
+
+    s_hat = cross_replicate_inner(diff, weights)
+    denom = cross_replicate_inner(d0, weights)
+    e2 = _ratio(d0, diff, weights)
+
+    # Delete-one-replicate jackknife on the RATIO, since the ratio is what the
+    # gate consumes and its variance is not the numerator's.
+    keep = [i for i in range(r)]
+    loo = np.array([_ratio(np.delete(d0, i, axis=0), np.delete(diff, i, axis=0),
+                           weights) for i in keep], dtype=float)
+    finite = loo[np.isfinite(loo)]
+    jack = (float((r - 1) / r * np.sum((finite - finite.mean()) ** 2))
+            if finite.size > 1 else float("nan"))
+
+    return DebiasedEffect(s_hat, denom, e2, r, jack)
+
+
+def sobolev_smooth(field, alpha: float, spacing=None) -> np.ndarray:
+    """Solve (I - alpha * Laplacian) u = f exactly, homogeneous Neumann.
+
+    An H^1 regularisation: `alpha` has units of length squared and sets the
+    smoothing length sqrt(alpha). Zero-flux boundaries are the physically right
+    choice for a bounded specimen — a periodic solve would wrap dose across the
+    cylinder — and they match the 6-connected Neumann stencil the CPM already
+    uses (`biofilms_potts.jl:668`, `biofilms_potts_jacc.jl:215`).
+
+    DIAGNOSTIC AND DISPLAY ONLY. This must never enter a gate statistic.
+    Smoothing a difference field changes any norm computed on it: it can hide
+    real localized structure and it can manufacture apparent structure out of
+    noise. Nothing in `feedback_gate` or `synthetic_gate` may import it, and a
+    test asserts exactly that.
+
+    Method: even-symmetric extension on every axis realises a DCT, which
+    diagonalises the Neumann Laplacian, so the solve is one FFT, one divide and
+    one inverse FFT — exact, deterministic, no solver tolerance, and numpy-only.
+    scipy is deliberately absent from this package's dependency tier.
+
+    NOTE THE TRAP: applying 1-D solves axis by axis computes
+    prod_i (I - alpha d_i^2)^-1, NOT (I - alpha sum_i d_i^2)^-1. Both preserve
+    constants and both reduce to the identity at alpha = 0, so only the PDE
+    residual distinguishes them. The transform is taken over all axes at once.
+    """
+    f = np.asarray(field, dtype=float)
+    if alpha < 0:
+        raise ValueError(f"alpha must be non-negative, got {alpha}")
+    if alpha == 0:
+        return f.copy()
+    h = ((1.0,) * f.ndim if spacing is None
+         else tuple(float(s) for s in np.broadcast_to(np.asarray(spacing, float),
+                                                      (f.ndim,))))
+    if any(s <= 0 for s in h):
+        raise ValueError(f"spacing must be positive, got {h}")
+
+    ext = f
+    for axis in range(f.ndim):
+        ext = np.concatenate([ext, np.flip(ext, axis)], axis=axis)
+
+    lam = np.zeros(ext.shape, dtype=float)
+    for axis, step in enumerate(h):
+        k = np.fft.fftfreq(ext.shape[axis])
+        eig = (4.0 / step ** 2) * np.sin(np.pi * k) ** 2
+        shape = [-1 if i == axis else 1 for i in range(f.ndim)]
+        lam = lam + eig.reshape(shape)
+
+    u = np.fft.ifftn(np.fft.fftn(ext) / (1.0 + alpha * lam)).real
+    return u[tuple(slice(0, n) for n in f.shape)]
 
 
 def common_random_number_benefit(paired: PairedEffect,

@@ -13,23 +13,38 @@ cannot honestly be declared in advance because it depends on the spread this
 pilot is measuring. It stops on budget exhaustion and returns an indeterminate
 verdict rather than a cheap one.
 
-THE PRIMARY METRIC is the mass-weighted relative L2 dose-field effect over
-occupied biological material:
+THE GATE STATISTIC IS A DEBIASED SQUARED EFFECT, estimated across ordered
+replicate pairs r != s:
 
-    E = sqrt( sum_b m_v (D1 - D0)^2 ) / sqrt( sum_b m_v D0^2 )
+    S_hat = (1 / R(R-1)) sum_{r != s} d_r^T W d_s,     d_r = D1_r - D0_r
 
-Not a raw maximum relative difference: near-zero bins make that a measure of the
-dose floor rather than of the material change. Omega_b requires biological
-occupancy, positive mass, and a declared dose floor — three PHYSICAL criteria,
-declared before the run. It deliberately no longer requires acceptable transport
-uncertainty: a statistical criterion on a region definition made the region move
-with the history count and made the two mesh factors cover different fractions
-of the domain. See `omega_b`.
+Because replicates are independent, E[d_r^T W d_s] = E[d_r]^T W E[d_s], so this
+estimates ||E[d]||^2_W with NO noise term. It is normalised by the same
+cross-replicate construction on the baseline — E[||D0_r||^2_W] carries the
+baseline's own noise power, so a naive squared-norm denominator is biased high —
+and compared against delta^2. Squared throughout: taking a root near zero
+reintroduces exactly the bias this removes. S_hat MAY BE NEGATIVE, and must be,
+about half the time when nothing changed.
 
-THE METRIC IS UNSIGNED, so it cannot return zero even when the true effect is
-zero, and it has a noise floor that must be measured rather than assumed. The
-`noise_floor` scenario measures it by running identical material with
-DECORRELATED seeds; every other scenario is reported against it.
+WHY, AND WHAT IT REPLACED. The former primary metric was the mass-weighted
+relative L2 norm E = sqrt(sum_b m_b (D1-D0)^2) / sqrt(sum_b m_b D0^2). A norm is
+UNSIGNED, so with zero true effect and residual Monte Carlo noise it returns
+|noise|, not 0 — and returns it *stably*, so replicate scatter never reveals the
+bias. Measured here, that bias was 0.0545 at the finest mesh, larger than four of
+the six material levers of interest. It is still computed and still reported,
+because it remains the right evidence for the N^-1/2 history scaling and for what
+common random numbers buy; it is no longer what any verdict rests on.
+
+Omega_b requires biological occupancy, positive mass, and a declared dose floor —
+three PHYSICAL criteria, declared before the run. It deliberately does not
+require acceptable transport uncertainty: a statistical criterion on a region
+definition made the region move with the history count and made the mesh factors
+cover different fractions of the domain. See `omega_b`.
+
+The `noise_floor` scenario runs identical material with DECORRELATED seeds. Under
+the raw norm it reports that norm's bias; under the debiased statistic it should
+be indistinguishable from zero, and a run where it is not has a defect the gate
+cannot see.
 
 EVERY VARIANCE SOURCE IS MEASURED SEPARATELY, because the A0 lesson is that
 Monte Carlo noise falls with histories while resolution loss is a floor that
@@ -57,6 +72,8 @@ from biofilm_calibration.joint_uncertainty import CorrelationGroup, sample_joint
 
 from biofilm_openmc.config import BIOFILM_CYLINDER, load_dose_rate_config
 from biofilm_openmc.dose import dose_from_per_source, per_source_from_statepoint
+from biofilm_openmc.feedback_uq import (debiased_squared_effect,
+                                        relative_l2_effect)
 from biofilm_openmc.fingerprint import transport_state_hash
 from biofilm_openmc.lineage import aggregate_by_label
 from biofilm_openmc.materials import (mesh_material_masses_kg,
@@ -66,7 +83,17 @@ from biofilm_openmc.snapshot import load_snapshot
 from biofilm_openmc.synthetic_gate import (S0Verdict, ThresholdPolicy,
                                            VarianceBudget, decide)
 
-POLICY = ThresholdPolicy()
+# THE GATE DECIDES ON THE DEBIASED SQUARED EFFECT, not on the raw norm. The
+# same 0.10 and 0.02 magnitudes are declared, squared, because the statistic is
+# squared — comparing a threshold denominated in E against draws denominated in
+# E^2 is a silent factor-of-ten error, which is why `metric_id` is carried and
+# `decide()` refuses a mismatch.
+POLICY = ThresholdPolicy(metric_id="debiased_relative_l2_squared",
+                         effect_threshold=0.10 ** 2,
+                         practical_importance_floor=0.02 ** 2)
+# The raw unsigned norm remains REPORTED, as the diagnostic it is: it is what
+# shows the N^-1/2 history scaling and what common random numbers buy.
+RAW_METRIC_ID = "relative_l2"
 # Declared BEFORE the run: a bin below this carries no usable dose information
 # and would make a relative metric a measure of the floor.
 DOSE_FLOOR_FRACTION = 1e-3
@@ -78,6 +105,38 @@ MAX_REL_ERR = 0.25
 # The density lever moves rho rather than the composition, so it cannot be
 # expressed as a feedback element map like every other scenario.
 DENSITY_SCALE = {"lever_density_x1.35": 1.35}
+
+
+def _nuclear_data_id() -> str:
+    """Identify the cross-section library ACTUALLY IN USE, not a literal.
+
+    `synthetic_e2e.py` hardcodes the string "endfb-viii.0". That is a claim
+    about the environment made by the source file rather than read from it, so
+    it stays correct only as long as nobody points OPENMC_CROSS_SECTIONS
+    somewhere else. Reading the env var reports what the run really used, and
+    the recorded SHA-256 (written alongside the library per docs/openmc_stack.md)
+    distinguishes two libraries that share a filename.
+    """
+    import os
+    xs = os.environ.get("OPENMC_CROSS_SECTIONS", "")
+    if not xs:
+        return "OPENMC_CROSS_SECTIONS unset"
+    path = Path(xs)
+    library = path.parent
+    # The recorded checksum is the one for the downloaded ARCHIVE, not for
+    # cross_sections.xml — `docs/openmc_stack.md` promises the latter and only
+    # the former exists. The archive digest is the stronger identity anyway
+    # (it pins every data file, not just the index), so look for it beside the
+    # extracted directory before giving up.
+    candidates = [path.with_name(path.name + ".sha256")]
+    if library.parent.exists():
+        candidates += sorted(library.parent.glob(f"{library.name}*.sha256"))
+    for candidate in candidates:
+        if candidate.exists():
+            digest = candidate.read_text().split()[0]
+            return (f"{library.name}/{path.name} "
+                    f"sha256={digest[:16]} ({candidate.name})")
+    return f"{library.name}/{path.name} sha256=unrecorded"
 
 
 def _seed(draw: int, rep: int, state: str, paired: bool) -> int:
@@ -101,15 +160,6 @@ def _seed(draw: int, rep: int, state: str, paired: bool) -> int:
     """
     return 1000 * (draw + 1) + rep + (0 if paired or state == "baseline"
                                       else 500_000)
-
-
-def relative_l2_effect(d0, d1, mass, mask) -> float:
-    """The primary metric. Mass-weighted, relative, and restricted to Omega_b."""
-    m, a, b = mass[mask], d0[mask], d1[mask]
-    denom = math.sqrt(float(np.sum(m * a * a)))
-    if denom == 0.0:
-        return float("nan")
-    return math.sqrt(float(np.sum(m * (b - a) ** 2))) / denom
 
 
 # A coarse bin counts as biological when at least this much of its VOLUME is
@@ -287,6 +337,7 @@ def main(argv=None) -> int:
     total_histories = 0
     statepoint_bytes = 0
     records: list[dict] = []
+    debiased: list[dict] = []
     stopped_early = None
 
     for factor in factors:
@@ -343,6 +394,22 @@ def main(argv=None) -> int:
                 (b_fields, mass), (f_fields, _) = (per_state["baseline"],
                                                    per_state["feedback"])
                 mask = omega_b(b_fields[0].field, mass, bio_fraction)
+
+                # THE GATE STATISTIC, one per outer draw. The U-statistic runs
+                # over ORDERED REPLICATE PAIRS r != s, so it consumes the
+                # replicate dimension: there is no per-replicate debiased value
+                # to record, and its spread comes from the jackknife rather
+                # than from replicate scatter.
+                deb = debiased_squared_effect([b.field for b in b_fields],
+                                              [f.field for f in f_fields],
+                                              mass, mask)
+                debiased.append({
+                    "scenario": scenario, "mesh_factor": factor,
+                    "outer_draw": draw, "density_g_cm3": float(rho),
+                    "paired_seeds": bool(paired_seeds),
+                    "omega_b_bins": int(mask.sum()), **deb.as_dict(),
+                })
+
                 for i, (b, f) in enumerate(zip(b_fields, f_fields)):
                     err = b.rel_err[mask]
                     records.append({
@@ -366,11 +433,13 @@ def main(argv=None) -> int:
             break
 
     wall_total = time.perf_counter() - started
-    return _report(records, args, runs, total_histories, statepoint_bytes,
+    return _report(records, debiased, args, runs, total_histories,
+                   statepoint_bytes,
                    wall_total, raytrace_wall, stopped_early, base, snapshot)
 
 
-def _report(records, args, runs, histories, sp_bytes, wall, raytrace_wall,
+def _report(records, debiased, args, runs, histories, sp_bytes, wall,
+            raytrace_wall,
             stopped_early, base, snapshot) -> int:
     import openmc
 
@@ -386,16 +455,22 @@ def _report(records, args, runs, histories, sp_bytes, wall, raytrace_wall,
     factors = sorted({r["mesh_factor"] for r in records})
     budgets, verdicts = {}, {}
     for s in scenario_names:
+        # EVERY BUDGET TERM IS IN E^2, the units the gate decides in. Mixing a
+        # raw-norm variance into a squared-effect verdict would repeat, in a
+        # subtler place, exactly the units error `metric_id` now refuses.
         within, per_draw = [], []
         for f in factors:
             for d in sorted({r["outer_draw"] for r in records}):
-                v = eff(lambda r, f=f, s=s, d=d: (r["mesh_factor"] == f
-                                                  and r["scenario"] == s
-                                                  and r["outer_draw"] == d))
-                if v.size > 1:
-                    within.append(float(np.var(v, ddof=1)))
-                if v.size:
-                    per_draw.append((f, float(np.mean(v))))
+                rows = [x for x in debiased
+                        if x["mesh_factor"] == f and x["scenario"] == s
+                        and x["outer_draw"] == d
+                        and x["e_squared"] is not None]
+                # TRANSPORT SPREAD COMES FROM THE JACKKNIFE, not from replicate
+                # scatter: the U-statistic runs over replicate PAIRS, so it
+                # consumes that dimension and leaves one value per outer draw.
+                within += [x["jackknife_var"] for x in rows
+                           if x["jackknife_var"] is not None]
+                per_draw += [(f, x["e_squared"]) for x in rows]
         transport_var = float(np.mean(within)) if within else 0.0
         calib_var = 0.0
         for f in factors:
@@ -436,36 +511,66 @@ def _report(records, args, runs, histories, sp_bytes, wall, raytrace_wall,
                            calibration=calib_var, model_form=0.0)
         budgets[s] = {
             **b.as_dict(),
+            "units": POLICY.metric_id,
+            "transport_basis": "mean_delete_one_replicate_jackknife_variance",
             "numerics_basis": "max_squared_deviation_from_finest_mesh",
             "numerics_n_factors": len(by_factor),
             "numerics_per_factor_mean": {str(f): v for f, v in by_factor.items()},
         }
-        draws = eff(lambda r, s=s: r["scenario"] == s)
-        v = decide(draws, b, POLICY) if draws.size else S0Verdict(
-            "NOT_EVALUATED", "no finite effects recorded")
-        verdicts[s] = {**v.as_dict(),
-                       "per_factor_mean": {str(f): float(np.mean(
-                           eff(lambda r, f=f, s=s: r["mesh_factor"] == f
-                               and r["scenario"] == s)))
-                           for f in factors}}
+        draws = np.array([x["e_squared"] for x in debiased
+                          if x["scenario"] == s and x["e_squared"] is not None],
+                         dtype=float)
+        v = (decide(draws, b, POLICY, metric_id=POLICY.metric_id)
+             if draws.size else
+             S0Verdict("NOT_EVALUATED", "no finite effects recorded"))
+        verdicts[s] = {
+            **v.as_dict(),
+            "metric_id": POLICY.metric_id,
+            "per_factor_mean": {str(f): v for f, v in by_factor.items()},
+            # The raw unsigned norm alongside, as a DIAGNOSTIC, so the bias the
+            # debiased statistic removes stays visible rather than merely
+            # asserted.
+            "raw_relative_l2_median": {
+                "metric_id": RAW_METRIC_ID,
+                **{str(f): float(np.median(
+                    eff(lambda r, f=f, s=s: r["mesh_factor"] == f
+                        and r["scenario"] == s)))
+                   for f in factors
+                   if eff(lambda r, f=f, s=s: r["mesh_factor"] == f
+                          and r["scenario"] == s).size}},
+        }
     budget = VarianceBudget(**{k: max(b[k] for b in budgets.values())
                                for k in ("transport", "numerics",
                                          "calibration", "model_form")})
 
-    # THE NOISE FLOOR IS MEASURED RATHER THAN ASSUMED ZERO. `noise_floor` runs
-    # the two states on IDENTICAL material with DECORRELATED seeds, so the
-    # effect it reports is exactly what this unsigned metric returns when the
-    # true effect is zero. Everything else is compared against it, because an
-    # unsigned norm cannot distinguish a small real effect from its own noise
-    # without knowing how large that noise is.
+    # THE RAW METRIC'S NOISE FLOOR, still measured and still reported — but now
+    # as a DIAGNOSTIC rather than as the significance test. `noise_floor` runs
+    # identical material with DECORRELATED seeds, so what it reports under the
+    # raw unsigned norm is that norm's positive bias.
     nf = eff(lambda r: r["scenario"] == "noise_floor")
     floor = float(np.quantile(nf, 0.99)) if nf.size else float("nan")
-    for v in verdicts.values():
-        med = v.get("effect_median")
-        v["noise_floor_q99"] = floor if math.isfinite(floor) else None
-        v["above_noise_floor"] = (
-            None if med is None or not math.isfinite(floor)
-            else bool(med > 3.0 * floor))
+
+    # SIGNIFICANCE NOW COMES FROM THE ESTIMATOR'S OWN STANDARD ERROR, not from
+    # a comparison against another scenario. The debiased statistic is centred
+    # on zero when nothing changed, so "is this distinguishable from no effect"
+    # is a question about its jackknife spread — and unlike the 3x-floor rule it
+    # replaces, this needs no second scenario and acquires no status as an
+    # undeclared second threshold.
+    for s, v in verdicts.items():
+        rows = [x for x in debiased if x["scenario"] == s
+                and x["e_squared"] is not None
+                and x["jackknife_var"] is not None]
+        v["raw_noise_floor_q99"] = floor if math.isfinite(floor) else None
+        if rows:
+            e2 = float(np.mean([x["e_squared"] for x in rows]))
+            se = float(np.sqrt(np.mean([x["jackknife_var"] for x in rows])))
+            v["e_squared_mean"] = e2
+            v["e_squared_standard_error"] = se
+            v["z_versus_zero"] = e2 / se if se > 0 else None
+            v["distinguishable_from_zero"] = bool(se > 0 and e2 > 3.0 * se)
+        else:
+            v["e_squared_mean"] = v["e_squared_standard_error"] = None
+            v["z_versus_zero"] = v["distinguishable_from_zero"] = None
 
     prov = git_provenance(str(REPO))
     budget_doc = {
@@ -517,32 +622,100 @@ def _report(records, args, runs, histories, sp_bytes, wall, raytrace_wall,
     if not records:
         print("no records — nothing to write")
         return 1
-    samples = REPO / "data" / "calibration" / "openmc_effect_samples.csv"
+
+    # PROVENANCE TRAVELS WITH THE COMMITTED TABLE. Previously it lived only in
+    # the two sibling JSONs, which sit under artifacts/ and are gitignored — so
+    # the committed CSV named no commit, no OpenMC version and no nuclear data,
+    # and could not be tied to the run that produced it.
+    #
+    # An artifact CANNOT record the commit that will contain it: it is written
+    # before that commit exists, so `git_commit` names the PARENT and carries a
+    # `-dirty` marker whenever the tree has uncommitted changes, which during a
+    # development run it always does. The honest identity is that pair plus the
+    # config and snapshot hashes, and it is written as such rather than implied.
+    prov_lines = [
+        f"# provenance: git_commit={prov.get('git_commit')}",
+        f"#   (names the PARENT commit; an artifact cannot name the commit that contains it)",
+        f"# provenance: openmc_version={openmc.__version__}",
+        f"# provenance: nuclear_data={_nuclear_data_id()}",
+        f"# provenance: particles={args.particles} batches={args.batches}"
+        f" replicates={args.replicates} outer_draws={args.outer_draws}",
+        f"# provenance: mesh_factors={args.mesh_factors}"
+        f" volume_samples={args.volume_samples}",
+        f"# provenance: threshold_policy_id={POLICY.threshold_policy_id}"
+        f" metric_id={POLICY.metric_id}",
+        f"# provenance: snapshot={args.snapshot.name} config={args.config.name}",
+        f"# provenance: argv={' '.join(sys.argv[1:])}",
+    ]
     import csv as _csv
-    with open(samples, "w", newline="", encoding="utf-8") as fh:
-        fh.write("# openmc_effect_samples — one row per transport replicate.\n"
-                 "# tier S0, target_calibration = false. The effect is the\n"
-                 "# mass-weighted relative L2 dose-field change over occupied\n"
-                 "# biological material, not a maximum relative difference.\n"
-                 "#\n"
-                 "# paired_seeds = false marks the noise-floor scenario, which\n"
-                 "# runs identical material with decorrelated seeds so the\n"
-                 "# effect it reports IS this unsigned metric's noise floor.\n"
-                 "# reported_rel_err_* are DIAGNOSTICS: rel_err is deliberately\n"
-                 "# not an Omega_b membership criterion, because a statistical\n"
-                 "# cut made the mesh factors cover different regions.\n")
-        w = _csv.DictWriter(fh, fieldnames=list(records[0]), lineterminator="\n")
-        w.writeheader()
-        w.writerows(records)
+
+    def _write(path, header, rows):
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            fh.write(header)
+            fh.write("#\n" + "\n".join(prov_lines) + "\n")
+            w = _csv.DictWriter(fh, fieldnames=list(rows[0]),
+                                lineterminator="\n")
+            w.writeheader()
+            w.writerows(rows)
+
+    data_dir = REPO / "data" / "calibration"
+    _write(data_dir / "openmc_effect_samples.csv",
+           "# openmc_effect_samples — one row per transport replicate.\n"
+           "# tier S0, target_calibration = false.\n"
+           "#\n"
+           "# THIS TABLE IS A DIAGNOSTIC, NOT THE GATE INPUT. effect_rel_l2 is\n"
+           "# an UNSIGNED norm, so it is positively biased under the null and\n"
+           "# cannot return zero when nothing changed. The gate decides on the\n"
+           "# debiased squared effect in openmc_debiased_effects.csv. This\n"
+           "# table remains the right evidence for the N^-1/2 history scaling\n"
+           "# and for what common random numbers buy.\n"
+           "#\n"
+           "# paired_seeds = false marks the noise-floor scenario, which runs\n"
+           "# identical material with decorrelated seeds so the effect it\n"
+           "# reports IS this unsigned metric's bias.\n"
+           "# reported_rel_err_* are DIAGNOSTICS: rel_err is deliberately not\n"
+           "# an Omega_b membership criterion, because a statistical cut made\n"
+           "# the mesh factors cover different regions.\n",
+           records)
+
+    if debiased:
+        _write(data_dir / "openmc_debiased_effects.csv",
+               "# openmc_debiased_effects — THE GATE INPUT. One row per\n"
+               "# (scenario, mesh_factor, outer_draw); there is deliberately no\n"
+               "# replicate column, because the U-statistic runs over ordered\n"
+               "# replicate PAIRS r != s and consumes that dimension.\n"
+               "#\n"
+               "# s_hat estimates ||E[d]||^2_W with no noise term, because for\n"
+               "# independent replicates E[d_r^T W d_s] = E[d_r]^T W E[d_s].\n"
+               "# IT MAY BE NEGATIVE, and that is the point: an unbiased\n"
+               "# estimate of a non-negative quantity must fall below zero\n"
+               "# about half the time when the true effect is zero. A negative\n"
+               "# row is evidence of no effect, never a defect.\n"
+               "#\n"
+               "# e_squared = s_hat / (debiased ||D0||^2_W) and is compared\n"
+               "# against delta^2. Do NOT take its square root before gating:\n"
+               "# a root near zero reintroduces the positive bias this exists\n"
+               "# to remove.\n"
+               "# jackknife_var is the delete-one-replicate variance OF THE\n"
+               "# RATIO, since the ratio is what the gate consumes.\n",
+               debiased)
 
     print(f"\nruns={runs} histories={histories:,} wall={wall:.1f}s "
           f"({budget_doc['histories_per_second']:,} hist/s)")
-    print(f"variance: {budget.as_dict()}  dominant={budget.dominant}")
-    print(f"noise floor (q99 of noise_floor scenario): {floor:.4g}")
+    print(f"variance ({POLICY.metric_id}): {budget.as_dict()}"
+          f"  dominant={budget.dominant}")
+    print(f"raw unsigned-norm bias (q99 of noise_floor): {floor:.4g}"
+          "   [diagnostic]")
+    print(f"{'scenario':26} {'E^2':>11} {'+/- se':>10} {'z':>7}  verdict")
     for s, v in verdicts.items():
-        flag = {True: "", False: "  [BELOW 3x NOISE FLOOR]",
-                None: "  [floor unmeasured]"}[v["above_noise_floor"]]
-        print(f"  {s:26} -> {v['verdict']}{flag}")
+        e2, se, z = (v["e_squared_mean"], v["e_squared_standard_error"],
+                     v["z_versus_zero"])
+        flag = {True: "", False: "  [NOT DISTINGUISHABLE FROM ZERO]",
+                None: "  [no estimate]"}[v["distinguishable_from_zero"]]
+        cells = ("%11.3e %10.1e %7.1f" % (e2, se, z)
+                 if e2 is not None and se is not None and z is not None
+                 else f"{'-':>11} {'-':>10} {'-':>7}")
+        print(f"  {s:24} {cells}  {v['verdict']}{flag}")
     if stopped_early:
         print(f"STOPPED EARLY: {stopped_early}")
     return 0

@@ -1,22 +1,32 @@
 # OpenMC nested pilot — variance, cost, and which lever actually moves dose
 
-**Date:** 2026-08-16, revised after an instrumentation repair · **Tier:** S0 ·
+**Date:** 2026-08-16, revised twice — instrument, then metric · **Tier:** S0 ·
 **`target_calibration = false`** · **Policy:** `synthetic_gate_contract_v1` ·
 **Reference D verdict:** `NOT_EVALUATED` ·
 **Driver:** `coupling/scripts/openmc_nested_pilot.py` ·
-**Artifacts:** `artifacts/pilot/openmc_nested_pilot_{budget,verdict}.json`,
-`data/calibration/openmc_effect_samples.csv`
+**Estimator:** `coupling/biofilm_openmc/feedback_uq.py` ·
+**Gate input:** `data/calibration/openmc_debiased_effects.csv` ·
+**Diagnostic:** `data/calibration/openmc_effect_samples.csv` ·
+**Budget/verdict:** `artifacts/pilot/openmc_nested_pilot_{budget,verdict}.json`
+(gitignored — the committed CSVs carry their own provenance headers)
 
-> **This revision supersedes the first version of this report.** An adversarial
-> re-reading of the pilot's own code found four defects in the *instrument*, not
-> in the transport. The physical conclusions largely survive — the lever ranking
-> is unchanged and now has provenance and an independent cross-check — but two
-> headline numbers were wrong in kind, and **the compute recommendation is
-> reversed.** The corrections are set out in "What was wrong" at the end.
+> **Revision 2 — the metric itself was replaced.** Fixing the instrument (below)
+> established that the primary metric had a positive bias under the null. It is
+> now superseded as the gate statistic by a cross-replicate **debiased squared
+> effect**, which is unbiased by construction. The raw norm survives as a
+> declared diagnostic. Consequences: the weak levers shrink by 48–70% while the
+> strong ones move by 1–4%, the noise-floor control is now *indistinguishable
+> from zero*, and **the ~40× history recommendation from revision 1 is itself
+> superseded** — see "Correcting the correction".
+>
+> **Revision 1 — the instrument.** An adversarial re-reading of the pilot's own
+> code found four defects in the *instrument*, not in the transport. Two headline
+> numbers were wrong in kind. Set out in "What was wrong" at the end.
 
 ## The measurement that was missing: the metric's own noise floor
 
-The primary metric is an **unsigned** norm,
+The metric that was primary through revision 1, and is now a declared diagnostic,
+is an **unsigned** norm:
 
 $$E=\frac{\sqrt{\sum_b m_b (D_1-D_0)^2}}{\sqrt{\sum_b m_b D_0^2}},$$
 
@@ -55,42 +65,115 @@ sits from zero *on average*. An unsigned metric has a noise **bias**, and the
 pilot was reporting only its **scatter**, which is small and stable precisely
 because the bias is systematic.
 
+*(Those figures describe the budget as it stood in revision 1. The budget is now
+denominated in E² throughout, and its `transport` term is the mean
+delete-one-replicate jackknife variance of the debiased statistic — 7.7 × 10⁻⁷
+against a discretisation bound of 9.2 × 10⁻⁴. The section below on the estimator
+is what made the old comparison unnecessary.)*
+
+## The estimator that removes the bias instead of measuring it
+
+Knowing the floor is 0.0545 lets you *discount* an effect. It does not let you
+*measure* one, because the raw norm's bias depends on the noise level, which
+depends on the history count. The fix is an estimator with no bias to discount.
+
+With `d_r = D₁,ᵣ − D₀,ᵣ` the paired difference at replicate `r`, and replicates
+independent of one another:
+
+$$\hat S=\frac{1}{R(R-1)}\sum_{r\neq s} d_r^{\mathsf T} W d_s,
+\qquad E[\hat S]=\lVert E[d]\rVert_W^2 .$$
+
+The cross terms carry no noise contribution, because `E[dᵣᵀ W d_s] = E[dᵣ]ᵀ W E[d_s]`
+for `r ≠ s`. The diagonal `r = s` is exactly where the noise power sits, so it is
+**excluded rather than subtracted afterwards** — and excluded by zeroing, not by
+`G.sum() − tr G`, which would form and then cancel the large diagonal total in
+precisely the near-null regime the estimator exists for.
+
+The denominator gets the same treatment, because `E[‖D₀,ᵣ‖²_W]` carries the
+*baseline's* noise power and a naive squared norm is biased high:
+
+$$E^2=\hat S \Big/ \frac{1}{R(R-1)}\sum_{r\neq s} D_{0,r}^{\mathsf T} W D_{0,s}$$
+
+Everything is compared against `δ²`. Taking a square root near zero would
+reintroduce exactly the bias being removed.
+
+**Ŝ may be negative, and must be.** An unbiased estimate of a non-negative
+quantity has to fall below zero about half the time when the truth is zero. The
+`noise_floor` scenario returned 9 negative and 7 positive values across its 16
+draws — a statistic that never went negative would still be biased.
+
+**It is already unbiased at R = 3.** Simulation at this geometry recovers a true
+effect of 0.0200 at every R from 3 to 20, where the raw norm on the same draws
+reads 0.0223–0.0294. More replicates buy *precision*, not correctness — which is
+what supersedes the history recommendation below.
+
+### What it does to the measured effects
+
+| scenario (f = 1) | debiased E | raw E | change |
+|---|---|---|---|
+| `noise_floor` | **0.0103** *(not distinguishable from 0)* | 0.05449 | **−81%** |
+| 5% Fe | 0.00253 | 0.00488 | −48% |
+| density ×1.35 | 0.00743 | 0.02443 | **−70%** |
+| 5% Gd | 0.03652 | 0.03786 | −4% |
+| dehydration, H 0.112 → 0.06 | 0.04607 | 0.04707 | −2% |
+| 20% Gd (`near_threshold`) | 0.12240 | 0.12372 | −1% |
+| 40% Gd (`clearly_detectable`) | 0.22477 | 0.22595 | −1% |
+
+**The correction is monotone in the effect size** — largest where the effect is
+smallest — which is the signature of removing an additive noise floor rather than
+of a physics change. The ranking is untouched, so every physical conclusion in
+this report stands; what changes is how much of the weak levers was ever real.
+
 ## Common random numbers work, and that is now demonstrated rather than assumed
 
-A paired effect below the unpaired floor is not automatically noise, because
-matched seeds cancel common histories. Every lever therefore runs **both ways**,
-and the two give independent estimates that can be checked against each other:
-if the unpaired result is effect and noise in quadrature, then
-$\sqrt{u^2-n^2}$ should reproduce the paired value.
+Every lever runs **both ways** — matched seeds and decorrelated seeds — so what
+pairing buys is measured rather than assumed. Under the debiased estimator the
+answer is unusually clean.
 
-| Lever (f = 1) | paired | unpaired | √(u² − n²) | agree? |
-|---|---|---|---|---|
-| 5% Fe | 0.00488 | 0.05490 | 0.00672 | ✅ |
-| density ×1.35 | 0.02443 | 0.05061 | — (u < n) | n/a |
-| 5% Gd | 0.03786 | 0.06486 | 0.03518 | ✅ |
-| dehydration, H 0.112 → 0.06 | 0.04707 | 0.07565 | 0.05247 | ✅ |
+| Lever (f = 1) | paired E | unpaired E | jackknife sd (E², paired → unpaired) |
+|---|---|---|---|
+| 5% Fe | 0.00253 | 0.0117 *(consistent with 0)* | 2.35e-06 → 3.29e-04 (**140×**) |
+| density ×1.35 | 0.00743 | 0.0116 *(consistent with 0)* | — |
+| 5% Gd | 0.03652 | 0.03344 | 6.37e-05 → 5.33e-04 (**8.4×**) |
+| dehydration | 0.04607 | 0.05524 | — |
 
-Three of four agree within 35%. The fourth is uninformative rather than
-contradictory: the density lever's unpaired value sits *below* the floor, which
-is ordinary scatter in the floor estimate itself and leaves the quadrature
-subtraction with nothing to subtract.
+**Common random numbers now move the precision and not the estimate**, which is
+what a variance-reduction technique is supposed to do. Where the unpaired
+measurement has the precision to say anything — 5% Gd — the two agree to 9%.
+Where it does not, the unpaired value is statistically consistent with zero and
+its apparent magnitude is noise.
 
-**So the lever values are real, and pairing is what makes them measurable.** The
-first version of this report asserted them with no such support.
+Under the raw norm the same comparison showed paired and unpaired differing by
+13–83%, and revision 1 read that as CRN "removing noise" from the estimate. It
+was really the bias contaminating both by different amounts. The corrected
+reading is stronger: pairing tightens the standard error by roughly one to two
+orders of magnitude and leaves the answer alone.
 
 ## The finding: which lever moves dose, and by how much
 
-Measured at **f = 1**, the finest mesh, paired, with sample rows behind every
-number in `data/calibration/openmc_effect_samples.csv`:
+Debiased, at **f = 1**, the finest mesh, paired, with rows behind every number in
+`data/calibration/openmc_debiased_effects.csv`. `z` is the pooled estimate over
+its own jackknife standard error — how far it stands from *no effect at all*:
 
-| Material lever | Effect (rel. L2) | × noise floor |
+| Material lever | Debiased E | z vs zero |
 |---|---|---|
-| 5% Fe (replacing O) | 0.00488 | 0.09 ← the weakest tested |
-| density ×1.35 | 0.02443 | 0.45 |
-| 5% Gd | 0.03786 | 0.69 |
-| dehydration, H 0.112 → 0.06 | 0.04707 | 0.86 |
-| 20% Gd (`near_threshold`) | 0.12372 | 2.27 |
-| 40% Gd (`clearly_detectable`) | 0.22595 | 4.15 |
+| `noise_floor` (identical material) | 0.0103 | **0.1 — not distinguishable from zero** |
+| 5% Fe (replacing O) | 0.00253 | 7.9 ← the weakest real lever |
+| density ×1.35 | 0.00743 | 4.2 |
+| 5% Gd | 0.03652 | 46.1 |
+| dehydration, H 0.112 → 0.06 | 0.04607 | 26.4 |
+| 20% Gd (`near_threshold`) | 0.12240 | 60.6 |
+| 40% Gd (`clearly_detectable`) | 0.22477 | 79.0 |
+
+The ranking is **unchanged from every previous version of this table**. Every
+lever is now resolved against zero on its own evidence, without reference to any
+other scenario — including 5% Fe, whose 0.00253 is about **one twentieth** of the
+raw norm's 0.0545 noise floor and was unmeasurable under the old metric.
+
+`z` is deliberately not monotone in `E`: dehydration is the larger effect but
+carries the larger standard error, so 5% Gd is the more firmly resolved one.
+Magnitude and certainty are different questions, which is why the gate needs both
+δ and a spread rather than a single test statistic.
 
 **The physical conclusions are unchanged.** Dose is energy per unit mass, so a
 uniform density change raises numerator and denominator together — heating
@@ -114,22 +197,35 @@ not adjusted to reach it**, which would have been a stop condition.
 
 ## The gate returned what was declared
 
-| Scenario | Declared | Returned | Effect (pooled median) | vs floor |
+Thresholds are declared in **E²** now, so δ = 0.10 becomes 0.01 and the practical
+floor 0.02 becomes 4 × 10⁻⁴. `ThresholdPolicy` carries a `metric_id` and
+`decide()` refuses draws from a different metric, because a threshold declared
+for E and compared against E² is a silent factor-of-ten error that no inspection
+of the number alone would catch.
+
+| Scenario | Declared | Returned | E² | z |
 |---|---|---|---|---|
-| `noise_floor` | *(new)* | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 0.02546 | — |
-| `clearly_detectable` | `PASS_SYNTHETIC_GATE` | ✅ same | 0.26894 | 4.1× |
-| `near_threshold` | `DECIDED_BY_PILOT` | `PASS_SYNTHETIC_GATE` | 0.15994 | 2.5× |
+| `noise_floor` | *(control)* | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 4.81e-05 | **0.1** |
+| `lever_Fe_5pct` | *(measured)* | `EFFECT_BELOW_THRESHOLD` | 1.86e-05 | 7.9 |
+| `near_threshold` | `DECIDED_BY_PILOT` | `PASS_SYNTHETIC_GATE` | 2.48e-02 | 60.6 |
+| `clearly_detectable` | `PASS_SYNTHETIC_GATE` | ✅ same | 6.94e-02 | 79.0 |
 
-1 056 OpenMC runs, 1.056 × 10⁸ histories, 527 s wall.
+1 056 OpenMC runs, 1.056 × 10⁸ histories, 520 s wall.
 
-**`noise_floor`'s verdict is the most informative line in the table.** On a
-scenario whose true effect is exactly zero, the gate reports *effect detected,
-not practically important* — a real false positive, above the 0.02 practical
-floor. That is the demonstration the old control could never produce, and it is
-why `above_noise_floor` is now emitted beside every verdict.
+**A limitation this exposes, reported rather than patched.** `noise_floor`'s
+verdict says *effect detected* on a scenario whose true effect is exactly zero
+— and z = 0.1 says the opposite. Both are right about different things.
+`decide()` takes the 99th percentile of the draws, and there are 16 draws (4
+outer × 4 mesh factors), so that quantile is effectively the **maximum**. One
+draw landed at +5.3 × 10⁻⁴, about 1.6σ, which is unremarkable noise but sits
+just above the 4 × 10⁻⁴ practical floor.
 
-`near_threshold` still passes, and at 2.5× the floor that pass is defensible;
-but it is no longer the comfortable margin the first report implied.
+So the verdict vocabulary is being driven by the upper tail of a very small
+sample. This is the same class of problem as everything else in this report: a
+quantile needs enough draws to mean anything, and `seed_sufficiency()` already
+sets 20 as the floor for estimating a *variance* — a 99% quantile needs far more.
+**The `z` column, not the verdict, is the trustworthy significance statement at
+this sample size.** Raising the outer-draw count is the production fix.
 
 ## Numerics is a bound, not a variance
 
@@ -150,16 +246,24 @@ the finest mesh, with `numerics_basis` and `numerics_n_factors` recorded beside
 it. The effect rises monotonically under coarsening — it is systematic error, not
 scatter about a centre, which is why the deviation is referenced to f = 1:
 
+Debiased E by mesh factor — the effect rises monotonically with coarsening in
+every scenario:
+
 | Scenario | f = 1 | f = 2 | f = 4 | f = 5 |
 |---|---|---|---|---|
-| `near_threshold` | 0.1237 | 0.1509 | 0.1685 | 0.1821 |
-| `clearly_detectable` | 0.2260 | 0.2599 | 0.2806 | 0.2845 |
+| `near_threshold` | 0.1224 | 0.1506 | 0.1685 | 0.1821 |
+| `clearly_detectable` | 0.2248 | 0.2596 | 0.2806 | 0.2844 |
 
-Comparing sources in **effect units** rather than variance units, the
-discretisation bound is 0.058 against a transport standard deviation of 0.0023
-for `near_threshold` — a factor of **25**, not 115. Discretisation still
-dominates scatter by more than an order of magnitude; the A0 lesson holds. What
-does not hold is the inference drawn from it, below.
+Debiasing barely moves these — the noise bias mattered for the weak levers, not
+for the strong ones — so the discretisation finding is independent of the metric
+change, which is the best evidence that it is real.
+
+Comparing sources on a common scale rather than in variance units, the
+discretisation bound is 0.0304 against a transport standard deviation of
+8.8 × 10⁻⁴ (both in E²) — a factor of **35**, and not the 115 that compared two
+different kinds of quantity. Discretisation dominates scatter by more than an
+order of magnitude; the A0 lesson holds. What does not hold is the inference
+drawn from it, below.
 
 ## Cost, and a reversed recommendation
 
@@ -184,18 +288,36 @@ Projected full Reference D study — 128 outer draws × 2 material states × 20 
 | 1 × 10⁶ | ~14 h | ~27 min | ~0.017 |
 | 1 × 10⁵ (this pilot) | ~1.4 h | ~3 min | 0.055 |
 
-**The recommendation is now the upper row.** The first version of this report
-recommended the cheapest, reasoning that "with numerics at 97.7% of the variance,
-quadrupling the histories buys a 0.7% component". That reasoning was wrong,
-because the 97.7% compared a discretisation *bound* with a replicate *scatter*
-and omitted the noise **bias** entirely. The bias is 0.055 at the pilot's
-settings, it scales as 1/√N, and it is the quantity that decides whether an
-effect of 0.02–0.05 — which is where every physically realistic lever sits — can
-be measured at all.
+### Correcting the correction
 
-Histories are the thing to buy after all, and roughly 40× more of them than the
-pilot used are needed to push the floor below 0.01. That is still a
-laptop-overnight or few-core job; it does not need a cluster.
+This recommendation has now moved twice, so it is worth being explicit about what
+each version got wrong.
+
+**Revision 0** recommended the cheapest row: "with numerics at 97.7% of the
+variance, quadrupling the histories buys a 0.7% component." That compared a
+discretisation *bound* against a replicate *scatter* and omitted the noise
+**bias** entirely.
+
+**Revision 1** reversed it to ~40× histories, on the ground that the bias is what
+decides whether a 0.02–0.05 effect is measurable. That was right *about the raw
+norm*.
+
+**Revision 2 supersedes it.** The debiased estimator has no bias to buy down. It
+is unbiased at R = 3 and at the pilot's existing 10⁵ histories per run, and the
+run confirms it: 5% Gd resolves at z = 46 and dehydration at z = 26 without
+buying anything. **Histories now buy precision, not correctness**, and the
+40× figure sized a problem that no longer exists.
+
+What remains worth buying is different and smaller: histories tighten the
+standard error as 1/√N, and the **discretisation bound still dominates the
+budget** — 9.2 × 10⁻⁴ against a transport term of 7.7 × 10⁻⁷ in E², a factor of
+1 200. The honest recommendation is therefore the **middle row for precision**,
+with the real money in mesh resolution rather than in histories, and a
+larger outer-draw count so the gate's quantile means something.
+
+The general lesson is worth more than the number: **a metric with a bias makes
+compute look necessary that a better estimator makes unnecessary.** Two of the
+three recommendations in this document's history were sized against an artifact.
 
 ## What was wrong
 
@@ -233,7 +355,23 @@ The first report's claim that the 22% factor-1-to-2 spread was "genuine
 discretisation rather than a masking artifact" was therefore **half right**: the
 occupancy criterion had been equalised, the uncertainty criterion had not. With
 both fixed the f = 1 → f = 2 movement is 0.1237 → 0.1509, still 22%, so the
-conclusion survives — but it did not follow from the evidence given for it.
+conclusion survives — but it did not follow from the evidence given for it. It
+survives the debiasing too, at 0.1224 → 0.1506.
+
+**5. And then the metric itself.** Fixing the four above made the fifth problem
+legible rather than solving it: the primary metric was still a norm, so it was
+still biased under the null, and the best revision 1 could do was *measure* that
+bias and discount against it. Measuring a bias is strictly worse than not having
+one — the discount depends on the history count, so every comparison across
+resolutions or budgets inherits it.
+
+The pattern across all five is the same: **each defect was invisible to the
+statistic that was supposed to catch it.** Replicate scatter could not see the
+noise bias because the bias is systematic. A two-point spread could not see that
+it was not a variance. A hardcoded table could not disagree with a run that never
+happened. An estimator that could not fail its own control could not report that
+it had. Nothing here was caught by the numbers looking wrong; everything was
+caught by reading what produced them.
 
 ## Known residuals
 
@@ -244,9 +382,18 @@ conclusion survives — but it did not follow from the evidence given for it.
 - **The dose floor still depends on the estimator**, through
   `nanmax(dose0)`. Bin counts at f = 1 vary 1 492–1 516 across draws, a residual
   1.6% against the ~33% the `rel_err` cut was causing.
-- **The floor is measured unpaired.** For the large-effect scenarios, pairing
-  retains little, so the unpaired floor is the right comparison; for the small
-  levers it is conservative by design.
+- **The floor is measured unpaired.** It bounds the raw diagnostic, not the
+  debiased statistic, which needs no floor.
+- **The gate's 99% quantile is taken over 16 draws**, where it is effectively the
+  maximum — see the gate section. `z` is the reliable significance statement
+  until the outer-draw count rises.
+- **`sobolev_smooth` exists and is barred from every gate.** It solves
+  `(I − α∇²)u = f` exactly under zero-flux boundaries, numpy-only via an
+  even-extension FFT, for display and for inspecting where a difference field
+  concentrates. It must not enter a statistic: smoothing a difference field can
+  both hide real localized structure and manufacture apparent structure out of
+  noise, and α would become a second tunable with none of δ's discipline. A test
+  asserts neither gate module references it.
 
 ## What this does not establish
 
@@ -264,15 +411,28 @@ energy before its effects can be read.
 
 ## Next
 
-Two open items, in order.
+**Discretisation is now the whole of the problem.** It dominates the budget by a
+factor of 1 200 over transport, and it is systematic rather than random: the
+effect rises monotonically under coarsening at every scenario, 0.1224 → 0.1821
+across factors 1 → 5 for `near_threshold`.
 
-**The magnitude is not converged, and f = 1 is the finest tally available** — the
-mesh cannot be refined below the CPM lattice pitch. Converging it requires a
-finer *snapshot*, which is a Reference D question about the selected pitch rather
-than a transport-numerics one. Note that a naive snapshot refinement changes what
-a parcel physically *is*: `V_target = 120` in `biofilms_potts.jl` is in **sites**,
-not physical volume, so raising N at fixed `V_target` shrinks every parcel.
+**"f = 1 is the finest tally available" is an implementation restriction, not an
+OpenMC one** — an earlier version of this report stated it as though it were
+physical. An `openmc.RegularMesh` sets its extent and its bin count
+independently, and `biofilm_mesh_extent_cm()` already ignores the mesh dimension,
+so a tally *finer* than the CPM material lattice is possible. What blocks it is
+narrow: `resolve_mesh_dimension()` integer-divides and guards `factor >= 1`, the
+biofilm base dimension is a literal `(n, n, n)` in `model.py`, and two packages
+independently validate divisibility. The exact-CSG mass denominator
+(`mesh_material_masses_kg`) is already resolution-agnostic and needs no change.
 
-**The floor must be driven below the effects of interest** before any lever
-below ~0.05 is quoted as resolved. That is ~40× the pilot's histories, and it is
-now a projection with a measured scaling law behind it rather than an assumption.
+A subvoxel refinement study at ratios 1×, 2×, 4× on a fixed snapshot is therefore
+the next measurement, and it answers a question the coarsening sweep cannot: how
+much of the movement is tally discretisation inside a fixed piecewise-constant
+geometry, as opposed to the geometry's own resolution.
+
+**Snapshot resolution is a separate study** and must not be confused with it. A
+naive N-sweep changes what a parcel physically *is*: `V_target = 120` in
+`biofilms_potts.jl` is in **sites**, so raising N at fixed `V_target` shrinks
+every parcel. The first version should rasterize one fixed analytic morphology at
+several resolutions, with no CPM dynamics involved.

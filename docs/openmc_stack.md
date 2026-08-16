@@ -37,10 +37,18 @@ tar -xJf endfb-viii.0-hdf5.tar.xz
 export OPENMC_CROSS_SECTIONS=$HOME/openmc-data/endfb-viii.0-hdf5/cross_sections.xml
 ```
 
-Archive SHA-256 and the `cross_sections.xml` checksum are recorded in
-`~/openmc-data/*.sha256` and echoed into every `transport_result.h5`
-(`nuclear_data` attr). Data-gated tests skip — reported as SKIPPED, never
-passed — when `OPENMC_CROSS_SECTIONS` is unset or the file is missing.
+The **archive** SHA-256 is recorded in `~/openmc-data/*.sha256`. There is no
+separate checksum for `cross_sections.xml`, and an earlier version of this
+document claimed one — the archive digest is the stronger identity in any case,
+since it pins every data file rather than only the index.
+
+It is echoed into every `transport_result.h5` (`nuclear_data` attr). Note that
+`synthetic_e2e.py` writes the **literal string** `"endfb-viii.0"` rather than
+reading the environment, so it records an assumption about the library rather
+than an observation of it; `openmc_nested_pilot.py:_nuclear_data_id()` resolves
+`OPENMC_CROSS_SECTIONS` and its recorded digest instead, and names the file the
+digest came from. Data-gated tests skip — reported as SKIPPED, never passed —
+when `OPENMC_CROSS_SECTIONS` is unset or the file is missing.
 
 ## Running anything in the transport tier
 
