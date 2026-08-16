@@ -26,6 +26,10 @@ __all__ = [
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "source_placement_problems",
     "git_provenance",
+    "UNCERTAINTY_TYPES", "SAMPLING_ROLES", "EFFECT_DIRECTIONS",
+    "FEEDBACK_GATE_VERDICTS", "distribution_row_problems",
+    "DEFAULT_EXCEEDANCE_PROBABILITY", "DEFAULT_NUMERICAL_BUDGET_FRACTION",
+    "DEFAULT_VOLUME_BUDGET_FRACTION", "DEFAULT_SURROGATE_BUDGET_FRACTION",
 ]
 
 # --- vocabulary ----------------------------------------------------------
@@ -184,3 +188,112 @@ def git_provenance(root: str | None = None) -> dict:
     except (OSError, subprocess.CalledProcessError):
         return {"git_commit": None, "git_dirty": None}
     return {"git_commit": head + ("-dirty" if dirty else ""), "git_dirty": dirty}
+
+
+# --- feedback gates ------------------------------------------------------
+#
+# Two gates, answering different questions. Conflating them would make
+# "feedback matters" indistinguishable from "the software can perform
+# feedback", which is the single most important distinction this repository
+# has left to protect.
+#
+#   OFFLINE  a counterfactual transport experiment on immutable snapshots.
+#            Does changing a biologically controlled material state produce a
+#            transport effect distinguishable from Monte Carlo noise, numerical
+#            discretization, calibration uncertainty and biological-state
+#            uncertainty? It never advances the CPM and never feeds dose back
+#            into biology.
+#   ONLINE   an AUTHORIZATION condition on the real two-way loop. It may open
+#            only after the offline gate passes, the calibration prerequisites
+#            are ready, the current state is inside the validated envelope, and
+#            the effect still exceeds a predeclared threshold.
+
+# What KIND of uncertainty a quantity carries. The separation is load-bearing:
+# putting a probability distribution on a numerical control or a model choice
+# mixes epistemic uncertainty with engineering decisions and produces a
+# probability nobody can interpret.
+UNCERTAINTY_TYPES = frozenset({
+    "physical_measurement",    # a posterior over a measured quantity
+    "biological_posterior",    # a fitted response parameter
+    "source_metrology",        # certificate/assay, propagated to date
+    "monte_carlo_estimator",   # transport stochasticity; nested replicates
+    "numerical_convergence",   # mesh, histories, ray counts; bounded, not sampled
+    "discrete_model_choice",   # occupancy map, mass denominator; branched
+    "nuclear_data_model",      # library version; sensitivity, not a Gaussian
+    "declared_exact",
+    "unsupported",
+})
+
+# HOW a quantity enters the experiment. `outer_random` is the only role that
+# draws from a probability distribution, and it must be refused for numerical
+# controls and model choices unless a separately reviewed probability model
+# genuinely exists.
+SAMPLING_ROLES = frozenset({
+    "outer_random",              # drawn from its distribution per outer point
+    "inner_transport_replicate", # an independent OpenMC seed
+    "convergence_axis",          # swept to bound a residual, never sampled
+    "scenario_branch",           # an explicit named alternative
+    "fixed",
+    "excluded",
+})
+
+# Roles that may never be assigned to these uncertainty types, because doing so
+# would launder an engineering decision into an epistemic probability.
+_NEVER_RANDOM = frozenset({"numerical_convergence", "discrete_model_choice",
+                           "nuclear_data_model"})
+
+# The direction a scientifically meaningful effect is expected to move in.
+# Declared with the threshold, before results are inspected: a two-sided test
+# would pass on an effect of the wrong sign.
+EFFECT_DIRECTIONS = frozenset({"increase", "decrease"})
+
+# One state machine, not a scatter of if-statements. Every terminal state says
+# WHY, so a blocked gate is diagnostic rather than merely closed.
+FEEDBACK_GATE_VERDICTS = (
+    "NOT_EVALUATED",
+    "BLOCKED_ON_PHYSICAL_CALIBRATION",
+    "BLOCKED_ON_NUMERICAL_RESOLUTION",
+    "BLOCKED_ON_BIOLOGICAL_CALIBRATION",
+    "OFFLINE_EFFECT_BELOW_THRESHOLD",
+    "OFFLINE_UNCERTAINTY_TOO_LARGE",
+    "OFFLINE_PASS",
+    "ONLINE_OUT_OF_DOMAIN",
+    "ONLINE_UNCERTAINTY_TOO_LARGE",
+    "ONLINE_ENABLED",
+    "UNSUPPORTED_BY_CURRENT_MODEL",
+)
+
+# Conservative project defaults, versioned in an acceptance policy rather than
+# presented as metrological constants. The scientific effect threshold itself
+# gets NO default: until someone declares what magnitude of feedback would
+# matter, the gate stays NOT_EVALUATED, which is the honest answer.
+DEFAULT_EXCEEDANCE_PROBABILITY = 0.99
+DEFAULT_NUMERICAL_BUDGET_FRACTION = 0.25   # U99(transport+numerical) <= 0.25*delta
+DEFAULT_VOLUME_BUDGET_FRACTION = 0.10      # CSG mass is denominator-critical
+DEFAULT_SURROGATE_BUDGET_FRACTION = 0.10   # emulator error << decision margin
+
+
+def distribution_row_problems(row: dict) -> list[str]:
+    """Why this uncertainty-ledger row may not be sampled as written.
+
+    The refusal that matters: a mesh factor or a mass-denominator method is an
+    engineering choice, not a random variable. Sampling one produces a
+    probability that looks like evidence and is not.
+    """
+    problems: list[str] = []
+    kind = (row.get("uncertainty_type") or "").strip()
+    role = (row.get("sampling_role") or "").strip()
+    if kind not in UNCERTAINTY_TYPES:
+        problems.append(f"uncertainty_type {kind!r} not in {sorted(UNCERTAINTY_TYPES)}")
+    if role not in SAMPLING_ROLES:
+        problems.append(f"sampling_role {role!r} not in {sorted(SAMPLING_ROLES)}")
+    if kind in _NEVER_RANDOM and role == "outer_random":
+        problems.append(
+            f"uncertainty_type={kind} may not take sampling_role=outer_random — "
+            "assigning a probability distribution to a numerical control or a "
+            "model choice mixes engineering decisions with epistemic "
+            "uncertainty and makes the resulting probability uninterpretable. "
+            "Use convergence_axis or scenario_branch")
+    if kind == "unsupported" and role not in ("excluded", "fixed"):
+        problems.append("an unsupported quantity may only be excluded or fixed")
+    return problems
