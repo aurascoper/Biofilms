@@ -45,14 +45,66 @@ def _rows():
         return list(csv.DictReader(l for l in fh if not l.startswith("#")))
 
 
-def _preprint_text() -> str:
-    """The manuscript as one normalised lowercase line.
+def normalise_markup(source: str) -> str:
+    """Manuscript source as plain lowercase prose, markup removed.
 
-    LaTeX wraps at the column, so a claim that survives revision is usually
-    split across a newline. Collapsing whitespace is what makes the search find
-    it; without this the test passes for the wrong reason.
+    WITHOUT THIS THE GUARD BARELY GUARDS. The ledger records claims as prose —
+    `using DifferentialEquations.jl` — while the sources carry them as markup:
+    `using \\texttt{DifferentialEquations.jl}` in LaTeX, backticked in the
+    Markdown derivative. A raw substring search therefore misses a restored
+    claim written the way anyone would actually write it. Measured against the
+    original manuscript, normalising lifts detection from 12 to 15 of 30 in the
+    `.tex` and from 15 to 20 of 30 in the `.md`.
+
+    Also collapses whitespace, because LaTeX wraps at the column and a claim is
+    usually split across a newline.
     """
-    return " ".join(PREPRINT.read_text(encoding="utf-8").split()).lower()
+    s = re.sub(r"(?m)(?<!\\)%.*", " ", source)                  # comments
+    s = re.sub(r"\\(begin|end)\{[^}]*\}", " ", s)               # environments
+    for _ in range(5):                                          # unwrap, nested
+        s = re.sub(r"\\[a-zA-Z]+\*?\s*(?:\[[^\]]*\])?\{([^{}]*)\}", r"\1", s)
+    s = re.sub(r"\\[a-zA-Z]+\*?", " ", s)                        # bare macros
+    for ch in ("~", "\\", "`", "*"):
+        s = s.replace(ch, " ")
+    s = re.sub(r"[{}$&_^]", " ", s)
+    s = re.sub(r"[\u2010-\u2015]", "-", s)                       # unicode dashes
+    return " ".join(s.split()).lower()
+
+
+def _preprint_text() -> str:
+    return normalise_markup(PREPRINT.read_text(encoding="utf-8"))
+
+
+# The manuscript as first committed, before any revision removed anything. It is
+# the only document known to CONTAIN the deleted claims, which makes it the only
+# valid control for whether this guard detects them.
+ORIGINAL_COMMIT = "5980dc5"
+ORIGINAL_PATH = "preprint/modeling_radiotrophic_fitness.md"
+
+
+def _original_manuscript() -> str | None:
+    import subprocess
+
+    shallow = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+        capture_output=True, text=True)
+    if shallow.stdout.strip() == "true":
+        return None
+    got = subprocess.run(
+        ["git", "-C", str(REPO), "show", f"{ORIGINAL_COMMIT}:{ORIGINAL_PATH}"],
+        capture_output=True, text=True)
+    return normalise_markup(got.stdout) if got.returncode == 0 else None
+
+
+def _detected(rows, text) -> list[str]:
+    out = []
+    for row in rows:
+        if not row["claim_id"].startswith("PP-") or row["status"] != "delete":
+            continue
+        phrase = distinguishing_phrase(row["claim_text"])
+        if phrase and phrase.lower() in text:
+            out.append(row["claim_id"])
+    return out
 
 
 def distinguishing_phrase(claim: str) -> str:
@@ -100,25 +152,65 @@ def test_no_deleted_claim_survives_in_the_manuscript(rows):
         + "\n  ".join(survivors))
 
 
-def test_the_uncheckable_claims_are_named_not_hidden(rows, capsys):
-    """Coverage is reported because it is partial. A reader who believes this
-    suite covers all 34 would retire the manual review that covers the rest."""
+def test_the_guard_actually_detects_deleted_claims(rows):
+    """THE TEST THAT PROVES THE OTHER ONE MEANS SOMETHING.
+
+    `test_no_deleted_claim_survives_in_the_manuscript` passes when it finds
+    nothing. So does a guard that can find nothing at all — and the first
+    version of this file was exactly that: raw substring matching against LaTeX,
+    which detected 12 of 30 in the original and would have reported a clean
+    manuscript either way. A check that cannot fail is not a check, which is the
+    lesson this repository keeps relearning.
+
+    So: run the guard against the one document known to CONTAIN the deleted
+    claims, and require it to find them.
+
+    The floor is 18 rather than the measured 20 to leave room for harmless
+    changes in phrase extraction, and it is above the 15 that raw substring
+    matching achieves — so dropping the markup normalisation fails here rather
+    than silently halving the guard.
+    """
+    original = _original_manuscript()
+    if original is None:
+        pytest.skip("shallow clone: the original manuscript is not reachable")
+    found = _detected(rows, original)
+    assert len(found) >= 18, (
+        f"the guard detected only {len(found)} deleted claims in the "
+        "pre-revision manuscript, which contains them. It has stopped "
+        "guarding — most likely the markup normalisation regressed.")
+
+
+def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
+    """Coverage is reported because it is PARTIAL, and reported as the number
+    that means something.
+
+    An earlier version of this file announced "30 of 34 textually checkable",
+    which counts rows that YIELD a searchable phrase — not rows the guard can
+    actually find. Only about 20 are detectable in a document known to contain
+    them, because many ledger entries are reconstructions across the two
+    superseded sources rather than verbatim quotes from either. Reporting the
+    larger number invited retiring the manual review that covers the rest.
+    """
     deleted = [r for r in rows
                if r["claim_id"].startswith("PP-") and r["status"] == "delete"]
-    uncheckable = [r["claim_id"] for r in deleted
-                   if not distinguishing_phrase(r["claim_text"])]
+    yields_phrase = [r for r in deleted if distinguishing_phrase(r["claim_text"])]
+    original = _original_manuscript()
 
     with capsys.disabled():
-        print(f"\n  claims-ledger guard: {len(deleted) - len(uncheckable)} of "
-              f"{len(deleted)} `delete` claims are textually checkable")
-        if uncheckable:
-            print("  NOT textually checkable — these need human review:")
-            for cid in uncheckable:
+        print(f"\n  claims-ledger guard: {len(deleted)} `delete` claims; "
+              f"{len(yields_phrase)} yield a searchable phrase")
+        if original is None:
+            print("  detection rate: NOT MEASURED (shallow clone)")
+        else:
+            found = set(_detected(rows, original))
+            print(f"  DETECTED in the pre-revision manuscript: {len(found)} of "
+                  f"{len(deleted)} — this is the real coverage")
+            missed = [r["claim_id"] for r in deleted if r["claim_id"] not in found]
+            print("  NOT detectable — these still need human review:")
+            for cid in missed:
                 print(f"      {cid}")
 
-    assert len(deleted) - len(uncheckable) >= 25, (
-        "coverage collapsed: most `delete` claims no longer yield a searchable "
-        "phrase, so this guard has quietly stopped guarding")
+    assert len(yields_phrase) >= 25
 
 
 def test_every_preprint_claim_names_a_document_that_exists(rows):
