@@ -1,5 +1,12 @@
 # Preprint revision plan
 
+> **SUPERSEDED — kept as the record of how the revision was planned.** The revision it plans has
+> landed as `preprint/modeling_radioresistance_and_radiotropic_fitness.tex`, and the two files
+> named below are in git history rather than in the tree. Every path and line number here refers
+> to THOSE documents; they are deliberately not repointed, because they record what was true when
+> the plan was written and rewriting them would falsify it. For what the current manuscript
+> claims, read the manuscript; for what was withdrawn from it, read `data/claims_ledger.csv`.
+
 **Subject:** `preprint/modeling_radiotrophic_fitness.tex` (source of record) and
 `preprint/modeling_radiotrophic_fitness.md` (derivative, shorter).
 **New title:** *Modeling Radioresistance and Radiotropic Fitness*.

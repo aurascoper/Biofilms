@@ -1,4 +1,13 @@
-# claims_ledger — every quantitative claim in README.md and preprint/modeling_radiotrophic_fitness.{md,tex},
+# claims_ledger — every quantitative claim in README.md and the preprint, plus the claims made
+# by the work that has landed since. The preprint is now
+# preprint/modeling_radioresistance_and_radiotropic_fitness.tex; the PP-* rows were written
+# against its superseded predecessor preprint/modeling_radiotrophic_fitness.{md,tex}, which is
+# in git history. Their line-number citations refer to THAT document and are deliberately not
+# rewritten: they record what was said at audit time, and repointing them would falsify it.
+#
+# ENFORCED, since calibration/tests/test_claims_ledger.py: no claim marked `delete` may
+# reappear in the current manuscript. 30 of the 34 are checked mechanically and the other four
+# are NAMED as needing human review rather than passed over.
 # plus the claims made by the work that has landed since those documents were written.
 #
 # WHY THIS EXISTS. The README and the preprint were written 2026-04-13. The calibration

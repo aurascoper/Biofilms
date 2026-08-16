@@ -810,62 +810,42 @@ What the tests pin:
 
 ## Preprint
 
-`preprint/modeling_radiotrophic_fitness.tex` is the **source of record**; the `.md` is a shorter
-derivative that is now revised in step with it rather than left at its 2026-04-13 state. Both carry
-the new title, the phenotype fold, the radiotrophy-status subsection and the melanin finding. The
-`.md` still ends in a section titled "Notation Fixes Required Before Submission", of which items 4
-(the undefined effective mass) and 5 (melanin dimensional consistency) remain **open** — a to-do
-list living inside a manuscript. What is deliberately still deferred in both sources is tracked in
-`docs/preprint_revision_plan.md`; the file basenames still read `radiotrophic` because the rename is
-its own commit.
+`preprint/modeling_radioresistance_and_radiotropic_fitness.tex` is the source of record:
+*Modeling Radioresistance and Radiotropic Fitness in Multispecies Biofilms — A Computational
+Framework, Implementation Audit, and One-Way Radiation-Transport Foundation*.
 
-**The committed PDF is superseded and is not citable.** It is a build of the *pre-revision* `.tex`,
-so it carries the old title, the withdrawn radiotrophy claims, the fabricated Computational Methods
-section and the incorrect attribution of the radial stratification to `β_ion`. It is kept as a
-historical artifact and it carries no caveat of its own, which is why this note exists — it sits at
-a stable GitHub URL where the caveat does not travel with it. It was also built before the figures
-beside it were regenerated, so the repository cannot reproduce it even from an unchanged `.tex`.
+It reports executed computational work and an implementation audit. It infers no target physical
+parameter, and its transport section reports that the one-way CPM–OpenMC path *executed* rather
+than reporting results from it — no gate verdict, no lever magnitude, no dose in physical units.
+The Ethics statement records that the work involved no culture, no recombinant or synthetic
+nucleic-acid experiment and no irradiation, so no institutional approval was required for it, and
+that any future campaign waits on prospective strain-, protocol-, facility- and source-specific
+approvals.
 
-Defects a reader who opens **the PDF** should know about. Each is corrected in the current sources;
-none of the corrections is in the PDF:
+**It cites the parent of the commit that adds it.** A document cannot cite the commit that
+contains it, which is the same structural limit the run artifacts record for their own provenance
+— `git_commit` there names the parent and carries a `-dirty` marker for the same reason.
 
-- **§5 Computational Methods describes a software stack that has never existed here** —
-  `DifferentialEquations.jl`, `JuMP`, `Ipopt`, Sobol indices, Morris screening, `Agents.jl`,
-  `PlotlyJS.jl`, Euler–Maruyama, symplectic leapfrog — against a `Project.toml` whose `[deps]` is
-  exactly `AMDGPU`, `HDF5`, `JACC`, and against three of the four simulations being written in R. It
-  reports model outputs in physical units and calls the work "a predictive modeling tool". Those are
-  precisely the claims `calibration/` and `coupling/` exist to refuse.
-- **§6.2 presents Th-232 "actual versus predicted"** — a claimed comparison against measured data
-  that exists in no `data/` file, from decay code that exists nowhere. It is the only place in the
-  document claiming a comparison to observation.
-- **§6.4** reports phase coherence and a kGy dose axis from an oscillator that was never implemented
-  and a unit that appears nowhere in the repository.
-- **§§6.1–6.4 hard-code "Figure 1"–"Figure 4"** for four figures with no source files, so in the
-  compiled PDF they silently alias onto the four CPM/radiodialysis figures shown above.
-- **§5 says 60³ and §6.5 says 40³**, and the reported r values are consistent only at N = 40.
-- **§6.1 names *Polaribacter* and *Flavobacterium***, which appear in **no file in this repository**,
-  in a ten-organism cluster attributed to a run that instantiates neither. *Pseudoalteromonas*
-  (`biofilms_3d.R` only) and the missing *O. intermedium* are the other roster discrepancies.
-- `\begin{thebibliography}{38}` against 47 `\bibitem`s in the current `.tex` — harmless, since the
-  argument only sets label width, but it should be bumped when the bibliography is next touched —
-  and wrong DOIs on [11], [12] and [15], the three methodological citations supporting the methods
-  that were never implemented.
+**The repository has moved past that revision, and some of what it moved past was our own
+published numbers.** A false-positive control that could not fail, a squared difference reported
+as a variance, an unprovenanced sensitivity table, and one synthetic-gate verdict withdrawn as not
+resolution-converged. None of those numbers appears in the manuscript. The full record is
+`data/claims_ledger.csv` and `docs/calibration/`.
 
-Section map, corrected: §3 Mathematical Framework · §4 Parameter Estimation · §5 Computational
-Methods · **§6 Results** · **§7 Discussion** · §8 Conclusion. The `.tex` additionally carries §3.11
-and §6.6 (the radiodialysis mathematics and results), which the `.md` lacks; the `.md` does now
-carry §6.5, the CPM results.
+**The superseded sources are in git history, not in the tree.** `modeling_radiotrophic_fitness.{md,tex}`
+and the pre-revision PDF carried a fabricated Computational Methods section, a Th-232 comparison
+against data that exists in no `data/` file, organisms named in no file here, and a symplectic
+integrator the `Project.toml` has never contained. Those claims are catalogued as 115 `PP-*` rows
+in the claims ledger, 34 of them `delete`.
 
-Table 2 is 6 species × 7 parameter types, sparsely populated — *O. intermedium* AM7 has no row, and
-the CPM fills the gap with values annotated in source as "estimated, not in Table 2". Its ranges are
-literature-sourced and honestly presented as ranges, but the section title overstates them: **no
-estimation was performed anywhere in this repository.** There is no objective function, no fit and no
-data to fit to; every parameter in every model is a hard-coded literal. Two specific cautions: the CPM
-inverts the sign of `β_ion` for the two radiotropic fungi relative to Table 2, a modelling choice with
-no literature support and a different quantity from the tabulated damage coefficient; and `α_M` in
-µg cell⁻¹ Gy⁻¹ is roughly 4–5 orders of magnitude above a fungal cell's entire melanin content per
-gray, cannot be converted under parcel semantics, and is not used by the acceptance term, which
-hard-codes `0.5` instead.
+**And the ledger is now enforced.** `calibration/tests/test_claims_ledger.py` asserts that no
+claim marked `delete` reappears in the manuscript. It checks 30 of the 34 mechanically and
+**names the other four** rather than passing silently over them — those are paraphrases with no
+verbatim fragment to search for, and they still need a human. Until that test existed, nothing in
+the repository checked the ledger at all.
+
+Figures are generated by `biofilms_potts.jl` below its split marker. The `.tex` includes them
+without an extension, so a `pdflatex` build resolves `preprint/figures/*.pdf`.
 
 ---
 
