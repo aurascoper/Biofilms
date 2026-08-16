@@ -41,6 +41,37 @@ even though the single-flip acceptance physics is identical (the `--selftest`
 asserts ΔH agreement site-by-site). Consequently only distributional
 observables must match.
 
+## The port is now executed (2026-08-16)
+
+`--selftest` existed from the start and **nothing called it**. Neither
+`tests/runtests.jl` nor `validate_serial.jl` touched the port — both load the
+serial monolith through the split-marker trick — so it could have drifted or
+broken outright while every suite stayed green. A radiodialysis substep guard
+was added to it before any tier existed, and nothing would have caught a mistake.
+
+`tests/jacc_port_tests.jl` closes that, from `runtests.jl`. It asserts the
+kernel-level criterion this document already specifies, plus that the substep
+rule is textually identical in both ports and is a no-op at the geometry every
+call site uses — so adding it cannot have moved a published trajectory.
+
+**It runs everywhere, which is the point of a portability layer.** JACC picks
+its backend from `LocalPreferences.toml`, which is untracked; with no preference
+file it defaults to threads, so a runner with no GPU executes these kernels for
+real instead of skipping them. Verified on both:
+
+| Backend | Result | Wall time |
+|---|---|---|
+| `ROCBackend` (gfx1150, Radeon 890M) | PASS | 13.9 s |
+| `ThreadsBackend` (no preference file, as CI sees it) | PASS | 1.8 s |
+
+The GPU being ~8x SLOWER here is not a defect and is worth reading correctly: at
+N = 40 the lattice is ~6.4e4 sites, and the run is dominated by HIP kernel
+compilation and launch overhead rather than by arithmetic. That matches the
+local JACC 1.3.1 reduction benchmarks, where reusing a reducer beats the default
+by 11-21x at n = 1e3-1e5 and the arms converge to within 1.07-1.23x by n = 1e7.
+**The near-term work on this port is kernel structure, not more FLOPs**, and a
+larger device would not change that.
+
 ## Ensemble observables that must remain statistically consistent
 
 Across matched seed ensembles (the existing CSV contract, extended):
