@@ -179,6 +179,7 @@ def test_material_gate_names_unblanked_samples(tmp_path):
             dry_mass_sample_plus_substrate_g="1.0",
             hydrated_volume_cm3="10.0", volume_method="imaging",
             volume_basis="whole_biofilm_envelope",
+            volume_support="full_coupon",
             drain_orientation="vertical", drain_time_s="60",
             blot_material="lint-free", blot_contact_time_s="5",
             ambient_temperature_C="21.0", time_to_weighing_s="120",
