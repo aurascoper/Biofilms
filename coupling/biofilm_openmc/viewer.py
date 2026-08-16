@@ -381,6 +381,15 @@ def read_layer(path, name) -> tuple:
 
 
 def quantitative_layers(manifest_doc) -> list[str]:
-    """The layers a reader may compute with. Everything else is for looking at."""
+    """The layers a reader may compute with. Everything else is for looking at.
+
+    KEYED ON `authoritative_for_quantitation` ALONE, because that is the field
+    named for the decision and `native` is descriptive. Requiring both was a
+    leftover from the blunter first rule, and it silently demoted the case the
+    sharpened rule exists to permit: an exact mass-weighted reduction is derived
+    (native = false) and IS quotable, since it reproduces the native field at
+    that resolution to 5.6e-16. `bundle_problems` already guarantees the flag
+    cannot be set on an upsampling, so the flag alone is sufficient.
+    """
     return [l["name"] for l in manifest_doc["layers"]
-            if l["native"] and l["authoritative_for_quantitation"]]
+            if l["authoritative_for_quantitation"]]

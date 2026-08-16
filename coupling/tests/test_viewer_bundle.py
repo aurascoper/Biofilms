@@ -225,7 +225,7 @@ def test_a_refined_grid_declares_what_resolves_its_material():
     assert any("not declared" in p for p in bundle_problems([dangling], []))
 
 
-def test_quantitative_layers_selects_only_native_authoritative():
+def test_quantitative_layers_selects_on_the_authoritative_flag_alone():
     doc = manifest([LATTICE, REFINED], [
         _labels(),
         _dose(),
@@ -236,3 +236,15 @@ def test_quantitative_layers_selects_only_native_authoritative():
               derivation="upsampled_coarse_dose"),
     ])
     assert set(quantitative_layers(doc)) == {"cell_id", "dose_per_source"}
+
+
+def test_a_correct_reduction_appears_in_the_quotable_set():
+    """`native` is descriptive; `authoritative_for_quantitation` decides. Keying
+    on both demoted an exact reduction, which the sharpened rule permits."""
+    reduced = Layer("dose_on_lattice", "cpm_labels", "Gy/source-particle",
+                    "intensive", np.zeros((4, 4, 4)), native=False,
+                    authoritative_for_quantitation=True,
+                    source_grid_id="dose_refinement_4",
+                    derivation="mass_weighted_mean")
+    doc = manifest([LATTICE, REFINED], [reduced])
+    assert quantitative_layers(doc) == ["dose_on_lattice"]
