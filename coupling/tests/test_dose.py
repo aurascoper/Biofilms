@@ -1,8 +1,10 @@
+import warnings
+
 import numpy as np
 import pytest
 
 from biofilm_openmc.dose import (EV_TO_J, dose_from_statepoint, normalize_heating,
-                                 sparsity_report)
+                                 specific_energy_per_source, sparsity_report)
 
 from conftest import heating_statepoint_from_logical
 
@@ -49,3 +51,41 @@ def test_rel_err_and_sparsity_report():
     assert rep["occupied_voxels"] == 2
     assert rep["occupied_unscored_fraction"] == 0.5
     assert np.isclose(rep["median_rel_err"], 0.25)
+
+
+def test_trace_heating_in_a_massless_bin_is_tolerated_and_warned():
+    """A zero raytraced volume is an ESTIMATE, not a proof of emptiness. A bin
+    clipped by the cylinder can hold a sliver too thin for any ray to strike,
+    and one history may still deposit there. Measured on a 4x refined tally:
+    1-2 bins of 512 000, at most 6.5e-07 of the heating, and buying 3x the rays
+    does not remove it. Refusing that refuses a correct run."""
+    heating = np.ones((2, 2, 2)) * 1000.0
+    mass = np.ones((2, 2, 2))
+    heating[0, 0, 0], mass[0, 0, 0] = 1e-4, 0.0     # ~1.2e-8 of the total
+    with pytest.warns(RuntimeWarning, match="massless bin"):
+        got = specific_energy_per_source(heating, mass)
+    assert got[0, 0, 0] == 0.0, "orphaned energy is discarded, never redistributed"
+    assert got[1, 1, 1] == pytest.approx(1000.0 * EV_TO_J)
+
+
+def test_substantial_heating_in_massless_bins_is_still_refused():
+    """What the guard exists for: a misaligned mesh, a wrong extent or a
+    transposed axis puts a LARGE share of the heating outside the material.
+    The tolerance sits three orders of magnitude below that."""
+    heating = np.ones((2, 2, 2)) * 1000.0
+    mass = np.ones((2, 2, 2))
+    mass[0, 0, 0] = 0.0                              # 1/8 of the heating orphaned
+    with pytest.raises(ValueError, match="disagree about where material is"):
+        specific_energy_per_source(heating, mass)
+
+
+def test_a_truly_empty_bin_is_silent():
+    """No mass and no heating is dose zero — the ordinary case for every corner
+    bin of a cube mesh circumscribing a cylinder, which is 21.5% of them."""
+    heating = np.ones((2, 2, 2)) * 1000.0
+    mass = np.ones((2, 2, 2))
+    heating[0, 0, 0], mass[0, 0, 0] = 0.0, 0.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")               # any warning fails the test
+        got = specific_energy_per_source(heating, mass)
+    assert got[0, 0, 0] == 0.0

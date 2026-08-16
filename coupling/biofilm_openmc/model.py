@@ -281,7 +281,11 @@ def build_biofilm_cylinder_model(snapshot: Snapshot, config: TransportConfig):
     # Heating tally over the lattice cube, at the configured coarsening. The
     # extent is fixed by the geometry; only the bin count moves.
     extent = biofilm_mesh_extent_cm(config, n)
-    dimension = resolve_mesh_dimension((n, n, n), config.mesh_coarsening_factor)
+    # The extent comes from the geometry and the bin count from the config, and
+    # they are independent: refinement subdivides the tally without touching the
+    # material lattice, which stays piecewise constant at the CPM pitch.
+    dimension = resolve_mesh_dimension((n, n, n), config.mesh_coarsening_factor,
+                                       config.mesh_refinement_factor)
     tallies = _heating_tally(openmc, dimension, (x0, y0, z0),
                              (x0 + extent[0], y0 + extent[1], z0 + extent[2]))
     return openmc.Model(geometry=geometry,
