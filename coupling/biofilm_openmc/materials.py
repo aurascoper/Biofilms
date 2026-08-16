@@ -134,8 +134,24 @@ def _volume_raytrace_model(model, mesh):
                         materials=model.materials, settings=model.settings)
 
 
+def mesh_material_volumes(mesh, model, *, n_samples: int = 10_000_000,
+                          max_materials: int = 4) -> dict:
+    """Per-bin material VOLUMES (cm3), keyed by material id.
+
+    Split out from the mass because a counterfactual varies material DENSITIES
+    on fixed geometry: the volumes are then identical across states, and
+    raytracing them once instead of once per state is both cheaper and exact.
+    Reusing a volume set across a geometry change would not be.
+    """
+    volumes = mesh.material_volumes(_volume_raytrace_model(model, mesh),
+                                    n_samples=n_samples,
+                                    max_materials=max_materials)
+    return {int(k): np.asarray(v, dtype=float)
+            for k, v in volumes.items() if k is not None}
+
+
 def mesh_material_masses_kg(mesh, model, dimension, *, n_samples: int = 10_000_000,
-                            max_materials: int = 4) -> np.ndarray:
+                            max_materials: int = 4, volumes: dict | None = None) -> np.ndarray:
     """EXACT per-bin masses (kg), logical (x,y,z), from the CSG itself.
 
         m_v = sum_k rho_k * V_vk
@@ -159,9 +175,9 @@ def mesh_material_masses_kg(mesh, model, dimension, *, n_samples: int = 10_000_0
     `max_materials` must cover the most materials in any one bin: biomass,
     medium, membrane and void is already four.
     """
-    volumes = mesh.material_volumes(_volume_raytrace_model(model, mesh),
-                                    n_samples=n_samples,
-                                    max_materials=max_materials)
+    if volumes is None:
+        volumes = mesh_material_volumes(mesh, model, n_samples=n_samples,
+                                        max_materials=max_materials)
     # From the GEOMETRY, not `model.materials`: the builders pass materials
     # implicitly through the cells, so `model.materials` is empty and a lookup
     # against it raises KeyError on the first real bin.
