@@ -167,21 +167,34 @@ Biofilms/
 │   │   ├── acquisition.py         # acquisition contract, biosafety gate
 │   │   ├── precision.py           # derived replicate counts, detectability
 │   │   └── schema.py              # shared status / evidence vocabulary
-│   ├── scripts/vcholerae_pilot.py # public surrogate pilot (target_calibration = false)
-│   └── tests/                     # 11 modules, 173 tests collected
+│   ├── scripts/                   # vcholerae_pilot (surrogate), detectability_pilot,
+│   │                              #   emit_synthetic_reference_config, reference_d_status
+│   └── tests/                     # 14 modules, 237 tests collected
+│
+├── contract/                      # biofilm-contract (Python; NO dependencies)
+│   └── physical_contract/         # vocabulary, MaterialSpec, composition closure,
+│                                  #   source placement, git provenance, feedback
+│                                  #   gate verdicts. calibration/ may not import
+│                                  #   coupling/, so what both need lives here.
 │
 ├── coupling/                      # biofilm-openmc (Python; numpy, h5py)
 │   ├── biofilm_openmc/            # config, model, materials, mesh, dose, lineage,
-│   │                              #   snapshot, results, fingerprint, convergence, drivers
-│   ├── scripts/a0_sweep.py        # transport resolution sweep
+│   │                              #   snapshot, results, fingerprint, convergence, drivers,
+│   │                              #   feedback_uq, feedback_gate
+│   ├── scripts/                   # a0_sweep, synthetic_e2e, import_dose_field.jl
 │   ├── requirements.txt
-│   └── tests/                     # 13 unit modules + tests/integration/ (3, OpenMC-gated); 86 collected
+│   └── tests/                     # 14 unit modules + tests/integration/ (5, OpenMC-gated);
+│                                  #   122 collected (6 skip without OpenMC)
 │
 ├── config/
-│   ├── coupling_template.toml                    # 14 REQUIRED-but-unset keys
+│   ├── coupling_template.toml                    # 21 REQUIRED-but-unset keys
 │   ├── cpm_spatial_acceptance_template.toml      # every threshold unset
 │   ├── biofilm_material_acceptance_template.toml # every threshold unset
-│   └── reference_a0_water_phantom.toml           # the first populated configuration
+│   ├── reference_a0_water_phantom.toml           # the first populated configuration
+│   ├── reference_synthetic_biofilm_e2e.toml      # synthetic; calibrates nothing
+│   ├── reference_d_spatial_acceptance.toml       # FROZEN declarations
+│   ├── reference_d_material_acceptance.toml      # FROZEN declarations
+│   └── feedback_effect_policy_template.toml      # threshold UNSET on purpose
 │
 ├── data/
 │   ├── parameter_provenance.csv      # 44 rows × 21 columns, per-parameter provenance ledger
@@ -734,10 +747,14 @@ row status: ready | provisional | blocked | unresolved | not_applicable
 | JACC coupling port | **design only** — no JACC coupling code exists on this branch, deliberately |
 | Time observable | **SELECTED: `biomass_autocorrelation_decay`**, row `status = provisional` (runner-up `interface_rearrangement_rate`); seconds/MCS still blocked on the pitch half |
 | Baseline condition | **Ships UNSET** — a protocol contract, not a claim about a specimen that exists |
+| Reference D declarations | **FROZEN** — all twelve modelling decisions made, `reference_d_acceptance_v1`; three declared criteria carry `enforcement = not_implemented` and may not close a gate |
+| Reference D campaign | **`CAMPAIGN_READY: no`** — blocked by exactly one thing, `D-APPROVAL`, which only a biosafety committee can issue |
+| Offline feedback gate | **`NOT_EVALUATED`** — no effect threshold declared, and none may be defaulted |
+| Online feedback | **`DISABLED`, fail-closed** — every prerequisite defaults to its refusing value |
 
-Provenance ledger distribution (`data/parameter_provenance.csv`, 44 rows × 21 columns): `status` —
-17 `ready`, 10 `not_applicable`, 9 `blocked`, 7 `provisional`, 1 `unsupported_by_current_model`.
-`model_compatibility` — 29 `direct`, 10 `requires_transform`, 5 `unsupported`. A row whose status is
+Provenance ledger distribution (`data/parameter_provenance.csv`, 49 rows × 21 columns): `status` —
+22 `ready`, 10 `not_applicable`, 9 `blocked`, 7 `provisional`, 1 `unsupported_by_current_model`.
+`model_compatibility` — 34 `direct`, 10 `requires_transform`, 5 `unsupported`. A row whose status is
 `ready` must carry a `source_id`; `unresolved` and `blocked` rows must not carry a value.
 
 ---

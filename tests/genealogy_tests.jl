@@ -161,3 +161,47 @@ let
     @test sim.rd.s == rd_legacy.s
     @test sim.mcs == n == sim.state.current_mcs
 end
+
+# ---------- online feedback: the fail-closed side of the authorization ------
+#
+# The authorization DECISION lives in Python (biofilm_openmc.feedback_gate).
+# Julia's obligation is narrower and more important: it must be structurally
+# unable to act on a decision that was never made. These assert the properties
+# that make "ONLINE_FEEDBACK = DISABLED" true of the code rather than of a
+# configuration flag somebody could flip.
+let
+    N = 12
+    st = SR.init_state(SR.CPMParams(N = N, n_cells_per_species = 1); seed = 7)
+    dose = fill(0.25, N, N, N)
+    sd = fill(0.01, N, N, N)
+
+    rad0 = copy(st.radiation)
+    mel0 = copy(st.melanin_drive)
+    lat0 = copy(st.lattice)
+    acc0 = copy(st.accumulated_dose_Gy)
+
+    # A physical dose field may ALWAYS be imported — it is a diagnostic until
+    # something transforms it. Importing is not authorizing.
+    SR.import_dose_field!(st, dose, sd)
+    @test st.dose_active
+    @test st.dose_rate_mean_Gy_s == dose
+
+    # No transform supplied => no biological signal moved, and no cell moved.
+    @test st.radiation == rad0
+    @test st.melanin_drive == mel0
+    @test st.lattice == lat0
+    @test st.accumulated_dose_Gy == acc0
+
+    # And with no clock, no dose may be accrued to any parcel, so a
+    # time-integrated response cannot be assembled by accident.
+    @test isnan(st.params.seconds_per_mcs)
+    @test_throws ErrorException SR.accrue_dose!(st)
+
+    # Re-importing a DIFFERENT field still changes no dynamics. The only path
+    # into the biological signals is an explicit transform, which is what the
+    # online gate authorizes and what nothing here supplies.
+    SR.import_dose_field!(st, fill(9.0, N, N, N), sd)
+    @test st.radiation == rad0
+    @test st.melanin_drive == mel0
+    @test st.lattice == lat0
+end

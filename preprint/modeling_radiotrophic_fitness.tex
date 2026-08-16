@@ -1216,6 +1216,15 @@ characterised radiation exposure, and none pairs a calibrated hydrated volume wi
 mass and matched blanks for any organism \cite{audit2026}. Those measurements must be acquired, not
 retrieved.
 
+\paragraph{The implementation path is validated; the physical target is not.}
+The one-way CPM--OpenMC dose-transfer implementation has been executed end to end under an
+explicitly synthetic, non-calibrating reference system, validating configuration emission,
+transport, CSG mass normalisation, dose conversion, coordinate transfer, and label
+attribution. No target-system physical or biological parameter was inferred from that
+execution. The two statements are separate: an implementation path that runs is not a
+physical target that has been calibrated, and nothing in that execution bears on the
+paragraph above.
+
 \paragraph{Physical simplifications.}
 The radiation field is treated as radially symmetric with exponential attenuation
 (Eq.~\ref{eq:gamma_field}), whereas actual environments at Chernobyl and Hanford exhibit complex
