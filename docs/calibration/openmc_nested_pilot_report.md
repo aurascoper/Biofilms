@@ -99,7 +99,7 @@ reintroduce exactly the bias being removed.
 
 **Ŝ may be negative, and must be.** An unbiased estimate of a non-negative
 quantity has to fall below zero about half the time when the truth is zero. The
-`noise_floor` scenario returned 9 negative and 7 positive values across its 16
+`noise_floor` scenario returned 8 negative and 8 positive values across its 16
 draws — a statistic that never went negative would still be biased.
 
 **It is already unbiased at R = 3.** Simulation at this geometry recovers a true
