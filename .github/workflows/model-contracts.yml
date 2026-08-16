@@ -109,10 +109,10 @@ jobs:
             latexmk lmodern texlive-fonts-recommended texlive-latex-extra texlive-science
       - name: Compile the manuscript from source
         working-directory: preprint
-        run: latexmk -pdf -interaction=nonstopmode -halt-on-error modeling_radiotrophic_fitness.tex
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error modeling_radioresistance_and_radiotropic_fitness.tex
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: manuscript-pdf
-          path: preprint/modeling_radiotrophic_fitness.pdf
+          path: preprint/modeling_radioresistance_and_radiotropic_fitness.pdf
           if-no-files-found: error
