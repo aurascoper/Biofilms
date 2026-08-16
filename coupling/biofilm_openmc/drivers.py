@@ -134,14 +134,39 @@ def _problem_ops(snapshot, nuclear_data_id: str):
                 lambda cfg: phantom_mass_kg(
                     cfg,
                     resolve_mesh_dimension(cfg.mesh_base_dimension,
-                                           cfg.mesh_coarsening_factor),
+                                           cfg.mesh_coarsening_factor,
+                                           cfg.mesh_refinement_factor),
                     phantom_mesh_extent_cm(cfg)),
                 lambda cfg: water_phantom_state_hash(cfg, nuclear_data_id))
 
     return (lambda cfg: build_biofilm_cylinder_model(snapshot, cfg),
-            lambda cfg: coarsen_field(voxel_mass_kg(snapshot, cfg),
-                                      cfg.mesh_coarsening_factor),
+            lambda cfg: _biofilm_scan_mass(snapshot, cfg),
             lambda cfg: transport_state_hash(snapshot, cfg, nuclear_data_id))
+
+
+def _biofilm_scan_mass(snapshot, cfg):
+    """Mass at the TALLY resolution, or a refusal before anything expensive.
+
+    A refined biofilm tally has (n*r)^3 bins while `voxel_mass_kg` is defined at
+    the lattice, and its only reducer is a block sum. Going the other way needs
+    `upsample_field(mass, r) / r**3`, which does not exist, and the honest
+    denominator at a refined mesh is the exact CSG raytrace rather than a
+    subdivided full-voxel mass anyway.
+    
+    So this refuses, and refuses EARLY. Left alone the mismatch surfaces inside
+    `per_source_from_statepoint` as a reshape failure — after the transport run
+    has already been paid for.
+    """
+    from .mesh import coarsen_field
+
+    if cfg.mesh_refinement_factor > 1:
+        raise ConfigError(
+            f"[transport.mesh] refinement_factor = {cfg.mesh_refinement_factor} "
+            "is not supported by the scan path: its mass denominator comes from "
+            "voxel_mass_kg at the lattice resolution and can only be coarsened. "
+            "Use coupling/scripts/subvoxel_refinement.py, which takes the "
+            "denominator from the exact CSG raytrace at the refined mesh")
+    return coarsen_field(voxel_mass_kg(snapshot, cfg), cfg.mesh_coarsening_factor)
 
 
 def scan(snapshot: Snapshot | None, base_config: TransportConfig,

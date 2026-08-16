@@ -13,7 +13,8 @@
 > **Revision 2 — the metric itself was replaced.** Fixing the instrument (below)
 > established that the primary metric had a positive bias under the null. It is
 > now superseded as the gate statistic by a cross-replicate **debiased squared
-> effect**, which is unbiased by construction. The raw norm survives as a
+> effect**, whose numerator and denominator are each unbiased by construction
+> (their ratio carries a bounded O(1/R) term — see below). The raw norm survives as a
 > declared diagnostic. Consequences: the weak levers shrink by 48–70% while the
 > strong ones move by 1–4%, the noise-floor control is now *indistinguishable
 > from zero*, and **the ~40× history recommendation from revision 1 is itself
@@ -102,10 +103,26 @@ quantity has to fall below zero about half the time when the truth is zero. The
 `noise_floor` scenario returned 8 negative and 8 positive values across its 16
 draws — a statistic that never went negative would still be biased.
 
-**It is already unbiased at R = 3.** Simulation at this geometry recovers a true
-effect of 0.0200 at every R from 3 to 20, where the raw norm on the same draws
-reads 0.0223–0.0294. More replicates buy *precision*, not correctness — which is
-what supersedes the history recommendation below.
+**It is usable at R = 3.** Simulation at this geometry recovers a true effect of
+0.0200 at every R from 3 to 20, where the raw norm on the same draws reads
+0.0223–0.0294. More replicates buy *precision*, not a correction for the raw
+norm's bias — which is what supersedes the history recommendation below.
+
+**But the ratio is not itself unbiased, and an earlier version of this report
+said it was.** The numerator and denominator are each unbiased; their ratio is
+not, because `E[X/Y] ≠ E[X]/E[Y]` and the two are correlated through the
+baseline rows they share. The right thing to record is the scale, not a point
+estimate that depends on an unmeasured correlation:
+
+    |bias| / SD  ~  relerr · √( 2(1−ρ) / (R · B_eff) )    < 3 × 10⁻²
+
+across the whole envelope this pilot operates in. `B_eff` is the participation
+ratio (Σwμ²)²/(Σw²μ⁴) ≈ 400 — **not** the bin count ≈ 1500, since a dose field
+concentrated near a line source has far fewer effective bins than bins. No
+plug-in correction is applied: both the delta-method and jackknife corrections
+were measured and both are harmful at small R, turning −35% into +170% in the
+stress regime. A correction whose own variance exceeds the bias it removes makes
+the number worse.
 
 ### What it does to the measured effects
 
@@ -195,37 +212,74 @@ material change at these energies.
 pretension; its only job is to prove the gate can pass. **The 0.10 threshold was
 not adjusted to reach it**, which would have been a stop condition.
 
-## The gate returned what was declared
+## The gate, after an external review found three faults in it
 
-Thresholds are declared in **E²** now, so δ = 0.10 becomes 0.01 and the practical
+Thresholds are declared in **E²**, so δ = 0.10 becomes 0.01 and the practical
 floor 0.02 becomes 4 × 10⁻⁴. `ThresholdPolicy` carries a `metric_id` and
-`decide()` refuses draws from a different metric, because a threshold declared
-for E and compared against E² is a silent factor-of-ten error that no inspection
-of the number alone would catch.
+`decide()` refuses draws from a different metric.
 
-| Scenario | Declared | Returned | E² | z |
-|---|---|---|---|---|
-| `noise_floor` | *(control)* | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 4.81e-05 | **0.1** |
-| `lever_Fe_5pct` | *(measured)* | `EFFECT_BELOW_THRESHOLD` | 1.86e-05 | 7.9 |
-| `near_threshold` | `DECIDED_BY_PILOT` | `PASS_SYNTHETIC_GATE` | 2.48e-02 | 60.6 |
-| `clearly_detectable` | `PASS_SYNTHETIC_GATE` | ✅ same | 6.94e-02 | 79.0 |
+An automated review of the merged branches then found three further faults, two
+of which reached the verdict itself. All three are fixed and the run below is
+regenerated.
 
-1 056 OpenMC runs, 1.056 × 10⁸ histories, 520 s wall.
+**The gate was pooling draws across tally resolutions.** That put a systematic,
+monotone discretisation trend inside a distribution the gate reads as sampling
+spread — and `mesh_coarsening_factor` is declared `sampling_role =
+convergence_axis` precisely so it is never drawn from. The trend is not small:
+`clearly_detectable` runs 5.05 × 10⁻² at f = 1 to 8.09 × 10⁻² at f = 5, a **60%
+drift and ~71× the correct standard error**.
 
-**A limitation this exposes, reported rather than patched.** `noise_floor`'s
-verdict says *effect detected* on a scenario whose true effect is exactly zero
-— and z = 0.1 says the opposite. Both are right about different things.
-`decide()` takes the 99th percentile of the draws, and there are 16 draws (4
-outer × 4 mesh factors), so that quantile is effectively the **maximum**. One
-draw landed at +5.3 × 10⁻⁴, about 1.6σ, which is unremarkable noise but sits
-just above the 4 × 10⁻⁴ practical floor.
+Reading only the finest factor would have been a *relaxation*, not a fix:
+`lever_density_x1.35`'s 99% upper bound falls 7.59 × 10⁻⁴ → 7.12 × 10⁻⁵, under
+the practical floor, converting "real but not worth acting on" into "below
+threshold" **by looking at less**. So `decide()` now takes the residual
+discretisation bound and widens the interval symmetrically. Under finest+bound
+no verdict became easier and three became stricter.
 
-So the verdict vocabulary is being driven by the upper tail of a very small
-sample. This is the same class of problem as everything else in this report: a
-quantile needs enough draws to mean anything, and `seed_sufficiency()` already
-sets 20 as the floor for estimating a *variance* — a 99% quantile needs far more.
-**The `z` column, not the verdict, is the trustworthy significance statement at
-this sample size.** Raising the outer-draw count is the production fix.
+**The significance flag was wrong three ways in one line.** It pooled over draws
+and factors; `sqrt(mean(jackknife_var))` is the RMS standard error of *one row*,
+carrying no 1/√M and no between-draw term, so it was not the standard error of
+the mean it divided into; and "3 σ" on M−1 = 3 degrees of freedom is a ~94%
+one-sided test wearing a 99.9% label. It is now a cluster-on-outer-draw SE at
+the finest mesh with the correct t critical value of 10.21.
+
+The direction here is worth recording, because the first analysis got it
+backwards: measured against the cluster SE the old statistic was **conservative
+in 10 of 11 scenarios** (2.06× to 10.15×) and anti-conservative in exactly one
+(0.87×). It produced no false positives — it simply was not measuring what its
+name claimed.
+
+**Ω_b required a dose floor taken from replicate 0.** The same error this module
+had already learned once with `rel_err`, in a subtler form: the region became a
+random set drawn from one replicate, so 2(R−1) of the R(R−1) ordered pairs the
+U-statistic averages involve a row that helped choose the weights — four of six
+at R = 3. Ω_b is now two geometric criteria and takes no field at all.
+
+### The regenerated run
+
+| Scenario | Returned | E² | E | t | vs zero |
+|---|---|---|---|---|---|
+| `noise_floor` | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 1.05e-04 | 0.0103 | 0.4 | **no** |
+| `lever_Fe_5pct` | `EFFECT_BELOW_THRESHOLD` | 6.49e-06 | 0.00255 | 10.3 | yes |
+| `lever_density_x1.35` | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 5.52e-05 | 0.00743 | 1.8 | **no** |
+| `lever_Gd_5pct` | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 1.34e-03 | 0.0366 | 39.9 | yes |
+| `lever_dehydration_H_0.06` | `EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT` | 2.12e-03 | 0.0461 | 15.7 | yes |
+| `near_threshold` | **`INDETERMINATE_NUMERICS`** | 1.50e-02 | 0.1224 | 81.0 | yes |
+| `clearly_detectable` | `PASS_SYNTHETIC_GATE` | 5.05e-02 | 0.2248 | 84.0 | yes |
+
+1 056 OpenMC runs, 1.056 × 10⁸ histories, 610 s wall. Ω_b is 1 631 bins, the
+geometric count.
+
+**`near_threshold`'s PASS is withdrawn.** Its interval is −0.0035 to 0.0336
+against a threshold of 0.01, with a resolution bound of 0.0182 — it straddles,
+and numerics dominates. The earlier PASS was carried by coarse meshes whose
+spread exceeds the threshold it passed, so it was never resolution-converged.
+The honest response is more factors near f = 1, not averaging the axis away.
+
+**The lever magnitudes are unchanged by all of this** — every value moved by
+≤ 0.7% when the dose floor was dropped — so the physical ranking and every
+conclusion drawn from it stand. What changed is which of them the gate is
+entitled to call resolved.
 
 ## Numerics is a bound, not a variance
 
@@ -303,7 +357,8 @@ decides whether a 0.02–0.05 effect is measurable. That was right *about the ra
 norm*.
 
 **Revision 2 supersedes it.** The debiased estimator has no bias to buy down. It
-is unbiased at R = 3 and at the pilot's existing 10⁵ histories per run, and the
+carries no history-dependent bias to buy down at R = 3 and at the pilot's
+existing 10⁵ histories per run, and the
 run confirms it: 5% Gd resolves at z = 46 and dehydration at z = 26 without
 buying anything. **Histories now buy precision, not correctness**, and the
 40× figure sized a problem that no longer exists.

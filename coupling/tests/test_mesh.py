@@ -210,3 +210,33 @@ def test_refining_then_summing_back_recovers_the_coarse_field_exactly():
     two_step = coarsen_ratio(coarsen_field(fine_energy, 2),
                              coarsen_field(fine_mass, 2), 1)
     assert np.allclose(coarse_dose, two_step)
+
+
+def test_the_scan_path_refuses_refinement_before_spending_the_histories():
+    """`voxel_mass_kg` is defined at the lattice and its only reducer is a block
+    sum, so a refined biofilm tally has no denominator in the scan path. Left
+    alone the mismatch surfaces inside `per_source_from_statepoint` as a reshape
+    failure — AFTER the transport run has been paid for."""
+    from biofilm_openmc.drivers import _biofilm_scan_mass
+
+    cfg = load_transport_config(_with_mesh(refinement_factor=2))
+    with pytest.raises(ConfigError, match="not supported by the scan path"):
+        _biofilm_scan_mass(object(), cfg)
+
+
+def test_the_water_phantom_honours_refinement_because_its_hash_claims_it():
+    """`water_phantom_state_hash` records the refined dimension. A builder that
+    ignored refinement would give a run an identity describing a mesh it never
+    used — a cache key for a different model."""
+    from biofilm_openmc.fingerprint import water_phantom_state_hash
+
+    base = load_transport_config(WATER_PHANTOM_CONFIG, kind="water_phantom")
+    refined = load_transport_config(
+        WATER_PHANTOM_CONFIG.replace(
+            "[transport.mesh]", "[transport.mesh]\n  refinement_factor = 2\n"),
+        kind="water_phantom")
+    assert refined.mesh_refinement_factor == 2
+    assert resolve_mesh_dimension(refined.mesh_base_dimension, 1, 2) == \
+        tuple(2 * d for d in resolve_mesh_dimension(base.mesh_base_dimension, 1))
+    # and the identity must actually differ, or a refined run reuses a cache
+    assert water_phantom_state_hash(base) != water_phantom_state_hash(refined)

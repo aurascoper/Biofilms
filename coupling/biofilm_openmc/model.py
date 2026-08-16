@@ -200,8 +200,12 @@ def build_water_phantom_model(config: TransportConfig):
                           region=-cyl & +bottom & -top)
     geometry = openmc.Geometry([phantom])
 
+    # Refinement applies here too. `water_phantom_state_hash` already records
+    # the refined dimension, so omitting it would give a run an identity that
+    # claims a mesh it did not use — a cache key describing a different model.
     dimension = resolve_mesh_dimension(config.mesh_base_dimension,
-                                       config.mesh_coarsening_factor)
+                                       config.mesh_coarsening_factor,
+                                       config.mesh_refinement_factor)
     tallies = _heating_tally(openmc, dimension, (x0, y0, z0),
                              (x0 + extent[0], y0 + extent[1], z0 + extent[2]))
     source = _photon_source(openmc, config, cx, cy, z_lo, z_hi)

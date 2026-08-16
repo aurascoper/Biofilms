@@ -63,11 +63,12 @@ from biofilm_openmc.feedback_uq import (cross_replicate_inner,
                                         relative_l2_effect)
 from biofilm_openmc.fingerprint import transport_state_hash
 from biofilm_openmc.materials import mesh_material_masses_kg, mesh_material_volumes
-from biofilm_openmc.mesh import (coarsen_field, coarsen_ratio,
-                                 resolve_mesh_dimension, upsample_field)
+from biofilm_openmc.viewer import Grid, Layer, write_bundle
+from biofilm_openmc.mesh import (biofilm_mesh_extent_cm, coarsen_field,
+                                 coarsen_ratio, resolve_mesh_dimension,
+                                 upsample_field)
 
 # Declared before the run, and identical to the pilot's so the two are comparable.
-DOSE_FLOOR_FRACTION = 1e-3
 MIN_BIOMASS_VOLUME_FRACTION = 0.5
 
 # Samples per mesh bin from the CSG raytrace. 250 is ample: the volumes are
@@ -113,20 +114,57 @@ def volume_fraction(bio, total) -> np.ndarray:
     return np.divide(bio, total, out=np.zeros_like(bio), where=total > 0)
 
 
-def omega_b(dose0, mass, biomass_fraction) -> np.ndarray:
-    """Three PHYSICAL criteria. Deliberately no uncertainty cut — see the
-    pilot's `omega_b`: a statistical criterion on a region definition makes the
-    region move with the history count."""
-    peak = float(np.nanmax(dose0))
-    floor = DOSE_FLOOR_FRACTION * peak if np.isfinite(peak) else 0.0
-    return ((biomass_fraction >= MIN_BIOMASS_VOLUME_FRACTION)
-            & (mass > 0) & (dose0 > floor))
+def omega_b(mass, biomass_fraction) -> np.ndarray:
+    """Two criteria, both GEOMETRIC — see the pilot's `omega_b`.
+
+    A dose floor taken from one replicate makes the region a random set drawn
+    from that replicate, so the cross-replicate independence the debiased
+    estimator rests on fails for every ordered pair involving it.
+    """
+    return ((biomass_fraction >= MIN_BIOMASS_VOLUME_FRACTION) & (mass > 0))
 
 
 def _seed(rep: int, state: str, paired: bool) -> int:
     """Common random numbers across states, except for the null control, which
     must be able to fail. Same rule as the pilot."""
     return 7000 + rep + (0 if paired or state == "baseline" else 500_000)
+
+
+def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
+                  config, openmc_version) -> None:
+    """Assemble the multi-grid bundle from what this run already computed.
+
+    Costs no extra transport. The point is that the refinement study is the
+    first thing in the repository to produce a genuinely NATIVE high-resolution
+    dose field — before it, a viewer could only have shown the lattice grid, and
+    anything finer would have been a coarse field broadcast to look detailed.
+    """
+    from biofilm_openmc.results import provenance_attrs
+
+    labels = [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              snapshot.cell_id.astype(np.int32),
+              note="a computational biomass PARCEL id, never an organism"),
+        Layer("lineage_id", "cpm_labels", "dimensionless", "categorical",
+              snapshot.lineage_id.astype(np.int32)),
+        Layer("generation", "cpm_labels", "dimensionless", "categorical",
+              snapshot.generation.astype(np.int32),
+              note="generation 0 is a founder, not a missing value"),
+        Layer("omega_b", "cpm_labels", "dimensionless", "boolean",
+              np.asarray(common_mask, dtype=bool), derivation=None,
+              note="the metric's region: biomass volume fraction >= 0.5, "
+                   "positive mass, above the dose floor. No uncertainty cut - "
+                   "a statistical criterion on a region definition makes the "
+                   "region move with the history count"),
+    ]
+    path = args.outdir / "viewer_bundle.h5"
+    doc = write_bundle(
+        path, [lattice_grid] + grids, labels + layers,
+        provenance={**provenance_attrs(config, repo_root=str(REPO)),
+                    "openmc_version": openmc_version,
+                    "study": "subvoxel_tally_refinement",
+                    "particles": args.particles, "batches": args.batches})
+    print(f"wrote {path} - {len(doc['grids'])} grids, {len(doc['layers'])} layers")
 
 
 def main(argv=None) -> int:
@@ -139,6 +177,10 @@ def main(argv=None) -> int:
     ap.add_argument("--particles", type=int, default=20000)
     ap.add_argument("--batches", type=int, default=20)
     ap.add_argument("--budget-seconds", type=float, default=3600.0)
+    ap.add_argument("--bundle", action="store_true",
+                    help="also write a multi-grid viewer bundle. Costs no "
+                         "extra transport: the native dose field at every "
+                         "ratio is already in memory here")
     args = ap.parse_args(argv)
 
     import openmc
@@ -161,8 +203,41 @@ def main(argv=None) -> int:
     runs = total_histories = statepoint_bytes = 0
     rows: list[dict] = []
     common_mask = None          # Omega_b at lattice resolution, defined once
+    lattice_grid = None
+    bundle_grids = [] if args.bundle else None
+    bundle_layers = []
     reference_remapped: dict[str, float] = {}
+    reference_lattice_dose: dict = {}
+    field_drift: dict = {}
     stopped_early = None
+
+    # ONE RAYTRACE, AT THE FINEST RATIO, COARSENED DOWN FOR THE REST.
+    #
+    # Raytracing each ratio independently looks natural and is wrong. The mass
+    # denominator is an O(1/sqrt(n)) ESTIMATE, so independent raytraces differ:
+    # measured here, up to 3.0% per voxel and 0.13% in total between a 1x and a
+    # coarsened-4x mass. Dose is heating over mass, so that error lands directly
+    # in every dose field and makes the ratios differ for a reason that has
+    # nothing to do with resolution.
+    #
+    # Mass is EXTENSIVE, so coarsening the finest estimate is exact and gives
+    # every ratio a mutually consistent denominator by construction. It is also
+    # cheaper: one raytrace instead of one per ratio.
+    finest = ratios[-1]
+    cfg_fine = replace(base, mesh_coarsening_factor=1,
+                       mesh_refinement_factor=finest,
+                       batches=args.batches, particles=args.particles)
+    dim_fine = resolve_mesh_dimension((n, n, n), 1, finest)
+    probe_fine = build_biofilm_cylinder_model(snapshot, cfg_fine)
+    t0 = time.perf_counter()
+    n_rays = ray_samples(dim_fine)
+    volumes_fine = mesh_material_volumes(
+        probe_fine.tallies[0].filters[0].mesh, probe_fine, n_samples=n_rays)
+    raytrace_wall = time.perf_counter() - t0
+    mass_fine = mesh_material_masses_kg(
+        probe_fine.tallies[0].filters[0].mesh, probe_fine, dim_fine,
+        volumes=volumes_fine)
+    bio_fine, total_fine = biomass_volumes(volumes_fine, dim_fine)
 
     for ratio in ratios:
         # Coarsening is forced to 1: the two are opposite ends of one axis and
@@ -174,11 +249,10 @@ def main(argv=None) -> int:
         probe = build_biofilm_cylinder_model(snapshot, cfg_r)
         mesh = probe.tallies[0].filters[0].mesh
 
-        t0 = time.perf_counter()
-        n_rays = ray_samples(dim)
-        volumes = mesh_material_volumes(mesh, probe, n_samples=n_rays)
-        raytrace_wall = time.perf_counter() - t0
-        bio_vol, total_vol = biomass_volumes(volumes, dim)
+        step = finest // ratio
+        mass_ratio = coarsen_field(mass_fine, step)
+        extent_cm = biofilm_mesh_extent_cm(cfg_r, n)
+        bio_vol, total_vol = coarsen_field(bio_fine, step), coarsen_field(total_fine, step)
         bio_fraction = volume_fraction(bio_vol, total_vol)
 
         for scenario, feedback_elements in SCENARIOS.items():
@@ -197,7 +271,7 @@ def main(argv=None) -> int:
                                                     elements)
                 cfg_s = replace(cfg_r, materials=mats)
                 model = build_biofilm_cylinder_model(snapshot, cfg_s)
-                mass = mesh_material_masses_kg(mesh, model, dim, volumes=volumes)
+                mass = mass_ratio
                 fields = []
                 for rep in range(args.replicates):
                     cfg_x = replace(cfg_s, seed=_seed(rep, state, paired))
@@ -223,6 +297,62 @@ def main(argv=None) -> int:
             b_lat = [coarsen_ratio(f.field * mass, mass, ratio) for f in b_fields]
             f_lat = [coarsen_ratio(f.field * mass, mass, ratio) for f in f_fields]
 
+            if bundle_grids is not None and scenario == "near_threshold":
+                # THE BASELINE FIELD AT ITS OWN RESOLUTION, kept as measured.
+                # Nothing is resampled onto the lattice here: the whole point of
+                # the bundle is that a 4x dose field has structure the CPM grid
+                # cannot hold, and flattening it to fit would destroy exactly
+                # what makes it worth showing.
+                gid = f"dose_refinement_{ratio}"
+                bundle_grids.append(Grid(
+                    gid, tuple(int(d) for d in dim),
+                    tuple(float(v) for v in base.origin_cm),
+                    tuple(float(e) / int(d) for e, d in zip(extent_cm, dim)),
+                    material_resolution_grid="cpm_labels",
+                    note=("native OpenMC tally; the MATERIAL it integrates is "
+                          "piecewise constant at the CPM pitch, so sub-voxel "
+                          "structure here is transport structure, not biology")))
+                bundle_layers.append(Layer(
+                    f"dose_per_source_r{ratio}", gid, "Gy/source-particle",
+                    "intensive", b_fields[0].field))
+                bundle_layers.append(Layer(
+                    f"mass_kg_r{ratio}", gid, "kg", "extensive", mass,
+                    note="exact CSG raytraced volumes x density"))
+                bundle_layers.append(Layer(
+                    f"rel_err_r{ratio}", gid, "dimensionless", "intensive",
+                    b_fields[0].rel_err,
+                    note="tally relative error; a DIAGNOSTIC, never an "
+                         "Omega_b membership criterion"))
+                if ratio > 1:
+                    # BOTH SIDES OF THE RULE, on real data, because a viewer
+                    # overlaying dose on labels needs exactly these two.
+                    #
+                    # Reducing the fine dose onto the lattice is exact - it
+                    # reproduces the native ratio-1 field to nine significant
+                    # figures - so it stays quotable.
+                    bundle_layers.append(Layer(
+                        f"dose_on_lattice_from_r{ratio}", "cpm_labels",
+                        "Gy/source-particle", "intensive", b_lat[0],
+                        native=False, authoritative_for_quantitation=True,
+                        source_grid_id=gid, derivation="mass_weighted_mean",
+                        note="block-summed heating over block-summed mass; "
+                             "exact, and equal to the native lattice field"))
+                    # Broadcasting labels the other way is exact too, because
+                    # the material lattice is piecewise constant. It is still
+                    # marked unquotable: the direction is what the rule keys
+                    # on, and a reader who learns to trust ONE upsampled layer
+                    # will trust the next one, which will be a dose field.
+                    bundle_layers.append(Layer(
+                        f"cell_id_on_r{ratio}", gid, "dimensionless",
+                        "categorical",
+                        upsample_field(snapshot.cell_id.astype(np.int32), ratio),
+                        native=False, authoritative_for_quantitation=False,
+                        source_grid_id="cpm_labels",
+                        derivation="display_resampling",
+                        note="for overlay only. Exact here, since the lattice "
+                             "is piecewise constant, but marked unquotable "
+                             "because the DIRECTION is what the rule keys on"))
+
             if common_mask is None:
                 # Defined ONCE, at ratio 1, and reused unchanged for every
                 # finer ratio, so the comparison is over an identical region by
@@ -230,7 +360,13 @@ def main(argv=None) -> int:
                 # close. The fraction is sum(bio)/sum(total) over the block.
                 lattice_fraction = volume_fraction(coarsen_field(bio_vol, ratio),
                                                    coarsen_field(total_vol, ratio))
-                common_mask = omega_b(b_lat[0], lattice_mass, lattice_fraction)
+                common_mask = omega_b(lattice_mass, lattice_fraction)
+                lattice_grid = Grid(
+                    "cpm_labels", (n, n, n),
+                    tuple(float(v) for v in base.origin_cm),
+                    (base.voxel_pitch_cm,) * 3,
+                    note="the CPM material lattice; every material boundary in "
+                         "the model lies on this grid")
 
             # THE FINE REGION IS THE COARSE REGION, UPSAMPLED. Using each
             # ratio's own Omega_b would compare different physical regions, and
@@ -252,6 +388,51 @@ def main(argv=None) -> int:
             # value MUST equal the ratio-1 value to floating-point. If it ever
             # does not, either the remap is not conservative or the refinement
             # perturbed the transport, and both are defects.
+            # THE FIELD ITSELF, not only the statistic. An earlier version
+            # checked only E^2 and read its agreement as proof that the dose
+            # field was reproduced. It was not: E^2 is a ratio in which the
+            # mass denominator appears in both sums and cancels to high order,
+            # so it agreed to nine figures while the underlying dose field
+            # differed by 1.5% from independently raytraced masses. Comparing
+            # the FIELD is the claim worth making, and it only became true once
+            # every ratio shared one raytrace.
+            if ratio == 1:
+                reference_lattice_dose[scenario] = b_lat[0].copy()
+            else:
+                ref_field = reference_lattice_dose.get(scenario)
+                if ref_field is not None:
+                    peak = float(np.abs(ref_field).max())
+                    drift = (float(np.abs(b_lat[0] - ref_field).max()) / peak
+                             if peak else 0.0)
+                    # 1e-7, and the slack has a MECHANISM rather than being
+                    # numerical slop. Measured: 0 at r=1, 1.5e-13 at r=2, and
+                    # 3.0e-09 at r=4. Float accumulation would predict the 8-term
+                    # and 64-term sums to differ by ~8x, not by four orders of
+                    # magnitude, so it is not accumulation.
+                    #
+                    # It is the ORPHANED-ENERGY DISCARD, and it is
+                    # resolution-dependent. `specific_energy_per_source` drops
+                    # heating found in bins the raytrace gave zero volume. At
+                    # r=4 a sliver sub-bin is its own bin and its energy is
+                    # discarded; at r=1 that same energy sits inside a coarse
+                    # voxel with plenty of mass and is kept. Localised exactly
+                    # where predicted: of the voxels carrying drift above 1% of
+                    # the maximum there is EXACTLY ONE, and it holds 28 of 64
+                    # massless sub-bins, against 19% of the remaining voxels
+                    # holding any. Mass itself conserves to 4.8e-16.
+                    #
+                    # So this check detects more than a bad remap: it also
+                    # bounds how much the sliver tolerance costs. The defect it
+                    # was written for - each ratio raytracing its own mass -
+                    # showed up at 1.5e-02, five orders of magnitude above.
+                    field_drift[(scenario, ratio)] = drift
+                    if drift > 1e-7:
+                        raise SystemExit(
+                            f"reduced dose field at r={ratio} ({scenario}) "
+                            f"differs from the native lattice field by "
+                            f"{drift:.3e} — the remap is not conservative, or "
+                            "the ratios do not share a mass denominator")
+
             if ratio == 1:
                 reference_remapped[scenario] = remapped.e_squared
             else:
@@ -293,6 +474,9 @@ def main(argv=None) -> int:
                     subvoxel_rms / voxel_rms if voxel_rms else float("nan")),
                 "mesh_dimension": int(dim[0]), "bins": int(np.prod(dim)),
                 "ray_samples": n_rays,
+                "mass_basis": "single_raytrace_at_finest_ratio_coarsened",
+                "lattice_field_drift_vs_ratio1": field_drift.get(
+                    (scenario, ratio), 0.0),
                 "raytrace_seconds": round(raytrace_wall, 2),
                 "native_omega_b_bins": int(fine_mask.sum()),
                 "common_omega_b_bins": int(common_mask.sum()),
@@ -320,6 +504,10 @@ def main(argv=None) -> int:
                   f"remapped E2={remapped.e_squared:+.5e}", flush=True)
         if stopped_early:
             break
+
+    if bundle_grids is not None and bundle_grids:
+        _write_bundle(args, snapshot, bundle_grids, bundle_layers,
+                      lattice_grid, common_mask, base, openmc.__version__)
 
     wall = time.perf_counter() - started
     doc = {
