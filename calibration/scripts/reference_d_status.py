@@ -41,7 +41,37 @@ DATA = REPO / "data" / "calibration"
 REQUIREMENTS = DATA / "reference_d_requirements.csv"
 
 SUPPLIED_BY = ("measured", "evaluated_data", "derived", "declared")
-STATUSES = ("not_started", "satisfied", "blocked_on_model", "awaits_upstream")
+
+# What each requirement is waiting FOR, because "not started" hid the only
+# distinction that matters for scheduling: an institutional approval and a
+# numerical study are not measurements, and neither is a modelling decision.
+STATUSES = (
+    "awaiting_declaration",          # a modeller must decide it
+    "awaiting_approval",             # an institution must issue it
+    "awaiting_measurement",          # a laboratory must produce it
+    "awaiting_derivation",           # computable once its inputs exist
+    "awaiting_analysis",             # needs a study, not a measurement
+    "awaiting_evaluated_data",       # published data, looked up
+    "unsupported_by_current_model",  # needs a model change, not data
+    "satisfied",
+)
+
+# Which states block which threshold. THE CAMPAIGN MUST NOT WAIT ON ITS OWN
+# OUTPUTS: D-NUMERICS and D-AXIALFACE are `awaiting_analysis` precisely because
+# they depend on data the campaign produces, so they cannot gate its start.
+# An unmade modelling decision does gate it — measurements would answer a
+# question nobody had framed. So does approval, which gates culturing itself.
+_BLOCKS_CAMPAIGN = ("awaiting_declaration", "awaiting_approval")
+
+CAMPAIGN_READY = "CAMPAIGN_READY"
+CONFIG_READY = "REFERENCE_D_CONFIG_READY"
+SWEEP_READY = "BIOFILM_SWEEP_READY"
+NOT_READY = "NOT_READY"
+
+# Frozen acceptance configs, read for their [enforcement] tables. A criterion
+# nothing compares against may be declared, but it may never close a gate.
+ACCEPTANCE_CONFIGS = ("reference_d_spatial_acceptance.toml",
+                      "reference_d_material_acceptance.toml")
 
 # Fields the emitter names that the ledger addresses under a different key,
 # because one artifact closes several at once and splitting the row would make
@@ -84,6 +114,63 @@ def load_requirements() -> list[dict]:
         raise ValueError("reference_d_requirements.csv is malformed:\n  - "
                          + "\n  - ".join(problems))
     return rows
+
+
+def enforcement_report() -> dict[str, list[str]]:
+    """Which declared criteria a consumer actually compares against.
+
+    A gate that closes on a criterion nobody evaluated is a gate that closed on
+    nothing. The frozen configs classify every threshold, and this surfaces the
+    ones that are decoration so a reader is not misled by their presence.
+    """
+    import tomllib
+
+    out: dict[str, list[str]] = {"hard": [], "advisory": [], "derived": [],
+                                 "not_implemented": []}
+    for name in ACCEPTANCE_CONFIGS:
+        path = REPO / "config" / name
+        if not path.exists():
+            continue
+        with open(path, "rb") as fh:
+            data = tomllib.load(fh)
+        for key, level in (data.get("enforcement") or {}).items():
+            out.setdefault(level, []).append(f"{name.split('_')[2]}:{key}")
+    return out
+
+
+def readiness(requirements, spatial_verdict, material_verdict,
+              binding) -> dict[str, tuple[bool, list[str]]]:
+    """The three thresholds, which gate different things and must not be one
+    flag. A campaign can be ready while a config is not; a config can be ready
+    while the sweep has not run."""
+    by_status: dict[str, list[str]] = {}
+    for r in requirements:
+        by_status.setdefault(r["status"], []).append(r["requirement_id"])
+
+    campaign_blockers = [f"{s}: {', '.join(sorted(by_status[s]))}"
+                         for s in _BLOCKS_CAMPAIGN if by_status.get(s)]
+
+    config_blockers = []
+    unsatisfied = [r["requirement_id"] for r in requirements
+                   if r["status"] not in ("satisfied", "unsupported_by_current_model")
+                   and r["unblocks"] != "radiodialysis gate"]
+    if unsatisfied:
+        config_blockers.append(f"{len(unsatisfied)} requirement(s) unsatisfied")
+    if spatial_verdict != spatial_report.READY:
+        config_blockers.append(f"spatial gate is {spatial_verdict}")
+    if material_verdict != material_report.READY_OPENMC:
+        config_blockers.append(f"material OpenMC gate is {material_verdict}")
+    if binding.lattice_pitch_um is None or binding.density_g_cm3 is None:
+        config_blockers.append("voxel binding is not populated")
+
+    sweep_blockers = list(config_blockers) or [
+        "no measured Reference D config has been emitted or loaded"]
+
+    return {
+        CAMPAIGN_READY: (not campaign_blockers, campaign_blockers),
+        CONFIG_READY: (not config_blockers, config_blockers),
+        SWEEP_READY: (False, sweep_blockers),
+    }
 
 
 def declared_binding() -> VoxelBinding:
@@ -143,9 +230,12 @@ def main(argv=None) -> int:
     requirements = load_requirements()
     binding = declared_binding()
 
+    # The FROZEN configs, not the templates: the templates ship unset by
+    # design and reading them here would report the freeze as never happening.
     spatial = spatial_report.evaluate(
-        DATA / "spatial", REPO / "config" / "cpm_spatial_acceptance_template.toml")
-    material = material_report.evaluate(DATA / "materials")
+        DATA / "spatial", REPO / "config" / "reference_d_spatial_acceptance.toml")
+    material = material_report.evaluate(
+        DATA / "materials", REPO / "config" / "reference_d_material_acceptance.toml")
 
     print("REFERENCE D — engineered radiotropic composite\n")
     print(f"binding coherent : {'yes' if not coherence_problems(binding) else 'NO'}")
@@ -160,8 +250,17 @@ def main(argv=None) -> int:
     for r in requirements:
         by_source[r["supplied_by"]].append(r)
 
+    by_status: dict[str, list[str]] = {}
+    for r in requirements:
+        by_status.setdefault(r["status"], []).append(r["requirement_id"])
     print(f"\n{len(requirements)} requirements, "
-          f"{sum(1 for r in requirements if r['status'] == 'satisfied')} satisfied\n")
+          f"{len(by_status.get('satisfied', []))} satisfied")
+    print("\nWAITING ON")
+    for state in STATUSES:
+        ids = by_status.get(state)
+        if state != "satisfied" and ids:
+            print(f"  {state:<30} {len(ids):>2}  {', '.join(sorted(ids))}")
+    print()
     for source in SUPPLIED_BY:
         rows = by_source[source]
         if not rows:
@@ -210,12 +309,32 @@ def main(argv=None) -> int:
         print("every requirement is justified by an open gate or a required "
               "field, and every required field has a requirement.")
 
-    blocked = [r for r in requirements if r["status"] == "blocked_on_model"]
+    blocked = [r for r in requirements
+               if r["status"] == "unsupported_by_current_model"]
     if blocked:
         print(f"\n{len(blocked)} requirement(s) await a MODEL CHANGE, not a "
               "measurement — do not put them in a campaign:")
         for r in blocked:
             print(f"  - {r['requirement_id']}: {r['notes'][:110]}")
+
+    enforcement = enforcement_report()
+    decorative = enforcement.get("not_implemented", [])
+    if decorative:
+        print(f"\n{len(decorative)} declared criteria have NO CONSUMER and may "
+              "not close a gate:")
+        for key in sorted(decorative):
+            print(f"  - {key}")
+
+    print("\nREADINESS")
+    # `reached` deliberately does NOT shadow `ok`: --check reports whether the
+    # ledger and the contract agree, which is a different question from whether
+    # the programme is ready. Conflating them made --check fail forever, since
+    # BIOFILM_SWEEP_READY is false by construction until measurements exist.
+    for verdict, (reached, blockers) in readiness(
+            requirements, spatial.verdict, material.openmc, binding).items():
+        print(f"  {verdict:<26} {'YES' if reached else 'no'}")
+        for b in blockers:
+            print(f"      - {b}")
 
     if args.check:
         return 0 if ok else 1
