@@ -1237,8 +1237,19 @@ end
 """
 Advance the radiodialysis PDE system by one time step dt.
 Substeps automatically if dt exceeds the explicit-Euler diffusion stability
-bound (0.4·dr²/2D_eff); with the legacy defaults n_sub = 1, so legacy
-trajectories are bit-for-bit unchanged.
+bound (0.4·dr²/2D_eff).
+
+n_sub = 1 AT THE GEOMETRY EVERY CALL SITE USES, not at this struct's own
+default. Every caller passes R = N/2 in LATTICE units (`:1441`, `:1807`), giving
+dr = 0.513 and dt_stable = 52.6 at N = 40, so legacy trajectories are bit-for-bit
+unchanged. At the RadiolysisParams default R = 1.0 — which no call site uses, and
+which is also `biofilms_radiodialysis.R`'s grid, integrated there by LSODA rather
+than by this stepper — dt_stable = 0.132 and n_sub = 4.
+
+So the safety margin here is an artifact of the documented r-in-lattice-units
+error (RADIODIALYSIS: BLOCKED), not of dt_rd being small. Correcting the units to
+R = 1.0 cm makes dt_rd = 0.5 genuinely unstable, and this guard is what absorbs
+it. `biofilms_potts_jacc.jl` carries the identical wrapper for the same reason.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
     dr = rd.r_grid[2] - rd.r_grid[1]

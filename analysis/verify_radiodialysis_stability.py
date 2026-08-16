@@ -206,16 +206,53 @@ def run_audit() -> dict[str, Any]:
         np.isclose(no_loss_eig, 0.0, atol=1.0e-11)
     )
 
+    # TWO GEOMETRIES, because the struct default and the as-run value differ and
+    # only one of them is the grid an explicit step is ever taken on.
+    #
+    #   radius = 1.0   RadiolysisParams' own default. NO CALL SITE USES IT. It is
+    #                  also default_parms()' grid in biofilms_radiodialysis.R,
+    #                  which integrates with deSolve::ode(method="lsoda") —
+    #                  adaptive and stiff-capable, taking no explicit step at all.
+    #   radius = 20.0  what every Julia call site passes: R = N/2 in LATTICE
+    #                  units at N = 40 (biofilms_potts.jl:1441, :1807;
+    #                  biofilms_potts_jacc.jl:387). This is the grid the explicit
+    #                  stepper actually runs, and the grid Figures 3 and 4 ran on.
+    #
+    # Reporting only the first would say dt = 0.5 is unstable for a solver that
+    # never sees that grid. Reporting only the second would hide the trap: the
+    # explicit path is stable ONLY BECAUSE r is in lattice units while D_eff is
+    # in cm^2/s — the documented units error behind RADIODIALYSIS: BLOCKED.
+    # Correct the units so R = 1.0 cm and dt = 0.5 becomes the unstable case.
+    geometries = []
+    for label, radius, in_use in (
+        ("struct_default_unused", 1.0, False),
+        ("as_run_lattice_units", 20.0, True),
+    ):
+        op, dr_g = build_semidiscrete_operator(
+            nr=40, radius=radius, rates=rates, permeability=0.01)
+        eig = np.linalg.eigvals(op)
+        cls = classify_eigenvalues(eig)
+        geometries.append({
+            "label": label,
+            "radius": radius,
+            "dr": dr_g,
+            "explicit_euler_path_runs_here": in_use,
+            "max_real_eigenvalue": float(np.max(np.real(eig))),
+            "min_real_eigenvalue": float(np.min(np.real(eig))),
+            "classification": cls,
+            "contract_passed": cls == "strictly_asymptotically_stable",
+            "explicit_euler": explicit_euler_diagnostic(eig, dt=0.5),
+        })
+
+    # The semidiscrete CONTRACT must hold on both; only the as-run geometry
+    # licenses a statement about the time step actually taken.
+    semi_ok = all(g["contract_passed"] for g in geometries)
+    as_run = next(g for g in geometries if g["explicit_euler_path_runs_here"])
     semi, dr = build_semidiscrete_operator(
-        nr=40,
-        radius=1.0,
-        rates=rates,
-        permeability=0.01,
-    )
+        nr=40, radius=1.0, rates=rates, permeability=0.01)
     semi_eig = np.linalg.eigvals(semi)
     semi_class = classify_eigenvalues(semi_eig)
-    semi_ok = semi_class == "strictly_asymptotically_stable"
-    euler = explicit_euler_diagnostic(semi_eig, dt=0.5)
+    euler = as_run["explicit_euler"]
 
     return {
         "schema_version": 1,
@@ -236,7 +273,10 @@ def run_audit() -> dict[str, Any]:
             "radius": 1.0,
             "permeability": 0.01,
             "explicit_euler_dt": 0.5,
+            "explicit_euler_dt_source": "biofilms_potts.jl:1208 dt_rd, s per CPM MCS",
+            "production_substep_rule": "0.4 * dr^2 / (2 * D_eff), biofilms_potts.jl:1245",
         },
+        "geometries": geometries,
         "analytical_modes": mode_rows,
         "loss_free_zero_mode": {
             "eigenvalues": [
