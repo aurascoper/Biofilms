@@ -35,3 +35,10 @@ end
 @testset "Exchange schemas (snapshot + restart)" begin
     include("checkpoint_io_tests.jl")
 end
+
+# The JACC port had no automated execution at all until this tier. It runs on
+# whichever backend JACC selects — threads where there is no GPU, which is what
+# a CI runner sees — so the portability layer's portability is itself tested.
+@testset "JACC port kernels versus the serial reference" begin
+    include("jacc_port_tests.jl")
+end

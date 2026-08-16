@@ -134,8 +134,39 @@ def _volume_raytrace_model(model, mesh):
                         materials=model.materials, settings=model.settings)
 
 
+def mesh_material_volumes(mesh, model, *, n_samples: int = 10_000_000,
+                          max_materials: int = 4) -> dict:
+    """Per-bin material VOLUMES (cm3), keyed by material id.
+
+    Split out from the mass because a counterfactual varies material DENSITIES
+    on fixed geometry: the volumes are then identical across states, and
+    raytracing them once instead of once per state is both cheaper and exact.
+    Reusing a volume set across a geometry change would not be.
+
+    KEYED BY MATERIAL NAME, NOT BY ID. openmc assigns a fresh id every time a
+    Material is constructed, so ids from one model build do not exist in the
+    next one — reusing an id-keyed volume set across builds raises KeyError at
+    best and silently attributes a volume to the wrong material at worst. Names
+    come from the config's class table and are stable across builds.
+    """
+    by_id = mesh.material_volumes(_volume_raytrace_model(model, mesh),
+                                  n_samples=n_samples,
+                                  max_materials=max_materials)
+    name_of = {m.id: m.name
+               for m in model.geometry.get_all_materials().values()}
+    out: dict[str, np.ndarray] = {}
+    for mid, per_element in by_id.items():
+        if mid is None:                     # void carries no mass
+            continue
+        name = name_of.get(int(mid))
+        if name is None:
+            raise ValueError(f"raytraced material id {mid} is not in the model")
+        out[name] = np.asarray(per_element, dtype=float)
+    return out
+
+
 def mesh_material_masses_kg(mesh, model, dimension, *, n_samples: int = 10_000_000,
-                            max_materials: int = 4) -> np.ndarray:
+                            max_materials: int = 4, volumes: dict | None = None) -> np.ndarray:
     """EXACT per-bin masses (kg), logical (x,y,z), from the CSG itself.
 
         m_v = sum_k rho_k * V_vk
@@ -159,22 +190,25 @@ def mesh_material_masses_kg(mesh, model, dimension, *, n_samples: int = 10_000_0
     `max_materials` must cover the most materials in any one bin: biomass,
     medium, membrane and void is already four.
     """
-    volumes = mesh.material_volumes(_volume_raytrace_model(model, mesh),
-                                    n_samples=n_samples,
-                                    max_materials=max_materials)
+    if volumes is None:
+        volumes = mesh_material_volumes(mesh, model, n_samples=n_samples,
+                                        max_materials=max_materials)
     # From the GEOMETRY, not `model.materials`: the builders pass materials
     # implicitly through the cells, so `model.materials` is empty and a lookup
-    # against it raises KeyError on the first real bin.
-    density_by_id = {m.id: m.get_mass_density()
-                     for m in model.geometry.get_all_materials().values()}
+    # against it raises KeyError on the first real bin. Keyed by NAME, so a
+    # precomputed volume set stays valid across model rebuilds that reassign ids.
+    density_by_name = {m.name: m.get_mass_density()
+                       for m in model.geometry.get_all_materials().values()}
 
     dim = tuple(int(d) for d in dimension)
     grams = np.zeros(int(np.prod(dim)), dtype=float)
-    for material_id, per_element in volumes.items():
-        if material_id is None:            # void contributes no mass
-            continue
-        # openmc returns numpy integer ids; `Material.id` is a Python int.
-        grams += density_by_id[int(material_id)] * np.asarray(per_element, dtype=float)
+    for name, per_element in volumes.items():
+        if name not in density_by_name:
+            raise ValueError(
+                f"material {name!r} has a raytraced volume but no density in "
+                "this model — the volume set was measured on a different "
+                "geometry or material table")
+        grams += density_by_name[name] * np.asarray(per_element, dtype=float)
     # Mesh elements run x fastest, z slowest — the same convention
     # `dose.extract_heating` undoes for the tally.
     return (grams * 1e-3).reshape(dim[::-1]).transpose(2, 1, 0)

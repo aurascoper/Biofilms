@@ -1,0 +1,26 @@
+# openmc_uncertainty_registry — the quantities the nested pilot varies, and HOW.
+#
+# Separate from data/uncertainty/feedback_parameter_distributions.csv, which is
+# the TARGET Reference D inventory. This one is the pilot's own design: the
+# synthetic subset actually exercised, at tier S0.
+#
+# THE MEASURED QUANTITIES ARE NOT COMBINED. The A0 lesson is that Monte Carlo
+# noise falls with histories while resolution loss is a floor histories cannot
+# remove, so a single "uncertainty" number cannot say what to buy next. Each row
+# below reports into exactly one bucket of the variance budget, and the gate
+# names the dominant bucket in its verdict.
+#
+# sampling_role is enforced by physical_contract.distribution_row_problems():
+# numerical controls and model choices may NOT take outer_random.
+#
+# UNIQUENESS KEY: quantity_id
+quantity_id,parameter_path,uncertainty_type,sampling_role,variance_bucket,correlation_group,pilot_setting,target_calibration,notes
+biomass_density,materials.baseline_biomass.density_g_cm3,physical_measurement,outer_random,calibration,gravimetry_coupon,"4 outer draws, shared balance sigma 2%",false,"SYNTHETIC value perturbed about the synthetic reference; shares its group with the hydrated volume so a balance error cancels in rho_wet rather than inflating it."
+hydrated_volume,materials.baseline_biomass.volume_cm3,physical_measurement,outer_random,calibration,gravimetry_coupon,"4 outer draws",false,"Correlated with the density it denominates. Sampling it independently would break rho_wet = m/V."
+biomass_composition,materials.baseline_biomass.elements,physical_measurement,outer_random,calibration,composition_simplex,"logistic-normal, log-sigma 0.05",false,"COMPOSITIONAL. Closed to <1e-12 on every draw by construction; independent Gaussians would leave the simplex and the loader would refuse the config."
+transport_seed,transport.seed,monte_carlo_estimator,inner_transport_replicate,transport,,"3 replicates per state",false,"Estimates Var_xi(dQ|theta). Mesh bins are not independent — one history scores several — so this comes from independent RUNS, never from summing per-bin variances."
+mesh_coarsening_factor,transport.mesh.coarsening_factor,numerical_convergence,convergence_axis,numerics,,"factors 1 and 2",false,"NOT SAMPLED. A mesh factor is an engineering decision; giving it a probability would mix that decision into the epistemic answer. Swept to bound a residual instead."
+transport_histories,transport.particles,numerical_convergence,convergence_axis,numerics,,"reduced for the pilot; escalated only where the verdict could change",false,"Sized against uncertainty in the EFFECT, not against a per-voxel criterion: A0's aggregate seed spread was ~0.013% while its median bin error was 6.7%."
+material_volume_samples,transport.material_volume_n_samples,numerical_convergence,convergence_axis,numerics,,"repeated raytrace seeds",false,"The exact CSG denominator is a raytracing ESTIMATE with its own O(1/sqrt n) error, and it is the denominator of every dose, so it gets its own budget line."
+mass_denominator_method,transport.mass_denominator,discrete_model_choice,scenario_branch,model_form,,"exact_csg_raytrace only",false,"Production must use exact_csg_raytrace. The full-bin method overstates A0's cylinder by exactly 4/pi and is a known NEGATIVE CONTROL, never an ensemble member."
+source_rate,source.photons_per_second,source_metrology,scenario_branch,model_form,,"two rates, to prove relative-effect invariance",false,"CANCELS from a relative effect, which is why the material screen runs per source particle before any assay certificate exists. Absolute Gy/s gets no such cancellation."

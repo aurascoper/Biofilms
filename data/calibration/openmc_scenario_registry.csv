@@ -1,0 +1,18 @@
+# openmc_scenario_registry — the discrete branches the pilot runs.
+#
+# A scenario is a NAMED ALTERNATIVE, never a sample. Two admissible model forms
+# are not two draws from a distribution over model forms, and assigning them
+# equal probability would invent a weight. When branches straddle the declared
+# threshold the gate returns INDETERMINATE_MODEL_FORM and reports the envelope.
+#
+# THE FEEDBACK LEVER IS COMPOSITION, NOT DENSITY, and that was measured rather
+# than assumed. Dose is energy PER UNIT MASS, so raising the biomass density
+# raises the heating and the denominator together and they largely cancel: a 35%
+# density increase moved the effect by 1.4% (heating x1.306, mass x1.350). The
+# first version of this registry used density and was wrong about it.
+#
+# UNIQUENESS KEY: scenario_id
+scenario_id,feedback_lever,feedback_state,expected_s0_verdict,observed_effect_rel_l2,run_order,target_calibration,notes
+zero_effect,none,identical composition,EFFECT_BELOW_THRESHOLD,0.0000,1,false,"Identical material states. A false positive here would invalidate every other row, so it runs FIRST. Observed exactly 0."
+clearly_detectable,composition,"H 0.111894 / O 0.488106 / Gd 0.40",PASS_SYNTHETIC_GATE,0.2441,2,false,"A deliberately EXTREME synthetic material with no biological pretension: its only job is to prove the gate can return a pass. 2.4x the declared 0.10 threshold, which was NOT adjusted to reach it."
+near_threshold,composition,"H 0.111894 / O 0.688106 / Gd 0.20",PASS_SYNTHETIC_GATE,0.1384,3,false,"RUN 2026-08-16. Verdict was DECIDED_BY_PILOT and came back PASS_SYNTHETIC_GATE: 1% lower bound 0.1202 against the 0.10 threshold. Numerics dominates its variance (3.8e-4 vs 3.3e-6 transport) and the effect still differs 22% between mesh factors (0.1236 at f=1, 0.1513 at f=2) — but the distribution does not STRADDLE the threshold, so the decision is resolution-robust even though the magnitude is not converged. A dominant variance source does not by itself make a verdict indeterminate."
