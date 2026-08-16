@@ -297,3 +297,9 @@ path that consumes it has already been demonstrated end to end on the synthetic 
 
 The radiodialysis gate will still read `BLOCKED`. That is the expected and correct result, and
 it is not a failure of this campaign.
+
+What happens after that is specified in `docs/feedback_gate_spec.md`: the target one-way dose
+model, then the **offline** material-feedback gate, which asks whether a plausible change in
+biological material state moves the radiation field by more than uncertainty and a declared
+threshold. That gate needs no calibrated biological response, so it can be answered before the
+response fitting is paid for — and if it fails, expensive two-way coupling is not justified.
