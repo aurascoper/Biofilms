@@ -23,42 +23,65 @@ Run it before planning anything:
 python calibration/scripts/reference_d_status.py
 ```
 
-Today: **29 requirements, 2 satisfied.** Spatial gate `PROVISIONAL`, material OpenMC gate
-`PROVISIONAL`, radiodialysis gate `BLOCKED`.
+Today: **30 requirements, 10 satisfied.** Spatial gate `PROVISIONAL`, material OpenMC gate
+`PROVISIONAL`, radiodialysis gate `BLOCKED`. `CAMPAIGN_READY: no` — blocked by exactly one
+thing, `D-APPROVAL`, which only a biosafety committee can issue.
 
 ---
 
-## 0. What must be written down before the incubator is switched on
+## 0. The declarations — MADE, not pending
 
-Four of these gate the campaign and one gates the culturing. All are **declarations**, not
-measurements: no experiment can supply them, and the reason to fix them first is that a
-threshold chosen after seeing the data is not a threshold.
+All twelve modelling decisions are frozen as `reference_d_acceptance_v1`, before any target
+data exists, in `config/reference_d_spatial_acceptance.toml` and
+`config/reference_d_material_acceptance.toml`. Every value carries its reason on the line
+above it, and every threshold carries an `enforcement` class, because a gate must not close
+on a criterion nothing compares against.
 
-| # | Declaration | Where | Requirement |
-|---|---|---|---|
-| 0.1 | Institutional biosafety approval, **per strain** | `data/calibration/baseline_condition.csv` | `D-APPROVAL` |
-| 0.2 | Five representation thresholds | `config/cpm_spatial_acceptance_template.toml` `[representation]` | `D-THRESH` |
-| 0.3 | Six observable tolerances | same file, `[observables]` | `D-OBSTOL` |
-| 0.4 | Occupancy mapping and its parameter | same file, `[occupancy]` | `D-OCCUPANCY` |
-| 0.5 | Domain semantics | same file, `[domain]` | `D-DOMAIN` |
-| 0.6 | Four material acceptance thresholds | `config/biofilm_material_acceptance_template.toml` | `D-MATACCEPT` |
+| Declaration | Value | Requirement |
+|---|---|---|
+| Domain semantics | `representative_segment` | `D-DOMAIN` |
+| Occupancy map | `threshold`, `tau = 0.5` | `D-OCCUPANCY` |
+| Source idealization | `line_z_axis`, `isotropic` | `D-SRCSHAPE` |
+| Boundaries | radial `vacuum`, axial `reflective` | `D-BOUNDS` |
+| Material model kind | `hydrated_effective_medium` | `D-MODELKIND` |
+| Five representation thresholds | see config | `D-THRESH` |
+| Six observable tolerances | see config | `D-OBSTOL` |
+| Four material acceptance thresholds | see config | `D-MATACCEPT` |
+| **Institutional biosafety approval** | **outstanding** | `D-APPROVAL` |
 
-**0.1 comes first and is not a formality.** Biosafety follows *strains*, not species — the
-consortium mixes BSL-1 organisms with *C. neoformans* at BSL-2 — so
+**0.1 The one that is still open, and gates culturing itself.** Biosafety follows *strains*,
+not species — the consortium mixes BSL-1 organisms with *C. neoformans* at BSL-2 — so
 `biosafety_level_by_strain` is per-strain (`'SO:BSL1;CN:BSL2'`), never one level for the
-consortium, and `institutional_approval_id` must precede culturing. `is_target_system` must be
-`true`: a surrogate exercises the harness and can never clear this gate.
+consortium. `institutional_approval_id` must precede culturing, and `is_target_system` must
+be `true`: a surrogate exercises the harness and can never clear this gate. Nothing in this
+repository can supply it.
 
-**0.4 is a calibration decision, not preprocessing.** `threshold` preserves connectivity but
-does not conserve biovolume; `mass_preserving` conserves biovolume in expectation but varies by
-seed. Neither is correct in general, which is why `apply_occupancy()` refuses while it is unset,
-and why an unseeded `mass_preserving` run cannot be reproduced.
+**0.2 The occupancy map is a calibration decision, and its cost is measured.** `threshold`
+is deterministic and needs no seed, so structural observables need no replicate handling.
+It does **not** conserve biovolume — caught by its own tolerance — and it does **not**
+preserve connectivity: a majority threshold severs thin bridges and deletes narrow
+filaments. That loss is reported by `field.occupancy_topology_report()` rather than assumed
+away, and on a two-blob fixture joined by a sub-tau bridge it registers one component
+becoming two.
 
-**0.5 has an answer the geometry may forbid.** The CPM forces **L = 2R** — `R = N/2` is
-recomputed at seven call sites and there is no length field. An apparatus whose real aspect
-ratio is not 2 therefore **cannot be claimed as `full_apparatus` at any pitch**. That is a
-topology fact, not a resolution one. Expect `representative_segment` or `microvolume`, and say
-which.
+**0.3 The axial boundary is conditional.** `reflective` imposes mirror symmetry, which
+represents a longer uniform reactor only if the material near both axial faces supports that
+continuation. An arbitrary CPM snapshot may vary strongly along z. The declaration is
+therefore stamped `axial_boundary_validation_required = "axial_face_compatibility"` and
+`D-AXIALFACE` records the check, which needs a real snapshot. Fallback if it fails: axial
+vacuum, scored over a central region distant from the ends.
+
+**0.4 A sealed capsule still cannot be represented.** `line_z_axis` is an idealized
+zero-radius axial line with no encapsulation and no self-attenuation. Reference A1 is
+declared and unsupported, so if the built source is a capsule, this is a recorded modelling
+limitation and not a description of the apparatus.
+
+**0.5 Three declared criteria are decoration, and say so.** `maximum_axis_ratio_error`,
+`minimum_objects_per_species` and `require_independent_validation_sample` have no consumer.
+They are `enforcement = not_implemented` and may not close a gate. `minimum_objects_per_species`
+is additionally questionable under parcel semantics: pitch selection operates on a
+coarse-grained field, not on segmented organism objects, and mixed-consortium imaging may
+not separate the seven species at all.
 
 ---
 
