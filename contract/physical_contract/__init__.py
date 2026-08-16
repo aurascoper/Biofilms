@@ -54,6 +54,48 @@ EVIDENCE_POLICIES = frozenset({"measured_only", "synthetic"})
 SYSTEM_PROVENANCE = frozenset({"published_replica", "certified_component",
                                "engineered_composite", "declared"})
 
+# What kind of document a source record pins. Without this a source_id resolves
+# happily to any registered document, so an approval field could cite a
+# cross-section table and pass -- the "belongs to another protocol" failure with
+# no way to see it.
+APPROVAL_DOCUMENT_TYPES = frozenset({
+    "institutional_biosafety_approval",
+    "institutional_review_approval",
+    "risk_assessment",
+    "standard_operating_procedure",
+})
+
+# Strings that look like an answer and carry no evidence.
+#
+# THIS DEVIATES FROM THE USUAL IDIOM HERE, DELIBERATELY. Everywhere else a
+# placeholder is a declared vocabulary VALUE that then gets refused --
+# BLOCKED_EVIDENCE, status = awaiting_approval -- which is stronger, because the
+# refusal is structural rather than a string match. That works for a field with
+# a closed vocabulary.
+#
+# An institutional approval identifier is not such a field. Formats differ
+# between institutions, so constraining the identifier itself with a regex would
+# be wrong, and the only remaining instrument is to name the fillers that are
+# never identifiers. It is a blacklist and it is weaker than a vocabulary: it
+# stops the careless case, not the determined one. `d approved` is in the list
+# because it was actually offered.
+#
+# Compared case-folded with whitespace collapsed, so "  D Approved " matches.
+NON_EVIDENTIAL_PLACEHOLDERS = frozenset({
+    "", "-", "--", "n/a", "na", "none", "null", "nil", "tbd", "tba",
+    "unknown", "pending", "in review", "in progress", "submitted", "draft",
+    "placeholder", "example", "test", "todo", "approved", "yes", "ok",
+    "d approved", "approval pending", "not located", "requested",
+})
+
+
+def is_placeholder(value) -> bool:
+    """True when a free-text field holds filler rather than evidence."""
+    if value is None:
+        return True
+    return " ".join(str(value).split()).casefold() in NON_EVIDENTIAL_PLACEHOLDERS
+
+
 # What kind of run this is. `target_calibration = false` alone cannot tell an A0
 # benchmark from a public surrogate, a synthetic fixture, an uncalibrated
 # Reference D, or an exploratory sensitivity case.

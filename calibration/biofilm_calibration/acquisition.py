@@ -74,6 +74,11 @@ BASELINE_CONDITION = TableSchema(
         "assigned levels. Current guidance is protocol-driven risk assessment",
         "rather than a level label, so the chain is: exact strain IDs ->",
         "institutional review -> containment decision -> approved procedures.",
+        "AN APPROVAL IS EVIDENCE, NOT A DECLARATION. The identifier alone is",
+        "not enough: the gate also requires an issuing authority, a resolvable",
+        "approval document, dates bracketing the culturing, and a scope digest",
+        "that matches the conditions on this row. Filler text is refused by",
+        "value -- 'approved', 'pending', 'TBD' name nothing.",
     ),
     key=("growth_condition_id",),
     columns=(
@@ -87,8 +92,33 @@ BASELINE_CONDITION = TableSchema(
         Column("biosafety_level_by_strain",
                doc="per-strain, e.g. 'SO:BSL1;CN:BSL2' — never a single level "
                    "for the consortium"),
+        # AN APPROVAL IS EVIDENCE, NOT A DECLARATION, so the identifier alone
+        # is not enough: it must name an authority, resolve to a registered
+        # document, carry dates that bracket the culturing, and bind the scope
+        # it was issued for. All OPTIONAL here and enforced at the GATE, the
+        # same split `linkage_columns()` uses and for the same reason — a
+        # schema that refuses a blank forces every hand-built fixture row to
+        # invent one, which is how placeholders get written in the first place.
         Column("institutional_approval_id",
-               doc="biosafety committee approval; gate-blocks when absent"),
+               doc="biosafety committee approval; the gate refuses filler text "
+                   "as well as a blank"),
+        Column("institutional_approval_authority", required=False,
+               doc="the committee or office that issued it — an identifier "
+                   "with no issuer names nothing"),
+        Column("approval_source_id", required=False,
+               doc="resolves in data/calibration/spatial/sources.csv, and that "
+                   "row must be document_type = institutional_biosafety_approval"),
+        Column("approval_effective_date", required=False,
+               doc="ISO date; must not be after culturing_start_date"),
+        Column("approval_expiration_date", required=False,
+               doc="ISO date; must be after culturing_start_date and after today"),
+        Column("approved_protocol_version", required=False,
+               doc="the protocol version the approval was issued against"),
+        Column("approval_scope_hash", required=False,
+               doc="digest of the approved scope columns. Detects a growth "
+                   "condition edited after approval; does not detect forgery"),
+        Column("culturing_start_date", required=False,
+               doc="ISO date; the approval must already be effective on it"),
         Column("containment_facility"),
         Column("risk_assessment_reference", required=False,
                doc="protocol-driven assessment, not a level label alone"),

@@ -1,0 +1,19 @@
+# reference_d_condition_proposal — PREPARATORY, NOT AUTHORITATIVE.
+#
+# This is where a growth condition is drafted while the institutional
+# biosafety process runs. It is deliberately a SEPARATE FILE from
+# data/calibration/baseline_condition.csv, which is an authoritative input
+# and not a planning worksheet.
+#
+# NOTHING HERE CAN CLEAR A GATE. The spatial gate reads baseline_condition.csv
+# by name and never this file, and every row here carries
+# authoritative_for_campaign = false. A test asserts the gate cannot be
+# pointed at this table.
+#
+# When the institution issues an approval, copy the EXACT approved condition
+# into baseline_condition.csv with its approval provenance attached — do not
+# move this file, and do not edit a condition after approval without
+# recomputing approval_scope_hash, which is what makes such an edit visible.
+#
+# Blank cells mean NOT SUPPLIED. They are never read as approved.
+growth_condition_id,consortium_or_surrogate,strain_identities,biosafety_level_by_strain,institutional_approval_id,institutional_approval_authority,approval_source_id,approval_effective_date,approval_expiration_date,approved_protocol_version,approval_scope_hash,culturing_start_date,containment_facility,risk_assessment_reference,growth_medium,temperature_C,pH,oxygen_condition,substrate_or_membrane,biofilm_age_h,flow_condition,irradiation,domain_semantics,is_target_system,evidence_basis,source_id,status,notes,authoritative_for_campaign

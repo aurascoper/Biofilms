@@ -13,6 +13,11 @@
 # assigned levels. Current guidance is protocol-driven risk assessment
 # rather than a level label, so the chain is: exact strain IDs ->
 # institutional review -> containment decision -> approved procedures.
+# AN APPROVAL IS EVIDENCE, NOT A DECLARATION. The identifier alone is
+# not enough: the gate also requires an issuing authority, a resolvable
+# approval document, dates bracketing the culturing, and a scope digest
+# that matches the conditions on this row. Filler text is refused by
+# value -- 'approved', 'pending', 'TBD' name nothing.
 # UNIQUENESS KEY: growth_condition_id
 # Blank numeric cells mean NOT MEASURED. They are never read as zero.
-growth_condition_id,consortium_or_surrogate,strain_identities,biosafety_level_by_strain,institutional_approval_id,containment_facility,risk_assessment_reference,growth_medium,temperature_C,pH,oxygen_condition,substrate_or_membrane,biofilm_age_h,flow_condition,irradiation,domain_semantics,is_target_system,evidence_basis,source_id,status,notes
+growth_condition_id,consortium_or_surrogate,strain_identities,biosafety_level_by_strain,institutional_approval_id,institutional_approval_authority,approval_source_id,approval_effective_date,approval_expiration_date,approved_protocol_version,approval_scope_hash,culturing_start_date,containment_facility,risk_assessment_reference,growth_medium,temperature_C,pH,oxygen_condition,substrate_or_membrane,biofilm_age_h,flow_condition,irradiation,domain_semantics,is_target_system,evidence_basis,source_id,status,notes
