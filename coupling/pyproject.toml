@@ -16,6 +16,11 @@ biofilm-dose-scan = "biofilm_openmc.drivers:main_scan"
 # The real transport stack is provided by the pinned conda env
 # (conda-forge openmc=0.15.3, see docs); this extra only documents the pin.
 openmc = ["openmc==0.15.3"]
+# The read-only observer. PyVista is a DISPLAY CONSUMER of the viewer
+# bundle: nothing in the core imports it, and biofilm_openmc.observer
+# imports it function-locally so the whole contract stays testable in the
+# bare tier.
+viewer = ["pyvista>=0.44"]
 dev = ["pytest"]
 
 [tool.setuptools.packages.find]
@@ -25,6 +30,7 @@ include = ["biofilm_openmc*"]
 markers = [
     "openmc_api: needs the OpenMC Python API importable (no transport run, no nuclear data)",
     "openmc: needs the OpenMC executable AND nuclear data (OPENMC_CROSS_SECTIONS)",
+    "viewer: needs the viewer extra (PyVista) for actual rendering",
 ]
 # No -m deselection: gated tests use skipif so accounting is always
 # passed/failed/SKIPPED — deselected tests hide from the report.
