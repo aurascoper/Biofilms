@@ -15,11 +15,12 @@ overturned the assumption the scenario registry was originally built on.
 | Scenario | Declared verdict | Returned | Effect (rel. L2) |
 |---|---|---|---|
 | `zero_effect` | `EFFECT_BELOW_THRESHOLD` | ✅ same | 0.0000 |
-| `clearly_detectable` | `PASS_SYNTHETIC_GATE` | ✅ same | 0.2441 |
+| `clearly_detectable` | `PASS_SYNTHETIC_GATE` | ✅ same | 0.2442 |
+| `near_threshold` | `DECIDED_BY_PILOT` | `PASS_SYNTHETIC_GATE` | 0.1384 |
 
-72 OpenMC runs, 7.2 × 10⁶ histories, 39 s wall. The zero-effect case returned
+108 OpenMC runs, 1.08 × 10⁷ histories, 60 s wall. The zero-effect case returned
 **exactly** zero, which is the false-positive control that licenses every other
-row.
+row. `near_threshold` had no declared verdict by design — see below.
 
 ## The finding: density is a weak lever, and it is weak for a structural reason
 
@@ -74,27 +75,33 @@ material with no biological pretension — its only job is to prove the gate can
 pass. **The 0.10 threshold was not adjusted to reach it**, which would have been
 a stop condition.
 
-## Variance: numerics is 97.7% of it
+## Variance: numerics dominates, by two orders of magnitude
 
-| Source | Variance | Share | What reduces it |
-|---|---|---|---|
-| **numerics** | 5.92 × 10⁻⁴ | **97.7%** | finer mesh, more raytrace samples. **A floor.** |
-| calibration | 9.35 × 10⁻⁶ | 1.5% | better measurements only |
-| transport | 4.28 × 10⁻⁶ | 0.7% | more histories and replicates |
-| model form | 0 | 0% | a decision |
+Per scenario, because a global maximum charges every case the largest case's
+discretisation error:
+
+| Scenario | transport | numerics | calibration | dominant |
+|---|---|---|---|---|
+| `clearly_detectable` | 8.5 × 10⁻⁶ | **6.0 × 10⁻⁴** | 9.4 × 10⁻⁶ | numerics |
+| `near_threshold` | 3.3 × 10⁻⁶ | **3.8 × 10⁻⁴** | 1.6 × 10⁻⁶ | numerics |
+| `zero_effect` | 1.6 × 10⁻³² | 6.6 × 10⁻³⁴ | 3.2 × 10⁻³³ | — (no effect) |
 
 This is the A0 lesson reproduced on the biofilm geometry and quantified: **the
-resolution floor is ~140× the Monte Carlo noise.** Buying more histories would
+resolution floor is 70–115× the Monte Carlo noise.** Buying more histories would
 buy almost nothing, and a single pooled "uncertainty" number would have hidden
 that completely — which is the reason the gate reports the dominant source in
 its verdict rather than a total.
+
+Note `zero_effect`'s budget: ~10⁻³³ across the board, because an identical
+material state produces an identical field at every resolution. Under the old
+global-maximum budget it was charged 6.0 × 10⁻⁴ of somebody else's numerics.
 
 ## Measured cost, and the projection
 
 | Quantity | Measured |
 |---|---|
-| seconds per run | 0.542 |
-| histories per second | 184 612 |
+| seconds per run | 0.55 |
+| histories per second | 181 230 |
 | statepoint per run | 94 440 B |
 | raytrace (5 × 10⁵ rays) | 0.22 s, once per geometry |
 
@@ -132,10 +139,54 @@ The sensitivity ranking above is measured **on the synthetic geometry at
 that makes Fe uninteresting here would not survive a lower-energy source, where
 photoelectric absorption scales steeply with Z.
 
+## `near_threshold`, run 2026-08-16
+
+The case whose verdict was declared `DECIDED_BY_PILOT` came back
+**`PASS_SYNTHETIC_GATE`**, and the way it passed is the interesting part.
+
+| | effect | 1% lower bound | verdict |
+|---|---|---|---|
+| `near_threshold` (20% Gd) | median 0.1384 | **0.1202** | `PASS_SYNTHETIC_GATE` |
+
+Its variance is numerics-dominated — 3.8 × 10⁻⁴ against 3.3 × 10⁻⁶ transport,
+a factor of 115 — and the effect still differs by **22% between mesh factors**
+(0.1236 at f = 1, 0.1513 at f = 2). Yet the verdict is a pass, because the
+distribution does not *straddle* the threshold: even the coarse end sits above
+0.10.
+
+**A dominant variance source does not by itself make a verdict indeterminate.**
+Indeterminacy requires the spread to reach across the decision boundary, and
+here it does not. The gate distinguished "noisy" from "noisy enough to matter",
+which is the distinction it exists for.
+
+The honest summary is therefore split: **the decision is resolution-robust; the
+magnitude is not converged.** Anyone quoting 0.1384 as *the* effect would be
+over-reading it by 22%.
+
+## Two defects this scenario exposed
+
+Running a third scenario made both visible, and both had been silently wrong.
+
+**The variance budget took a global maximum across scenarios.** Every scenario
+was judged against the largest scenario's discretisation error, so
+`near_threshold` inherited `clearly_detectable`'s spread and `zero_effect` was
+credited with a numerics variance it does not have. Budgets are now computed
+per scenario: `near_threshold`'s own numerics variance is 3.8 × 10⁻⁴, not the
+6.0 × 10⁻⁴ it was being charged, and `zero_effect`'s is ~10⁻³³.
+
+**`omega_b` subsampled occupancy under coarsening.** Taking `occ[::factor]`
+picks one representative voxel per coarse bin, so a bin that is 12% biomass
+counted as fully biological and the two mesh factors measured different regions
+— discretisation error that was really a definitional artifact. Occupancy now
+comes from the exact CSG volumes already computed for the mass denominator: a
+bin is biological when at least half its volume is biomass. Factor-2 bins went
+from 199 to 215, and the per-factor spread survived, which is how we know the
+22% is genuine discretisation rather than a masking artifact.
+
 ## Next
 
-`near_threshold` (20% Gd, effect 0.1241) is the honest candidate for the
-uncertainty-dominated case: it sits just above the threshold, so its verdict is
-a finding rather than a declaration. It should be run once the mesh-resolution
-question is addressed, since numerics currently dominates the spread it would be
-judged against.
+The mesh disagreement is the open item, and it has a floor: **factor 1 is the
+finest mesh available**, since the tally cannot be refined below the CPM lattice
+pitch. Converging the magnitude therefore requires a finer *snapshot*, not a
+finer tally — which is a Reference D question about the selected pitch, not a
+transport-numerics one.

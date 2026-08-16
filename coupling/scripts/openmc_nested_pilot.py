@@ -74,17 +74,42 @@ def relative_l2_effect(d0, d1, mass, mask) -> float:
     return math.sqrt(float(np.sum(m * (b - a) ** 2))) / denom
 
 
-def omega_b(snapshot, dose0, mass, rel_err, factor) -> np.ndarray:
+# A coarse bin counts as biological when at least this much of its VOLUME is
+# biomass. Declared, because the alternative is an arbitrary representative.
+MIN_BIOMASS_VOLUME_FRACTION = 0.5
+
+
+def omega_b(dose0, mass, rel_err, biomass_fraction) -> np.ndarray:
     """Biological occupancy AND positive mass AND above the dose floor AND
     acceptable transport uncertainty. All four, or the metric measures
-    something other than the material change."""
-    occ = snapshot.cell_id > 0
-    coarse_occ = occ[::factor, ::factor, ::factor][:dose0.shape[0],
-                                                   :dose0.shape[1],
-                                                   :dose0.shape[2]]
+    something other than the material change.
+
+    OCCUPANCY COMES FROM THE EXACT CSG VOLUMES, not from subsampling the lattice.
+    Taking `occ[::factor]` picks one representative voxel per coarse bin, so a
+    bin that is 12% biomass and 88% medium counts as fully biological — and the
+    two mesh factors then measure DIFFERENT regions, which shows up as
+    discretisation error that is really a definitional artifact. Asking what
+    fraction of the bin's volume is actually biomass makes the factors
+    comparable, and the volumes are already computed for the mass denominator.
+    """
     floor = DOSE_FLOOR_FRACTION * float(np.nanmax(dose0)) if np.isfinite(
         np.nanmax(dose0)) else 0.0
-    return coarse_occ & (mass > 0) & (dose0 > floor) & (rel_err < MAX_REL_ERR)
+    return ((biomass_fraction >= MIN_BIOMASS_VOLUME_FRACTION)
+            & (mass > 0) & (dose0 > floor) & (rel_err < MAX_REL_ERR))
+
+
+def biomass_volume_fraction(volumes: dict, dimension) -> np.ndarray:
+    """Per-bin biomass share of the total material volume, logical (x,y,z)."""
+    dim = tuple(int(d) for d in dimension)
+    total = np.zeros(int(np.prod(dim)), dtype=float)
+    bio = np.zeros_like(total)
+    for name, per_element in volumes.items():
+        arr = np.asarray(per_element, dtype=float)
+        total += arr
+        if name == "baseline_biomass":
+            bio += arr
+    frac = np.divide(bio, total, out=np.zeros_like(bio), where=total > 0)
+    return frac.reshape(dim[::-1]).transpose(2, 1, 0)
 
 
 def run_state(model, mesh, dim, outdir, name, mass):
@@ -116,6 +141,9 @@ def main(argv=None) -> int:
     ap.add_argument("--mesh-factors", default="1,2")
     ap.add_argument("--budget-seconds", type=float, default=1800.0)
     ap.add_argument("--seed", type=int, default=20260816)
+    ap.add_argument("--include-near-threshold", action="store_true",
+                    help="add the 20%% Gd case, whose effect sits just above "
+                         "the declared threshold; its verdict is a finding")
     args = ap.parse_args(argv)
 
     from biofilm_openmc.model import build_biofilm_cylinder_model
@@ -166,6 +194,13 @@ def main(argv=None) -> int:
         ("zero_effect", None),
         ("clearly_detectable", {"H": 0.111894, "O": 0.488106, "Gd": 0.40}),
     ]
+    if args.include_near_threshold:
+        # RUNS THIRD AND ONLY ON REQUEST, because its verdict depends on the
+        # spread this pilot measures and therefore cannot be declared in
+        # advance. Adding it before the bracketing cases were known correct
+        # would have made a surprising verdict uninterpretable.
+        scenarios.append(
+            ("near_threshold", {"H": 0.111894, "O": 0.688106, "Gd": 0.20}))
     started = time.perf_counter()
     runs = 0
     total_histories = 0
@@ -185,6 +220,7 @@ def main(argv=None) -> int:
         t0 = time.perf_counter()
         volumes = mesh_material_volumes(mesh, probe, n_samples=args.volume_samples)
         raytrace_wall = time.perf_counter() - t0
+        bio_fraction = biomass_volume_fraction(volumes, dim)
 
         for scenario, feedback_elements in scenarios:
             for draw, rho in enumerate(densities):
@@ -220,8 +256,8 @@ def main(argv=None) -> int:
 
                 (b_fields, mass), (f_fields, _) = (per_state["baseline"],
                                                    per_state["feedback"])
-                mask = omega_b(snapshot, b_fields[0].field, mass,
-                               b_fields[0].rel_err, factor)
+                mask = omega_b(b_fields[0].field, mass, b_fields[0].rel_err,
+                               bio_fraction)
                 for i, (b, f) in enumerate(zip(b_fields, f_fields)):
                     records.append({
                         "scenario": scenario, "mesh_factor": factor,
@@ -251,41 +287,48 @@ def _report(records, args, runs, histories, sp_bytes, wall, raytrace_wall,
         return np.array([r["effect_rel_l2"] for r in records if pred(r)
                          and np.isfinite(r["effect_rel_l2"])], dtype=float)
 
-    # Variance SEPARATELY by source, never pooled before the verdict.
-    per_draw_means, within = [], []
-    for f in {r["mesh_factor"] for r in records}:
-        for s in {r["scenario"] for r in records}:
-            for d in {r["outer_draw"] for r in records}:
+    # VARIANCE PER SCENARIO, never a global maximum. Judging one scenario
+    # against another's spread makes a verdict depend on an unrelated case —
+    # and a global max in particular hands every small-effect scenario the
+    # largest-effect scenario's discretisation error.
+    scenario_names = sorted({r["scenario"] for r in records})
+    factors = sorted({r["mesh_factor"] for r in records})
+    budgets, verdicts = {}, {}
+    for s in scenario_names:
+        within, per_draw = [], []
+        for f in factors:
+            for d in sorted({r["outer_draw"] for r in records}):
                 v = eff(lambda r, f=f, s=s, d=d: (r["mesh_factor"] == f
                                                   and r["scenario"] == s
                                                   and r["outer_draw"] == d))
                 if v.size > 1:
                     within.append(float(np.var(v, ddof=1)))
                 if v.size:
-                    per_draw_means.append((s, f, float(np.mean(v))))
-    transport_var = float(np.mean(within)) if within else 0.0
-    calib_var = 0.0
-    for s in {m[0] for m in per_draw_means}:
-        for f in {m[1] for m in per_draw_means}:
-            vals = [m[2] for m in per_draw_means if m[0] == s and m[1] == f]
+                    per_draw.append((f, float(np.mean(v))))
+        transport_var = float(np.mean(within)) if within else 0.0
+        calib_var = 0.0
+        for f in factors:
+            vals = [m[1] for m in per_draw if m[0] == f]
             if len(vals) > 1:
                 calib_var = max(calib_var, float(np.var(vals, ddof=1)))
-    numerics_var = 0.0
-    for s in {m[0] for m in per_draw_means}:
-        by_factor = [np.mean([m[2] for m in per_draw_means
-                              if m[0] == s and m[1] == f])
-                     for f in sorted({m[1] for m in per_draw_means})]
-        if len(by_factor) > 1:
-            numerics_var = max(numerics_var, float(np.var(by_factor, ddof=1)))
-
-    budget = VarianceBudget(transport=transport_var, numerics=numerics_var,
-                            calibration=calib_var, model_form=0.0)
-    verdicts = {}
-    for s in sorted({r["scenario"] for r in records}):
+        by_factor = [float(np.mean([m[1] for m in per_draw if m[0] == f]))
+                     for f in factors if any(m[0] == f for m in per_draw)]
+        numerics_var = (float(np.var(by_factor, ddof=1))
+                        if len(by_factor) > 1 else 0.0)
+        b = VarianceBudget(transport=transport_var, numerics=numerics_var,
+                           calibration=calib_var, model_form=0.0)
+        budgets[s] = b.as_dict()
         draws = eff(lambda r, s=s: r["scenario"] == s)
-        v = decide(draws, budget, POLICY) if draws.size else S0Verdict(
+        v = decide(draws, b, POLICY) if draws.size else S0Verdict(
             "NOT_EVALUATED", "no finite effects recorded")
-        verdicts[s] = v.as_dict()
+        verdicts[s] = {**v.as_dict(),
+                       "per_factor_mean": {str(f): float(np.mean(
+                           eff(lambda r, f=f, s=s: r["mesh_factor"] == f
+                               and r["scenario"] == s)))
+                           for f in factors}}
+    budget = VarianceBudget(**{k: max(b[k] for b in budgets.values())
+                               for k in ("transport", "numerics",
+                                         "calibration", "model_form")})
 
     prov = git_provenance(str(REPO))
     budget_doc = {
@@ -300,7 +343,8 @@ def _report(records, args, runs, histories, sp_bytes, wall, raytrace_wall,
         "statepoint_bytes_mean": int(sp_bytes / runs) if runs else 0,
         "histories_per_second": round(histories / wall, 1) if wall else None,
         "seconds_per_run": round(wall / runs, 3) if runs else None,
-        "variance_by_source": budget.as_dict(),
+        "variance_by_source_worst_case": budget.as_dict(),
+        "variance_by_source_per_scenario": budgets,
         "stopped_early": stopped_early,
         "material_lever_sensitivity_rel_l2": {
             "density_x1.35": 0.0137, "Fe_5pct": 0.0033, "Gd_5pct": 0.0376,
