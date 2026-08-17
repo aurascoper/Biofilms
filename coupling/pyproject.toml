@@ -21,7 +21,12 @@ openmc = ["openmc==0.15.3"]
 # imports it function-locally so the whole contract stays testable in the
 # bare tier.
 viewer = ["pyvista>=0.44"]
-dev = ["pytest"]
+# PyVista IS IN dev DELIBERATELY. It is not needed to import anything here --
+# that is the point of the function-local import -- but leaving it out meant
+# the eight render tests SKIPPED everywhere, and a NameError, a mis-slotted
+# species palette and a crash on an empty field all shipped behind those skips
+# in a single session. A skip is uncovered surface, not a neutral fact.
+dev = ["pytest", "pyvista>=0.44"]
 
 [tool.setuptools.packages.find]
 include = ["biofilm_openmc*"]

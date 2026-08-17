@@ -457,3 +457,28 @@ def test_an_empty_species_layer_still_produces_a_palette():
     cmap, (lo, hi) = species_palette([])
     assert len(cmap) == len(SPECIES_COLOURS)
     assert lo < 1 and hi > len(SPECIES_COLOURS)
+
+
+@_needs_pyvista
+def test_an_all_background_species_layer_draws_instead_of_crashing(tmp_path):
+    """"NOTHING IS HERE" IS A RESULT A READER NEEDS TO SEE.
+
+    Making `species_palette` empty-safe only moved the crash one line down:
+    thresholding an all-background layer leaves a dataset with zero cells, and
+    `add_mesh` rejects it. The bare-tier control exercised `species_palette([])`
+    and so could not detect that — the fix was verified one level below where
+    it failed.
+
+    This drives `plot_layer` itself, which is the only place the two interact.
+    """
+    path = tmp_path / "empty.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("species_id", "cpm_labels", "dimensionless",
+                        "categorical", np.zeros((4, 4, 4), np.int32),
+                        background=0)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+    plotter = observer.plot_layer(path, "species_id")
+    assert plotter is not None

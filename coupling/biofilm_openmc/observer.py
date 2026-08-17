@@ -320,7 +320,16 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             occupied = image.threshold(
                 (layer.background, layer.background), scalars=layer_name,
                 invert=True)
-        if layer.colour_by == "species":
+        if occupied.n_cells == 0:
+            # AN EMPTY FIELD MUST STILL DRAW, because "nothing is here" is a
+            # result a reader needs to see. Thresholding an all-background
+            # layer leaves a dataset with no cells and `add_mesh` rejects it,
+            # so making `species_palette` empty-safe only moved the crash one
+            # line down -- the bare-tier test exercised the palette, not this.
+            # Say so on the canvas and fall through to the banner.
+            p.add_text(f"{layer_name}: no occupied cells",
+                       position="lower_left", font_size=9)
+        elif layer.colour_by == "species":
             data, _ = read_layer(path, layer_name)
             legend = species_legend(data)
             cmap, clim = species_palette(legend)
