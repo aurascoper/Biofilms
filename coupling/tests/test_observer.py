@@ -21,7 +21,8 @@ from biofilm_openmc.observer import (SPECIES_COLOURS, SPECIES_LABELS,
                                      display_plan, grid_geometry,
                                      occupied_mask, provenance_panel,
                                      species_legend)
-from biofilm_openmc.viewer import Grid, Layer, manifest, write_bundle
+from biofilm_openmc.viewer import (UNDECLARED, Grid, Layer, manifest,
+                                   write_bundle)
 
 LATTICE = Grid("cpm_labels", (4, 4, 4), (0.0, 0.0, 0.0), (0.25, 0.25, 0.25))
 REFINED = Grid("dose_refinement_4", (16, 16, 16), (0.0, 0.0, 0.0),
@@ -30,11 +31,12 @@ REFINED = Grid("dose_refinement_4", (16, 16, 16), (0.0, 0.0, 0.0),
 
 def _bundle_manifest():
     labels = Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
-                   np.arange(64, dtype=np.int32).reshape((4, 4, 4)))
+                   np.arange(64, dtype=np.int32).reshape((4, 4, 4)),
+                   background=0)
     species = Layer("species_id", "cpm_labels", "dimensionless", "categorical",
-                    np.full((4, 4, 4), 2, dtype=np.int32))
+                    np.full((4, 4, 4), 2, dtype=np.int32), background=0)
     omega = Layer("omega_b", "cpm_labels", "dimensionless", "boolean",
-                  np.ones((4, 4, 4), dtype=bool))
+                  np.ones((4, 4, 4), dtype=bool), background=0)
     dose = Layer("dose_per_source_r4", "dose_refinement_4",
                  "Gy/source-particle", "intensive", np.zeros((16, 16, 16)))
     upsampled = Layer("dose_on_lattice", "cpm_labels", "Gy/source-particle",
@@ -310,7 +312,8 @@ def test_a_layer_becomes_cell_data_positioned_in_centimetres(tmp_path):
     doc = _bundle_manifest()
     write_bundle(path, [LATTICE, REFINED],
                  [Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
-                        np.arange(64, dtype=np.int32).reshape((4, 4, 4)))])
+                        np.arange(64, dtype=np.int32).reshape((4, 4, 4)),
+                        background=0)])
     image = observer.to_image_data(path, "cell_id")
     assert image.dimensions == (5, 5, 5)
     assert "cell_id" in image.cell_data
@@ -360,7 +363,7 @@ def test_absence_semantics_survive_the_round_trip_to_the_display_plan():
     assert plan["cell_id"].background == 0
     assert plan["cell_id"].occupancy_from is None
     # The ambiguous layer must NOT claim a background value...
-    assert plan["generation"].background is None
+    assert plan["generation"].background is UNDECLARED
     # ...and must not be left claiming every voxel is informative either.
     assert plan["generation"].occupancy_from == "cell_id"
 
@@ -482,3 +485,62 @@ def test_an_all_background_species_layer_draws_instead_of_crashing(tmp_path):
                                  "openmc_version": "0.15.3"})
     plotter = observer.plot_layer(path, "species_id")
     assert plotter is not None
+
+
+def test_a_categorical_layer_must_declare_what_absence_means():
+    """OMISSION MUST NOT ACQUIRE A SEMANTICS.
+
+    `background=None` says "every cell carries information, hide nothing". That
+    is true for `generation` and wrong for `omega_b`, whose false cells are not
+    part of the region. When None was also the DEFAULT, a producer who simply
+    forgot made that claim silently — and two did: `omega_b` drew its false
+    cells as region, and the upsampled `cell_id_on_r*` overlay grew a shell of
+    empty space around itself. Both were found by review, not here.
+
+    So the default is UNDECLARED and is refused at write time. Saying "every
+    cell is informative" is still available; it just has to be said.
+    """
+    from biofilm_openmc.viewer import bundle_problems
+
+    def problems(**kwargs):
+        return bundle_problems([LATTICE], [Layer(
+            "cell_id", "cpm_labels", "dimensionless", "categorical",
+            np.zeros((4, 4, 4), np.int32), **kwargs)])
+
+    assert any("declares neither" in p for p in problems()), problems()
+    # each of the three ways to declare is accepted
+    assert not [p for p in problems(background=0) if "declares neither" in p]
+    assert not [p for p in problems(background=None) if "declares neither" in p]
+    assert not [p for p in problems(occupancy_from="cell_id")
+                if "declares neither" in p]
+
+
+def test_the_real_refinement_bundle_declares_absence_on_every_label_layer():
+    """COVER THE PRODUCED MANIFEST, not a fixture that resembles it.
+
+    The two layers that omitted a declaration — `omega_b` and the upsampled
+    `cell_id_on_r*` — are built by `subvoxel_refinement.py`, and every test here
+    used its own hand-written layers, so nothing looked at what the producer
+    actually emits.
+    """
+    import ast
+    from pathlib import Path
+
+    producer = (Path(observer.__file__).resolve().parents[1] / "scripts"
+                / "subvoxel_refinement.py")
+    assert producer.exists(), f"the producer moved: {producer}"
+    src = producer.read_text()
+    tree = ast.parse(src)
+    undeclared = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "Layer"):
+            continue
+        kinds = [a.value for a in node.args if isinstance(a, ast.Constant)]
+        if not ({"categorical", "boolean"} & set(kinds)):
+            continue
+        declared = {k.arg for k in node.keywords}
+        if not (declared & {"background", "occupancy_from"}):
+            undeclared.append(kinds[0] if kinds else "?")
+    assert not undeclared, (
+        f"{len(undeclared)} categorical/boolean layers in subvoxel_refinement.py "
+        "declare neither background nor occupancy_from")

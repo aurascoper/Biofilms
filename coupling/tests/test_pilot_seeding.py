@@ -328,3 +328,38 @@ def test_main_accepts_the_ladder_the_study_actually_runs(tmp_path):
                          "--config", str(tmp_path / "nope.toml"),
                          "--outdir", str(tmp_path / "out"),
                          "--ratios", "1,2,4"])
+
+
+@pytest.mark.parametrize("publish,to_canonical,complete,refuses", [
+    (True,  False, False, True),    # --publish with the default scenario set
+    (True,  False, True,  False),
+    # THE ALIAS. A COMPLETED run with --outdir data/calibration and no
+    # --publish: the stopped-early guard permits it, and the completeness check
+    # used to skip it because args.publish was false. It would then overwrite
+    # the canonical CSVs with the default, partial scenario set and drop the
+    # rows that published claims cite.
+    (False, True,  False, True),
+    (False, True,  True,  False),
+    (False, False, False, False),   # somewhere harmless: nothing to protect
+])
+def test_a_partial_scenario_set_cannot_replace_a_complete_one(
+        publish, to_canonical, complete, refuses, tmp_path):
+    """EVERY PUBLICATION PREREQUISITE KEYS ON THE DESTINATION.
+
+    `--publish` is one route into data/calibration/; `--outdir` naming it is
+    another. Guarding the flag protects one of them, and this repository has
+    now made that mistake twice in the same function — once for the
+    stopped-early check and once for this one.
+    """
+    from types import SimpleNamespace
+
+    args = SimpleNamespace(
+        publish=publish,
+        outdir=(pilot.CANONICAL_TABLES if to_canonical else tmp_path),
+        levers=complete, include_near_threshold=complete)
+
+    if refuses:
+        with pytest.raises(SystemExit, match="canonical tables"):
+            pilot.refuse_incomplete_scenarios(args)
+    else:
+        assert pilot.refuse_incomplete_scenarios(args) is None

@@ -264,16 +264,7 @@ def main(argv=None) -> int:
     # histories have been paid for is a refusal that costs what it was meant to
     # save -- the same reason the scan path rejects an unsupported refinement
     # factor up front rather than failing on a reshape at the end.
-    if args.publish:
-        missing = [flag for flag, on in (("--levers", args.levers),
-                                         ("--include-near-threshold",
-                                          args.include_near_threshold)) if not on]
-        if missing:
-            raise SystemExit(
-                "--publish writes the canonical tables in data/calibration/, and "
-                f"this run omits {', '.join(missing)}. A partial scenario set "
-                "must not replace a complete one: the rows it would drop are the "
-                "provenance for numbers the reports cite.")
+    refuse_incomplete_scenarios(args)
 
     from biofilm_openmc.model import build_biofilm_cylinder_model
 
@@ -493,6 +484,42 @@ def t_critical_999(df: int) -> float | None:
 CANONICAL_TABLES = (REPO / "data" / "calibration").resolve()
 
 
+def writes_canonical_tables(args) -> bool:
+    """Whether this run will write the published evidence tables.
+
+    EVERY PUBLICATION PREREQUISITE KEYS ON THIS, not on `--publish`. The flag
+    is one route to data/calibration/; `--outdir data/calibration` is another,
+    and it used to skip both checks -- so a complete run with the default,
+    partial scenario set could overwrite the canonical CSVs and drop the rows
+    that published claims cite, without ever naming the flag those checks
+    watched.
+    """
+    target = (CANONICAL_TABLES if args.publish
+              else Path(args.outdir).expanduser().resolve())
+    return target == CANONICAL_TABLES or CANONICAL_TABLES in target.parents
+
+
+def refuse_incomplete_scenarios(args) -> None:
+    """A partial scenario set must not replace a complete one.
+
+    CHECKED BEFORE ANY TRANSPORT RUNS. A refusal that arrives after the
+    histories have been paid for is a refusal that costs what it was meant to
+    save -- the same reason the scan path rejects an unsupported refinement
+    factor up front rather than failing on a reshape at the end.
+    """
+    if not writes_canonical_tables(args):
+        return
+    missing = [flag for flag, on in (("--levers", args.levers),
+                                     ("--include-near-threshold",
+                                      args.include_near_threshold)) if not on]
+    if missing:
+        raise SystemExit(
+            "this run writes the canonical tables in data/calibration/, and "
+            f"omits {', '.join(missing)}. A partial scenario set must not "
+            "replace a complete one: the rows it would drop are the provenance "
+            "for numbers the reports cite.")
+
+
 def resolve_output_dir(args, stopped_early):
     """Where the tables go -- and the ONLY way to reach the canonical ones.
 
@@ -503,17 +530,11 @@ def resolve_output_dir(args, stopped_early):
     guard and the target in one function makes the canonical directory
     unobtainable without passing it.
     """
-    target = (CANONICAL_TABLES if args.publish
-              else Path(args.outdir).expanduser().resolve())
-    # GUARD THE DESTINATION, NOT THE FLAG. `--publish` is one route to the
-    # canonical tables; `--outdir data/calibration` is another, and it reached
-    # them without passing any check at all -- so a budget-exhausted run could
-    # still overwrite the published evidence with partial rows, which is the
-    # precise loss this refusal exists to prevent. A flag is a proxy for the
-    # thing that matters; the directory IS the thing that matters.
-    if target == CANONICAL_TABLES or CANONICAL_TABLES in target.parents:
+    # GUARD THE DESTINATION, NOT THE FLAG -- see `writes_canonical_tables`.
+    if writes_canonical_tables(args):
         refuse_partial_publish(True, stopped_early)
-    return target
+    return (CANONICAL_TABLES if args.publish
+            else Path(args.outdir).expanduser().resolve())
 
 
 def distinguishable_from_zero(e2, se, m) -> bool:

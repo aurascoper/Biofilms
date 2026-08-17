@@ -65,6 +65,13 @@ SCHEMA_VERSION = 1
 # How a layer behaves under resampling. See the module docstring.
 EXTENSIVE = "extensive"
 INTENSIVE = "intensive"
+# THE DEFAULT MUST NOT BE A STATEMENT. `background=None` says "every cell
+# carries information, hide nothing" -- true for `generation`, and wrong for
+# `omega_b`. If it were also the default, a producer who simply forgot would
+# make that claim silently, which is how two layers came to render their empty
+# space as data. UNDECLARED is the default and is refused at write time.
+UNDECLARED = "undeclared"
+
 CATEGORICAL = "categorical"
 BOOLEAN = "boolean"
 SEMANTIC_KINDS = frozenset({EXTENSIVE, INTENSIVE, CATEGORICAL, BOOLEAN})
@@ -143,7 +150,7 @@ class Layer:
     # `generation` 0 is a founder and thresholding it away deletes the first
     # cohort from the picture. Only the code that built the field knows which it
     # is, so `None` means every cell carries information and none may be hidden.
-    background: float | None = None
+    background: float | None | str = UNDECLARED
     # WHEN A VALUE CANNOT DISAMBIGUATE ITSELF. `generation` is 0 both for a
     # founder and for empty lattice sites, because `export_checkpoint.jl`
     # zero-fills the array and skips unoccupied voxels -- so no `background`
@@ -163,7 +170,8 @@ class Layer:
                     bool(self.authoritative_for_quantitation),
                 "source_grid_id": self.source_grid_id,
                 "derivation": self.derivation,
-                "background": (None if self.background is None
+                "background": (self.background
+                               if self.background in (None, UNDECLARED)
                                else float(self.background)),
                 "occupancy_from": self.occupancy_from,
                 "note": self.note}
@@ -302,6 +310,23 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
         # not merely mislabel the layer, it silently returns the renderer to
         # the ambiguity the field was added to resolve. Same treatment as
         # source_grid_id above: name it at write time, not at draw time.
+        # OMISSION MUST NOT ACQUIRE A SEMANTICS. `background=None` means "every
+        # cell carries information, hide nothing" -- a real and sometimes
+        # correct statement, but a terrible DEFAULT, because a producer that
+        # simply forgot silently claims it. Two layers did: `omega_b` drew its
+        # false cells as part of the region, and the upsampled `cell_id_on_r*`
+        # overlay grew a shell of empty space. Both were found by review, not
+        # here. A categorical or boolean layer must now SAY which it means.
+        if layer.semantic_kind in (CATEGORICAL, BOOLEAN) \
+                and layer.background is UNDECLARED \
+                and layer.occupancy_from is None:
+            out.append(
+                f"layer {layer.name!r} is {layer.semantic_kind} but declares "
+                "neither `background` nor `occupancy_from`, so a renderer "
+                "cannot tell absence from data. Say which value means "
+                "'nothing here', name the layer that does, or pass "
+                "`background=None` to state that every cell is informative")
+
         if layer.occupancy_from is not None:
             other = next((l for l in layers if l.name == layer.occupancy_from),
                          None)
@@ -314,7 +339,7 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
                            f"{layer.occupancy_from!r}, which is on grid "
                            f"{other.grid_id!r} and not {layer.grid_id!r}; a "
                            "mask must be cell-for-cell with what it masks")
-            elif layer.background is not None:
+            elif layer.background not in (None, UNDECLARED):
                 out.append(f"layer {layer.name!r} declares both a background "
                            "value and an occupancy layer; they are two answers "
                            "to one question and the renderer would pick one")

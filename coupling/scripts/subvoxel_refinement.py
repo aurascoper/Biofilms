@@ -177,6 +177,7 @@ def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
                    "cell_id is what says which voxels hold biomass"),
         Layer("omega_b", "cpm_labels", "dimensionless", "boolean",
               np.asarray(common_mask, dtype=bool), derivation=None,
+              background=0,   # False is outside the region, not a value in it
               note="the metric's region: biomass volume fraction >= 0.5, "
                    "positive mass, above the dose floor. No uncertainty cut - "
                    "a statistical criterion on a region definition makes the "
@@ -383,6 +384,7 @@ def main(argv=None) -> int:
                         native=False, authoritative_for_quantitation=False,
                         source_grid_id="cpm_labels",
                         derivation="display_resampling",
+                        background=0,   # cell_id semantics survive upsampling
                         note="for overlay only. Exact here, since the lattice "
                              "is piecewise constant, but marked unquotable "
                              "because the DIRECTION is what the rule keys on"))

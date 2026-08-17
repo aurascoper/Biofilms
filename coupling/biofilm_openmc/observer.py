@@ -31,7 +31,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .viewer import BOOLEAN, CATEGORICAL, read_layer, read_manifest
+from .viewer import (BOOLEAN, CATEGORICAL, UNDECLARED, read_layer,
+                     read_manifest)
 
 # Same palette and labels as the serial model's figure section, carried across
 # from the CairoMakie prototype on `feat/visualize-3d`. That branch is otherwise
@@ -61,7 +62,7 @@ class DisplayLayer:
     banner: str             # empty when quotable; REQUIRED on screen otherwise
     derivation_note: str    # how a derived layer was made; may be quotable
     colour_by: str          # "species" | "scalar" | "mask"
-    background: float | None = None   # the producer's, never the renderer's
+    background: float | None | str = UNDECLARED   # producer's, not renderer's
     occupancy_from: str | None = None  # the layer that says where biomass is
 
     def as_dict(self) -> dict:
@@ -126,7 +127,8 @@ def display_plan(manifest: dict) -> list[DisplayLayer]:
         quotable=bool(l["authoritative_for_quantitation"]),
         banner=_banner(l), derivation_note=_derivation_note(l),
         colour_by=_colour_by(l),
-        background=(None if l.get("background") is None
+        background=(l.get("background", UNDECLARED)
+                    if l.get("background", UNDECLARED) in (None, UNDECLARED)
                     else float(l["background"])),
         occupancy_from=l.get("occupancy_from")) for l in manifest["layers"]]
 
@@ -312,6 +314,10 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             occupied.set_active_scalars(layer_name)
         elif layer.background is None:
             occupied = image.threshold(scalars=layer_name)   # keeps everything
+        elif layer.background is UNDECLARED:
+            # write_bundle refuses this, so a bundle in hand cannot reach here.
+            raise ValueError(
+                f"layer {layer_name!r} declares no absence semantics")
         else:
             # Drop ONLY the declared background value. `invert=True` on an
             # equality band removes that one value and keeps both sides, so a
