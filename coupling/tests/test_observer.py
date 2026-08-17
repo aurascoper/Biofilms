@@ -568,12 +568,52 @@ def test_the_occupancy_source_must_use_the_encoding_the_mask_implements(
     """
     from biofilm_openmc.viewer import bundle_problems
 
+    # DATA THAT EXERCISES BOTH HALVES OF THE CONTRACT. An earlier version of
+    # this test used an all-zero array, so the negative-sentinel half was never
+    # touched: -1 is the schema's out-of-domain marker and must be allowed
+    # alongside a background of 0.
+    source = np.zeros((4, 4, 4), np.int32)
+    source[0, 0, 0] = -1
+    source[1, 1, 1] = 3
     layers = [
         Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
-              np.zeros((4, 4, 4), np.int32), background=source_background),
+              source, background=source_background),
         Layer("generation", "cpm_labels", "dimensionless", "categorical",
               np.zeros((4, 4, 4), np.int32), occupancy_from="cell_id"),
     ]
     complaints = [p for p in bundle_problems([LATTICE], layers)
                   if "occupancy" in p and "mask tests" in p]
+    assert (not complaints) is accepted, complaints
+
+
+@pytest.mark.parametrize("sentinel,accepted", [
+    (-1, True),    # the schema's out-of-domain marker; the mask expects it
+    (-2, False),   # an encoding the mask does not implement
+    (-7, False),
+])
+def test_an_occupancy_source_may_only_use_the_known_out_of_domain_sentinel(
+        sentinel, accepted):
+    """THE OTHER HALF OF A TWO-PART CONTRACT.
+
+    `background = 0` says which value is empty. It does NOT say that every
+    negative is a sentinel, and `Layer.background` cannot — it names one value.
+    But the mask tests `> 0`, so a source using -7 as legitimate data loses
+    those cells silently.
+
+    The previous check validated only the background half, and its control used
+    an all-zero array, so nothing exercised the negative half at all. That is
+    the same shape as testing a helper and calling the guard covered.
+    """
+    from biofilm_openmc.viewer import bundle_problems
+
+    source = np.zeros((4, 4, 4), np.int32)
+    source[0, 0, 0] = sentinel
+    layers = [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              source, background=0),
+        Layer("generation", "cpm_labels", "dimensionless", "categorical",
+              np.zeros((4, 4, 4), np.int32), occupancy_from="cell_id"),
+    ]
+    complaints = [p for p in bundle_problems([LATTICE], layers)
+                  if "negative values other than" in p]
     assert (not complaints) is accepted, complaints

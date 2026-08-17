@@ -31,8 +31,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .viewer import (BOOLEAN, CATEGORICAL, UNDECLARED, read_layer,
-                     read_manifest)
+from .viewer import (BOOLEAN, CATEGORICAL, OUT_OF_DOMAIN, UNDECLARED,
+                     read_layer, read_manifest)
 
 # Same palette and labels as the serial model's figure section, carried across
 # from the CairoMakie prototype on `feat/visualize-3d`. That branch is otherwise
@@ -48,7 +48,7 @@ SPECIES_LABELS = ("C. neoformans", "D. radiodurans", "C. sphaerospermum",
 DEFAULT_CAMERA = {"azimuth": 0.4, "elevation": 0.5}
 
 BACKGROUND = 0          # cell_id background, per the exchange schema
-WALL = -1               # outside the biological domain; NOT a membrane material
+WALL = OUT_OF_DOMAIN    # outside the biological domain; NOT a membrane material
 
 
 @dataclass(frozen=True)

@@ -72,6 +72,13 @@ INTENSIVE = "intensive"
 # space as data. UNDECLARED is the default and is refused at write time.
 UNDECLARED = "undeclared"
 
+# The exchange schema's out-of-domain sentinel: 0 is empty space INSIDE the
+# biological domain, -1 is outside it. `observer.occupied_mask` tests `> 0`, so
+# it treats both as absent -- which makes this constant half of the occupancy
+# contract, not a detail of one renderer. It lives here, beside the Layer that
+# has to validate against it.
+OUT_OF_DOMAIN = -1
+
 CATEGORICAL = "categorical"
 BOOLEAN = "boolean"
 SEMANTIC_KINDS = frozenset({EXTENSIVE, INTENSIVE, CATEGORICAL, BOOLEAN})
@@ -197,6 +204,15 @@ class Table:
         return {"name": self.name, "basis": self.basis,
                 "columns": {k: len(np.asarray(v)) for k, v in self.columns.items()},
                 "units": dict(self.units), "note": self.note}
+
+
+def _has_unknown_sentinel(data) -> bool:
+    """Any negative value that is not the schema's out-of-domain marker."""
+    arr = np.asarray(data)
+    if not np.issubdtype(arr.dtype, np.number):
+        return False
+    negative = arr[arr < 0]
+    return bool(negative.size and (negative != OUT_OF_DOMAIN).any())
 
 
 def bundle_problems(grids, layers, tables=()) -> list[str]:
@@ -343,6 +359,20 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
                 out.append(f"layer {layer.name!r} declares both a background "
                            "value and an occupancy layer; they are two answers "
                            "to one question and the renderer would pick one")
+            elif other.background == 0 and _has_unknown_sentinel(other.data):
+                # THE OTHER HALF OF THE CONTRACT. Declaring background 0 says
+                # which value is empty; it does NOT say that every negative is
+                # a sentinel, and `Layer.background` cannot -- it names one
+                # value. But the mask tests `> 0`, so a source using, say, -7
+                # as legitimate data loses those cells silently. Only the
+                # schema's own -1 is a known sentinel; anything else is an
+                # encoding this mask does not implement.
+                out.append(
+                    f"layer {layer.name!r} takes occupancy from "
+                    f"{layer.occupancy_from!r}, which declares background 0 but "
+                    f"holds negative values other than {OUT_OF_DOMAIN} "
+                    "(out-of-domain). The occupancy mask tests `> 0`, so those "
+                    "cells would be dropped as if they were empty")
             elif other.background != 0:
                 # THE MASK IMPLEMENTS ONE ENCODING, so only that one is
                 # accepted. `observer.occupied_mask` tests `> 0`: background 0
