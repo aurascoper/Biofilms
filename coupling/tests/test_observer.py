@@ -299,3 +299,34 @@ def test_suppressing_a_banner_is_refused_rather_than_warned(tmp_path):
               derivation="upsampled_coarse_dose")])
     with pytest.raises(ValueError, match="banner may not be suppressed"):
         observer.plot_layer(path, "dose_on_lattice", show_banner=False)
+
+
+def test_absence_semantics_survive_the_round_trip_to_the_display_plan():
+    """A VALUE DOES NOT ALWAYS KNOW ITS OWN MEANING, so the producer says.
+
+    `generation` is 0 for a founder and 0 for empty lattice sites, because
+    `export_checkpoint.jl` zero-fills the array and skips unoccupied voxels. No
+    background VALUE can separate those: 0 deletes the founding cohort from
+    every picture of it, and None draws the void as generation-0 biomass. Both
+    of those shipped, in that order — the second was the fix for the first.
+
+    The disambiguator is a different layer, so the producer names it. This
+    checks the declaration actually reaches the renderer; a field that is
+    written to the manifest and dropped on the way back is worse than no field,
+    because the producer has been told it was heard.
+    """
+    doc = manifest(
+        [Grid("cpm_labels", (2, 2, 2), (0.0, 0.0, 0.0), (1e-3, 1e-3, 1e-3))],
+        [Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+               np.zeros((2, 2, 2), np.int32), background=0),
+         Layer("generation", "cpm_labels", "dimensionless", "categorical",
+               np.zeros((2, 2, 2), np.int32), occupancy_from="cell_id")],
+        [], provenance={})
+    plan = {l.name: l for l in display_plan(doc)}
+
+    assert plan["cell_id"].background == 0
+    assert plan["cell_id"].occupancy_from is None
+    # The ambiguous layer must NOT claim a background value...
+    assert plan["generation"].background is None
+    # ...and must not be left claiming every voxel is informative either.
+    assert plan["generation"].occupancy_from == "cell_id"

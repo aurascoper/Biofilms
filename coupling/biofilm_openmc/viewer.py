@@ -144,6 +144,13 @@ class Layer:
     # cohort from the picture. Only the code that built the field knows which it
     # is, so `None` means every cell carries information and none may be hidden.
     background: float | None = None
+    # WHEN A VALUE CANNOT DISAMBIGUATE ITSELF. `generation` is 0 both for a
+    # founder and for empty lattice sites, because `export_checkpoint.jl`
+    # zero-fills the array and skips unoccupied voxels -- so no `background`
+    # can be right: 0 deletes the founders, None draws the void as biomass.
+    # Naming the layer that says WHERE BIOMASS IS resolves it, and only the
+    # producer knows which layer that is.
+    occupancy_from: str | None = None
     note: str = ""
 
     def as_dict(self) -> dict:
@@ -158,6 +165,7 @@ class Layer:
                 "derivation": self.derivation,
                 "background": (None if self.background is None
                                else float(self.background)),
+                "occupancy_from": self.occupancy_from,
                 "note": self.note}
 
 

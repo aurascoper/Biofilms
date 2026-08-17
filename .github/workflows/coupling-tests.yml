@@ -64,6 +64,18 @@ jobs:
       - name: Run unit tier
         run: cd coupling && pytest -rs tests
 
+  merge-gate:
+    # The gate that refuses a merge over unresolved review findings. It is a
+    # check like any other and gets the same treatment: its first version let
+    # P3 threads through while documenting that it refused every unresolved
+    # thread, so it now ships with negative controls that run here.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the merge gate's negative controls
+        run: scripts/test_preflight_merge.sh
+
   calibration-unit:
     # Calibration contracts and harnesses: numpy/pytest only, no transport
     # stack. Separate package from coupling/ because it answers biological

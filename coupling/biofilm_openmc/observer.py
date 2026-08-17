@@ -62,6 +62,7 @@ class DisplayLayer:
     derivation_note: str    # how a derived layer was made; may be quotable
     colour_by: str          # "species" | "scalar" | "mask"
     background: float | None = None   # the producer's, never the renderer's
+    occupancy_from: str | None = None  # the layer that says where biomass is
 
     def as_dict(self) -> dict:
         return {"name": self.name, "grid_id": self.grid_id, "unit": self.unit,
@@ -126,7 +127,8 @@ def display_plan(manifest: dict) -> list[DisplayLayer]:
         banner=_banner(l), derivation_note=_derivation_note(l),
         colour_by=_colour_by(l),
         background=(None if l.get("background") is None
-                    else float(l["background"]))) for l in manifest["layers"]]
+                    else float(l["background"])),
+        occupancy_from=l.get("occupancy_from")) for l in manifest["layers"]]
 
 
 def grid_geometry(manifest: dict, grid_id: str) -> dict:
@@ -228,12 +230,18 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
     yields an opaque shell with the biofilm hidden inside it. Two paths, chosen
     by the layer's own semantic kind:
 
-    - CATEGORICAL and BOOLEAN layers are drawn as a surface, hiding only the
-      value the PRODUCER declared as background. A renderer cannot infer that
-      value: `cell_id` 0 is empty space, but `generation` 0 is a founder, and an
-      earlier version of this function thresholded at 0.5 and so deleted the
-      founding cohort from every picture of it. A layer that declares no
-      background is drawn in full. A species layer gets the seven fixed colours
+    - CATEGORICAL and BOOLEAN layers are drawn as a surface, hiding what the
+      PRODUCER declared to be absent — never what this function guessed. Three
+      cases, because a value does not always know its own meaning: a layer that
+      names an `occupancy_from` layer is masked by THAT field, one that declares
+      a `background` value hides exactly that value, and one that declares
+      neither is drawn in full.
+
+      `generation` is why. It is 0 for a founder and 0 for empty lattice sites,
+      since `export_checkpoint.jl` zero-fills and skips unoccupied voxels — so
+      thresholding at 0.5 deleted the founding cohort, and drawing everything
+      rendered the void as generation-0 biomass. Neither is a background value;
+      the answer is `cell_id`. A species layer gets the seven fixed colours
       rather than a continuous colormap, which is the whole point of having a
       palette: the same organism must not change colour because a different
       subset is present.
@@ -263,7 +271,18 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
     title = f"{layer_name} [{layer.unit}]"
 
     if layer.semantic_kind in (CATEGORICAL, BOOLEAN):
-        if layer.background is None:
+        if layer.occupancy_from:
+            # THE VALUE CANNOT DISAMBIGUATE ITSELF, so do not ask it to.
+            # `generation` is 0 for a founder AND for empty space, so mask by
+            # the layer the producer named as occupancy instead of by value.
+            occ, _ = read_layer(path, layer.occupancy_from)
+            # `occupied_mask`, not `!= 0`: the schema uses -1 for outside the
+            # biological domain, so a truthiness test draws the wall as biomass.
+            image.cell_data["_occupied"] = (
+                occupied_mask(occ).ravel(order="F")).astype(np.uint8)
+            occupied = image.threshold(0.5, scalars="_occupied")
+            occupied.set_active_scalars(layer_name)
+        elif layer.background is None:
             occupied = image.threshold(scalars=layer_name)   # keeps everything
         else:
             # Drop ONLY the declared background value. `invert=True` on an

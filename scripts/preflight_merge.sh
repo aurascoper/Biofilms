@@ -25,6 +25,14 @@
 set -euo pipefail
 
 PR="${1:?usage: preflight_merge.sh <pr-number>}"
+
+# A gate nobody can test is a gate nobody can trust, and this one shipped with a
+# branch that let P3 threads through while claiming to refuse every unresolved
+# thread. PREFLIGHT_FIXTURE substitutes a canned API response so the decision
+# logic can be exercised against synthetic threads. See test_preflight_merge.sh.
+if [[ -n "${PREFLIGHT_FIXTURE:-}" ]]; then
+  DATA="$(cat "$PREFLIGHT_FIXTURE")"
+else
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 OWNER="${REPO%%/*}"
 NAME="${REPO##*/}"
@@ -47,6 +55,7 @@ query($owner:String!, $name:String!, $pr:Int!) {
     }
   }
 }')"
+fi
 
 PRJ="$(jq -r '.data.repository.pullRequest' <<<"$DATA")"
 HEAD="$(jq -r '.headRefOid' <<<"$PRJ")"
@@ -114,9 +123,13 @@ else
     [[ "$outdated" == "true" ]] && mark=" (on an outdated diff)"
     printf '  OPEN  %-8s %s:%s%s\n        %s\n        — %s\n\n' \
            "$sev" "$path" "$line" "$mark" "$summary" "$who"
-    case "$sev" in
-      P1|P2|UNRANKED) fail=1 ;;
-    esac
+    # EVERY severity blocks, including P3 and unranked. The first version
+    # listed P1|P2|UNRANKED and let a P3-only pull request print "Clear to
+    # merge" while contradicting this script's own stated contract -- a check
+    # that could not fail, in the check written to stop checks that cannot
+    # fail. Severity ranks what to fix first; it does not rank what may be
+    # ignored, and an unread P3 is exactly as unread as an unread P1.
+    fail=1
   done <<<"$threads"
 fi
 

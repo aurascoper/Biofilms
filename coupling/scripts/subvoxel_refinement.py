@@ -146,11 +146,14 @@ def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
               snapshot.cell_id.astype(np.int32), background=0,
               note="a computational biomass PARCEL id, never an organism"),
         Layer("lineage_id", "cpm_labels", "dimensionless", "categorical",
-              snapshot.lineage_id.astype(np.int32), background=0),
+              snapshot.lineage_id.astype(np.int32),
+              occupancy_from="cell_id"),
         Layer("generation", "cpm_labels", "dimensionless", "categorical",
-              snapshot.generation.astype(np.int32), background=None,
-              note="generation 0 is a founder, not a missing value, so this "
-                   "layer declares NO background and must be drawn in full"),
+              snapshot.generation.astype(np.int32),
+              occupancy_from="cell_id",
+              note="generation 0 is a founder AND the zero-fill for empty "
+                   "lattice sites, so no background VALUE can separate them; "
+                   "cell_id is what says which voxels hold biomass"),
         Layer("omega_b", "cpm_labels", "dimensionless", "boolean",
               np.asarray(common_mask, dtype=bool), derivation=None,
               note="the metric's region: biomass volume fraction >= 0.5, "
