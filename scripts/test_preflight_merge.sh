@@ -85,6 +85,12 @@ cat >"$FAKEBIN/gh" <<'FAKE'
 # `gh repo view` -> the repo; `gh api graphql --paginate` -> two pages, exactly
 # as the real command emits them: one JSON document per page, concatenated.
 if [[ "$1" == "repo" ]]; then echo "aurascoper/Biofilms"; exit 0; fi
+# The gate makes TWO paginated calls now -- reviewThreads and comments. Answer
+# the comments one with an empty page; this control is about reviewThreads.
+if [[ "$*" == *"comments(first:100"* ]]; then
+  echo '{"data":{"repository":{"pullRequest":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}'
+  exit 0
+fi
 page() {  # $1 hasNextPage, $2 threads-json
   cat <<JSON
 {"data":{"repository":{"pullRequest":{
@@ -185,6 +191,60 @@ if grep -q "STALE REVIEW" "$TMP/out"; then
   sed 's/^/        | /' "$TMP/out"; fail=1
 else
   printf '  ok    a comment-form review counts as covering the head\n'
+fi
+
+# THE FINDING BURIED PAST THE FIRST PAGE. `comments(last:30)` in the main query
+# was not paginated at all -- one --paginate call advances one connection, and
+# that one is reviewThreads. A comment-form finding followed by thirty later
+# comments vanished, and the gate cleared without a push.
+printf '\n  comment pagination — the finding buried under later chatter\n  %s\n' \
+       "──────────────────────────────────────────"
+
+# 40 innocuous comments AFTER the finding, so anything reading only a recent
+# window misses it entirely.
+FILLER="$(python3 - <<'PY'
+import json
+print(",".join(json.dumps({"author":{"login":"aurascoper"},
+                           "createdAt":"2026-08-17T19:%02d:00Z" % i,
+                           "body":"routine follow-up %d" % i}) for i in range(40)))
+PY
+)"
+FINDING="$(python3 - "$HEAD_SHA" <<'PY'
+import json,sys
+sha=sys.argv[1]
+print(json.dumps({"author":{"login":"chatgpt-codex-connector"},
+  "createdAt":"2026-08-17T18:00:00Z",
+  "body":"### Codex Review\n\nhttps://github.com/o/r/blob/%s/f.py#L1-L2\n"
+         "**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)"
+         "</sub></sub>  Buried finding past the first page**\n" % sha}))
+PY
+)"
+cat >"$TMP/fixture.json" <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"paged comments","headRefOid":"$HEAD_SHA",
+  "reviews":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+    "submittedAt":"2026-08-17T18:30:00Z",
+    "body":"**Reviewed commit:** \`$HEAD_SHA\`"}]},
+  "comments":{"nodes":[$FINDING,$FILLER]},
+  "reviewThreads":{"nodes":[]}
+}}}}
+JSON
+PREFLIGHT_FIXTURE="$TMP/fixture.json" "$GATE" 1 >"$TMP/out" 2>&1; got=$?
+if [[ "$got" == 1 ]] && grep -q "Buried finding" "$TMP/out"; then
+  printf '  ok    a finding behind 40 later comments still blocks\n'
+else
+  printf '  FAIL  buried comment-form finding was missed (exit %s)\n' "$got"
+  sed 's/^/        | /' "$TMP/out"; fail=1
+fi
+
+# AND THE REAL QUERY MUST DECLARE THE CURSOR CONTRACT for comments, which the
+# fixture path cannot exercise -- same reasoning as the reviewThreads check.
+if grep -q 'comments(first:100, after:$endCursor)' "$HERE/preflight_merge.sh" \
+   && grep -A3 'comments(first:100' "$HERE/preflight_merge.sh" | grep -q 'pageInfo { hasNextPage endCursor }'; then
+  printf '  ok    the comments query declares after:$endCursor and pageInfo\n'
+else
+  printf '  FAIL  the comments connection is not paginated in the real query\n'
+  fail=1
 fi
 
 printf '  %s\n' "──────────────────────────────────────────"

@@ -52,9 +52,6 @@ query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
       reviews(last:20) {
         nodes { author { login } submittedAt body }
       }
-      comments(last:30) {
-        nodes { author { login } createdAt body }
-      }
       reviewThreads(first:100, after:$endCursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -68,9 +65,35 @@ query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
       (.[0].data.repository.pullRequest
        + {reviewThreads:{nodes:
            [.[].data.repository.pullRequest.reviewThreads.nodes[]]}})}}}')"
+
+# COMMENTS GET THEIR OWN PAGINATED CALL. `gh api --paginate` advances exactly
+# one connection -- the one carrying `after:$endCursor` and `pageInfo` -- and
+# that is reviewThreads above. A bare `comments(last:30)` alongside it is not
+# paginated at all, so a comment-form finding followed by more than thirty
+# comments simply vanished and the gate cleared without a push. That is the
+# same fail-open as the unpaginated reviewThreads, reproduced in the surface
+# added to fix a different fail-open.
+COMMENTS="$(gh api graphql --paginate \
+  -f owner="$OWNER" -f name="$NAME" -F pr="$PR" -f query='
+query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+  repository(owner:$owner, name:$name) {
+    pullRequest(number:$pr) {
+      comments(first:100, after:$endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes { author { login } createdAt body }
+      }
+    }
+  }
+}' | jq -s '[.[].data.repository.pullRequest.comments.nodes[]]')"
 fi
 
 PRJ="$(jq -r '.data.repository.pullRequest' <<<"$DATA")"
+# Fold the separately-paginated comments in, so everything below sees one shape.
+if [[ -n "${PREFLIGHT_FIXTURE:-}" ]]; then
+  PRJ="$(jq '.comments.nodes //= []' <<<"$PRJ")"
+else
+  PRJ="$(jq --argjson c "${COMMENTS:-[]}" '.comments = {nodes: $c}' <<<"$PRJ")"
+fi
 HEAD="$(jq -r '.headRefOid' <<<"$PRJ")"
 
 printf '\n  PR #%s — %s\n' "$PR" "$(jq -r '.title' <<<"$PRJ")"

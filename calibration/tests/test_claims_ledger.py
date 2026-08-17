@@ -515,6 +515,13 @@ BLANKET_REASSURANCE = re.compile(
 # last sentence or clause boundary -- so an unrelated "not" in a previous
 # sentence cannot excuse a genuine reassurance.
 _NEGATION_BEFORE = re.compile(r"\b(?:not|no|never|none|nor|cannot|n't)\b", re.I)
+# A negation governs only its own clause. Splitting on sentence marks alone was
+# too coarse: "This is not a measurement, but all other findings stand." had its
+# reassurance suppressed by a `not` belonging to the previous clause, so any
+# correction whose sentence contained an earlier negation got a free pass.
+# Commas, colons and coordinating conjunctions end the negation's reach.
+_CLAUSE_BOUNDARY = re.compile(
+    r"[.;:,\n]|\b(?:but|yet|however|although|though|whereas|while|still)\b", re.I)
 
 
 def blanket_reassurance_hits(text: str) -> list[str]:
@@ -528,8 +535,7 @@ def blanket_reassurance_hits(text: str) -> list[str]:
     """
     hits = []
     for match in BLANKET_REASSURANCE.finditer(text or ""):
-        clause = (text[:match.start()]
-                  .rsplit(".", 1)[-1].rsplit(";", 1)[-1].rsplit("\n", 1)[-1])
+        clause = _CLAUSE_BOUNDARY.split(text[:match.start()])[-1]
         if _NEGATION_BEFORE.search(clause):
             continue        # a retraction, not a reassurance
         hits.append(match.group(0))
@@ -651,6 +657,12 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
         # scan stops at the sentence break. Otherwise any correction that used
         # the word "not" anywhere earlier would get a free pass.
         "This is not a measurement. All other findings stand.",
+        # AND THE SAME-SENTENCE VARIANTS. A negation reaches only its own
+        # clause; splitting on sentence marks alone let an earlier `not` excuse
+        # a reassurance sharing its sentence.
+        "This is not a measurement, but all other findings stand.",
+        "This is not a measurement: all other findings stand.",
+        "Although the range moved, all other findings stand.",
     ]
     for phrase in blanket:
         assert blanket_reassurance_hits(phrase), f"missed: {phrase}"
