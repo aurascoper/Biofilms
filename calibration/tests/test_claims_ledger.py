@@ -293,3 +293,26 @@ def test_every_row_has_an_id_and_a_verdict(rows):
     for row in rows:
         assert row["claim_id"].strip(), row
         assert row["status"] in verdicts, (row["claim_id"], row["status"])
+
+
+def test_every_row_has_exactly_the_declared_columns():
+    """A ROW THAT SPILLS ITS FIELDS IS SILENTLY A DIFFERENT ROW.
+
+    Appending a sentence to a CSV line by string concatenation puts it AFTER the
+    final quoted field, so every comma in it becomes a column separator. That is
+    what happened editing `LADDER-03`: the row grew three phantom fields, its
+    `notes` were truncated mid-clause, and `csv.DictReader` reported the excess
+    under the `None` key — where nothing looked.
+
+    Every other test here reads named columns, so all of them passed over a
+    corrupted row. `DictReader` is forgiving by design; this is the check that
+    is not.
+    """
+    with open(LEDGER, encoding="utf-8") as fh:
+        reader = csv.reader(l for l in fh if not l.startswith("#"))
+        header = next(reader)
+        wrong = [(i + 2, row[0] if row else "?", len(row))
+                 for i, row in enumerate(reader) if len(row) != len(header)]
+    assert not wrong, (
+        f"rows whose field count is not {len(header)} — a value containing a "
+        f"comma was written unquoted: {wrong}")
