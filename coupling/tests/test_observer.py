@@ -617,3 +617,59 @@ def test_an_occupancy_source_may_only_use_the_known_out_of_domain_sentinel(
     complaints = [p for p in bundle_problems([LATTICE], layers)
                   if "negative values other than" in p]
     assert (not complaints) is accepted, complaints
+
+
+def test_the_undeclared_sentinel_is_refused_in_every_representation():
+    """BY VALUE, NEVER BY IDENTITY.
+
+    The sentinel has to survive a round trip through the manifest, and
+    `json.loads('"undeclared"')` is a different string object that compares
+    equal. `layer.background is UNDECLARED` therefore accepted a categorical
+    layer with no absence semantics at all — and `plot_layer`'s matching
+    identity check then fell through to the numeric branch and would have sent
+    the string into thresholding.
+
+    A bundle written and read back is the ORDINARY case, not an exotic one, so
+    this is the representation that mattered most and the one the check missed.
+    """
+    import json
+
+    from biofilm_openmc.viewer import UNDECLARED, bundle_problems, is_undeclared
+
+    round_tripped = json.loads(json.dumps(UNDECLARED))
+    assert round_tripped == UNDECLARED
+    assert round_tripped is not UNDECLARED, (
+        "if these are identical the test proves nothing; it exists because "
+        "they are not")
+
+    def complaints(background):
+        return [p for p in bundle_problems([LATTICE], [Layer(
+            "cell_id", "cpm_labels", "dimensionless", "categorical",
+            np.zeros((4, 4, 4), np.int32), background=background)])
+            if "declares neither" in p]
+
+    assert complaints(UNDECLARED), "the constant must be refused"
+    assert complaints(round_tripped), "and so must its round trip"
+    assert complaints(UNDECLARED) == complaints(round_tripped)
+
+    # the predicate itself: only the sentinel, and no number
+    assert is_undeclared(UNDECLARED) and is_undeclared(round_tripped)
+    for other in (None, 0, -1, 3.5, "0", "background", ""):
+        assert not is_undeclared(other), other
+
+
+def test_a_declared_background_still_survives_the_round_trip(tmp_path):
+    """The control that keeps the one above honest: a real background value must
+    come back as a NUMBER, not be swept up by the sentinel check. Writing 0 and
+    reading `"0"` would be the mirror-image failure."""
+    path = tmp_path / "b.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+                        np.zeros((4, 4, 4), np.int32), background=0)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+    layer = {l.name: l for l in display_plan(observer.read_manifest(path))}["cell_id"]
+    assert layer.background == 0
+    assert isinstance(layer.background, float), type(layer.background)

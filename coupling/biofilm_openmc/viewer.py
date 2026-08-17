@@ -79,6 +79,19 @@ UNDECLARED = "undeclared"
 # has to validate against it.
 OUT_OF_DOMAIN = -1
 
+
+def is_undeclared(value) -> bool:
+    """Whether an absence declaration is missing.
+
+    BY VALUE, NEVER BY IDENTITY. The sentinel has to survive a round trip
+    through the manifest, and `json.loads('"undeclared"')` is a DIFFERENT string
+    object that compares equal -- so `value is UNDECLARED` accepted a categorical
+    layer with no absence semantics, and `plot_layer` then sent the string into
+    thresholding as though it were a number. Every representation must be
+    refused the same way, so every caller asks this one question.
+    """
+    return isinstance(value, str) and value == UNDECLARED
+
 CATEGORICAL = "categorical"
 BOOLEAN = "boolean"
 SEMANTIC_KINDS = frozenset({EXTENSIVE, INTENSIVE, CATEGORICAL, BOOLEAN})
@@ -178,7 +191,8 @@ class Layer:
                 "source_grid_id": self.source_grid_id,
                 "derivation": self.derivation,
                 "background": (self.background
-                               if self.background in (None, UNDECLARED)
+                               if self.background is None
+                               or is_undeclared(self.background)
                                else float(self.background)),
                 "occupancy_from": self.occupancy_from,
                 "note": self.note}
@@ -334,7 +348,7 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
         # overlay grew a shell of empty space. Both were found by review, not
         # here. A categorical or boolean layer must now SAY which it means.
         if layer.semantic_kind in (CATEGORICAL, BOOLEAN) \
-                and layer.background is UNDECLARED \
+                and is_undeclared(layer.background) \
                 and layer.occupancy_from is None:
             out.append(
                 f"layer {layer.name!r} is {layer.semantic_kind} but declares "
@@ -355,7 +369,8 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
                            f"{layer.occupancy_from!r}, which is on grid "
                            f"{other.grid_id!r} and not {layer.grid_id!r}; a "
                            "mask must be cell-for-cell with what it masks")
-            elif layer.background not in (None, UNDECLARED):
+            elif layer.background is not None \
+                    and not is_undeclared(layer.background):
                 out.append(f"layer {layer.name!r} declares both a background "
                            "value and an occupancy layer; they are two answers "
                            "to one question and the renderer would pick one")

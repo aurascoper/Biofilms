@@ -395,6 +395,48 @@ def test_every_row_has_exactly_the_declared_columns():
         f"comma was written unquoted: {wrong}")
 
 
+def shadowed_definitions(source: str) -> dict:
+    """Top-level names defined more than once in a module, with their counts.
+
+    Takes SOURCE, not a path, so it can be handed a module that is known to be
+    bad. A scan that has only ever read a clean repository has not been shown to
+    find anything — weaken the predicate and it stays green either way.
+
+    Only the module's own body is examined. A helper redefined inside two
+    different functions is legal, common, and not what this is about.
+    """
+    import ast
+    import collections
+
+    counts = collections.Counter(
+        node.name for node in ast.parse(source).body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.ClassDef)))
+    return {name: n for name, n in counts.items() if n > 1}
+
+
+def test_the_shadowing_scan_detects_a_known_bad_module():
+    """THE CONTROL. Three inputs, and the third is the one that stops this
+    becoming a nuisance: a name reused inside two separate function bodies is
+    ordinary Python and must NOT be reported."""
+    clean = "def a():\n    pass\n\n\ndef b():\n    pass\n"
+    assert shadowed_definitions(clean) == {}
+
+    duplicated = clean + "\n\ndef a():\n    pass\n"
+    assert shadowed_definitions(duplicated) == {"a": 2}
+
+    classes = "class C:\n    pass\n\n\nclass C:\n    pass\n"
+    assert shadowed_definitions(classes) == {"C": 2}
+
+    # a method named the same in two classes, and a local helper in two
+    # functions — both legal, both must be ignored
+    nested = ("class C:\n    def go(self):\n        pass\n\n\n"
+              "class D:\n    def go(self):\n        pass\n\n\n"
+              "def one():\n    def helper():\n        pass\n\n\n"
+              "def two():\n    def helper():\n        pass\n")
+    assert shadowed_definitions(nested) == {}
+
+
 def test_no_module_defines_the_same_name_twice():
     """A SHADOWED DEFINITION MAKES A TEST RUN AGAINST CODE YOU JUST REPLACED.
 
@@ -408,9 +450,6 @@ def test_no_module_defines_the_same_name_twice():
 
     Cheap to check, and it covers every module rather than the one that failed.
     """
-    import ast
-    import collections
-
     repo = Path(__file__).resolve().parents[2]
     shadowed = {}
     for path in repo.rglob("*.py"):
@@ -418,14 +457,9 @@ def test_no_module_defines_the_same_name_twice():
                for part in path.parts):
             continue
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            repeated = shadowed_definitions(path.read_text(encoding="utf-8"))
         except (SyntaxError, UnicodeDecodeError):
             continue    # not ours to judge
-        counts = collections.Counter(
-            node.name for node in tree.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                 ast.ClassDef)))
-        repeated = {name: n for name, n in counts.items() if n > 1}
         if repeated:
             shadowed[str(path.relative_to(repo))] = repeated
     assert not shadowed, (

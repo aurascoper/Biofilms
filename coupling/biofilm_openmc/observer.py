@@ -32,7 +32,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .viewer import (BOOLEAN, CATEGORICAL, OUT_OF_DOMAIN, UNDECLARED,
-                     read_layer, read_manifest)
+                     is_undeclared, read_layer, read_manifest)
 
 # Same palette and labels as the serial model's figure section, carried across
 # from the CairoMakie prototype on `feat/visualize-3d`. That branch is otherwise
@@ -128,7 +128,8 @@ def display_plan(manifest: dict) -> list[DisplayLayer]:
         banner=_banner(l), derivation_note=_derivation_note(l),
         colour_by=_colour_by(l),
         background=(l.get("background", UNDECLARED)
-                    if l.get("background", UNDECLARED) in (None, UNDECLARED)
+                    if l.get("background", UNDECLARED) is None
+                    or is_undeclared(l.get("background", UNDECLARED))
                     else float(l["background"])),
         occupancy_from=l.get("occupancy_from")) for l in manifest["layers"]]
 
@@ -314,7 +315,7 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             occupied.set_active_scalars(layer_name)
         elif layer.background is None:
             occupied = image.threshold(scalars=layer_name)   # keeps everything
-        elif layer.background is UNDECLARED:
+        elif is_undeclared(layer.background):
             # write_bundle refuses this, so a bundle in hand cannot reach here.
             raise ValueError(
                 f"layer {layer_name!r} declares no absence semantics")
