@@ -200,3 +200,39 @@ def test_the_default_ladder_actually_exercises_the_skip_it_promises():
     row = next(r for r in slab if r["pitch_um"] == 3.2)
     assert "skipped" not in row
     assert row["within_biovolume_fraction"] is True
+
+
+def test_a_refused_pitch_does_not_break_the_convergence_tail():
+    """ABSENCE OF AN OBSERVATION IS NOT AN OBSERVATION OF FAILURE.
+
+    A refused rung carries no `within_*` key, and reading that with a default of
+    False made an explicit refusal indistinguishable from a measurement that
+    missed tolerance — which then broke the tail beneath it.
+
+    Codex's example, and it is a good one: put a non-tiling 1.4 between 1.6 and
+    0.8 for the spheres and component size drops from 1.6 to 0.8, with neither
+    valid measurement having changed. The default ladder hid this because its
+    only skipped pitch, 3.2, sits at the coarse END where there is no tail
+    below it to break.
+    """
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    spheres = PhysicalSpheres()
+    tolerances = rl.load_tolerances()
+
+    without = rl.run_ladder(spheres, [1.6, 0.8], tolerances)
+    with_skip = rl.run_ladder(spheres, [1.6, 1.4, 0.8], tolerances)
+
+    # 1.4 must genuinely be refused, or the test proves nothing
+    skipped = [r for r in with_skip if "skipped" in r]
+    assert [r["pitch_um"] for r in skipped] == [1.4], with_skip
+
+    for observable in ("component_size_q50_um3", "biovolume_fraction"):
+        assert (rl.coarsest_passing(with_skip, observable)
+                == rl.coarsest_passing(without, observable)), (
+            f"inserting a refused pitch changed {observable}; a rung that is "
+            "not a view of the object must not enter the tail")

@@ -156,24 +156,32 @@ def coarsest_passing(rows, observable) -> float | None:
     monotone in pitch — a sphere can be captured well at one pitch and badly at
     the next by where the centres happen to fall — so a single passing coarse
     pitch is luck, not headroom.
+
+    A SKIPPED PITCH IS NOT A FAILED MEASUREMENT. A refused rung carries no
+    `within_*` key, so reading it with a default of False made an explicit
+    refusal indistinguishable from an observation that missed tolerance -- and
+    it broke the tail beneath it. Inserting a non-tiling 1.4 between 1.6 and
+    0.8 could therefore drag a passing component-size result from 1.6 down to
+    0.8 with neither valid measurement having changed.
+
+    The refusal says this pitch is not a view of the object at all. Absence of
+    an observation is not an observation of failure, so the row stays in the
+    report and leaves the convergence tail alone.
     """
     key = f"within_{observable}"
-    passing = None
-    for row in sorted(rows, key=lambda r: r["pitch_um"]):
-        if not row.get(key, False):
-            passing = None
-        elif passing is None:
-            passing = row["pitch_um"]
-        else:
-            passing = max(passing, row["pitch_um"])
-    # walk coarse -> fine, keep the coarsest with an unbroken tail
-    best = None
-    ordered = sorted(rows, key=lambda r: -r["pitch_um"])
+    # Walk coarse -> fine and keep the coarsest rung whose tail is unbroken.
+    #
+    # A previous version computed a running `passing` in a first loop and then
+    # DISCARDED it, returning a value from this one -- so the filter I first
+    # added to that loop changed nothing at all, and the test still failed with
+    # the fix apparently in place. Dead code that looks like the answer is
+    # worse than no code: it absorbs a correction and reports success.
+    ordered = sorted((r for r in rows if "skipped" not in r),
+                     key=lambda r: -r["pitch_um"])
     for i, row in enumerate(ordered):
         if all(r.get(key, False) for r in ordered[i:]):
-            best = row["pitch_um"]
-            break
-    return best
+            return row["pitch_um"]
+    return None
 
 
 def main(argv=None) -> int:
