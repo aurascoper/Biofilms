@@ -72,10 +72,10 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 > entire purpose is to hold the object fixed and move only the sampling.
 >
 > A non-tiling pitch is now **refused** rather than rounded, and the ladder names
-> the pitch it skipped instead of dropping the row silently. The only published
-> number that moves is component size, from 3.2 to **1.6 µm** — it was passing at
-> a pitch that never validly ran. Every other conclusion is unchanged, including
-> the interface-area finding, which was measured at pitches that tile.
+> the pitch it skipped instead of dropping the row silently. Component size moves
+> from 3.2 to **1.6 µm** — it was passing at a pitch that never validly ran — and
+> the interface-area *range* moves with it, as recorded two paragraphs below.
+> The conclusions themselves are unchanged.
 >
 > **The first attempt at this correction was itself wrong**, and the same review
 > caught that too. It removed 3.2 from the ladder's default pitches, which is not
@@ -92,6 +92,15 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 >  7.5 voxels. Rounding would resize the box to 25.6 um while the analytic truth
 >  still uses the declared extent"}
 > ```
+>
+> **A second published number moves with it, and I missed it twice.** The
+> interface-area finding was stated as *0.41–0.51 across a 16× range*. Both
+> halves came from the withdrawn row: 0.41 is its error and 16× is 3.2 → 0.2.
+> Over the pitches that actually tile it is **0.467–0.510 across 8×** — a
+> *narrower* spread over a *shorter* range, so the conclusion is unchanged and
+> in fact slightly stronger, since the error moves less than was reported while
+> still refusing to fall. Withdrawing a row means auditing everything computed
+> from it, not only the row's own headline.
 
 Porosity needing a 2× finer pitch than biovolume is not a surprise — it is the
 `derived` tolerance doing its job. Porosity is `1 − biovolume`, so an equal
@@ -100,8 +109,8 @@ derived 0.0025 for exactly that reason.
 
 ## The finding: `specific_interface_area` is not an area
 
-Its error does not fall with pitch. It sits at 0.41–0.51 across a 16× range and
-is slightly *worse* at the finest pitch. That is not slow convergence; it is a
+Its error does not fall with pitch. It sits at **0.467–0.510 across an 8× range**
+and is slightly *worse* at the finest pitch. That is not slow convergence; it is a
 systematic factor, and the mechanism is exact.
 
 **Counting axis-aligned faces measures ∫|n|₁ dA, not ∫|n|₂ dA.** The ratio to
