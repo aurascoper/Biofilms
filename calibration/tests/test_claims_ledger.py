@@ -325,194 +325,6 @@ def rows_of_wrong_width(path) -> list[tuple]:
     return out
 
 
-def distinguishing_phrase(claim: str) -> str:
-    """The longest run of the claim with no elision and no bracketed citation.
-
-    Ledger `claim_text` is a mix: some entries quote the manuscript verbatim,
-    others paraphrase with "..." where the original ran long. Only the
-    unelided runs can be searched for, so the longest one is taken and the rest
-    of the claim is ignored rather than guessed at.
-    """
-    best = ""
-    for segment in re.split(r"\.\.\.|\[\d+\]|[(),;]", claim):
-        segment = " ".join(segment.split())
-        if len(segment.split()) >= MIN_WORDS and len(segment) > len(best):
-            best = segment
-    return best
-
-
-@pytest.fixture(scope="module")
-def rows():
-    return _rows()
-
-
-def test_the_ledger_parses_and_is_not_empty(rows):
-    assert len(rows) > 200
-    assert {"claim_id", "status", "claim_text", "document"} <= set(rows[0])
-
-
-def test_no_deleted_claim_survives_in_the_manuscript(rows):
-    """THE ONE THAT MATTERS. Every `delete` verdict was reached because the
-    claim was unsupported, fabricated, or checkable and false — a Hamiltonian
-    that conserves nothing, a symplectic integrator that is not used, a
-    quantum-mechanical noise mechanism that is a Gaussian keyed to a diffusion
-    coefficient. They must not come back."""
-    text = _preprint_text()
-    survivors = []
-    for row in rows:
-        if not row["claim_id"].startswith("PP-") or row["status"] != "delete":
-            continue
-        phrase = distinguishing_phrase(row["claim_text"])
-        if phrase and phrase.lower() in text:
-            survivors.append(f"{row['claim_id']}: {phrase[:90]}")
-    assert not survivors, (
-        "claims marked `delete` in the ledger are present in the manuscript:\n  "
-        + "\n  ".join(survivors))
-
-
-def test_the_guard_actually_detects_deleted_claims(rows):
-    """THE TEST THAT PROVES THE OTHER ONE MEANS SOMETHING.
-
-    `test_no_deleted_claim_survives_in_the_manuscript` passes when it finds
-    nothing. So does a guard that can find nothing at all — and the first
-    version of this file was exactly that: raw substring matching against LaTeX,
-    which detected 12 of 30 in the original and would have reported a clean
-    manuscript either way. A check that cannot fail is not a check, which is the
-    lesson this repository keeps relearning.
-
-    So: run the guard against the one document known to CONTAIN the deleted
-    claims, and require it to find them.
-
-    The floor is 18 rather than the measured 20 to leave room for harmless
-    changes in phrase extraction, and it is above the 15 that raw substring
-    matching achieves — so dropping the markup normalisation fails here rather
-    than silently halving the guard.
-    """
-    original = _original_manuscript()
-    if original is None:
-        pytest.skip("shallow clone: the original manuscript is not reachable")
-    found = _detected(rows, original)
-    assert len(found) >= 18, (
-        f"the guard detected only {len(found)} deleted claims in the "
-        "pre-revision manuscript, which contains them. It has stopped "
-        "guarding — most likely the markup normalisation regressed.")
-
-
-def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
-    """Coverage is reported because it is PARTIAL, and reported as the number
-    that means something.
-
-    An earlier version of this file announced "30 of 34 textually checkable",
-    which counts rows that YIELD a searchable phrase — not rows the guard can
-    actually find. Only about 20 are detectable in a document known to contain
-    them, because many ledger entries are reconstructions across the two
-    superseded sources rather than verbatim quotes from either. Reporting the
-    larger number invited retiring the manual review that covers the rest.
-    """
-    deleted = [r for r in rows
-               if r["claim_id"].startswith("PP-") and r["status"] == "delete"]
-    yields_phrase = [r for r in deleted if distinguishing_phrase(r["claim_text"])]
-    original = _original_manuscript()
-
-    with capsys.disabled():
-        print(f"\n  claims-ledger guard: {len(deleted)} `delete` claims; "
-              f"{len(yields_phrase)} yield a searchable phrase")
-        if original is None:
-            print("  detection rate: NOT MEASURED (shallow clone)")
-        else:
-            found = set(_detected(rows, original))
-            print(f"  DETECTED in the pre-revision manuscript: {len(found)} of "
-                  f"{len(deleted)} — this is the real coverage")
-            missed = [r["claim_id"] for r in deleted if r["claim_id"] not in found]
-            print("  NOT detectable — these still need human review:")
-            for cid in missed:
-                print(f"      {cid}")
-
-    assert len(yields_phrase) >= 25
-
-
-def test_every_preprint_claim_names_a_document_that_exists(rows):
-    """What would have caught the drift this test was written after.
-
-    The manuscript was revised and renamed outside the repository while 115
-    ledger rows went on describing a file that had been superseded. A row whose
-    document cannot be resolved is a row nobody can check.
-    """
-    # "repository" is legitimate and not a data error: a PP-numbered claim can
-    # originate in the preprint audit while the thing it describes lives in the
-    # code — PP-T2-29 is a Table 2 value whose evidence is biofilms_potts.jl,
-    # PP-CIT-01 is about Citations.md.
-    known = {"preprint", "preprint_tex", "repository"}
-    unresolved = sorted({r["document"] for r in rows
-                         if r["claim_id"].startswith("PP-")} - known)
-    assert not unresolved, f"PP-* rows name unknown documents: {unresolved}"
-    assert PREPRINT.exists(), (
-        f"the ledger's preprint rows describe {PREPRINT.name}, which is not in "
-        "the repository")
-
-
-def test_the_manuscript_cites_a_resolvable_revision():
-    """A manuscript that cites a commit is only as good as the commit. The
-    citation names the PARENT of the commit that adds it, because a document
-    cannot cite the commit that contains it — the same structural limit the run
-    artifacts record for their own provenance."""
-    import subprocess
-
-    # A SHALLOW CLONE CANNOT ANSWER THIS, so do not pretend it did. CI checks
-    # this repository out at full depth for exactly that reason; anywhere else
-    # (a fork, a `--depth 1` clone) the absence of a commit says nothing about
-    # the citation, and failing there would report a fact about the checkout.
-    shallow = subprocess.run(
-        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
-        capture_output=True, text=True)
-    if shallow.stdout.strip() == "true":
-        pytest.skip("shallow clone: commit resolution is not decidable here")
-
-    text = PREPRINT.read_text(encoding="utf-8")
-    cited = set(re.findall(r"repository revision \\texttt\{([0-9a-f]{7,40})\}", text))
-    cited |= set(re.findall(r"manuscript is \\texttt\{([0-9a-f]{7,40})\}", text))
-    assert cited, "the manuscript cites no repository revision"
-    for sha in cited:
-        done = subprocess.run(["git", "-C", str(REPO), "cat-file", "-e", f"{sha}^{{commit}}"],
-                              capture_output=True)
-        assert done.returncode == 0, f"cited revision {sha} does not resolve"
-
-
-def test_claim_ids_are_unique(rows):
-    """AN ID THAT NAMES TWO CLAIMS NAMES NEITHER.
-
-    The ledger is referenced by id from commit messages, pull requests and the
-    manuscript revision plan, and `test_no_deleted_claim_survives_in_the_manuscript`
-    reports survivors by id. A duplicate makes every one of those references
-    ambiguous — and silently, since nothing read the file as a keyed table.
-
-    Two collisions had already accumulated (`REFINE-02`, `REFINE-03`), both
-    from this session appending rows without checking. Caught by external
-    review, not here, which is why this test exists now.
-    """
-    import collections
-
-    counts = collections.Counter(r["claim_id"] for r in rows)
-    duplicated = {cid: n for cid, n in counts.items() if n > 1}
-    assert not duplicated, f"claim ids used more than once: {duplicated}"
-
-
-def test_every_row_has_an_id_and_a_verdict(rows):
-    """The two columns everything else keys on.
-
-    Two vocabularies live here, and that is deliberate. The MANUSCRIPT audit
-    reached one of four editorial verdicts per claim; the REPOSITORY rows carry
-    a status describing what the code still owes. Mixing a new word into either
-    silently removes a row from whichever consumer filters on the other.
-    """
-    verdicts = {"keep", "restate", "requalify", "delete",          # manuscript
-                "supported", "needs_calibration",                  # repository
-                "needs_verification", "must_not_be_claimed"}
-    for row in rows:
-        assert row["claim_id"].strip(), row
-        assert row["status"] in verdicts, (row["claim_id"], row["status"])
-
-
 def test_a_malformed_row_is_actually_detected(tmp_path):
     """THE CONTROL FOR THE WIDTH GUARD.
 
@@ -581,3 +393,41 @@ def test_every_row_has_exactly_the_declared_columns():
     assert not wrong, (
         f"rows whose field count is not {len(header)} — a value containing a "
         f"comma was written unquoted: {wrong}")
+
+
+def test_no_module_defines_the_same_name_twice():
+    """A SHADOWED DEFINITION MAKES A TEST RUN AGAINST CODE YOU JUST REPLACED.
+
+    Editing this file with a script whose end-marker matched an earlier line
+    duplicated a 188-line span, giving ten test functions two definitions each
+    — and Python keeps the LAST one. The immediate damage was small because the
+    copies were identical, but the same slip had already left a stale
+    `rows_of_wrong_width` shadowing the fixed one, so the suite passed against
+    the version that had just been replaced. Nothing reported either: a
+    duplicate definition is legal Python and pytest collects only the survivor.
+
+    Cheap to check, and it covers every module rather than the one that failed.
+    """
+    import ast
+    import collections
+
+    repo = Path(__file__).resolve().parents[2]
+    shadowed = {}
+    for path in repo.rglob("*.py"):
+        if any(part in {".venv", "__pycache__", ".git", "build", "dist"}
+               for part in path.parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue    # not ours to judge
+        counts = collections.Counter(
+            node.name for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                 ast.ClassDef)))
+        repeated = {name: n for name, n in counts.items() if n > 1}
+        if repeated:
+            shadowed[str(path.relative_to(repo))] = repeated
+    assert not shadowed, (
+        "top-level definitions shadowed by a later one with the same name; "
+        f"the earlier definition never runs: {shadowed}")
