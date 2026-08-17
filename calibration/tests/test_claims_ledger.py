@@ -476,30 +476,101 @@ BLANKET_REASSURANCE = re.compile(
     r"|everything else stands)", re.I)
 
 
+def blanket_reassurance_hits(text: str) -> list[str]:
+    """Every blanket-reassurance phrase in `text`.
+
+    Takes TEXT so the same finder serves the ledger's notes and the correction
+    DOCUMENTS, and so a control can feed it known-bad input. The first version
+    inlined the search over `rows` only, which left the markdown reports -- the
+    place the phrase actually survived, twice -- unscanned by the production
+    path while the regex controls passed.
+    """
+    return [m.group(0) for m in BLANKET_REASSURANCE.finditer(text or "")]
+
+
+# The documents that carry marked corrections. Scanned as a directory rather
+# than a hand-listed file, so a new report is covered the day it is written.
+CORRECTION_DOCS = sorted((REPO / "docs" / "calibration").glob("*.md"))
+
+
+def reassurance_offenders(rows, docs) -> list[tuple]:
+    """(where, phrase) for every blanket reassurance across BOTH surfaces.
+
+    THE PRODUCTION PATH, extracted so a control can drive it. Testing
+    `blanket_reassurance_hits` alone proves the regex and not its wiring:
+    deleting the document loop left that control green while the reports went
+    unscanned -- which is the exact defect this function exists to close, so a
+    control that could not see it was worth nothing.
+    """
+    out = [(r["claim_id"], hit) for r in rows
+           for hit in blanket_reassurance_hits(r["notes"])]
+    for doc in docs:
+        out += [(doc.name, hit) for hit in
+                blanket_reassurance_hits(doc.read_text(encoding="utf-8"))]
+    return out
+
+
 def test_no_correction_offers_a_blanket_reassurance(rows):
     """SAY WHICH NUMBERS MOVED AND STOP.
 
     A correction that adds "every other conclusion is unchanged" makes a claim
-    about scope that nobody has checked — and here nobody had: withdrawing the
-    3.2 µm ladder rung moved component size AND the dependent interface-area
-    range, while the row recording it reassured the reader that nothing else
+    about scope that nobody has checked -- and here nobody had: withdrawing the
+    3.2 um ladder rung moved component size AND the dependent interface-area
+    range, while the text recording it reassured the reader that nothing else
     had.
 
     It survived two corrections by being REWORDED rather than deleted: first to
     "the conclusions themselves are unchanged" in the report, then to "the
-    findings themselves stand" in this ledger. Each time it read as a smaller
-    claim and meant the same thing, which is why the check is on the phrasing
-    family rather than on one sentence.
+    findings themselves stand" in the ledger. Each read as a smaller claim and
+    meant the same thing, which is why the check is on the phrasing family --
+    and why it scans BOTH surfaces. A guard covering one of the two places the
+    phrase has lived is a guard that would have caught neither instance.
 
     A statement scoped to ONE named finding and substantiated beside it is fine
-    and is not matched here. The interface-area paragraph makes exactly that
-    kind of claim and keeps it.
+    and is not matched. The interface-area paragraph makes exactly that kind of
+    claim ("so the conclusion is unchanged and in fact slightly stronger, since
+    the error moves less than was reported") and keeps it.
     """
-    offenders = [(r["claim_id"], BLANKET_REASSURANCE.search(r["notes"]).group(0))
-                 for r in rows if BLANKET_REASSURANCE.search(r["notes"] or "")]
+    offenders = reassurance_offenders(rows, CORRECTION_DOCS)
     assert not offenders, (
         "a correction claims unchecked scope; name the numbers that moved and "
         f"stop: {offenders}")
+
+
+def test_the_document_scan_is_wired_up_not_just_the_regex(tmp_path):
+    """THE CONTROL FOR THE WIRING, not for the pattern.
+
+    `test_the_blanket_reassurance_pattern_actually_matches` proves the regex.
+    It does NOT prove the regex is pointed at the reports, and for one commit
+    it was not: `offenders` searched only the ledger's notes, so the report
+    could have regained the phrase with the suite still green.
+
+    So drive the document path: a file that regains the sentence must be
+    caught, and one making the permitted scoped claim must not.
+    """
+    bad = tmp_path / "report.md"
+    bad.write_text("# Correction\n\nComponent size moves 3.2 -> 1.6 um. "
+                   "The conclusions themselves are unchanged.\n", encoding="utf-8")
+    # THROUGH THE PRODUCTION FUNCTION, with an empty ledger, so only the
+    # document path can produce the hit. Calling the regex helper here instead
+    # is what let the unwired version pass.
+    caught = reassurance_offenders([], [bad])
+    assert [w for w, _ in caught] == ["report.md"], caught
+
+    ok = tmp_path / "ok.md"
+    ok.write_text("# Correction\n\nThe range moves to 0.467-0.510 across 8x, "
+                  "so the conclusion is unchanged and in fact slightly stronger, "
+                  "since the error moves less than was reported.\n", encoding="utf-8")
+    assert reassurance_offenders([], [ok]) == []
+
+    # and a ledger-only offender is still caught, so neither surface was lost
+    assert reassurance_offenders(
+        [{"claim_id": "X-01", "notes": "The findings themselves stand."}], []
+    ) == [("X-01", "The findings themselves stand")]
+
+    # and the real reports are actually in the scanned set
+    assert any(d.name == "morphology_rasterization_ladder.md"
+               for d in CORRECTION_DOCS), CORRECTION_DOCS
 
 
 def test_the_blanket_reassurance_pattern_actually_matches(rows):
