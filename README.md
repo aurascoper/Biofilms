@@ -501,6 +501,28 @@ niche-partitioning claim.
 <img src="biofilm_dynamics_7_species.gif" width="48%" alt="7-species biofilm dynamics">
 </p>
 
+### 4 · Primary Fuel Source Geolocator — supporting visualization, not a model
+
+**This supports no claim in this repository.** It is a Tableau workbook over an external dataset,
+with no coupling to the biofilm model, the transport stack, or any gate. It is documented here
+because the `.mp4` and `.twb` were already committed and unreferenced, and an unexplained artifact
+in a repository is an invitation to infer a relationship that does not exist.
+
+`Primary Fuel Source Geolocator.twb` plots `power_plant_database_global.csv` — the WRI Global Power
+Plant Database schema (`primary_fuel`, `capacity_mw`, `commissioning_year`, `latitude`, `longitude`,
+`country_long`, `estimated_generation_gwh_2013`–`2017`) — as geolocated marks coloured by primary
+fuel. The recording walks the North America extent, filters the fifteen fuel categories from the
+legend, and hovers marks to raise tooltips carrying plant name, fuel type, capacity in MW and
+coordinates.
+
+![Primary Fuel Source Geolocator — global power plants by fuel type](primary_fuel_source_geolocator.gif)
+
+The animation above is a reduced capture: 760 px wide, 8 fps, 128 colours. The full-resolution
+source is `Primary Fuel Source Geolocator.mp4` (1336 × 714, 30 fps, 26 s) and the workbook itself is
+`Primary Fuel Source Geolocator.twb`, which needs Tableau to open. **Read no capacity or generation
+figure off the GIF** — it is dithered and downsampled, and the numbers in the tooltips are the
+dataset's estimates, not measurements taken here.
+
 ---
 
 ## Calibration and coupling
