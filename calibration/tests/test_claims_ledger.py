@@ -467,29 +467,44 @@ def test_no_module_defines_the_same_name_twice():
         f"the earlier definition never runs: {shadowed}")
 
 
-# STRUCTURAL, NOT A PHRASE LIST. The first version enumerated the six exact
-# sentences that had appeared, which cannot close a natural-language class: "the
-# remaining conclusions are unchanged" and "all other findings stand" are the
-# same prohibited claim and matched none of them. This matches the SHAPE --
-# a quantifier over the unnamed remainder, a plural subject, and a verb of
-# unchangedness -- while leaving the permitted singular scoped sentence alone.
+# STRUCTURAL AND POLARITY-AWARE, not a phrase list. Two earlier versions failed
+# in opposite directions, which is the useful part of the history:
+#
+#   1. An enumeration of the six sentences that had appeared could not close a
+#      natural-language class -- "the remaining conclusions are unchanged" is
+#      the same prohibited claim and matched none of them.
+#   2. Generalising to shape then over-matched: an unrestricted bridge crossed
+#      a negation, so "The remaining conclusions no longer hold" read as
+#      "...hold", and "Every other conclusion is affected" -- an explicit
+#      RETRACTION and a DISCLOSURE, the honest behaviours the rule wants --
+#      were both rejected as reassurances.
+#
+# So the verbs are split by the polarity of their subject. A positive
+# quantifier over the remainder ("all other findings") is reassuring only with
+# an unchangedness verb; a negative one ("nothing else") is reassuring only
+# with a change verb. The bridge refuses to cross a negation, so a retraction
+# cannot be read as its own opposite.
 #
 # WHAT IT STILL CANNOT DO. No regex closes a paraphrase class; a determined
-# rewording gets through. This is a tripwire for a reflex that has now recurred
-# three times, not a proof. The actual control is AGENTS.md rule 5 -- delete the
-# sentence, do not reword it -- and claiming otherwise here would itself be an
-# unchecked statement about scope, which is the defect being guarded against.
+# rewording gets through. This is a tripwire for a reflex that has recurred
+# three times, not a proof. The actual control is AGENTS.md rule 5 -- delete
+# the sentence, do not reword it -- and claiming more for the regex here would
+# itself be an unchecked statement about scope, which is the defect guarded.
+_POS_SUBJECT = (r"(?:all|every|the|any)\s+(?:other|remaining)\s+(?:\w+\s+){0,2}?"
+                r"(?:conclusions?|findings?|results?|numbers?|figures?|claims?|values?)"
+                r"|(?:the\s+)?(?:conclusions|findings|results|numbers|figures|claims)"
+                r"\s+themselves"
+                r"|the\s+rest\s+of\s+the\s+(?:conclusions?|findings?|results?|analysis|report)"
+                r"|everything\s+else")
+_POS_VERB = r"(?:unchanged|unaffected|stands?\b|holds?\b|survives?\b|remains?\s+valid)"
+_NEG_SUBJECT = r"(?:nothing\s+else|no\s+other\s+\w+|none\s+of\s+the\s+(?:other\s+)?\w+)"
+_NEG_VERB = r"(?:changes?\b|moved?\b|moves\b|(?:is|are|was|were)\s+affected)"
+# Tempered: consumes anything up to a clause end EXCEPT a negation.
+_BRIDGE = r"(?:(?!\bno\b|\bnot\b|\bnever\b|n't\b)[^.;]){0,45}?"
+
 BLANKET_REASSURANCE = re.compile(
-    r"(?:"
-    r"(?:all|every|the|any)\s+(?:other|remaining)\s+(?:\w+\s+){0,2}?"
-    r"(?:conclusions?|findings?|results?|numbers?|figures?|claims?|values?)"
-    r"|(?:the\s+)?(?:conclusions|findings|results|numbers|figures|claims)\s+themselves"
-    r"|nothing\s+else|everything\s+else|no\s+other\s+\w+"
-    r"|the\s+rest\s+of\s+the\s+(?:conclusions?|findings?|results?|analysis|report)"
-    r")"
-    r"[^.;]{0,45}?"
-    r"(?:unchanged|unaffected|stands?\b|holds?\b|is\s+affected|changes?\b|moved|survive)",
-    re.I)
+    rf"(?:(?:{_POS_SUBJECT}){_BRIDGE}{_POS_VERB})"
+    rf"|(?:{_NEG_SUBJECT}{_BRIDGE}{_NEG_VERB})", re.I)
 
 
 def blanket_reassurance_hits(text: str) -> list[str]:
@@ -617,6 +632,21 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
     ]
     for phrase in blanket:
         assert blanket_reassurance_hits(phrase), f"missed: {phrase}"
+
+    # RETRACTIONS AND DISCLOSURES SAY THE OPPOSITE and must never trip. An
+    # earlier version bridged straight over the negation, so "no longer hold"
+    # read as "hold" and the guard rejected a correction for being honest --
+    # the precise inversion of its purpose.
+    opposite = [
+        "The remaining conclusions no longer hold",
+        "Every other conclusion is affected",
+        "all other findings changed",
+        "the remaining numbers moved",
+        "every other result is not unchanged",
+    ]
+    for phrase in opposite:
+        assert not blanket_reassurance_hits(phrase), (
+            f"rejected a RETRACTION as if it were a reassurance: {phrase}")
 
     # THE PERMITTED FORM: one named finding, substantiated on the same line.
     # If these ever trip, the guard has started deleting honest scoped claims,
