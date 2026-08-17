@@ -490,6 +490,35 @@ def t_critical_999(df: int) -> float | None:
     return T_CRIT_999[max(below)] if below else None
 
 
+def resolve_output_dir(args, stopped_early):
+    """Where the tables go -- and the ONLY way to reach the canonical ones.
+
+    THE REFUSAL IS THE DOOR, not a sign next to it. Testing
+    `refuse_partial_publish` alone proves the predicate and not the wiring:
+    delete its call and every test stays green while `_report` reopens
+    data/calibration/ in write mode after a budget-exhausted run. Putting the
+    guard and the target in one function makes the canonical directory
+    unobtainable without passing it.
+    """
+    refuse_partial_publish(args.publish, stopped_early)
+    return (REPO / "data" / "calibration") if args.publish else args.outdir
+
+
+def distinguishable_from_zero(e2, se, m) -> bool:
+    """Whether the debiased squared effect clears its critical value.
+
+    `m` is the number of outer draws, so the test has `m - 1` degrees of
+    freedom and one draw has none. `t_critical_999` returns None there and this
+    returns False -- which is the whole point, and is why the two belong in one
+    function. Testing `t_critical_999(0) is None` proves the table; it does not
+    prove that the None reaches the verdict. Replacing the call site with the
+    old 3.09 fallback left every such test green while a one-draw scenario went
+    back to being reportable as significant.
+    """
+    crit = t_critical_999(int(m) - 1)
+    return bool(crit is not None and se > 0 and e2 > crit * se)
+
+
 def refuse_partial_publish(publish, stopped_early) -> None:
     """Refuse to overwrite the canonical tables with a run that did not finish.
 
@@ -688,8 +717,8 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
             v["n_outer_draws"] = int(m)
             v["t_versus_zero"] = e2 / se if se > 0 else None
             v["t_critical_0.999"] = crit
-            v["distinguishable_from_zero"] = bool(
-                crit is not None and se > 0 and e2 > crit * se)
+            v["distinguishable_from_zero"] = distinguishable_from_zero(
+                e2, se, m)
             # Kept because it is the right input to VarianceBudget.transport and
             # answers "would more histories help" — but it is a per-row spread,
             # not the standard error of anything reported here.
@@ -806,8 +835,7 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
     # publishing then replaces the complete evidence tables with partial rows --
     # the exact data loss the guard exists to prevent, arriving by a different
     # door.
-    refuse_partial_publish(args.publish, stopped_early)
-    data_dir = (REPO / "data" / "calibration") if args.publish else args.outdir
+    data_dir = resolve_output_dir(args, stopped_early)
     _write(data_dir / "openmc_effect_samples.csv",
            "# openmc_effect_samples — one row per transport replicate.\n"
            "# tier S0, target_calibration = false.\n"

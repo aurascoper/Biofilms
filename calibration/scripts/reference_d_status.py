@@ -25,6 +25,7 @@ import argparse
 import csv
 from datetime import date
 import dataclasses
+import re
 import sys
 from pathlib import Path
 
@@ -176,39 +177,85 @@ def authorization_criteria(baseline, sources=None, *, today=None):
     if not baseline:
         return [(c, False) for c in AUTHORIZATION_CRITERIA]
     found = approval.problems(baseline, sources or [], today=today)
-    text = " ".join(found)
-    patterns = {
-        1: ("strain_identities",),
-        2: ("approval_scope_hash is unset",),
-        3: ("containment_facility",),
-        4: ("risk_assessment_reference",),
-        5: ("institutional_approval_id", "institutional_approval_authority"),
-        6: ("does not match the conditions", "approved_protocol_version"),
-        # A BARE "is unset" MATCHED THE WRONG REFUSALS. `approval.problems`
-        # emits "<field> is unset" for the three dates, but also
-        # "approval_source_id is unset" and "approval_scope_hash is unset" --
-        # so an approval with no registered document reported criterion 7,
-        # about DATES, as its blocker while criterion 8, about provenance,
-        # stayed green. Being told the wrong thing is wrong is worse than
-        # being told nothing: it sends whoever reads the milestone to fix a
-        # date that was never the problem. Name the three date fields.
-        7: ("must precede culturing", "expired", "is not an ISO date",
-            "approval_effective_date is unset",
-            "approval_expiration_date is unset",
-            "culturing_start_date is unset"),
-        8: ("does not resolve", "not an approval",
-            "neither a locator nor a digest",
-            "approval_source_id is unset"),
-        9: ("is not the target system",),
-    }
-    met = {i: not any(k in text for k in keys) for i, keys in patterns.items()}
 
-    # A refusal nobody mapped is not an absence of refusal. Anything the
-    # patterns above missed fails criterion 6 -- the scope criterion, because an
-    # unrecognised problem means the approval's scope is not established -- and
-    # is named, so the gap gets closed rather than absorbed.
-    unmapped = [p for p in found
-                if not any(k in p for keys in patterns.values() for k in keys)]
+    # CLASSIFY EACH PROBLEM, DO NOT SUBSTRING THE CONCATENATION. Every message
+    # is "growth condition <id>: <field> ..." or a cross-field sentence, and
+    # matching patterns against `" ".join(found)` let ANY FIELD VALUE
+    # manufacture a blocker: `approval_source_id = "expired"` produced a
+    # provenance-only refusal, whose text echoed the value, and criterion 7 --
+    # about dates -- fired on the word. So a bad identifier could report a date
+    # problem that did not exist, on an institutional biosafety milestone.
+    #
+    # A message that names a field belongs to that field's criterion. Only the
+    # sentences that name no field are matched by phrase, and those phrases are
+    # checked against the single message rather than the whole text.
+    field_criterion = {
+        "strain_identities": 1,
+        "biosafety_level_by_strain": 1,
+        "approval_scope_hash": 2,
+        "containment_facility": 3,
+        "risk_assessment_reference": 4,
+        "institutional_approval_id": 5,
+        "institutional_approval_authority": 5,
+        "approved_protocol_version": 6,
+        "approval_effective_date": 7,
+        "approval_expiration_date": 7,
+        "culturing_start_date": 7,
+        "approval_source_id": 8,
+        "is_target_system": 9,
+    }
+    # Sentences that describe a RELATION between fields and so name none of
+    # them as their subject.
+    phrase_criterion = (
+        ("does not match the conditions", 6),
+        ("culturing started", 7),
+        ("the approval expired", 7),
+        ("approval expires", 7),
+        ("approval document", 8),
+        ("is not the target system", 9),
+    )
+
+    def _criterion_of(problem: str) -> int | None:
+        # Strip the "growth condition '<id>'" prefix STRUCTURALLY rather than by
+        # splitting on the first colon: one message reads "growth condition
+        # 'GC1' is not the target system: ..." and puts its colon after the
+        # clause, so a colon split would hand back the explanation instead.
+        body = re.sub(r"^growth condition '[^']*':?\s*", "", problem)
+        # The field name, when there is one, is the first token of the body --
+        # and it is checked FIRST, so a message that names a field can never be
+        # reclassified by a value echoed later in the same sentence.
+        # ONE FIELD, TWO DIFFERENT FAILURES. `approval_scope_hash` unset means
+        # nothing binds the row -- the conditions are not frozen, criterion 2.
+        # `approval_scope_hash does not match` means the approval no longer
+        # describes the row -- the scope does not cover it, criterion 6. Same
+        # field, different criteria, so the message decides. The phrase is a
+        # whole clause rather than a word, which is what keeps an echoed field
+        # value from reaching it.
+        if "does not match the conditions" in body:
+            return 6
+        head = body.split(" ", 1)[0].strip("'\",")
+        if head in field_criterion:
+            return field_criterion[head]
+        for phrase, number in phrase_criterion:
+            if phrase in body:
+                return number
+        return None
+
+    unmet_numbers, unmapped = set(), []
+    for problem in found:
+        number = _criterion_of(problem)
+        if number is None:
+            unmapped.append(problem)
+        else:
+            unmet_numbers.add(number)
+
+    met = {i: i not in unmet_numbers
+           for i in range(1, len(AUTHORIZATION_CRITERIA) + 1)}
+
+    # A refusal nobody classified is not an absence of refusal. It fails
+    # criterion 6 -- the scope criterion, because an unrecognised problem means
+    # the approval's scope is not established -- and is NAMED, so the gap gets
+    # closed rather than absorbed.
     if unmapped:
         met[6] = False
 

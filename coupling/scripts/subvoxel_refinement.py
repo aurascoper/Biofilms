@@ -208,6 +208,20 @@ def main(argv=None) -> int:
                          "ratio is already in memory here")
     args = ap.parse_args(argv)
 
+    # REFUSE BEFORE THE IMPORT, not after it. This validation used to sit below
+    # `import openmc` and below `load_snapshot`, so a bad ratio was discovered
+    # only once the heavy stack was up -- and, in the bare tier, not at all,
+    # because the import fails first and the refusal is never reached. Parsing
+    # the ratios needs nothing but the argument string, so it happens here and
+    # the ordering is what makes the guard cheap.
+    #
+    # Sorted so ratio 1 runs first: it defines the common Omega_b that every
+    # finer ratio is then evaluated on.
+    ratios = sorted({int(r) for r in args.ratios.split(",")})
+    if ratios[0] != 1:
+        raise SystemExit("ratio 1 is the reference grid and must be included")
+    refuse_non_divisor_ratios(ratios)
+
     import openmc
 
     from biofilm_openmc.model import build_biofilm_cylinder_model
@@ -218,12 +232,6 @@ def main(argv=None) -> int:
                                  kind=BIOFILM_CYLINDER)
     snapshot = load_snapshot(args.snapshot)
     n = snapshot.cell_id.shape[0]
-    # Sorted so ratio 1 runs first: it defines the common Omega_b that every
-    # finer ratio is then evaluated on.
-    ratios = sorted({int(r) for r in args.ratios.split(",")})
-    if ratios[0] != 1:
-        raise SystemExit("ratio 1 is the reference grid and must be included")
-    refuse_non_divisor_ratios(ratios)
 
     started = time.perf_counter()
     runs = total_histories = statepoint_bytes = 0

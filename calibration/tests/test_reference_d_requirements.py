@@ -256,6 +256,15 @@ def test_criteria_with_no_consumer_are_named(requirements):
     ({"approval_effective_date": ""},     7, (8,)),  # an actual date
     ({"approval_expiration_date": ""},    7, (8,)),
     ({"culturing_start_date": ""},        7, (8,)),
+    # AN IDENTIFIER MUST NOT BE ABLE TO MANUFACTURE A DATE BLOCKER. These
+    # values are unresolvable source ids and nothing more; the refusal echoes
+    # them, and a substring match on the concatenated text made criterion 7
+    # fire on the word inside somebody's identifier.
+    ({"approval_source_id": "expired"},   8, (7,)),
+    ({"approval_source_id": "not-an-ISO-date"}, 8, (7,)),
+    ({"strain_identities": "unknown"},    1, (7, 8)),
+    ({"containment_facility": "TBD"},     3, (7, 8)),
+    ({"is_target_system": "false"},       9, (7, 8)),
 ])
 def test_an_unset_field_blames_the_criterion_it_actually_belongs_to(
         kwargs, expect_number, must_stay_met):
@@ -291,3 +300,24 @@ def test_an_unset_field_blames_the_criterion_it_actually_belongs_to(
         assert not any(c.startswith(f"{number}.") for c in unmet), (
             f"criterion {number} is reported unmet, but {kwargs} has nothing to "
             f"do with it; blockers were: {unmet}")
+
+
+def test_the_two_ways_a_scope_hash_can_fail_are_different_criteria():
+    """ONE FIELD, TWO FAILURES, and they are not the same problem.
+
+    An UNSET `approval_scope_hash` means nothing binds the approval to this row
+    — the conditions are not frozen, criterion 2. A hash that DOES NOT MATCH
+    means someone edited a growth condition after approval, so the approval no
+    longer describes what it covers — criterion 6. Reporting either as the
+    other sends a reader to the wrong remedy.
+    """
+    from test_approval import SOURCES, TODAY, row
+
+    def blockers(r):
+        return [c.split(".")[0] for c, ok in status.authorization_criteria(
+            [r], SOURCES, today=TODAY) if not ok]
+
+    edited = row()
+    edited["temperature_C"] = "37"          # approved at 30
+    assert blockers(edited) == ["6"]
+    assert blockers(row(scope_hash=" ")) == ["2"]

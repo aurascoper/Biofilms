@@ -225,3 +225,96 @@ def test_a_ratio_that_cannot_share_the_mass_denominator_is_refused(
     else:
         with pytest.raises(SystemExit, match="do not divide the finest"):
             refinement.refuse_non_divisor_ratios(ratios)
+
+
+# ------------------------- the guards, reached the way production reaches them
+
+def test_the_canonical_tables_are_unreachable_after_a_partial_run(tmp_path):
+    """THE REFUSAL IS THE DOOR, not a sign beside it.
+
+    `refuse_partial_publish` alone proves the predicate, not the wiring: delete
+    its call and every helper-level test stays green while `_report` reopens
+    data/calibration/ in write mode after a budget-exhausted run. So ask the
+    question production asks — "where do the tables go?" — and require that the
+    canonical answer cannot be obtained without passing the guard.
+    """
+    from types import SimpleNamespace
+
+    canonical = pilot.REPO / "data" / "calibration"
+
+    with pytest.raises(SystemExit, match="stopped early"):
+        pilot.resolve_output_dir(
+            SimpleNamespace(publish=True, outdir=tmp_path),
+            "budget exhausted before scenario 3")
+
+    # the same run without --publish is fine, and goes somewhere harmless
+    assert pilot.resolve_output_dir(
+        SimpleNamespace(publish=False, outdir=tmp_path),
+        "budget exhausted before scenario 3") == tmp_path
+    # and a COMPLETE run may publish, or the guard would make the pilot useless
+    assert pilot.resolve_output_dir(
+        SimpleNamespace(publish=True, outdir=tmp_path), None) == canonical
+
+
+@pytest.mark.parametrize("m,e2,se,expected", [
+    (1, 10.0, 0.001, False),   # one outer draw: no degrees of freedom at all
+    (0, 10.0, 0.001, False),
+    (2, 10.0, 0.001, True),    # df 1, crit 318.3, and 10/0.001 clears it
+    (2, 10.0, 1.0,   False),   # df 1: 10 does NOT clear 318.3
+    (31, 10.0, 1.0,  True),    # df 30, crit 3.385
+    (31, 10.0, 0.0,  False),   # zero standard error is not infinite confidence
+])
+def test_the_verdict_itself_refuses_when_there_are_no_degrees_of_freedom(
+        m, e2, se, expected):
+    """`t_critical_999(0) is None` proves the table. It does NOT prove the None
+    reaches the verdict — swapping the call site back to the 3.09 fallback left
+    every table-level test green while a one-draw scenario became reportable as
+    significant again.
+
+    The row at m=2, se=1.0 is the one that matters most: it FAILS, because at
+    one degree of freedom the critical value is 318.3 rather than 3.09. If the
+    normal fallback ever returns, that row flips to True.
+    """
+    assert pilot.distinguishable_from_zero(e2, se, m) is expected
+
+
+@pytest.mark.parametrize("ratios,message", [
+    ("1,3,4", "do not divide the finest"),
+    ("1,4,6", "do not divide the finest"),
+    ("2,4",   "ratio 1 is the reference grid"),
+])
+def test_main_refuses_a_bad_ratio_before_it_imports_openmc(
+        ratios, message, tmp_path):
+    """THE WIRING AND THE ORDERING, not just the predicate.
+
+    `refuse_non_divisor_ratios` alone proves the rule; delete its call from
+    `main()` and the suite stays green while the run proceeds to the finest-grid
+    raytrace and only then combines incompatible mass and tally shapes.
+
+    The check sat BELOW `import openmc` and below `load_snapshot`, so it fired
+    once the heavy stack was already up — and never at all in this tier, since
+    the import fails first. Moving it above the import is what makes the
+    refusal cheap, and this test is what proves it moved: openmc is not
+    installed here, so reaching the import at all raises ModuleNotFoundError
+    rather than SystemExit. The paths below do not exist either, for the same
+    reason — nothing may be opened before the ratios are judged.
+    """
+    with pytest.raises(SystemExit, match=message):
+        refinement.main(["--snapshot", str(tmp_path / "nope.h5"),
+                         "--config", str(tmp_path / "nope.toml"),
+                         "--outdir", str(tmp_path / "out"),
+                         "--ratios", ratios])
+    assert not (tmp_path / "out").exists(), (
+        "main() created its output directory before judging the ratios")
+
+
+def test_main_accepts_the_ladder_the_study_actually_runs(tmp_path):
+    """The control that keeps the one above honest: `1,2,4` must get PAST the
+    ratio check. A guard that refused every ladder would satisfy every test in
+    this file and make the study unrunnable — so require the refusal to end and
+    the next stage to begin, which here is the missing openmc stack."""
+    with pytest.raises((ModuleNotFoundError, ImportError, FileNotFoundError)):
+        refinement.main(["--snapshot", str(tmp_path / "nope.h5"),
+                         "--config", str(tmp_path / "nope.toml"),
+                         "--outdir", str(tmp_path / "out"),
+                         "--ratios", "1,2,4"])

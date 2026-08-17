@@ -98,7 +98,15 @@ JSON
 # Page one: nothing but a RESOLVED thread. Page two: the open P1.
 page true  '[{"isResolved":true,"isOutdated":false,"path":"p1.py","line":1,
              "comments":{"nodes":[{"author":{"login":"x"},"body":"resolved","url":"u"}]}}]'
-if [[ "$*" == *--paginate* ]]; then
+# THE FAKE ENFORCES THE REAL CONTRACT, or it tests nothing. `gh api --paginate`
+# only walks a GraphQL connection when the query declares an `$endCursor:
+# String` variable AND selects `pageInfo { hasNextPage endCursor }`. A fake
+# that emitted page two on the flag alone would stay green after either element
+# was deleted, while real pagination silently stopped -- which is the same
+# fail-open shape the pagination fix existed to close.
+if [[ "$*" == *--paginate* ]] \
+   && [[ "$*" == *'$endCursor'* ]] \
+   && [[ "$*" == *hasNextPage* ]] && [[ "$*" == *endCursor* ]]; then
   page false '[{"isResolved":false,"isOutdated":false,"path":"page2.py","line":9,
                 "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
                 "body":"![P1 Badge](x) only visible on page two","url":"u"}]}}]'
