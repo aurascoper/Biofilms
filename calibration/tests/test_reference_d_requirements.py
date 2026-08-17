@@ -326,3 +326,29 @@ def test_the_two_ways_a_scope_hash_can_fail_are_different_criteria():
     edited["temperature_C"] = "37"          # approved at 30
     assert blockers(edited) == ["6"]
     assert blockers(row(scope_hash=" ")) == ["2"]
+
+
+@pytest.mark.parametrize("gid", ["GC1", "O'Brien-1", 'a"b', "GC 1", "R2A/30C"])
+def test_the_condition_id_cannot_change_which_criterion_is_blamed(gid):
+    """THE IDENTIFIER IS DATA. It must not steer the checklist.
+
+    `approval.problems` formats the id with `!r`, and Python switches to double
+    quotes when the value contains an apostrophe — so an ordinary condition id
+    like `O'Brien-1` produced a prefix the classifier's regex could not strip.
+    The head became the word "condition", nothing matched, and an unset source
+    id was reported as a scope failure plus an UNMAPPED refusal.
+
+    Whether a growth condition happens to be named after someone Irish is not a
+    fact about its biosafety approval.
+    """
+    from test_approval import SOURCES, TODAY, row
+
+    def blockers(**kw):
+        return [c.split(".")[0] for c, ok in status.authorization_criteria(
+            [row(growth_condition_id=gid, **kw)], SOURCES, today=TODAY)
+            if not ok]
+
+    assert blockers(approval_source_id="") == ["8"]
+    assert blockers(approval_effective_date="") == ["7"]
+    assert blockers(strain_identities="unknown") == ["1"]
+    assert blockers() == []

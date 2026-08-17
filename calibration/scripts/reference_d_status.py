@@ -220,7 +220,15 @@ def authorization_criteria(baseline, sources=None, *, today=None):
         # splitting on the first colon: one message reads "growth condition
         # 'GC1' is not the target system: ..." and puts its colon after the
         # clause, so a colon split would hand back the explanation instead.
-        body = re.sub(r"^growth condition '[^']*':?\s*", "", problem)
+        # BOTH REPR QUOTE STYLES. `approval.problems` formats the id with !r,
+        # and Python switches to double quotes when the value contains an
+        # apostrophe -- so a perfectly ordinary condition id like "O'Brien-1"
+        # produced a prefix this regex could not strip, the head became
+        # "condition", nothing classified, and an unset source id was reported
+        # as a scope failure plus an UNMAPPED refusal. The id is data; it must
+        # not be able to change which criterion a message lands on.
+        body = re.sub(r"""^growth condition (?:'[^']*'|"[^"]*"):?\s*""",
+                      "", problem)
         # The field name, when there is one, is the first token of the body --
         # and it is checked FIRST, so a message that names a field can never be
         # reclassified by a value echoed later in the same sentence.
