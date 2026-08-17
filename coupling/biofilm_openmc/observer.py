@@ -339,10 +339,29 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
         elif layer.colour_by == "species":
             data, _ = read_layer(path, layer_name)
             legend = species_legend(data)
-            cmap, clim = species_palette(legend)
-            p.add_mesh(occupied, scalars=layer_name, show_scalar_bar=False,
-                       cmap=cmap, clim=clim)
-            p.add_legend([(label, colour) for _, label, colour in legend])
+            if not legend:
+                # Occupied cells, none of them a species this palette names.
+                p.add_text(f"{layer_name}: no valid species ids",
+                           position="lower_left", font_size=9)
+            else:
+                # WHAT IS DRAWN MUST BE WHAT THE LEGEND DESCRIBES.
+                # `species_legend` drops an out-of-range label -- 9, when there
+                # are seven species -- but the occupied dataset still held that
+                # cell, so it rendered in whatever colour its value landed on
+                # with nothing in the key to explain it. A viewer showing an
+                # organism it cannot name is worse than one showing fewer
+                # cells: the reader counts it.
+                #
+                # The legend's own span is the valid range by construction, so
+                # thresholding to it drops exactly the labels the legend
+                # dropped, and nothing else.
+                lo = min(i for i, _, _ in legend)
+                hi = max(i for i, _, _ in legend)
+                drawn = occupied.threshold((lo, hi), scalars=layer_name)
+                cmap, clim = species_palette(legend)
+                p.add_mesh(drawn, scalars=layer_name, show_scalar_bar=False,
+                           cmap=cmap, clim=clim)
+                p.add_legend([(label, colour) for _, label, colour in legend])
         else:
             p.add_mesh(occupied, scalars=layer_name,
                        scalar_bar_args={"title": title})

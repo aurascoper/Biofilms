@@ -673,3 +673,44 @@ def test_a_declared_background_still_survives_the_round_trip(tmp_path):
     layer = {l.name: l for l in display_plan(observer.read_manifest(path))}["cell_id"]
     assert layer.background == 0
     assert isinstance(layer.background, float), type(layer.background)
+
+
+@_needs_pyvista
+def test_an_out_of_range_species_id_is_not_drawn_either(tmp_path):
+    """WHAT IS DRAWN MUST BE WHAT THE LEGEND DESCRIBES.
+
+    `species_legend` drops a label outside 1..7, and a bare-tier test already
+    asserted that. But `plot_layer` passed the whole occupied dataset to
+    `add_mesh`, so the cell was still rendered — in whatever colour its value
+    landed on, with nothing in the key to explain it. The legend test and the
+    picture disagreed, and only the legend was checked.
+
+    A viewer showing an organism it cannot name is worse than one showing fewer
+    cells, because the reader counts it.
+    """
+    field = np.zeros((4, 4, 4), np.int32)
+    field[0, 0, 0] = 2      # a real species
+    field[1, 1, 1] = 9      # not one of the seven
+    path = tmp_path / "species.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("species_id", "cpm_labels", "dimensionless",
+                        "categorical", field, background=0)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+
+    assert [i for i, _, _ in species_legend(field)] == [2], "legend still filters"
+
+    plotter = observer.plot_layer(path, "species_id")
+    drawn = [m for m in plotter.renderer.actors]
+    assert drawn, "something must be rendered"
+    # the rendered dataset must hold ONE cell — the species-2 one — not two
+    meshes = [a.mapper.dataset for a in plotter.renderer.actors.values()
+              if getattr(a, "mapper", None) is not None
+              and getattr(a.mapper, "dataset", None) is not None
+              and a.mapper.dataset.n_cells]
+    total = sum(m.n_cells for m in meshes)
+    assert total == 1, (
+        f"{total} cells rendered; the out-of-range label 9 is still drawn "
+        "even though the legend cannot name it")
