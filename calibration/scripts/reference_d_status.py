@@ -25,7 +25,6 @@ import argparse
 import csv
 from datetime import date
 import dataclasses
-import re
 import sys
 from pathlib import Path
 
