@@ -507,6 +507,16 @@ BLANKET_REASSURANCE = re.compile(
     rf"|(?:{_NEG_SUBJECT}{_BRIDGE}{_NEG_VERB})", re.I)
 
 
+# A negation BEFORE the subject, which no lookbehind can catch here: Python's
+# `re` requires fixed-width lookbehind and these prefixes are not. "Not all
+# other findings hold" and "None of the other conclusions remain unchanged" are
+# retractions, and the pattern starts at the subject, so it never sees the word
+# that reverses them. Checked against the preceding CLAUSE only -- back to the
+# last sentence or clause boundary -- so an unrelated "not" in a previous
+# sentence cannot excuse a genuine reassurance.
+_NEGATION_BEFORE = re.compile(r"\b(?:not|no|never|none|nor|cannot|n't)\b", re.I)
+
+
 def blanket_reassurance_hits(text: str) -> list[str]:
     """Every blanket-reassurance phrase in `text`.
 
@@ -516,7 +526,14 @@ def blanket_reassurance_hits(text: str) -> list[str]:
     place the phrase actually survived, twice -- unscanned by the production
     path while the regex controls passed.
     """
-    return [m.group(0) for m in BLANKET_REASSURANCE.finditer(text or "")]
+    hits = []
+    for match in BLANKET_REASSURANCE.finditer(text or ""):
+        clause = (text[:match.start()]
+                  .rsplit(".", 1)[-1].rsplit(";", 1)[-1].rsplit("\n", 1)[-1])
+        if _NEGATION_BEFORE.search(clause):
+            continue        # a retraction, not a reassurance
+        hits.append(match.group(0))
+    return hits
 
 
 # The documents that carry marked corrections. Scanned as a directory rather
@@ -629,6 +646,11 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
         "nothing else is affected",
         "nothing else changes",
         "everything else stands",
+        # AND THE BOUNDARY CASE THE PREFIX FILTER MUST NOT SWALLOW: a negation
+        # in a PREVIOUS sentence says nothing about this one, so the clause
+        # scan stops at the sentence break. Otherwise any correction that used
+        # the word "not" anywhere earlier would get a free pass.
+        "This is not a measurement. All other findings stand.",
     ]
     for phrase in blanket:
         assert blanket_reassurance_hits(phrase), f"missed: {phrase}"
@@ -643,6 +665,12 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
         "all other findings changed",
         "the remaining numbers moved",
         "every other result is not unchanged",
+        # NEGATION BEFORE THE SUBJECT, which the pattern cannot see because it
+        # starts AT the subject. Python's `re` has no variable-width lookbehind,
+        # so these are filtered by inspecting the preceding clause instead.
+        "Not all other findings hold",
+        "None of the other conclusions remain unchanged",
+        "no other findings remain unchanged",
     ]
     for phrase in opposite:
         assert not blanket_reassurance_hits(phrase), (

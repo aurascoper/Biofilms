@@ -52,6 +52,9 @@ query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
       reviews(last:20) {
         nodes { author { login } submittedAt body }
       }
+      comments(last:30) {
+        nodes { author { login } createdAt body }
+      }
       reviewThreads(first:100, after:$endCursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -79,11 +82,23 @@ fail=0
 # ---- 1. has the current head actually been reviewed? -----------------------
 # Codex states "Reviewed commit: `<sha>`" in its review body. A review of an
 # older commit is not evidence about this one.
+# CODEX POSTS FINDINGS TWO WAYS and this gate only read one of them. A formal
+# review states "Reviewed commit: `<sha>`"; a COMMENT-form review carries the
+# sha inside a blob permalink instead. When the newest pass arrived as a
+# comment, the gate reported a stale review and "no unresolved threads" while a
+# live P2 finding sat in that comment -- a fail-open, and the fifth one found
+# in this script. Take whichever surface is NEWER.
 reviewed="$(jq -r '
-  [ .reviews.nodes[]
-    | select(.author.login == "chatgpt-codex-connector")
-    | .body ] | last // ""
-  | capture("Reviewed commit:\\*{0,2}\\s*`?(?<sha>[0-9a-f]{7,40})`?").sha // ""
+  ( [ .reviews.nodes[]
+      | select(.author.login == "chatgpt-codex-connector")
+      | {at: .submittedAt, body: .body} ]
+    + [ (.comments.nodes // [])[]
+      | select(.author.login == "chatgpt-codex-connector")
+      | {at: .createdAt, body: .body} ] )
+  | sort_by(.at) | last // {body:""} | .body
+  | ( capture("Reviewed commit:\\*{0,2}\\s*`?(?<sha>[0-9a-f]{7,40})`?").sha
+      // capture("/blob/(?<sha>[0-9a-f]{7,40})/").sha
+      // "" )
 ' <<<"$PRJ" 2>/dev/null || echo "")"
 
 if [[ -z "$reviewed" ]]; then
@@ -97,6 +112,42 @@ elif [[ "${HEAD:0:${#reviewed}}" != "$reviewed" ]]; then
   fail=1
 else
   printf '  Codex reviewed %s — current.\n' "${reviewed:0:10}"
+fi
+
+# ---- 1b. findings that arrived as a COMMENT, not a thread -------------------
+# These carry no resolved state, so they block only while they name the CURRENT
+# head: push a fix and the comment describes older code, exactly as a stale
+# review does. That terminates, and it cannot be cleared by ignoring it.
+# NO 2>/dev/null HERE. Swallowing a jq error turns a broken query into a clean
+# bill of health: the first version of this block mis-scoped `.` inside
+# startswith(), jq failed on every comment, the error went to /dev/null and the
+# gate printed "Clear to merge" over a live P2. A query that cannot run is an
+# unknown, not an all-clear, so the failure is fatal here.
+if ! comment_findings="$(jq -r --arg head "$HEAD" '
+  (.comments.nodes // [])[]
+  | select(.author.login == "chatgpt-codex-connector")
+  | select(.body | test("/blob/[0-9a-f]{7,40}/[^)]*#L[0-9]"))
+  | (.body | capture("/blob/(?<s>[0-9a-f]{7,40})/").s) as $sha
+  | select($head | startswith($sha))
+  | .body as $b
+  | [ $b | scan("</sub></sub>\\s*([^*\n]+)") ] | flatten
+  | to_entries[]
+  | ( ([ $b | scan("badge/(P[0-9])-") ] | flatten)[.key] // "COMMENT" )
+    + "\t" + (.value | sub("^\\s+";"") | sub("\\s+$";""))
+' <<<"$PRJ")"; then
+  printf '  COULD NOT READ COMMENT-FORM FINDINGS: the query failed.\n'
+  printf '  Treating that as unknown, not as clean.\n'
+  exit 1
+fi
+
+if [[ -n "$comment_findings" ]]; then
+  printf '\n  CODEX POSTED FINDINGS AS A COMMENT on this head, not as review\n'
+  printf '  threads. They have no resolve button; fix them and push.\n\n'
+  while IFS=$'\t' read -r sev title; do
+    [[ -z "$title" ]] && continue
+    printf '  OPEN  %-8s (comment, no thread) %s\n' "$sev" "$title"
+    fail=1
+  done <<<"$comment_findings"
 fi
 
 # ---- 2. unresolved threads, by severity ------------------------------------

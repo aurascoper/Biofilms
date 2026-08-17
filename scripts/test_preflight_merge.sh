@@ -28,6 +28,7 @@ check() {
   "reviews":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
     "submittedAt":"2026-08-16T00:00:00Z",
     "body":"### Codex Review\n\n**Reviewed commit:** \`$reviewed\`\n"}]},
+  "comments":{"nodes":[]},
   "reviewThreads":{"nodes":$threads}
 }}}}
 JSON
@@ -127,6 +128,63 @@ else
   printf '  FAIL  page-two thread not seen: exit %s\n' "$got"
   sed 's/^/        | /' <<<"$out"
   fail=1
+fi
+
+# ---------------------------------------------------------------------------
+# COMMENT-FORM REVIEWS. Codex posts findings two ways: a formal review, and an
+# issue comment carrying the sha in a blob permalink. The gate read only
+# reviews, so when the newest pass arrived as a comment it reported a stale
+# review and "no unresolved threads" -- while a live P2 sat in that comment.
+printf '\n  comment-form findings — the surface the gate was blind to\n  %s\n' \
+       "──────────────────────────────────────────"
+
+BODY='### Codex Review\n\nhttps://github.com/o/r/blob/'"$HEAD_SHA"'/f.py#L505-L507\n**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Account for negation before the positive subject**\n\nDetail.'
+
+comment_fixture() {  # $1 = comment body JSON string, $2 = reviews nodes
+  cat >"$TMP/fixture.json" <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"fixture","headRefOid":"$HEAD_SHA",
+  "reviews":{"nodes":$2},
+  "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+    "createdAt":"2026-08-17T18:00:00Z","body":$1}]},
+  "reviewThreads":{"nodes":[]}
+}}}}
+JSON
+  PREFLIGHT_FIXTURE="$TMP/fixture.json" "$GATE" 1 >"$TMP/out" 2>&1
+}
+
+# A comment naming the CURRENT head, with a finding -> must block, and must
+# name the finding rather than merely refusing.
+comment_fixture "$(jq -Rn --arg b "$(printf '%b' "$BODY")" '$b')" "[]"
+got=$?
+if [[ "$got" == 1 ]] && grep -q "Account for negation" "$TMP/out"; then
+  printf '  ok    a comment-form finding on the head blocks, and is named\n'
+else
+  printf '  FAIL  comment-form finding not surfaced (exit %s)\n' "$got"
+  sed 's/^/        | /' "$TMP/out"; fail=1
+fi
+
+# THE SAME COMMENT ON AN OLD SHA must NOT block: pushing a fix is what clears
+# it, exactly as with a stale review. Otherwise the gate never terminates.
+OLDBODY=${BODY//$HEAD_SHA/0000000000}
+comment_fixture "$(jq -Rn --arg b "$(printf '%b' "$OLDBODY")" '$b')" \
+  '[{"author":{"login":"chatgpt-codex-connector"},"submittedAt":"2026-08-17T18:01:00Z","body":"**Reviewed commit:** `'"$HEAD_SHA"'`"}]'
+got=$?
+if [[ "$got" == 0 ]]; then
+  printf '  ok    the same finding on an older sha no longer blocks\n'
+else
+  printf '  FAIL  a superseded comment still blocks (exit %s)\n' "$got"
+  sed 's/^/        | /' "$TMP/out"; fail=1
+fi
+
+# STALENESS MUST READ THE COMMENT TOO. A comment-only pass on the current head
+# is not a stale review; before the fix the gate called it one.
+comment_fixture "$(jq -Rn --arg b "$(printf '%b' "$BODY")" '$b')" "[]"
+if grep -q "STALE REVIEW" "$TMP/out"; then
+  printf '  FAIL  a current comment-form review was reported as stale\n'
+  sed 's/^/        | /' "$TMP/out"; fail=1
+else
+  printf '  ok    a comment-form review counts as covering the head\n'
 fi
 
 printf '  %s\n' "──────────────────────────────────────────"
