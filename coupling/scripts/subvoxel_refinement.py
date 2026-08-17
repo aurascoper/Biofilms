@@ -143,13 +143,14 @@ def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
 
     labels = [
         Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
-              snapshot.cell_id.astype(np.int32),
+              snapshot.cell_id.astype(np.int32), background=0,
               note="a computational biomass PARCEL id, never an organism"),
         Layer("lineage_id", "cpm_labels", "dimensionless", "categorical",
-              snapshot.lineage_id.astype(np.int32)),
+              snapshot.lineage_id.astype(np.int32), background=0),
         Layer("generation", "cpm_labels", "dimensionless", "categorical",
-              snapshot.generation.astype(np.int32),
-              note="generation 0 is a founder, not a missing value"),
+              snapshot.generation.astype(np.int32), background=None,
+              note="generation 0 is a founder, not a missing value, so this "
+                   "layer declares NO background and must be drawn in full"),
         Layer("omega_b", "cpm_labels", "dimensionless", "boolean",
               np.asarray(common_mask, dtype=bool), derivation=None,
               note="the metric's region: biomass volume fraction >= 0.5, "

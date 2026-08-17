@@ -87,6 +87,45 @@ def test_pyvista_is_imported_function_locally_only():
     assert "    import pyvista as pv" in src
 
 
+def test_every_global_the_render_path_uses_actually_resolves():
+    """THE BARE TIER MUST STILL BE ABLE TO FAIL ON THE RENDER PATH.
+
+    `plot_layer` shipped referencing CATEGORICAL and BOOLEAN, which live in
+    viewer.py and were never imported here. Every call on a machine with a
+    renderer raised NameError on the first line of the branch. Nothing caught
+    it: pyvista is absent from CI and from the dev environment, so all eight
+    render tests SKIPPED and the suite reported green over a dead function.
+
+    "8 skipped" is not a neutral line in a test report — it is the uncovered
+    surface, and this is the check that covers the part of it that needs no
+    renderer. Name resolution is decidable statically, so it is checked
+    statically.
+    """
+    import builtins
+
+    for fn in (observer.plot_layer, observer.to_image_data,
+               observer.species_legend, observer.display_plan,
+               observer.grid_geometry, observer.provenance_panel):
+        unresolved = [name for name in fn.__code__.co_names
+                      if name not in vars(observer)
+                      and not hasattr(builtins, name)
+                      # attribute access shares co_names with global lookups;
+                      # `pv.Plotter` puts "Plotter" here. Locals are the import
+                      # site for those, so anything bound locally is fine.
+                      and name not in fn.__code__.co_varnames]
+        # Attribute names on objects are indistinguishable from globals in
+        # co_names, so this cannot be a bare emptiness assert. What it CAN do is
+        # require that no unresolved name is one the module also uses as a
+        # module-level constant elsewhere -- which is exactly the CATEGORICAL
+        # case. Cross-check against the names viewer.py exports.
+        from biofilm_openmc import viewer
+        leaked = [n for n in unresolved
+                  if n.isupper() and hasattr(viewer, n)]
+        assert not leaked, (
+            f"{fn.__name__} uses {leaked} from viewer.py without importing "
+            "them; this raises NameError wherever the code actually runs")
+
+
 # --------------------------------------------------------- what it must say
 
 def test_a_non_quotable_layer_carries_a_banner_naming_the_mechanism():

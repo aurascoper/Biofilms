@@ -156,3 +156,47 @@ def test_a_pitch_that_does_not_tile_the_extent_is_refused():
         B = spheres.rasterize(pitch)
         for n, extent in zip(B.shape, spheres.extent_um):
             assert n * pitch == pytest.approx(extent)
+
+
+def test_the_default_ladder_actually_exercises_the_skip_it_promises():
+    """A REFUSAL THAT IS NEVER REACHED IS NOT A REFUSAL.
+
+    The first correction for the non-tiling pitch removed 3.2 from the default
+    `--pitches` instead of letting the ladder refuse it. That is a different
+    thing and it lost two properties at once: 3.2 tiles the SLAB and its
+    axis-aligned control row vanished, and `run_ladder` only emits a `skipped`
+    row for a pitch it is handed, so the documented promise that the ladder
+    "names the pitch it skipped" became unreachable in the very commit that
+    made it. A pitch absent from the list looks exactly like a pitch nobody
+    tried.
+
+    So this asserts against the DEFAULT the script ships, not against a tuple
+    written here.
+    """
+    import re
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    # Read the shipped default out of the source rather than restating it: a
+    # copy here would keep passing after someone edited the script.
+    src = Path(rl.__file__).read_text(encoding="utf-8")
+    match = re.search(r'--pitches",\s*default="([^"]+)"', src)
+    assert match, "the ladder no longer declares a default pitch list"
+    pitches = [float(p) for p in match.group(1).split(",")]
+    assert 3.2 in pitches, (
+        "3.2 must stay in the default ladder: it tiles the slab and is the "
+        "only pitch that exercises the spheres' non-tiling refusal")
+
+    spheres = rl.run_ladder(PhysicalSpheres(), pitches, rl.load_tolerances())
+    skipped = [r for r in spheres if "skipped" in r]
+    assert [r["pitch_um"] for r in skipped] == [3.2], skipped
+    assert "does not tile" in skipped[0]["skipped"]
+
+    # and the slab evaluates that same pitch as a real, passing row
+    slab = rl.run_ladder(PhysicalSlab(), pitches, rl.load_tolerances())
+    row = next(r for r in slab if r["pitch_um"] == 3.2)
+    assert "skipped" not in row
+    assert row["within_biovolume_fraction"] is True

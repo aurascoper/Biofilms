@@ -49,7 +49,7 @@ tolerance applied:
 
 | pitch (µm) | biovolume | porosity | **interface area** | component size |
 |---|---|---|---|---|
-| ~~3.2~~ | *withdrawn — see below* | | | |
+| 3.2 | **SKIPPED — does not tile the 24 µm axis (7.5 voxels); see below** | | | |
 | 1.6 | 6.39e-02 ✗ | 5.95e-03 ✗ | **4.99e-01 ✗** | 6.39e-02 ✓ |
 | 0.8 | 4.04e-02 ✓ | 3.77e-03 ✗ | **4.67e-01 ✗** | 4.04e-02 ✓ |
 | 0.4 | 4.55e-03 ✓ | 4.24e-04 ✓ | **4.79e-01 ✗** | 4.55e-03 ✓ |
@@ -76,6 +76,22 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 > number that moves is component size, from 3.2 to **1.6 µm** — it was passing at
 > a pitch that never validly ran. Every other conclusion is unchanged, including
 > the interface-area finding, which was measured at pitches that tile.
+>
+> **The first attempt at this correction was itself wrong**, and the same review
+> caught that too. It removed 3.2 from the ladder's default pitches, which is not
+> the same thing as refusing it. Two losses followed: 3.2 tiles the *slab* — the
+> axis-aligned control above — and that valid row disappeared with it; and
+> `run_ladder` only emits its `skipped` row for a pitch it is actually handed, so
+> the promise in the paragraph above went unreachable in the same commit that
+> made it. **A pitch absent from the list is indistinguishable from a pitch
+> nobody tried.** The default is `3.2,1.6,0.8,0.4,0.2` again; the slab evaluates
+> it, and the spheres refuse it by name:
+>
+> ```json
+> {"pitch_um": 3.2, "skipped": "pitch 3.2 does not tile axis 2 of extent 24.0:
+>  7.5 voxels. Rounding would resize the box to 25.6 um while the analytic truth
+>  still uses the declared extent"}
+> ```
 
 Porosity needing a 2× finer pitch than biovolume is not a surprise — it is the
 `derived` tolerance doing its job. Porosity is `1 − biovolume`, so an equal

@@ -179,12 +179,18 @@ def coarsest_passing(rows, observable) -> float | None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--outdir", type=Path, required=True)
-    # Defaults chosen to tile BOTH declared extents exactly -- (32,32,64) for
-    # the slab and (48,48,24) for the spheres. 3.2 was in this list and does not
-    # tile the spheres' 24 um axis (7.5 voxels), so that row was measuring a
-    # 25.6 um box against a 24 um analytic truth: a 6.7% denominator shift
-    # reported as rasterisation error.
-    ap.add_argument("--pitches", default="1.6,0.8,0.4,0.2")
+    # 3.2 TILES THE SLAB AND NOT THE SPHERES, and the default keeps it for
+    # exactly that reason. It does not divide the spheres' 24 um axis (7.5
+    # voxels), so that row was measuring a 25.6 um box against a 24 um analytic
+    # truth -- a 6.7% denominator shift reported as rasterisation error.
+    #
+    # The first correction DROPPED 3.2 from this list, which was wrong twice
+    # over: the slab's 3.2 control is valid and was lost, and `run_ladder`'s
+    # skip-row machinery only runs on a pitch it is actually given, so the
+    # promise that the ladder "names the pitch it skipped" quietly became
+    # unreachable. A pitch that is absent from the list is indistinguishable
+    # from a pitch nobody tried. Keep it; let the spheres refuse it by name.
+    ap.add_argument("--pitches", default="3.2,1.6,0.8,0.4,0.2")
     args = ap.parse_args(argv)
 
     args.outdir.mkdir(parents=True, exist_ok=True)

@@ -138,6 +138,12 @@ class Layer:
     authoritative_for_quantitation: bool = True
     source_grid_id: str | None = None     # where a derived layer came from
     derivation: str | None = None
+    # THE PRODUCER DECLARES THIS; A RENDERER MAY NOT ASSUME IT. Which value, if
+    # any, means "nothing is here". `cell_id` 0 is genuinely empty space, but
+    # `generation` 0 is a founder and thresholding it away deletes the first
+    # cohort from the picture. Only the code that built the field knows which it
+    # is, so `None` means every cell carries information and none may be hidden.
+    background: float | None = None
     note: str = ""
 
     def as_dict(self) -> dict:
@@ -149,7 +155,10 @@ class Layer:
                 "authoritative_for_quantitation":
                     bool(self.authoritative_for_quantitation),
                 "source_grid_id": self.source_grid_id,
-                "derivation": self.derivation, "note": self.note}
+                "derivation": self.derivation,
+                "background": (None if self.background is None
+                               else float(self.background)),
+                "note": self.note}
 
 
 @dataclass(frozen=True)

@@ -31,7 +31,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .viewer import read_layer, read_manifest
+from .viewer import BOOLEAN, CATEGORICAL, read_layer, read_manifest
 
 # Same palette and labels as the serial model's figure section, carried across
 # from the CairoMakie prototype on `feat/visualize-3d`. That branch is otherwise
@@ -61,6 +61,7 @@ class DisplayLayer:
     banner: str             # empty when quotable; REQUIRED on screen otherwise
     derivation_note: str    # how a derived layer was made; may be quotable
     colour_by: str          # "species" | "scalar" | "mask"
+    background: float | None = None   # the producer's, never the renderer's
 
     def as_dict(self) -> dict:
         return {"name": self.name, "grid_id": self.grid_id, "unit": self.unit,
@@ -123,7 +124,9 @@ def display_plan(manifest: dict) -> list[DisplayLayer]:
         semantic_kind=l["semantic_kind"],
         quotable=bool(l["authoritative_for_quantitation"]),
         banner=_banner(l), derivation_note=_derivation_note(l),
-        colour_by=_colour_by(l)) for l in manifest["layers"]]
+        colour_by=_colour_by(l),
+        background=(None if l.get("background") is None
+                    else float(l["background"]))) for l in manifest["layers"]]
 
 
 def grid_geometry(manifest: dict, grid_id: str) -> dict:
@@ -225,12 +228,15 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
     yields an opaque shell with the biofilm hidden inside it. Two paths, chosen
     by the layer's own semantic kind:
 
-    - CATEGORICAL and BOOLEAN layers are thresholded to drop the background
-      (`cell_id` 0 is background and -1 is the wall, per the exchange schema),
-      leaving the occupied cells as a surface that can actually be seen. A
-      species layer gets the seven fixed colours rather than a continuous
-      colormap, which is the whole point of having a palette: the same organism
-      must not change colour because a different subset is present.
+    - CATEGORICAL and BOOLEAN layers are drawn as a surface, hiding only the
+      value the PRODUCER declared as background. A renderer cannot infer that
+      value: `cell_id` 0 is empty space, but `generation` 0 is a founder, and an
+      earlier version of this function thresholded at 0.5 and so deleted the
+      founding cohort from every picture of it. A layer that declares no
+      background is drawn in full. A species layer gets the seven fixed colours
+      rather than a continuous colormap, which is the whole point of having a
+      palette: the same organism must not change colour because a different
+      subset is present.
     - INTENSIVE and EXTENSIVE layers are volume-rendered, because thresholding a
       dose field at an arbitrary value would hide exactly the structure the
       viewer exists to show.
@@ -257,7 +263,16 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
     title = f"{layer_name} [{layer.unit}]"
 
     if layer.semantic_kind in (CATEGORICAL, BOOLEAN):
-        occupied = image.threshold(0.5, scalars=layer_name)
+        if layer.background is None:
+            occupied = image.threshold(scalars=layer_name)   # keeps everything
+        else:
+            # Drop ONLY the declared background value. `invert=True` on an
+            # equality band removes that one value and keeps both sides, so a
+            # sentinel below the data (cell_id 0) and one above it are handled
+            # by the same call without the caller ranking them.
+            occupied = image.threshold(
+                (layer.background, layer.background), scalars=layer_name,
+                invert=True)
         if layer.colour_by == "species":
             data, _ = read_layer(path, layer_name)
             legend = species_legend(data)

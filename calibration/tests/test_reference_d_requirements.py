@@ -181,6 +181,64 @@ def test_authorization_cannot_be_reached_without_a_baseline_row():
     assert all(not met for _, met in status.authorization_criteria([]))
 
 
+def test_a_valid_approval_meets_every_criterion():
+    """The suite would be worthless if the milestone could not be reached. It
+    could not, for a while: `authorization_criteria` was called without
+    `sources`, so criterion 8 was unmeetable by any input — indistinguishable
+    from a correctly withheld authorization, because "not authorized" is the
+    expected state."""
+    from test_approval import SOURCES, TODAY, row
+
+    unmet = [c for c, ok in status.authorization_criteria(
+        [row()], SOURCES, today=TODAY) if not ok]
+    assert unmet == [], unmet
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("strain_identities", "unknown"),
+    ("containment_facility", "TBD"),
+    ("risk_assessment_reference", "pending"),
+    ("institutional_approval_id", "d approved"),
+    ("institutional_approval_authority", "n/a"),
+    ("approved_protocol_version", ""),
+    ("approval_source_id", "IBC_NOPE"),
+    ("approval_effective_date", "June 2026"),
+    ("approval_expiration_date", "2026-08-01"),
+    ("culturing_start_date", "2026-05-01"),
+    ("is_target_system", "false"),
+    ("scope_hash", " "),
+])
+def test_every_refusal_reaches_a_criterion(field, bad):
+    """THE NEGATIVE CONTROL THE MAPPING NEVER HAD.
+
+    `authorization_criteria` translates `approval.problems` into nine criteria
+    by substring. Any refusal matching no pattern used to be read as evidence
+    for nothing, and so defaulted to MET — a false positive on an institutional
+    biosafety milestone.
+
+    That is exactly what happened: adding the `approved_protocol_version` check
+    to the gate produced a refusal the milestone could not see. The gate said
+    no; all nine criteria said yes. Nothing failed, because nothing compared
+    them.
+
+    So break one field at a time and require the milestone to notice every
+    single one. A new check in `approval.problems` that lands nowhere now fails
+    here instead of silently widening the gap.
+    """
+    from biofilm_calibration import approval
+    from test_approval import SOURCES, TODAY, row
+
+    r = row(**{field: bad})
+    assert approval.problems([r], SOURCES, today=TODAY), (
+        "the fixture is stale: this input no longer refuses at the gate, so "
+        "the test proves nothing about the criteria")
+    unmet = [c for c, ok in status.authorization_criteria(
+        [r], SOURCES, today=TODAY) if not ok]
+    assert unmet, (
+        f"breaking {field!r} refuses at the gate but leaves all criteria met. "
+        "The milestone reads AUTHORIZED over a live refusal.")
+
+
 def test_criteria_with_no_consumer_are_named(requirements):
     """A gate must not close on a threshold nobody compares against."""
     report = status.enforcement_report()
