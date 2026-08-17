@@ -458,6 +458,22 @@ def main(argv=None) -> int:
                    wall_total, raytrace_wall, stopped_early, base, snapshot)
 
 
+def refuse_partial_publish(publish, stopped_early) -> None:
+    """Refuse to overwrite the canonical tables with a run that did not finish.
+
+    EXTRACTED SO IT CAN BE TESTED. It used to be two lines inside `_report`,
+    which imports openmc at its first statement and so cannot run in the bare
+    tier -- meaning the only protection against publishing partial evidence had
+    no coverage at all, on a machine where nothing could give it any. A guard
+    nobody can exercise is a guard nobody has checked.
+    """
+    if publish and stopped_early:
+        raise SystemExit(
+            f"--publish refused: the run stopped early ({stopped_early}). "
+            "Partial rows must not replace the canonical tables; re-run with a "
+            "larger --budget-seconds, or drop --publish to write under --outdir.")
+
+
 def _report(records, debiased, args, runs, histories, sp_bytes, wall,
             raytrace_wall,
             stopped_early, base, snapshot) -> int:
@@ -772,11 +788,7 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
     # publishing then replaces the complete evidence tables with partial rows --
     # the exact data loss the guard exists to prevent, arriving by a different
     # door.
-    if args.publish and stopped_early:
-        raise SystemExit(
-            f"--publish refused: the run stopped early ({stopped_early}). "
-            "Partial rows must not replace the canonical tables; re-run with a "
-            "larger --budget-seconds, or drop --publish to write under --outdir.")
+    refuse_partial_publish(args.publish, stopped_early)
     data_dir = (REPO / "data" / "calibration") if args.publish else args.outdir
     _write(data_dir / "openmc_effect_samples.csv",
            "# openmc_effect_samples — one row per transport replicate.\n"

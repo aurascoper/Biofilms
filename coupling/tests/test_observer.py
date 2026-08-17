@@ -330,3 +330,44 @@ def test_absence_semantics_survive_the_round_trip_to_the_display_plan():
     assert plan["generation"].background is None
     # ...and must not be left claiming every voxel is informative either.
     assert plan["generation"].occupancy_from == "cell_id"
+
+
+@pytest.mark.parametrize("kwargs,expect", [
+    ({"occupancy_from": "cel_id"},              "not a layer in this bundle"),
+    ({"occupancy_from": "dose_r4"},             "and not"),
+    ({"occupancy_from": "cell_id",
+      "background": 0},                         "two answers to one question"),
+])
+def test_a_dangling_occupancy_reference_is_refused_at_write_time(kwargs, expect):
+    """A BROKEN REFERENCE HERE FAILS OPEN.
+
+    `occupancy_from` exists because `generation` cannot state its own absence —
+    0 is a founder and 0 is empty space. So a misspelt name, or one pointing at
+    a layer on a different grid, does not merely mislabel the layer: it drops
+    the renderer straight back into the ambiguity the field was added to
+    resolve, and it does it silently.
+
+    Same treatment `source_grid_id` already gets — named when the bundle is
+    written, not when someone tries to draw it.
+    """
+    from biofilm_openmc.viewer import bundle_problems
+
+    grids = [LATTICE, REFINED]
+    layers = [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              np.zeros((4, 4, 4), np.int32), background=0),
+        Layer("dose_r4", "dose_refinement_4", "Gy/source-particle", "intensive",
+              np.zeros((16, 16, 16))),
+        Layer("generation", "cpm_labels", "dimensionless", "categorical",
+              np.zeros((4, 4, 4), np.int32), **kwargs),
+    ]
+    found = bundle_problems(grids, layers)
+    assert any(expect in p for p in found), found
+
+    # and the correct declaration raises nothing, so this is not a test that
+    # every occupancy reference is rejected
+    layers[-1] = Layer("generation", "cpm_labels", "dimensionless",
+                       "categorical", np.zeros((4, 4, 4), np.int32),
+                       occupancy_from="cell_id")
+    assert not [p for p in bundle_problems(grids, layers)
+                if "occupancy" in p], bundle_problems(grids, layers)

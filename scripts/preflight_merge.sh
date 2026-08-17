@@ -37,8 +37,14 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 OWNER="${REPO%%/*}"
 NAME="${REPO##*/}"
 
-DATA="$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F pr="$PR" -f query='
-query($owner:String!, $name:String!, $pr:Int!) {
+# --paginate with a $endCursor in the query walks every page and concatenates
+# the responses. A FIXED `first:100` WOULD MAKE THIS GATE FAIL OPEN: past a
+# hundred threads the unseen ones are indistinguishable from resolved ones, and
+# a gate that silently truncates its input is the same defect it exists to
+# catch. `jq -s` folds the pages back into one document.
+DATA="$(gh api graphql --paginate \
+  -f owner="$OWNER" -f name="$NAME" -F pr="$PR" -f query='
+query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
   repository(owner:$owner, name:$name) {
     pullRequest(number:$pr) {
       title
@@ -46,7 +52,8 @@ query($owner:String!, $name:String!, $pr:Int!) {
       reviews(last:20) {
         nodes { author { login } submittedAt body }
       }
-      reviewThreads(first:100) {
+      reviewThreads(first:100, after:$endCursor) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           isResolved isOutdated path line
           comments(first:1) { nodes { author { login } body url } }
@@ -54,7 +61,10 @@ query($owner:String!, $name:String!, $pr:Int!) {
       }
     }
   }
-}')"
+}' | jq -s '{data:{repository:{pullRequest:
+      (.[0].data.repository.pullRequest
+       + {reviewThreads:{nodes:
+           [.[].data.repository.pullRequest.reviewThreads.nodes[]]}})}}}')"
 fi
 
 PRJ="$(jq -r '.data.repository.pullRequest' <<<"$DATA")"

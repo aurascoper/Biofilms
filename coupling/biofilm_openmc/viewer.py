@@ -296,6 +296,29 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
             out.append(f"layer {layer.name!r} is derived but does not say from "
                        "which grid")
 
+        # A DANGLING OCCUPANCY REFERENCE FAILS OPEN. `occupancy_from` exists
+        # because `generation` cannot state its own absence -- 0 is a founder
+        # and 0 is empty space -- so a misspelt or cross-grid reference does
+        # not merely mislabel the layer, it silently returns the renderer to
+        # the ambiguity the field was added to resolve. Same treatment as
+        # source_grid_id above: name it at write time, not at draw time.
+        if layer.occupancy_from is not None:
+            other = next((l for l in layers if l.name == layer.occupancy_from),
+                         None)
+            if other is None:
+                out.append(f"layer {layer.name!r} names occupancy_from "
+                           f"{layer.occupancy_from!r}, which is not a layer in "
+                           "this bundle")
+            elif other.grid_id != layer.grid_id:
+                out.append(f"layer {layer.name!r} takes occupancy from "
+                           f"{layer.occupancy_from!r}, which is on grid "
+                           f"{other.grid_id!r} and not {layer.grid_id!r}; a "
+                           "mask must be cell-for-cell with what it masks")
+            elif layer.background is not None:
+                out.append(f"layer {layer.name!r} declares both a background "
+                           "value and an occupancy layer; they are two answers "
+                           "to one question and the renderer would pick one")
+
         # A label is not a number. Averaging two cell ids gives a third cell id,
         # which is why categorical layers may never be resampled arithmetically
         # and why a float dtype here is a defect rather than a style choice.

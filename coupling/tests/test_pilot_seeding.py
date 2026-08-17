@@ -16,6 +16,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
 import numpy as np
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -119,3 +120,35 @@ def test_the_lever_table_is_not_hardcoded_anywhere():
         assert stale not in code, (
             f"{stale} is a transcribed lever value; measure it with --levers "
             "so it arrives with a sample row instead")
+
+
+# ------------------------------------------- publishing an unfinished run
+
+@pytest.mark.parametrize("publish,stopped,expected", [
+    (True,  "budget exhausted before scenario 3", "refuse"),
+    (True,  None,                                 "allow"),
+    (False, "budget exhausted before scenario 3", "allow"),
+    (False, None,                                 "allow"),
+])
+def test_partial_results_may_not_replace_the_canonical_tables(
+        publish, stopped, expected):
+    """THE ONLY THING STANDING BETWEEN A TIMED-OUT RUN AND THE PUBLISHED
+    EVIDENCE, and until now it had no test.
+
+    `--publish` writes to `data/calibration/`, replacing the canonical tables.
+    The scenario-completeness check upstream confirms the full set was
+    REQUESTED; it cannot know whether the run finished. A budget exhausted
+    partway sets `stopped_early`, and publishing then swaps complete evidence
+    for partial rows.
+
+    The guard lived inside `_report`, which imports openmc on its first line and
+    therefore cannot run anywhere in this suite — so the protection existed and
+    was never once exercised. All four combinations are checked, not just the
+    refusing one: a guard that raised unconditionally would also stop the bad
+    case, and would make the pilot unpublishable.
+    """
+    if expected == "refuse":
+        with pytest.raises(SystemExit, match="stopped early"):
+            pilot.refuse_partial_publish(publish, stopped)
+    else:
+        assert pilot.refuse_partial_publish(publish, stopped) is None
