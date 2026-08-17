@@ -96,7 +96,16 @@ Any number this repository has published and later found wrong gets **all** of:
 1. the code fix, with a negative control,
 2. a row in `data/claims_ledger.csv` with verdict `delete` / `restate` /
    `requalify` / `keep`, stating what was wrong and how it was caught,
-3. a marked correction in the document that carried it — not a silent edit.
+3. a marked correction in the document that carried it — not a silent edit,
+4. **and an audit of everything computed FROM it.** A withdrawn measurement
+   takes its dependents with it. The 3.2 µm ladder row was withdrawn and its
+   own headline corrected twice, while the interface-area range published a few
+   lines below — `0.41–0.51 across 16×` — kept both of its halves from that row:
+   0.41 was its error, and 16× was 3.2 → 0.2. The correction stood next to a
+   number that contradicted it. Grep the value, and grep what it was divided by.
+5. If an earlier correction claimed "every other conclusion is unchanged" and
+   this one disproves it, delete that sentence. Do not leave it beside its
+   counterexample.
 
 A correction that only changes the number teaches nobody why it was wrong, and
 this repository has now corrected its own corrections twice.
