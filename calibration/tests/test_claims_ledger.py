@@ -465,3 +465,55 @@ def test_no_module_defines_the_same_name_twice():
     assert not shadowed, (
         "top-level definitions shadowed by a later one with the same name; "
         f"the earlier definition never runs: {shadowed}")
+
+
+BLANKET_REASSURANCE = re.compile(
+    r"(the findings themselves stand"
+    r"|every other conclusion is unchanged"
+    r"|all other conclusions? (are|is) unchanged"
+    r"|the conclusions themselves are unchanged"
+    r"|nothing else (is affected|changes)"
+    r"|everything else stands)", re.I)
+
+
+def test_no_correction_offers_a_blanket_reassurance(rows):
+    """SAY WHICH NUMBERS MOVED AND STOP.
+
+    A correction that adds "every other conclusion is unchanged" makes a claim
+    about scope that nobody has checked — and here nobody had: withdrawing the
+    3.2 µm ladder rung moved component size AND the dependent interface-area
+    range, while the row recording it reassured the reader that nothing else
+    had.
+
+    It survived two corrections by being REWORDED rather than deleted: first to
+    "the conclusions themselves are unchanged" in the report, then to "the
+    findings themselves stand" in this ledger. Each time it read as a smaller
+    claim and meant the same thing, which is why the check is on the phrasing
+    family rather than on one sentence.
+
+    A statement scoped to ONE named finding and substantiated beside it is fine
+    and is not matched here. The interface-area paragraph makes exactly that
+    kind of claim and keeps it.
+    """
+    offenders = [(r["claim_id"], BLANKET_REASSURANCE.search(r["notes"]).group(0))
+                 for r in rows if BLANKET_REASSURANCE.search(r["notes"] or "")]
+    assert not offenders, (
+        "a correction claims unchecked scope; name the numbers that moved and "
+        f"stop: {offenders}")
+
+
+def test_the_blanket_reassurance_pattern_actually_matches(rows):
+    """The control: the check above passes by finding nothing, and the phrases
+    it looks for were all written by me at some point in this branch's history,
+    so they are not hypothetical."""
+    for phrase in ("The findings themselves stand.",
+                   "every other conclusion is unchanged, including the "
+                   "interface-area finding",
+                   "The conclusions themselves are unchanged."):
+        assert BLANKET_REASSURANCE.search(phrase), phrase
+    # and a scoped, substantiated claim must NOT trip it
+    for allowed in ("so the conclusion is unchanged and in fact slightly "
+                    "stronger, since the error moves less than was reported",
+                    "the biovolume and porosity figures are unaffected, having "
+                    "been measured at pitches that tile"):
+        assert not BLANKET_REASSURANCE.search(allowed), allowed
