@@ -201,6 +201,14 @@ def species_palette(legend) -> tuple[list[str], tuple[float, float]]:
     Half-unit padding puts each integer id in the middle of its own band, so a
     species keeps its colour no matter which others are present.
     """
+    if not legend:
+        # AN EMPTY SNAPSHOT IS A LEGITIMATE FIELD, not a broken one: a species
+        # layer of pure background has no ids present, `species_legend` returns
+        # nothing, and min() over nothing raised ValueError before the layer
+        # could draw. Hand back the full fixed palette -- there is nothing to
+        # colour, so nothing can be miscoloured, and the caller stays on one
+        # code path.
+        return (list(SPECIES_COLOURS), (0.5, len(SPECIES_COLOURS) + 0.5))
     lo = min(i for i, _, _ in legend)
     hi = max(i for i, _, _ in legend)
     return ([SPECIES_COLOURS[i - 1] for i in range(lo, hi + 1)],

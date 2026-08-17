@@ -26,6 +26,11 @@ _spec = importlib.util.spec_from_file_location(
 pilot = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pilot)
 
+_rspec = importlib.util.spec_from_file_location(
+    "subvoxel_refinement", _ROOT / "coupling" / "scripts" / "subvoxel_refinement.py")
+refinement = importlib.util.module_from_spec(_rspec)
+_rspec.loader.exec_module(refinement)
+
 
 def test_unpaired_scenarios_give_the_two_states_different_seeds():
     """THE DEFECT THAT MADE THE FALSE-POSITIVE CONTROL VACUOUS.
@@ -152,3 +157,71 @@ def test_partial_results_may_not_replace_the_canonical_tables(
             pilot.refuse_partial_publish(publish, stopped)
     else:
         assert pilot.refuse_partial_publish(publish, stopped) is None
+
+
+# ------------------------------------ declaring significance with no test
+
+@pytest.mark.parametrize("df,expected", [
+    (0, None),      # a single outer draw: nothing to test with
+    (-1, None),
+    (1, 318.3),     # and the value that makes the refusal matter
+    (2, 22.33),
+    (100, 3.232),   # untabulated: the STRICTEST df not exceeding it
+])
+def test_significance_is_refused_where_there_are_no_degrees_of_freedom(
+        df, expected):
+    """A ONE-DRAW SCENARIO MUST NOT BE CALLED DISTINGUISHABLE FROM ZERO.
+
+    With `m` outer draws the test has `m - 1` degrees of freedom, so a single
+    draw has none. Falling back to the normal critical value 3.09 understates
+    the truth at every finite df — at df = 1 it is 318.3, a factor of 103 — so
+    a scenario with no degrees of freedom would be declared significant on a
+    test that cannot be performed.
+
+    This lived nested inside `_report`, whose first statement imports openmc.
+    The refusal could have been deleted and no suite in this repository would
+    have noticed.
+    """
+    assert pilot.t_critical_999(df) == expected
+
+
+def test_the_low_df_refusal_is_not_merely_a_smaller_number():
+    """The value returned for df = 1 must be enormous, or the refusal is
+    decoration: a critical value near 3.09 would let a one-draw scenario pass
+    on noise. 318.3 is the actual one-sided t at 0.999."""
+    assert pilot.t_critical_999(1) > 100
+    # and it must fall monotonically toward the normal limit, never below it
+    values = [pilot.t_critical_999(d) for d in sorted(pilot.T_CRIT_999)]
+    assert values == sorted(values, reverse=True)
+    assert min(values) > 3.09
+
+
+# ------------------------------------------- ratios that cannot share a mass
+
+@pytest.mark.parametrize("ratios,accepted", [
+    ([1, 2, 4], True),
+    ([1, 2], True),
+    ([1, 3, 4], False),     # 3 does not divide 4
+    ([2, 3, 6], True),
+    ([1, 4, 6], False),     # 4 does not divide 6
+])
+def test_a_ratio_that_cannot_share_the_mass_denominator_is_refused(
+        ratios, accepted):
+    """THE ONLY THING STANDING BETWEEN A BAD RATIO AND A PAID-FOR RAYTRACE.
+
+    The mass denominator is raytraced once at the finest ratio and coarsened by
+    `finest // ratio`. Integer division silently yields step 1 for a ratio of 3
+    under a finest of 4, pairing a 4x mass array with a 3x tally — and the
+    mismatch surfaces only when dose conversion combines them, after the
+    raytrace and the histories are spent.
+
+    The guard lived in `main()` below `import openmc`, so it was unreachable
+    from every suite that runs here. Both directions are checked: a guard that
+    refused everything would also stop `1,2,4`, which is the ladder the study
+    actually runs.
+    """
+    if accepted:
+        assert refinement.refuse_non_divisor_ratios(ratios) is None
+    else:
+        with pytest.raises(SystemExit, match="do not divide the finest"):
+            refinement.refuse_non_divisor_ratios(ratios)

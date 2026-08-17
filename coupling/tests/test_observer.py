@@ -440,3 +440,20 @@ def test_a_species_keeps_its_colour_whatever_subset_is_present():
     # and a contiguous subset that does not start at 1
     for sid in (3, 4, 5):
         assert slot_of(sid, [3, 4, 5]) == SPECIES_COLOURS[sid - 1], sid
+
+
+def test_an_empty_species_layer_still_produces_a_palette():
+    """AN EMPTY SNAPSHOT IS A LEGITIMATE FIELD, not a broken one.
+
+    A species layer of pure background has no ids present, so `species_legend`
+    returns nothing — which the existing out-of-range test already permits —
+    and `min()` over nothing raised ValueError before the layer could draw.
+    A viewer that crashes on an empty snapshot cannot show that the snapshot is
+    empty, which is a thing a reader needs to see.
+    """
+    from biofilm_openmc.observer import species_palette
+
+    assert species_legend(np.zeros((2, 2, 2), np.int32)) == []
+    cmap, (lo, hi) = species_palette([])
+    assert len(cmap) == len(SPECIES_COLOURS)
+    assert lo < 1 and hi > len(SPECIES_COLOURS)

@@ -458,6 +458,38 @@ def main(argv=None) -> int:
                    wall_total, raytrace_wall, stopped_early, base, snapshot)
 
 
+# One-sided t at 0.999 by degrees of freedom. Tabulated rather than computed
+# because scipy is excluded from this tier by design.
+T_CRIT_999 = {1: 318.3, 2: 22.33, 3: 10.21, 4: 7.173, 5: 5.893, 6: 5.208,
+              7: 4.785, 8: 4.501, 9: 4.297, 10: 4.144, 12: 3.930,
+              15: 3.733, 20: 3.552, 30: 3.385, 60: 3.232}
+
+
+def t_critical_999(df: int) -> float | None:
+    """Critical value, or None when no test is possible.
+
+    OUTSIDE THE TABLE THE ANSWER IS REFUSAL, NOT THE NORMAL VALUE. Falling back
+    to 3.09 understates the critical value at every finite df -- at df = 1 the
+    true value is 318 -- so a single outer draw would be declared
+    distinguishable from zero on a test with no degrees of freedom at all.
+    Buying MORE draws is safe, since t falls toward 3.09, so only the small end
+    is refused.
+
+    MODULE LEVEL SO IT CAN BE TESTED. Nested inside `_report`, whose first
+    statement imports openmc, this refusal could be deleted and no suite that
+    runs in this repository would notice.
+    """
+    if df < 1:
+        return None                      # no degrees of freedom, no test
+    exact = T_CRIT_999.get(df)
+    if exact is not None:
+        return exact
+    # Conservative: use the largest tabulated df not exceeding this one, so an
+    # untabulated count is judged by a STRICTER value than its own.
+    below = [d for d in T_CRIT_999 if d <= df]
+    return T_CRIT_999[max(below)] if below else None
+
+
 def refuse_partial_publish(publish, stopped_early) -> None:
     """Refuse to overwrite the canonical tables with a run that did not finish.
 
@@ -631,20 +663,6 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
     # true value is 318, so a single outer draw would be declared distinguishable
     # from zero on a test with no degrees of freedom at all. Buying MORE draws is
     # safe (the t value falls toward 3.09), so only the small end is refused.
-    T_CRIT_999 = {1: 318.3, 2: 22.33, 3: 10.21, 4: 7.173, 5: 5.893, 6: 5.208,
-                  7: 4.785, 8: 4.501, 9: 4.297, 10: 4.144, 12: 3.930,
-                  15: 3.733, 20: 3.552, 30: 3.385, 60: 3.232}
-
-    def _t_critical(df: int) -> float | None:
-        if df < 1:
-            return None                      # no degrees of freedom, no test
-        exact = T_CRIT_999.get(df)
-        if exact is not None:
-            return exact
-        # Conservative: use the largest tabulated df not exceeding this one, so
-        # an untabulated count is judged by a STRICTER value than its own.
-        below = [d for d in T_CRIT_999 if d <= df]
-        return T_CRIT_999[max(below)] if below else None
     for s, v in verdicts.items():
         v["raw_noise_floor_q99"] = floor if math.isfinite(floor) else None
         fine = min({x["mesh_factor"] for x in debiased
@@ -661,7 +679,7 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
             transport_floor = float(math.sqrt(float(np.mean(jack)) / m))
             se = max(between, transport_floor)
             e2 = float(np.mean(y))
-            crit = _t_critical(m - 1)
+            crit = t_critical_999(m - 1)
             v["e_squared_mean"] = e2
             v["e_squared_standard_error"] = se
             v["standard_error_basis"] = (

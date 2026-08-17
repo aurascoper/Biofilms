@@ -130,6 +130,27 @@ def _seed(rep: int, state: str, paired: bool) -> int:
     return 7000 + rep + (0 if paired or state == "baseline" else 500_000)
 
 
+def refuse_non_divisor_ratios(ratios) -> None:
+    """EVERY RATIO MUST DIVIDE THE FINEST, checked before any transport.
+
+    The mass denominator is raytraced once at the finest ratio and coarsened by
+    `finest // ratio`; integer division silently gives step 1 for a ratio like 3
+    under a finest of 4, pairing a 4x mass array with a 3x tally. The mismatch
+    surfaces only when dose conversion combines them -- after the raytrace and
+    the histories have been paid for.
+
+    MODULE LEVEL SO IT CAN BE TESTED. It lived in `main()` below `import
+    openmc`, which put the only protection against that expensive late failure
+    out of reach of every suite that runs here.
+    """
+    bad = [r for r in ratios if ratios[-1] % r]
+    if bad:
+        raise SystemExit(
+            f"ratios {bad} do not divide the finest ratio {ratios[-1]}: the "
+            "shared mass denominator is coarsened by finest // ratio, so a "
+            "non-divisor pairs mismatched arrays and fails only after transport")
+
+
 def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
                   config, openmc_version) -> None:
     """Assemble the multi-grid bundle from what this run already computed.
@@ -202,18 +223,7 @@ def main(argv=None) -> int:
     ratios = sorted({int(r) for r in args.ratios.split(",")})
     if ratios[0] != 1:
         raise SystemExit("ratio 1 is the reference grid and must be included")
-    # EVERY RATIO MUST DIVIDE THE FINEST, checked before any transport. The mass
-    # denominator is raytraced once at the finest ratio and coarsened by
-    # `finest // ratio`; integer division silently gives step 1 for a ratio like
-    # 3 under a finest of 4, pairing a 4x mass array with a 3x tally. The
-    # mismatch surfaces only when dose conversion combines them -- after the
-    # raytrace and the histories have been paid for.
-    bad = [r for r in ratios if ratios[-1] % r]
-    if bad:
-        raise SystemExit(
-            f"ratios {bad} do not divide the finest ratio {ratios[-1]}: the "
-            "shared mass denominator is coarsened by finest // ratio, so a "
-            "non-divisor pairs mismatched arrays and fails only after transport")
+    refuse_non_divisor_ratios(ratios)
 
     started = time.perf_counter()
     runs = total_histories = statepoint_bytes = 0

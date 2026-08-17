@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from pathlib import Path
 
 from biofilm_openmc.config import ConfigError, load_transport_config
 from biofilm_openmc.dose import EV_TO_J, specific_energy_per_source
@@ -222,6 +223,35 @@ def test_the_scan_path_refuses_refinement_before_spending_the_histories():
     cfg = load_transport_config(_with_mesh(refinement_factor=2))
     with pytest.raises(ConfigError, match="not supported by the scan path"):
         _biofilm_scan_mass(object(), cfg)
+
+
+def test_scan_itself_refuses_before_it_calls_the_runner():
+    """THE CONTROL THE ORDERING FIX NEVER HAD.
+
+    The test above calls `_biofilm_scan_mass` directly, so it passes whether
+    the preflight loop exists or not — delete the loop and `scan()` goes back
+    to running the full transport and refusing afterwards, which is exactly the
+    cost the refusal exists to avoid, and nothing turns red.
+
+    So drive `scan()` and spy on the runner: the refusal must arrive with the
+    runner still untouched.
+    """
+    from biofilm_openmc.drivers import scan
+
+    calls = []
+
+    def spy(model, name):
+        calls.append(name)
+        raise AssertionError("the runner must not be reached")
+
+    cfg = load_transport_config(_with_mesh(refinement_factor=2))
+    with pytest.raises(ConfigError, match="not supported by the scan path"):
+        scan(object(), cfg, {"hot": cfg}, spy, Path("/nonexistent"),
+             effect_threshold=0.1, dose_floor_Gy_s=0.0,
+             nuclear_data_id="test", openmc_version="0.15.3")
+    assert calls == [], (
+        f"scan() invoked the runner {len(calls)} time(s) before refusing; the "
+        "histories are spent by the time the refusal arrives")
 
 
 def test_the_water_phantom_honours_refinement_because_its_hash_claims_it():
