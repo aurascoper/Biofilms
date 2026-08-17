@@ -262,6 +262,11 @@ def test_criteria_with_no_consumer_are_named(requirements):
     # fire on the word inside somebody's identifier.
     ({"approval_source_id": "expired"},   8, (7,)),
     ({"approval_source_id": "not-an-ISO-date"}, 8, (7,)),
+    # AND NO VALUE MAY IMPERSONATE A CROSS-FIELD SENTENCE. The relation
+    # phrases are checked only AFTER the field is identified, so an identifier
+    # spelling one out is still just an unresolvable identifier.
+    ({"approval_source_id": "does not match the conditions"}, 8, (6, 7)),
+    ({"approval_source_id": "is not the target system"}, 8, (9, 7)),
     ({"strain_identities": "unknown"},    1, (7, 8)),
     ({"containment_facility": "TBD"},     3, (7, 8)),
     ({"is_target_system": "false"},       9, (7, 8)),

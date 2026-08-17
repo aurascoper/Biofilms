@@ -104,8 +104,14 @@ page true  '[{"isResolved":true,"isOutdated":false,"path":"p1.py","line":1,
 # that emitted page two on the flag alone would stay green after either element
 # was deleted, while real pagination silently stopped -- which is the same
 # fail-open shape the pagination fix existed to close.
+# `after:$endCursor` ON THE CONNECTION, not merely the variable declaration.
+# Checking that `$endCursor` appears somewhere is satisfied by the declaration
+# alone: delete the binding and cursor updates cannot advance reviewThreads,
+# so the real gate sticks on page one while this control stays green. That was
+# verified by removing only the binding -- all nine controls passed.
 if [[ "$*" == *--paginate* ]] \
-   && [[ "$*" == *'$endCursor'* ]] \
+   && [[ "$*" == *'$endCursor: String'* || "$*" == *'$endCursor:String'* ]] \
+   && [[ "$*" == *'after: $endCursor'* || "$*" == *'after:$endCursor'* ]] \
    && [[ "$*" == *hasNextPage* ]] && [[ "$*" == *endCursor* ]]; then
   page false '[{"isResolved":false,"isOutdated":false,"path":"page2.py","line":9,
                 "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},

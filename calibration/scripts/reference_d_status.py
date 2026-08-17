@@ -224,17 +224,24 @@ def authorization_criteria(baseline, sources=None, *, today=None):
         # The field name, when there is one, is the first token of the body --
         # and it is checked FIRST, so a message that names a field can never be
         # reclassified by a value echoed later in the same sentence.
-        # ONE FIELD, TWO DIFFERENT FAILURES. `approval_scope_hash` unset means
-        # nothing binds the row -- the conditions are not frozen, criterion 2.
-        # `approval_scope_hash does not match` means the approval no longer
-        # describes the row -- the scope does not cover it, criterion 6. Same
-        # field, different criteria, so the message decides. The phrase is a
-        # whole clause rather than a word, which is what keeps an echoed field
-        # value from reaching it.
-        if "does not match the conditions" in body:
-            return 6
         head = body.split(" ", 1)[0].strip("'\",")
         if head in field_criterion:
+            # ONE FIELD, TWO DIFFERENT FAILURES. `approval_scope_hash` unset
+            # means nothing binds the row -- the conditions are not frozen,
+            # criterion 2. `approval_scope_hash does not match` means the
+            # approval no longer describes the row -- the scope does not cover
+            # it, criterion 6. Different remedies, so the message decides.
+            #
+            # THE FIELD IS IDENTIFIED FIRST AND THE PHRASE ONLY REFINES IT.
+            # Testing the phrase before reading the head left the same hole one
+            # size smaller: `approval_source_id = "does not match the
+            # conditions"` produced a provenance-only refusal that the checklist
+            # reported as criterion 6, leaving criterion 8 met. A phrase may
+            # narrow a message already known to be about a field; it may never
+            # decide which field a message is about.
+            if head == "approval_scope_hash" and \
+                    "does not match the conditions" in body:
+                return 6
             return field_criterion[head]
         for phrase, number in phrase_criterion:
             if phrase in body:
