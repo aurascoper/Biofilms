@@ -58,7 +58,20 @@ for one release and nobody could have noticed by reading its output.
 
 `cell_id == 0` is empty space. `generation == 0` is a founder. The renderer
 cannot tell these apart, so it must not try: `Layer.background` is declared by
-the code that built the field, and `None` means every cell carries information.
+the code that built the field.
+
+**And the default must not be a statement.** `background=None` says "every cell
+carries information, hide nothing" — true for `generation`, wrong for `omega_b`.
+While that was also the *default*, a producer who simply forgot made the claim
+silently, and two layers did: `omega_b` drew its false cells as part of the
+metric's region, and an upsampled overlay grew a shell of empty space. The
+default is `UNDECLARED` and is refused at write time. Saying "every cell is
+informative" is still available; it has to be said.
+
+**A consumer that reads the declaration must read all of it.** `occupied_mask`
+tests `> 0`, which is one encoding — 0 empty, negatives out-of-domain — so a
+source declaring `background = -1` is refused rather than silently mis-masked.
+Validate every half of a contract, and give the control data that can fail each.
 
 Applies broadly — units, sentinels, fill values, ordering, extensive versus
 intensive. If a consumer needs to know, the producer states it in the data.
