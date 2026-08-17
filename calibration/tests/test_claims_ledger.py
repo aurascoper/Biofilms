@@ -258,3 +258,38 @@ def test_the_manuscript_cites_a_resolvable_revision():
         done = subprocess.run(["git", "-C", str(REPO), "cat-file", "-e", f"{sha}^{{commit}}"],
                               capture_output=True)
         assert done.returncode == 0, f"cited revision {sha} does not resolve"
+
+
+def test_claim_ids_are_unique(rows):
+    """AN ID THAT NAMES TWO CLAIMS NAMES NEITHER.
+
+    The ledger is referenced by id from commit messages, pull requests and the
+    manuscript revision plan, and `test_no_deleted_claim_survives_in_the_manuscript`
+    reports survivors by id. A duplicate makes every one of those references
+    ambiguous — and silently, since nothing read the file as a keyed table.
+
+    Two collisions had already accumulated (`REFINE-02`, `REFINE-03`), both
+    from this session appending rows without checking. Caught by external
+    review, not here, which is why this test exists now.
+    """
+    import collections
+
+    counts = collections.Counter(r["claim_id"] for r in rows)
+    duplicated = {cid: n for cid, n in counts.items() if n > 1}
+    assert not duplicated, f"claim ids used more than once: {duplicated}"
+
+
+def test_every_row_has_an_id_and_a_verdict(rows):
+    """The two columns everything else keys on.
+
+    Two vocabularies live here, and that is deliberate. The MANUSCRIPT audit
+    reached one of four editorial verdicts per claim; the REPOSITORY rows carry
+    a status describing what the code still owes. Mixing a new word into either
+    silently removes a row from whichever consumer filters on the other.
+    """
+    verdicts = {"keep", "restate", "requalify", "delete",          # manuscript
+                "supported", "needs_calibration",                  # repository
+                "needs_verification", "must_not_be_claimed"}
+    for row in rows:
+        assert row["claim_id"].strip(), row
+        assert row["status"] in verdicts, (row["claim_id"], row["status"])
