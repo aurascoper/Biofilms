@@ -72,10 +72,12 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 > entire purpose is to hold the object fixed and move only the sampling.
 >
 > A non-tiling pitch is now **refused** rather than rounded, and the ladder names
-> the pitch it skipped instead of dropping the row silently. Component size moves
-> from 3.2 to **1.6 µm** — it was passing at a pitch that never validly ran — and
-> the interface-area *range* moves with it, as recorded two paragraphs below.
-> The conclusions themselves are unchanged.
+> the pitch it skipped instead of dropping the row silently. Two published
+> numbers move: component size from 3.2 to **1.6 µm**, which was passing at a
+> pitch that never validly ran, and the interface-area range, recorded two
+> paragraphs below. No blanket statement about the remaining conclusions belongs
+> here — the first version of this correction made one, and the interface range
+> is the counterexample that took two further rounds of review to surface.
 >
 > **The first attempt at this correction was itself wrong**, and the same review
 > caught that too. It removed 3.2 from the ladder's default pitches, which is not

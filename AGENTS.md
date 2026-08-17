@@ -117,8 +117,11 @@ Any number this repository has published and later found wrong gets **all** of:
    0.41 was its error, and 16× was 3.2 → 0.2. The correction stood next to a
    number that contradicted it. Grep the value, and grep what it was divided by.
 5. If an earlier correction claimed "every other conclusion is unchanged" and
-   this one disproves it, delete that sentence. Do not leave it beside its
-   counterexample.
+   this one disproves it, **delete that sentence — do not reword it.** A
+   paraphrase is the same claim: "the conclusions themselves are unchanged"
+   replaced the original here and sat one line above the paragraph documenting
+   the second number that moved. Say which numbers moved and stop. A correction
+   is not the place for a reassurance whose scope nobody has checked.
 
 A correction that only changes the number teaches nobody why it was wrong, and
 this repository has now corrected its own corrections twice.
