@@ -544,3 +544,36 @@ def test_the_real_refinement_bundle_declares_absence_on_every_label_layer():
     assert not undeclared, (
         f"{len(undeclared)} categorical/boolean layers in subvoxel_refinement.py "
         "declare neither background nor occupancy_from")
+
+
+@pytest.mark.parametrize("source_background,accepted", [
+    (0,    True),    # the exchange schema: 0 empty, negatives out-of-domain
+    (-1,   False),   # would mean label 0 is valid, and `> 0` would delete it
+    (99,   False),
+    (None, False),   # "every cell informative" cannot say where biomass is
+])
+def test_the_occupancy_source_must_use_the_encoding_the_mask_implements(
+        source_background, accepted):
+    """A MASK IS NOT A UNIVERSAL READER OF ABSENCE.
+
+    `occupied_mask` tests `> 0`, which encodes one specific convention: 0 is
+    empty and negatives are out-of-domain sentinels — cell_id 0 background,
+    -1 wall. A source declaring `background = -1` means label 0 is valid data,
+    and the mask would silently delete every zero-valued cell.
+
+    `occupancy_from` was validated for existence and grid but never for
+    ENCODING, so the referenced layer's own declaration was ignored by the one
+    piece of code that depends on it. Refusing is honest; rendering the wrong
+    cells quietly is not.
+    """
+    from biofilm_openmc.viewer import bundle_problems
+
+    layers = [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              np.zeros((4, 4, 4), np.int32), background=source_background),
+        Layer("generation", "cpm_labels", "dimensionless", "categorical",
+              np.zeros((4, 4, 4), np.int32), occupancy_from="cell_id"),
+    ]
+    complaints = [p for p in bundle_problems([LATTICE], layers)
+                  if "occupancy" in p and "mask tests" in p]
+    assert (not complaints) is accepted, complaints

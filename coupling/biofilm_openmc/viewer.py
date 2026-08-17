@@ -343,6 +343,22 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
                 out.append(f"layer {layer.name!r} declares both a background "
                            "value and an occupancy layer; they are two answers "
                            "to one question and the renderer would pick one")
+            elif other.background != 0:
+                # THE MASK IMPLEMENTS ONE ENCODING, so only that one is
+                # accepted. `observer.occupied_mask` tests `> 0`: background 0
+                # is empty and any NEGATIVE value is a sentinel outside the
+                # biological domain, which is the exchange schema's convention
+                # (cell_id 0 background, -1 wall). A source declaring
+                # `background = -1` would mean label 0 is valid data, and the
+                # mask would silently delete every zero-valued cell.
+                #
+                # Refusing is honest; quietly rendering the wrong cells is not.
+                out.append(
+                    f"layer {layer.name!r} takes occupancy from "
+                    f"{layer.occupancy_from!r}, which declares background "
+                    f"{other.background!r}. The occupancy mask tests `> 0`, so "
+                    "only a source with background 0 (and negative values as "
+                    "out-of-domain sentinels) is supported")
 
         # A label is not a number. Averaging two cell ids gives a third cell id,
         # which is why categorical layers may never be resampled arithmetically
