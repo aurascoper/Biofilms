@@ -300,11 +300,25 @@ def rows_of_wrong_width(path) -> list[tuple]:
     declared width. Takes a PATH so a synthetic malformed file can exercise it;
     a guard that has only ever read a well-formed file has not been shown to
     detect anything."""
+    # PHYSICAL LINE NUMBERS, so the report points at the line an editor opens.
+    # The comment filter drops lines from the stream, and a counter over the
+    # FILTERED sequence is off by however many comments precede the row -- an
+    # error message naming the wrong line is a small lie that costs real time.
+    # A quoted field may also hold newlines, so the reader's own position is
+    # the only correct source.
     with open(path, encoding="utf-8") as fh:
-        reader = csv.reader(l for l in fh if not l.startswith("#"))
-        header = next(reader)
-        return [(i + 2, row[0] if row else "?", len(row))
-                for i, row in enumerate(reader) if len(row) != len(header)]
+        lines = [l for l in fh if not l.startswith("#")]
+    physical = [i for i, l in enumerate(open(path, encoding="utf-8"), start=1)
+                if not l.startswith("#")]
+    reader = csv.reader(lines)
+    header = next(reader)
+    out = []
+    for index, row in enumerate(reader):
+        if len(row) != len(header):
+            # +1 because the header consumed the first filtered line
+            line = physical[index + 1] if index + 1 < len(physical) else -1
+            out.append((line, row[0] if row else "?", len(row)))
+    return out
 
 
 def test_a_malformed_row_is_actually_detected(tmp_path):
@@ -326,6 +340,13 @@ def test_a_malformed_row_is_actually_detected(tmp_path):
     caught = rows_of_wrong_width(_write(tmp_path / "spilled.csv", spilled))
     assert [c[1] for c in caught] == ["A-02"], caught
     assert caught[0][2] == 6, "the row should show its inflated field count"
+    assert caught[0][0] == 3, "line 3 of the file, not 3rd of the filtered rows"
+
+    # AND WITH COMMENTS ABOVE IT, which is what the real ledger has. Counting
+    # the filtered stream reported a line that does not hold the bad row.
+    commented = "# a note\n# another\n" + spilled
+    caught = rows_of_wrong_width(_write(tmp_path / "commented.csv", commented))
+    assert caught[0][0] == 5, f"expected physical line 5, got {caught[0][0]}"
 
     # and the opposite corruption: a row that lost a field
     short = good + "A-03,here,fine\n"

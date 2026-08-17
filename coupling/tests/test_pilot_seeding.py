@@ -363,3 +363,28 @@ def test_a_partial_scenario_set_cannot_replace_a_complete_one(
             pilot.refuse_incomplete_scenarios(args)
     else:
         assert pilot.refuse_incomplete_scenarios(args) is None
+
+
+def test_main_refuses_an_incomplete_scenario_set_before_it_imports_openmc(
+        tmp_path):
+    """THE WIRING, AGAIN. Same shape as the ratio guard.
+
+    `refuse_incomplete_scenarios` alone proves the predicate; delete its call
+    from `main()` and the suite stays green while a run with the default
+    scenario set proceeds to overwrite the canonical tables.
+
+    openmc is not installed here, so reaching the import raises
+    ModuleNotFoundError rather than SystemExit — which makes this a test of the
+    ORDERING as much as of the call.
+    """
+    with pytest.raises(SystemExit, match="canonical tables"):
+        pilot.main(["--snapshot", str(tmp_path / "nope.h5"),
+                    "--config", str(tmp_path / "nope.toml"),
+                    "--outdir", str(pilot.CANONICAL_TABLES)])
+
+    # and the complete set gets PAST it, or the pilot could never publish
+    with pytest.raises((ModuleNotFoundError, ImportError, FileNotFoundError)):
+        pilot.main(["--snapshot", str(tmp_path / "nope.h5"),
+                    "--config", str(tmp_path / "nope.toml"),
+                    "--outdir", str(pilot.CANONICAL_TABLES),
+                    "--levers", "--include-near-threshold"])
