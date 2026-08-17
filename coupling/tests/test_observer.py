@@ -714,3 +714,49 @@ def test_an_out_of_range_species_id_is_not_drawn_either(tmp_path):
     assert total == 1, (
         f"{total} cells rendered; the out-of-range label 9 is still drawn "
         "even though the legend cannot name it")
+
+
+@_needs_pyvista
+@pytest.mark.parametrize("values,background,expect_ids,expect_cells", [
+    # the ordinary case: background outside the species range
+    ({(0, 0, 0): 2, (1, 1, 1): 3}, 0, [2, 3], 2),
+    # AN IN-RANGE BACKGROUND. Species 1 is declared absent, so it must appear
+    # in neither the mesh nor the key -- reading the raw field gave a legend
+    # entry for a species the picture does not contain.
+    ({(0, 0, 0): 1, (1, 1, 1): 2}, 1, [2], 1),
+    # and the case that produced an EMPTY dataset: the only in-range value is
+    # the declared background, so nothing valid survives.
+    ({(0, 0, 0): 1, (1, 1, 1): 9}, 1, [], 0),
+])
+def test_the_legend_names_exactly_the_cells_that_are_drawn(
+        values, background, expect_ids, expect_cells, tmp_path):
+    """ONE SOURCE OF TRUTH FOR WHAT IS PRESENT.
+
+    `species_legend` was handed the raw array while the mesh was built from the
+    occupied cells — two independent derivations of one fact, which agreed only
+    while no producer declared a background inside the species range. They are
+    now the same derivation.
+    """
+    field = np.zeros((4, 4, 4), np.int32)
+    for where, value in values.items():
+        field[where] = value
+    path = tmp_path / f"sp{background}.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("species_id", "cpm_labels", "dimensionless",
+                        "categorical", field, background=background)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+
+    plotter = observer.plot_layer(path, "species_id")
+    meshes = [a.mapper.dataset for a in plotter.renderer.actors.values()
+              if getattr(a, "mapper", None) is not None
+              and getattr(a.mapper, "dataset", None) is not None]
+    drawn = sum(m.n_cells for m in meshes)
+    assert drawn == expect_cells, (
+        f"{drawn} cells drawn, expected {expect_cells}")
+
+    ids = sorted({int(v) for m in meshes if m.n_cells
+                  for v in np.asarray(m.cell_data["species_id"])})
+    assert ids == expect_ids, f"drew species {ids}, legend would name {expect_ids}"

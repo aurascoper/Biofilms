@@ -337,8 +337,19 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             p.add_text(f"{layer_name}: no occupied cells",
                        position="lower_left", font_size=9)
         elif layer.colour_by == "species":
-            data, _ = read_layer(path, layer_name)
-            legend = species_legend(data)
+            # THE LEGEND IS BUILT FROM THE CELLS THAT SURVIVE, not from the raw
+            # field. Reading the array again gave two independent derivations
+            # of one fact, and they disagreed the moment a producer declared an
+            # in-range background: with values {1, 9} and background 1, the raw
+            # field still offered species 1 to the legend while `occupied` had
+            # already dropped it, so the bounds selected nothing and `add_mesh`
+            # was handed an empty dataset. With {1, 2} and background 1 the
+            # same gap instead LISTED species 1 in a picture that does not
+            # contain it.
+            #
+            # One source. Whatever is in `occupied` is what gets named.
+            present = np.asarray(occupied.cell_data[layer_name])
+            legend = species_legend(present)
             if not legend:
                 # Occupied cells, none of them a species this palette names.
                 p.add_text(f"{layer_name}: no valid species ids",
