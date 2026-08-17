@@ -176,91 +176,45 @@ def authorization_criteria(baseline, sources=None, *, today=None):
 
     if not baseline:
         return [(c, False) for c in AUTHORIZATION_CRITERIA]
-    found = approval.problems(baseline, sources or [], today=today)
+    found = approval.classified(baseline, sources or [], today=today)
 
-    # CLASSIFY EACH PROBLEM, DO NOT SUBSTRING THE CONCATENATION. Every message
-    # is "growth condition <id>: <field> ..." or a cross-field sentence, and
-    # matching patterns against `" ".join(found)` let ANY FIELD VALUE
-    # manufacture a blocker: `approval_source_id = "expired"` produced a
-    # provenance-only refusal, whose text echoed the value, and criterion 7 --
-    # about dates -- fired on the word. So a bad identifier could report a date
-    # problem that did not exist, on an institutional biosafety milestone.
+    # THE REFUSAL CARRIES ITS OWN SUBJECT. Nothing here parses prose.
     #
-    # A message that names a field belongs to that field's criterion. Only the
-    # sentences that name no field are matched by phrase, and those phrases are
-    # checked against the single message rather than the whole text.
-    field_criterion = {
+    # The previous arrangement recovered the field by stripping a "growth
+    # condition <id>" prefix and taking the first token, and it failed four
+    # times in a row -- an echoed field value matching a criterion pattern, a
+    # longer echoed value impersonating a relation phrase, an apostrophe
+    # flipping repr to double quotes, and an id containing BOTH quote
+    # characters, which repr must escape and no delimiter pair can bracket.
+    # Each fix was correct and each left the shape intact one size smaller,
+    # because the defect was never the regex: it was asking a sentence built
+    # from unrestricted CSV data to say which field it was about.
+    #
+    # `approval.classified` now states the subject, so a condition id is data
+    # again and cannot reach this decision at all.
+    criterion_of = {
         "strain_identities": 1,
         "biosafety_level_by_strain": 1,
-        "approval_scope_hash": 2,
+        "approval_scope_hash": 2,            # unset: nothing binds the row
         "containment_facility": 3,
         "risk_assessment_reference": 4,
         "institutional_approval_id": 5,
         "institutional_approval_authority": 5,
         "approved_protocol_version": 6,
+        "approval_scope_hash:mismatch": 6,   # edited: scope no longer covers it
         "approval_effective_date": 7,
         "approval_expiration_date": 7,
         "culturing_start_date": 7,
+        None: 7,                             # relations between dates
         "approval_source_id": 8,
         "is_target_system": 9,
     }
-    # Sentences that describe a RELATION between fields and so name none of
-    # them as their subject.
-    phrase_criterion = (
-        ("does not match the conditions", 6),
-        ("culturing started", 7),
-        ("the approval expired", 7),
-        ("approval expires", 7),
-        ("approval document", 8),
-        ("is not the target system", 9),
-    )
-
-    def _criterion_of(problem: str) -> int | None:
-        # Strip the "growth condition '<id>'" prefix STRUCTURALLY rather than by
-        # splitting on the first colon: one message reads "growth condition
-        # 'GC1' is not the target system: ..." and puts its colon after the
-        # clause, so a colon split would hand back the explanation instead.
-        # BOTH REPR QUOTE STYLES. `approval.problems` formats the id with !r,
-        # and Python switches to double quotes when the value contains an
-        # apostrophe -- so a perfectly ordinary condition id like "O'Brien-1"
-        # produced a prefix this regex could not strip, the head became
-        # "condition", nothing classified, and an unset source id was reported
-        # as a scope failure plus an UNMAPPED refusal. The id is data; it must
-        # not be able to change which criterion a message lands on.
-        body = re.sub(r"""^growth condition (?:'[^']*'|"[^"]*"):?\s*""",
-                      "", problem)
-        # The field name, when there is one, is the first token of the body --
-        # and it is checked FIRST, so a message that names a field can never be
-        # reclassified by a value echoed later in the same sentence.
-        head = body.split(" ", 1)[0].strip("'\",")
-        if head in field_criterion:
-            # ONE FIELD, TWO DIFFERENT FAILURES. `approval_scope_hash` unset
-            # means nothing binds the row -- the conditions are not frozen,
-            # criterion 2. `approval_scope_hash does not match` means the
-            # approval no longer describes the row -- the scope does not cover
-            # it, criterion 6. Different remedies, so the message decides.
-            #
-            # THE FIELD IS IDENTIFIED FIRST AND THE PHRASE ONLY REFINES IT.
-            # Testing the phrase before reading the head left the same hole one
-            # size smaller: `approval_source_id = "does not match the
-            # conditions"` produced a provenance-only refusal that the checklist
-            # reported as criterion 6, leaving criterion 8 met. A phrase may
-            # narrow a message already known to be about a field; it may never
-            # decide which field a message is about.
-            if head == "approval_scope_hash" and \
-                    "does not match the conditions" in body:
-                return 6
-            return field_criterion[head]
-        for phrase, number in phrase_criterion:
-            if phrase in body:
-                return number
-        return None
 
     unmet_numbers, unmapped = set(), []
-    for problem in found:
-        number = _criterion_of(problem)
-        if number is None:
-            unmapped.append(problem)
+    for refusal in found:
+        number = criterion_of.get(refusal.subject, "missing")
+        if number == "missing":
+            unmapped.append(refusal.text)
         else:
             unmet_numbers.add(number)
 

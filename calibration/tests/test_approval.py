@@ -235,3 +235,37 @@ def test_an_approval_without_a_protocol_version_is_refused():
     found = problems(row(approved_protocol_version=""))
     assert any("approved_protocol_version" in p for p in found), found
     assert any("names nothing" in p for p in found)
+
+
+def test_every_refusal_states_its_own_subject():
+    """WHAT MAKES THE CHECKLIST UNPARSEABLE-BY-DESIGN.
+
+    `problems()` is prose for humans; `classified()` carries the column each
+    refusal is about. The institutional checklist consumes the latter, so no
+    condition id, identifier or other field value can influence which criterion
+    a refusal lands on — a defect that survived four narrowing fixes while it
+    was recovered by parsing the message.
+
+    Every subject must be a real column (or None, for the sentences relating
+    two dates), or the checklist's lookup silently gains an unmapped case.
+    """
+    known = set(approval.SCOPE_COLUMNS) | {
+        "approval_source_id", "approval_scope_hash", "approval_scope_hash:mismatch",
+        "institutional_approval_id", "institutional_approval_authority",
+        "approval_effective_date", "approval_expiration_date",
+        "culturing_start_date", "is_target_system", "strain_identities",
+        "biosafety_level_by_strain", "containment_facility",
+        "risk_assessment_reference", "approved_protocol_version", None}
+
+    broken = dict(row(), growth_condition_id='O\'Brien "lab"',
+                  approval_source_id="", strain_identities="unknown",
+                  containment_facility="TBD", approval_effective_date="")
+    seen = approval.classified([broken], SOURCES, today=TODAY)
+    assert seen, "the fixture stopped refusing; this test proves nothing"
+    for refusal in seen:
+        assert refusal.subject in known, refusal
+        assert refusal.text, refusal
+
+    # and prose is derived from the same list, so the two cannot disagree
+    assert approval.problems([broken], SOURCES, today=TODAY) == \
+        [r.text for r in seen]

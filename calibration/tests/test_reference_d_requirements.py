@@ -328,7 +328,13 @@ def test_the_two_ways_a_scope_hash_can_fail_are_different_criteria():
     assert blockers(row(scope_hash=" ")) == ["2"]
 
 
-@pytest.mark.parametrize("gid", ["GC1", "O'Brien-1", 'a"b', "GC 1", "R2A/30C"])
+@pytest.mark.parametrize("gid", [
+    "GC1", "O'Brien-1", 'a"b', "GC 1", "R2A/30C",
+    # THE ONE NO DELIMITER PAIR CAN BRACKET: repr must escape one of the two
+    # quote characters, so every "strip the quoted prefix" regex stops early.
+    'O\'Brien "lab"',
+    'both \' and " and: a colon',
+])
 def test_the_condition_id_cannot_change_which_criterion_is_blamed(gid):
     """THE IDENTIFIER IS DATA. It must not steer the checklist.
 
@@ -337,6 +343,11 @@ def test_the_condition_id_cannot_change_which_criterion_is_blamed(gid):
     like `O'Brien-1` produced a prefix the classifier's regex could not strip.
     The head became the word "condition", nothing matched, and an unset source
     id was reported as a scope failure plus an UNMAPPED refusal.
+
+    Four fixes narrowed that defect without closing it, because the defect was
+    never the regex — it was asking a sentence built from unrestricted CSV data
+    to say which field it was about. `approval.classified` now carries the
+    subject, so these ids cannot reach the decision at all.
 
     Whether a growth condition happens to be named after someone Irish is not a
     fact about its biosafety approval.
