@@ -467,13 +467,29 @@ def test_no_module_defines_the_same_name_twice():
         f"the earlier definition never runs: {shadowed}")
 
 
+# STRUCTURAL, NOT A PHRASE LIST. The first version enumerated the six exact
+# sentences that had appeared, which cannot close a natural-language class: "the
+# remaining conclusions are unchanged" and "all other findings stand" are the
+# same prohibited claim and matched none of them. This matches the SHAPE --
+# a quantifier over the unnamed remainder, a plural subject, and a verb of
+# unchangedness -- while leaving the permitted singular scoped sentence alone.
+#
+# WHAT IT STILL CANNOT DO. No regex closes a paraphrase class; a determined
+# rewording gets through. This is a tripwire for a reflex that has now recurred
+# three times, not a proof. The actual control is AGENTS.md rule 5 -- delete the
+# sentence, do not reword it -- and claiming otherwise here would itself be an
+# unchecked statement about scope, which is the defect being guarded against.
 BLANKET_REASSURANCE = re.compile(
-    r"(the findings themselves stand"
-    r"|every other conclusion is unchanged"
-    r"|all other conclusions? (are|is) unchanged"
-    r"|the conclusions themselves are unchanged"
-    r"|nothing else (is affected|changes)"
-    r"|everything else stands)", re.I)
+    r"(?:"
+    r"(?:all|every|the|any)\s+(?:other|remaining)\s+(?:\w+\s+){0,2}?"
+    r"(?:conclusions?|findings?|results?|numbers?|figures?|claims?|values?)"
+    r"|(?:the\s+)?(?:conclusions|findings|results|numbers|figures|claims)\s+themselves"
+    r"|nothing\s+else|everything\s+else|no\s+other\s+\w+"
+    r"|the\s+rest\s+of\s+the\s+(?:conclusions?|findings?|results?|analysis|report)"
+    r")"
+    r"[^.;]{0,45}?"
+    r"(?:unchanged|unaffected|stands?\b|holds?\b|is\s+affected|changes?\b|moved|survive)",
+    re.I)
 
 
 def blanket_reassurance_hits(text: str) -> list[str]:
@@ -574,17 +590,44 @@ def test_the_document_scan_is_wired_up_not_just_the_regex(tmp_path):
 
 
 def test_the_blanket_reassurance_pattern_actually_matches(rows):
-    """The control: the check above passes by finding nothing, and the phrases
-    it looks for were all written by me at some point in this branch's history,
-    so they are not hypothetical."""
-    for phrase in ("The findings themselves stand.",
-                   "every other conclusion is unchanged, including the "
-                   "interface-area finding",
-                   "The conclusions themselves are unchanged."):
-        assert BLANKET_REASSURANCE.search(phrase), phrase
-    # and a scoped, substantiated claim must NOT trip it
-    for allowed in ("so the conclusion is unchanged and in fact slightly "
-                    "stronger, since the error moves less than was reported",
-                    "the biovolume and porosity figures are unaffected, having "
-                    "been measured at pitches that tile"):
-        assert not BLANKET_REASSURANCE.search(allowed), allowed
+    """The control: the production check passes by finding nothing, so it is
+    worth what its pattern can find.
+
+    THE PARAPHRASES MATTER MORE THAN THE LITERALS. An earlier version listed the
+    six sentences that had actually appeared and caught nothing else -- so "the
+    remaining conclusions are unchanged" and "all other findings stand", the
+    same claim in different words, both passed. The repository rule treats a
+    rewording as the same prohibited claim, so the control has to test forms
+    that were never written here.
+    """
+    blanket = [
+        # the three that really appeared in this branch
+        "every other conclusion is unchanged, including the interface-area finding",
+        "The conclusions themselves are unchanged.",
+        "The findings themselves stand.",
+        # and paraphrases nobody has written yet, which is the point
+        "the remaining conclusions are unchanged",
+        "all other findings stand",
+        "all other results hold",
+        "every other number is unaffected",
+        "the rest of the analysis is unchanged",
+        "nothing else is affected",
+        "nothing else changes",
+        "everything else stands",
+    ]
+    for phrase in blanket:
+        assert blanket_reassurance_hits(phrase), f"missed: {phrase}"
+
+    # THE PERMITTED FORM: one named finding, substantiated on the same line.
+    # If these ever trip, the guard has started deleting honest scoped claims,
+    # which is a worse failure than the one it prevents.
+    scoped = [
+        "so the conclusion is unchanged and in fact slightly stronger, since "
+        "the error moves less than was reported",
+        "the biovolume (0.8) and porosity (0.4) figures are unaffected, having "
+        "been measured at pitches that tile",
+        "Two published numbers move: component size and the interface-area range.",
+        "The interface-area finding was stated as 0.41-0.51 across a 16x range.",
+    ]
+    for phrase in scoped:
+        assert not blanket_reassurance_hits(phrase), f"false positive: {phrase}"

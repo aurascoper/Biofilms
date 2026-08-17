@@ -75,9 +75,9 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 > the pitch it skipped instead of dropping the row silently. Two published
 > numbers move: component size from 3.2 to **1.6 µm**, which was passing at a
 > pitch that never validly ran, and the interface-area range, recorded two
-> paragraphs below. No blanket statement about the remaining conclusions belongs
-> here — the first version of this correction made one, and the interface range
-> is the counterexample that took two further rounds of review to surface.
+> paragraphs below. No blanket claim about how far this correction reaches
+> belongs here — the first version made one, and the interface range is the
+> counterexample that took two further rounds of review to surface.
 >
 > **The first attempt at this correction was itself wrong**, and the same review
 > caught that too. It removed 3.2 from the ladder's default pitches, which is not
