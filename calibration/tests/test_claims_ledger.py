@@ -295,6 +295,49 @@ def test_every_row_has_an_id_and_a_verdict(rows):
         assert row["status"] in verdicts, (row["claim_id"], row["status"])
 
 
+def rows_of_wrong_width(path) -> list[tuple]:
+    """(line number, claim id, field count) for every row that is not the
+    declared width. Takes a PATH so a synthetic malformed file can exercise it;
+    a guard that has only ever read a well-formed file has not been shown to
+    detect anything."""
+    with open(path, encoding="utf-8") as fh:
+        reader = csv.reader(l for l in fh if not l.startswith("#"))
+        header = next(reader)
+        return [(i + 2, row[0] if row else "?", len(row))
+                for i, row in enumerate(reader) if len(row) != len(header)]
+
+
+def test_a_malformed_row_is_actually_detected(tmp_path):
+    """THE CONTROL FOR THE WIDTH GUARD.
+
+    The guard below passes by finding nothing, which is what a guard that can
+    find nothing also does. I verified it by hand — editing the real ledger,
+    watching it fail, reverting — and committed no evidence of that, which is
+    the same as not having done it.
+
+    So: a file with the exact corruption that occurred, built here.
+    """
+    good = "claim_id,location,claim_text,status\nA-01,here,fine,keep\n"
+    assert rows_of_wrong_width(_write(tmp_path / "ok.csv", good)) == []
+
+    # a sentence appended after the final field, commas and all — the edit that
+    # gave LADDER-03 three phantom fields
+    spilled = good + "A-02,here,fine,keep appended, with a comma, outside\n"
+    caught = rows_of_wrong_width(_write(tmp_path / "spilled.csv", spilled))
+    assert [c[1] for c in caught] == ["A-02"], caught
+    assert caught[0][2] == 6, "the row should show its inflated field count"
+
+    # and the opposite corruption: a row that lost a field
+    short = good + "A-03,here,fine\n"
+    assert [c[1] for c in rows_of_wrong_width(_write(tmp_path / "short.csv", short))] \
+        == ["A-03"]
+
+
+def _write(path, text):
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def test_every_row_has_exactly_the_declared_columns():
     """A ROW THAT SPILLS ITS FIELDS IS SILENTLY A DIFFERENT ROW.
 
@@ -308,11 +351,9 @@ def test_every_row_has_exactly_the_declared_columns():
     corrupted row. `DictReader` is forgiving by design; this is the check that
     is not.
     """
+    wrong = rows_of_wrong_width(LEDGER)
     with open(LEDGER, encoding="utf-8") as fh:
-        reader = csv.reader(l for l in fh if not l.startswith("#"))
-        header = next(reader)
-        wrong = [(i + 2, row[0] if row else "?", len(row))
-                 for i, row in enumerate(reader) if len(row) != len(header)]
+        header = next(csv.reader(l for l in fh if not l.startswith("#")))
     assert not wrong, (
         f"rows whose field count is not {len(header)} — a value containing a "
         f"comma was written unquoted: {wrong}")
