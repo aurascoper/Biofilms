@@ -54,7 +54,8 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "calibration"))
 
 from biofilm_calibration.spatial.structure import summarise
-from biofilm_calibration.spatial.synthetic import PhysicalSlab, PhysicalSpheres
+from biofilm_calibration.spatial.synthetic import (NonTilingPitchError,
+                                                   PhysicalSlab, PhysicalSpheres)
 
 ACCEPTANCE = REPO / "config" / "reference_d_spatial_acceptance.toml"
 
@@ -115,7 +116,14 @@ def run_ladder(spec, pitches, tolerances) -> list[dict]:
     truth = truth_for(spec)
     rows = []
     for pitch in pitches:
-        B = spec.rasterize(pitch)
+        try:
+            B = spec.rasterize(pitch)
+        except NonTilingPitchError as err:
+            # NAMED, not silently dropped. A pitch that cannot tile this
+            # object is not a coarser view of it, and a ladder row that
+            # quietly disappeared would look like a pitch nobody tried.
+            rows.append({"pitch_um": float(pitch), "skipped": str(err)})
+            continue
         # Threshold occupancy at tau = 0.5, the frozen declared mapping. The
         # fields here are already binary, so this is an identity for them and
         # is written out anyway: an occupancy rule that appears only when it
@@ -148,29 +156,48 @@ def coarsest_passing(rows, observable) -> float | None:
     monotone in pitch — a sphere can be captured well at one pitch and badly at
     the next by where the centres happen to fall — so a single passing coarse
     pitch is luck, not headroom.
+
+    A SKIPPED PITCH IS NOT A FAILED MEASUREMENT. A refused rung carries no
+    `within_*` key, so reading it with a default of False made an explicit
+    refusal indistinguishable from an observation that missed tolerance -- and
+    it broke the tail beneath it. Inserting a non-tiling 1.4 between 1.6 and
+    0.8 could therefore drag a passing component-size result from 1.6 down to
+    0.8 with neither valid measurement having changed.
+
+    The refusal says this pitch is not a view of the object at all. Absence of
+    an observation is not an observation of failure, so the row stays in the
+    report and leaves the convergence tail alone.
     """
     key = f"within_{observable}"
-    passing = None
-    for row in sorted(rows, key=lambda r: r["pitch_um"]):
-        if not row.get(key, False):
-            passing = None
-        elif passing is None:
-            passing = row["pitch_um"]
-        else:
-            passing = max(passing, row["pitch_um"])
-    # walk coarse -> fine, keep the coarsest with an unbroken tail
-    best = None
-    ordered = sorted(rows, key=lambda r: -r["pitch_um"])
+    # Walk coarse -> fine and keep the coarsest rung whose tail is unbroken.
+    #
+    # A previous version computed a running `passing` in a first loop and then
+    # DISCARDED it, returning a value from this one -- so the filter I first
+    # added to that loop changed nothing at all, and the test still failed with
+    # the fix apparently in place. Dead code that looks like the answer is
+    # worse than no code: it absorbs a correction and reports success.
+    ordered = sorted((r for r in rows if "skipped" not in r),
+                     key=lambda r: -r["pitch_um"])
     for i, row in enumerate(ordered):
         if all(r.get(key, False) for r in ordered[i:]):
-            best = row["pitch_um"]
-            break
-    return best
+            return row["pitch_um"]
+    return None
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--outdir", type=Path, required=True)
+    # 3.2 TILES THE SLAB AND NOT THE SPHERES, and the default keeps it for
+    # exactly that reason. It does not divide the spheres' 24 um axis (7.5
+    # voxels), so that row was measuring a 25.6 um box against a 24 um analytic
+    # truth -- a 6.7% denominator shift reported as rasterisation error.
+    #
+    # The first correction DROPPED 3.2 from this list, which was wrong twice
+    # over: the slab's 3.2 control is valid and was lost, and `run_ladder`'s
+    # skip-row machinery only runs on a pitch it is actually given, so the
+    # promise that the ladder "names the pitch it skipped" quietly became
+    # unreachable. A pitch that is absent from the list is indistinguishable
+    # from a pitch nobody tried. Keep it; let the spheres refuse it by name.
     ap.add_argument("--pitches", default="3.2,1.6,0.8,0.4,0.2")
     args = ap.parse_args(argv)
 
@@ -194,17 +221,22 @@ def main(argv=None) -> int:
             "truth": truth,
             "coarsest_passing_um": {
                 obs: coarsest_passing(rows, obs)
-                for obs in truth if f"within_{obs}" in rows[0]},
+                for obs in truth
+                if any(f"within_{obs}" in r for r in rows)},
             "rows": rows,
         }
 
         print(f"\n=== {name} ===")
         print("  truth: " + "  ".join(f"{k}={v:.5g}" for k, v in truth.items()))
-        header = [o for o in truth if f"within_{o}" in rows[0]]
+        header = [o for o in truth if any(f"within_{o}" in r for r in rows)]
         print(f"  {'pitch':>7} {'shape':>14} " +
               " ".join(f"{o[:14]:>15}" for o in header))
         for row in rows:
             cells = []
+            if row.get("skipped"):
+                print(f"  {row['pitch_um']:7.2f} {'SKIPPED':>14}  "
+                      f"does not tile this extent")
+                continue
             for obs in header:
                 mark = "ok " if row.get(f"within_{obs}") else "OVER"
                 cells.append(f"{row[f'err_{obs}']:10.2e} {mark}")

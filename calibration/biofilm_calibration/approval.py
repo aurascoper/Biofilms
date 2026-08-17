@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date
+from typing import NamedTuple
 
 from physical_contract import APPROVAL_DOCUMENT_TYPES, is_placeholder
 
@@ -45,6 +46,12 @@ _MUST_NAME_SOMETHING = (
     "containment_facility",
     "strain_identities",
     "risk_assessment_reference",
+    # WITHOUT THIS THE SCOPE DIGEST BINDS NOTHING USEFUL. `approved_protocol_version`
+    # is one of the SCOPE_COLUMNS, so a blank value simply hashes as blank and the
+    # digest still matches -- an approval could be recorded without identifying
+    # WHICH protocol the institution reviewed, which is the binding the digest
+    # exists to create.
+    "approved_protocol_version",
 )
 
 # What the approval was issued AGAINST. Editing any of these after the fact
@@ -88,8 +95,35 @@ def _parse(value: str):
         return None
 
 
-def problems(rows, sources=None, *, today: date | None = None) -> list[str]:
-    """Everything wrong with the declared approvals, collected.
+class Refusal(NamedTuple):
+    """One refusal, with the field it is ABOUT carried beside the prose.
+
+    THE SUBJECT IS DATA, NOT SOMETHING TO RECOVER FROM THE SENTENCE. The
+    institutional checklist used to classify these by parsing the message --
+    strip the "growth condition <id>" prefix, take the first token as the field
+    name -- and that arrangement failed four times running, each time because a
+    VALUE reached a decision it had no part in: an echoed field value matching
+    a criterion pattern; a longer echoed value impersonating a relation phrase;
+    an apostrophe in a condition id flipping `repr` to double quotes; and then
+    an id holding BOTH quote characters, which `repr` must escape and no
+    delimiter pair can bracket.
+
+    Condition ids are unrestricted CSV data. Prose built from them cannot be
+    parsed back into its parts, so the parts are kept instead.
+
+    `subject` is the column the refusal is about. It is None for the sentences
+    describing a relation BETWEEN fields, which have no single subject, and
+    `"approval_scope_hash:mismatch"` distinguishes an edited condition from an
+    unset hash -- one field, two failures, two different remedies.
+    """
+
+    subject: str | None
+    text: str
+
+
+def classified(rows, sources=None, *,
+               today: date | None = None) -> list[Refusal]:
+    """Everything wrong with the declared approvals, each with its subject.
 
     `today` is INJECTED and defaults to the real date. An approval expires, so
     the verdict genuinely depends on when it is asked — that is correct, and it
@@ -100,65 +134,65 @@ def problems(rows, sources=None, *, today: date | None = None) -> list[str]:
     against rows rather than a path so this module does no I/O and stays as
     testable as the rest of the gate.
     """
-    out: list[str] = []
+    out: list[Refusal] = []
     today = today or date.today()
     by_id = {r["source_id"]: r for r in (sources or [])}
+
+    def add(subject, text):
+        out.append(Refusal(subject, f"growth condition {gid!r}: {text}"))
 
     for row in rows:
         gid = row.get("growth_condition_id", "<unnamed>")
 
         for field in _MUST_NAME_SOMETHING:
             if is_placeholder(row.get(field)):
-                out.append(
-                    f"growth condition {gid!r}: {field} = "
-                    f"{(row.get(field) or '')!r} names nothing. An approval is "
-                    "evidence produced by an institution; filler text has no "
-                    "evidentiary force whatever it says")
+                add(field,
+                    f"{field} = {(row.get(field) or '')!r} names nothing. An "
+                    "approval is evidence produced by an institution; filler "
+                    "text has no evidentiary force whatever it says")
 
         if row.get("is_target_system") != "true":
-            out.append(
-                f"growth condition {gid!r} is not the target system: a "
-                "surrogate exercises the harness but cannot clear the gate for "
-                "the seven-species consortium")
+            add("is_target_system",
+                "this is not the target system: a surrogate exercises the "
+                "harness but cannot clear the gate for the seven-species "
+                "consortium")
 
         # --- the approval document -------------------------------------
         source_id = (row.get("approval_source_id") or "").strip()
         if is_placeholder(source_id):
-            out.append(
-                f"growth condition {gid!r}: approval_source_id is unset — an "
-                "approval identifier with no registered document behind it "
-                "cannot be checked against anything")
+            add("approval_source_id",
+                "approval_source_id is unset — an approval identifier with no "
+                "registered document behind it cannot be checked against "
+                "anything")
         elif source_id not in by_id:
-            out.append(
-                f"growth condition {gid!r}: approval_source_id {source_id!r} "
-                "does not resolve in the spatial source registry")
+            add("approval_source_id",
+                f"approval_source_id {source_id!r} does not resolve in the "
+                "spatial source registry")
         else:
             src = by_id[source_id]
             kind = (src.get("document_type") or "").strip()
             if kind not in APPROVAL_DOCUMENT_TYPES:
-                out.append(
-                    f"growth condition {gid!r}: approval_source_id "
-                    f"{source_id!r} is document_type {kind or 'unset'!r}, not "
-                    "an approval — a source_id resolving to the wrong KIND of "
-                    "document is how an approval comes to cite a datasheet")
+                add("approval_source_id",
+                    f"approval_source_id {source_id!r} is document_type "
+                    f"{kind or 'unset'!r}, not an approval — a source_id "
+                    "resolving to the wrong KIND of document is how an "
+                    "approval comes to cite a datasheet")
             if is_placeholder(src.get("url")) and is_placeholder(src.get("sha256")):
-                out.append(
-                    f"growth condition {gid!r}: approval document "
-                    f"{source_id!r} has neither a locator nor a digest — an "
-                    "approval nobody can retrieve is not evidence")
+                add("approval_source_id",
+                    f"approval document {source_id!r} has neither a locator "
+                    "nor a digest — an approval nobody can retrieve is not "
+                    "evidence")
 
         # --- the dates --------------------------------------------------
         parsed = {}
         for field in _DATE_FIELDS:
             raw = row.get(field)
             if is_placeholder(raw):
-                out.append(f"growth condition {gid!r}: {field} is unset")
+                add(field, f"{field} is unset")
                 continue
             value = _parse(raw)
             if value is None:
-                out.append(
-                    f"growth condition {gid!r}: {field} = {raw!r} is not an "
-                    "ISO date (YYYY-MM-DD)")
+                add(field, f"{field} = {raw!r} is not an ISO date (YYYY-MM-DD)")
             else:
                 parsed[field] = value
 
@@ -166,37 +200,44 @@ def problems(rows, sources=None, *, today: date | None = None) -> list[str]:
         expires = parsed.get("approval_expiration_date")
         started = parsed.get("culturing_start_date")
 
+        # No single subject: each describes a relation BETWEEN dates.
         if effective and started and started < effective:
-            out.append(
-                f"growth condition {gid!r}: culturing started {started} but the "
-                f"approval was not effective until {effective} — the approval "
-                "must precede culturing, which is the whole point of it")
+            add(None,
+                f"culturing started {started} but the approval was not "
+                f"effective until {effective} — the approval must precede "
+                "culturing, which is the whole point of it")
         if expires and started and started >= expires:
-            out.append(
-                f"growth condition {gid!r}: culturing started {started}, on or "
-                f"after the approval expired {expires}")
+            add(None, f"culturing started {started}, on or after the approval "
+                      f"expired {expires}")
         if effective and expires and expires <= effective:
-            out.append(
-                f"growth condition {gid!r}: approval expires {expires}, on or "
-                f"before it becomes effective {effective}")
+            add(None, f"the approval expires {expires}, on or before it "
+                      f"becomes effective {effective}")
         if expires and today >= expires:
-            out.append(
-                f"growth condition {gid!r}: the approval expired {expires} and "
-                f"today is {today} — a lapsed approval authorises nothing")
+            add(None, f"the approval expired {expires} and today is {today} — "
+                      "a lapsed approval authorises nothing")
 
         # --- the scope --------------------------------------------------
         declared = (row.get("approval_scope_hash") or "").strip()
         if is_placeholder(declared):
-            out.append(
-                f"growth condition {gid!r}: approval_scope_hash is unset, so "
-                "nothing binds this row's conditions to what was approved")
+            add("approval_scope_hash",
+                "approval_scope_hash is unset, so nothing binds this row's "
+                "conditions to what was approved")
         else:
             computed = scope_digest(row)
             if declared.casefold() != computed.casefold():
-                out.append(
-                    f"growth condition {gid!r}: approval_scope_hash does not "
-                    f"match the conditions on this row (declared "
-                    f"{declared[:16]}…, computed {computed[:16]}…). A growth "
-                    "condition has been changed since the approval was "
-                    "recorded, so the approval no longer covers it")
+                add("approval_scope_hash:mismatch",
+                    "approval_scope_hash does not match the conditions on this "
+                    f"row (declared {declared[:16]}…, computed "
+                    f"{computed[:16]}…). A growth condition has been changed "
+                    "since the approval was recorded, so the approval no "
+                    "longer covers it")
     return out
+
+
+def problems(rows, sources=None, *, today: date | None = None) -> list[str]:
+    """The same refusals as prose, for display and for existing callers.
+
+    Built FROM `classified` rather than beside it, so the two cannot disagree
+    about what is wrong.
+    """
+    return [r.text for r in classified(rows, sources, today=today)]

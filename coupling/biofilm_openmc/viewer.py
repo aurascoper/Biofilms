@@ -65,6 +65,33 @@ SCHEMA_VERSION = 1
 # How a layer behaves under resampling. See the module docstring.
 EXTENSIVE = "extensive"
 INTENSIVE = "intensive"
+# THE DEFAULT MUST NOT BE A STATEMENT. `background=None` says "every cell
+# carries information, hide nothing" -- true for `generation`, and wrong for
+# `omega_b`. If it were also the default, a producer who simply forgot would
+# make that claim silently, which is how two layers came to render their empty
+# space as data. UNDECLARED is the default and is refused at write time.
+UNDECLARED = "undeclared"
+
+# The exchange schema's out-of-domain sentinel: 0 is empty space INSIDE the
+# biological domain, -1 is outside it. `observer.occupied_mask` tests `> 0`, so
+# it treats both as absent -- which makes this constant half of the occupancy
+# contract, not a detail of one renderer. It lives here, beside the Layer that
+# has to validate against it.
+OUT_OF_DOMAIN = -1
+
+
+def is_undeclared(value) -> bool:
+    """Whether an absence declaration is missing.
+
+    BY VALUE, NEVER BY IDENTITY. The sentinel has to survive a round trip
+    through the manifest, and `json.loads('"undeclared"')` is a DIFFERENT string
+    object that compares equal -- so `value is UNDECLARED` accepted a categorical
+    layer with no absence semantics, and `plot_layer` then sent the string into
+    thresholding as though it were a number. Every representation must be
+    refused the same way, so every caller asks this one question.
+    """
+    return isinstance(value, str) and value == UNDECLARED
+
 CATEGORICAL = "categorical"
 BOOLEAN = "boolean"
 SEMANTIC_KINDS = frozenset({EXTENSIVE, INTENSIVE, CATEGORICAL, BOOLEAN})
@@ -138,6 +165,19 @@ class Layer:
     authoritative_for_quantitation: bool = True
     source_grid_id: str | None = None     # where a derived layer came from
     derivation: str | None = None
+    # THE PRODUCER DECLARES THIS; A RENDERER MAY NOT ASSUME IT. Which value, if
+    # any, means "nothing is here". `cell_id` 0 is genuinely empty space, but
+    # `generation` 0 is a founder and thresholding it away deletes the first
+    # cohort from the picture. Only the code that built the field knows which it
+    # is, so `None` means every cell carries information and none may be hidden.
+    background: float | None | str = UNDECLARED
+    # WHEN A VALUE CANNOT DISAMBIGUATE ITSELF. `generation` is 0 both for a
+    # founder and for empty lattice sites, because `export_checkpoint.jl`
+    # zero-fills the array and skips unoccupied voxels -- so no `background`
+    # can be right: 0 deletes the founders, None draws the void as biomass.
+    # Naming the layer that says WHERE BIOMASS IS resolves it, and only the
+    # producer knows which layer that is.
+    occupancy_from: str | None = None
     note: str = ""
 
     def as_dict(self) -> dict:
@@ -149,7 +189,13 @@ class Layer:
                 "authoritative_for_quantitation":
                     bool(self.authoritative_for_quantitation),
                 "source_grid_id": self.source_grid_id,
-                "derivation": self.derivation, "note": self.note}
+                "derivation": self.derivation,
+                "background": (self.background
+                               if self.background is None
+                               or is_undeclared(self.background)
+                               else float(self.background)),
+                "occupancy_from": self.occupancy_from,
+                "note": self.note}
 
 
 @dataclass(frozen=True)
@@ -172,6 +218,15 @@ class Table:
         return {"name": self.name, "basis": self.basis,
                 "columns": {k: len(np.asarray(v)) for k, v in self.columns.items()},
                 "units": dict(self.units), "note": self.note}
+
+
+def _has_unknown_sentinel(data) -> bool:
+    """Any negative value that is not the schema's out-of-domain marker."""
+    arr = np.asarray(data)
+    if not np.issubdtype(arr.dtype, np.number):
+        return False
+    negative = arr[arr < 0]
+    return bool(negative.size and (negative != OUT_OF_DOMAIN).any())
 
 
 def bundle_problems(grids, layers, tables=()) -> list[str]:
@@ -278,6 +333,77 @@ def bundle_problems(grids, layers, tables=()) -> list[str]:
         if not layer.native and layer.source_grid_id is None:
             out.append(f"layer {layer.name!r} is derived but does not say from "
                        "which grid")
+
+        # A DANGLING OCCUPANCY REFERENCE FAILS OPEN. `occupancy_from` exists
+        # because `generation` cannot state its own absence -- 0 is a founder
+        # and 0 is empty space -- so a misspelt or cross-grid reference does
+        # not merely mislabel the layer, it silently returns the renderer to
+        # the ambiguity the field was added to resolve. Same treatment as
+        # source_grid_id above: name it at write time, not at draw time.
+        # OMISSION MUST NOT ACQUIRE A SEMANTICS. `background=None` means "every
+        # cell carries information, hide nothing" -- a real and sometimes
+        # correct statement, but a terrible DEFAULT, because a producer that
+        # simply forgot silently claims it. Two layers did: `omega_b` drew its
+        # false cells as part of the region, and the upsampled `cell_id_on_r*`
+        # overlay grew a shell of empty space. Both were found by review, not
+        # here. A categorical or boolean layer must now SAY which it means.
+        if layer.semantic_kind in (CATEGORICAL, BOOLEAN) \
+                and is_undeclared(layer.background) \
+                and layer.occupancy_from is None:
+            out.append(
+                f"layer {layer.name!r} is {layer.semantic_kind} but declares "
+                "neither `background` nor `occupancy_from`, so a renderer "
+                "cannot tell absence from data. Say which value means "
+                "'nothing here', name the layer that does, or pass "
+                "`background=None` to state that every cell is informative")
+
+        if layer.occupancy_from is not None:
+            other = next((l for l in layers if l.name == layer.occupancy_from),
+                         None)
+            if other is None:
+                out.append(f"layer {layer.name!r} names occupancy_from "
+                           f"{layer.occupancy_from!r}, which is not a layer in "
+                           "this bundle")
+            elif other.grid_id != layer.grid_id:
+                out.append(f"layer {layer.name!r} takes occupancy from "
+                           f"{layer.occupancy_from!r}, which is on grid "
+                           f"{other.grid_id!r} and not {layer.grid_id!r}; a "
+                           "mask must be cell-for-cell with what it masks")
+            elif layer.background is not None \
+                    and not is_undeclared(layer.background):
+                out.append(f"layer {layer.name!r} declares both a background "
+                           "value and an occupancy layer; they are two answers "
+                           "to one question and the renderer would pick one")
+            elif other.background == 0 and _has_unknown_sentinel(other.data):
+                # THE OTHER HALF OF THE CONTRACT. Declaring background 0 says
+                # which value is empty; it does NOT say that every negative is
+                # a sentinel, and `Layer.background` cannot -- it names one
+                # value. But the mask tests `> 0`, so a source using, say, -7
+                # as legitimate data loses those cells silently. Only the
+                # schema's own -1 is a known sentinel; anything else is an
+                # encoding this mask does not implement.
+                out.append(
+                    f"layer {layer.name!r} takes occupancy from "
+                    f"{layer.occupancy_from!r}, which declares background 0 but "
+                    f"holds negative values other than {OUT_OF_DOMAIN} "
+                    "(out-of-domain). The occupancy mask tests `> 0`, so those "
+                    "cells would be dropped as if they were empty")
+            elif other.background != 0:
+                # THE MASK IMPLEMENTS ONE ENCODING, so only that one is
+                # accepted. `observer.occupied_mask` tests `> 0`: background 0
+                # is empty and any NEGATIVE value is a sentinel outside the
+                # biological domain, which is the exchange schema's convention
+                # (cell_id 0 background, -1 wall). A source declaring
+                # `background = -1` would mean label 0 is valid data, and the
+                # mask would silently delete every zero-valued cell.
+                #
+                # Refusing is honest; quietly rendering the wrong cells is not.
+                out.append(
+                    f"layer {layer.name!r} takes occupancy from "
+                    f"{layer.occupancy_from!r}, which declares background "
+                    f"{other.background!r}. The occupancy mask tests `> 0`, so "
+                    "only a source with background 0 (and negative values as "
+                    "out-of-domain sentinels) is supported")
 
         # A label is not a number. Averaging two cell ids gives a third cell id,
         # which is why categorical layers may never be resampled arithmetically

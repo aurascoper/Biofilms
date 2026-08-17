@@ -54,6 +54,9 @@ jobs:
           cache-dependency-path: |
             contract/pyproject.toml
             coupling/pyproject.toml
+      - name: Install headless rendering support
+        # PyVista needs an X server to construct a Plotter even off-screen.
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1 libxrender1
       - name: Install package (bare)
         run: pip install -e contract && pip install -e "coupling[dev]"
       - name: Run shared-contract tier
@@ -62,7 +65,22 @@ jobs:
         # which needs both installed.
         run: pytest -rs contract/tests
       - name: Run unit tier
-        run: cd coupling && pytest -rs tests
+        # -rs so the skip list is VISIBLE in the log. The render tier used to
+        # be eight silent skips that hid three real defects; the only skips
+        # that should remain here are the openmc ones.
+        run: cd coupling && xvfb-run -a pytest -rs tests
+
+  merge-gate:
+    # The gate that refuses a merge over unresolved review findings. It is a
+    # check like any other and gets the same treatment: its first version let
+    # P3 threads through while documenting that it refused every unresolved
+    # thread, so it now ships with negative controls that run here.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the merge gate's negative controls
+        run: scripts/test_preflight_merge.sh
 
   calibration-unit:
     # Calibration contracts and harnesses: numpy/pytest only, no transport
@@ -119,4 +137,4 @@ jobs:
         run: pip install -e contract && pip install -e "coupling[dev]"
       - name: Run API tier and report data-gated skips
         shell: micromamba-shell {0}
-        run: cd coupling && pytest -rs tests
+        run: cd coupling && xvfb-run -a pytest -rs tests
