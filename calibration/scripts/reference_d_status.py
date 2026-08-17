@@ -184,10 +184,21 @@ def authorization_criteria(baseline, sources=None, *, today=None):
         4: ("risk_assessment_reference",),
         5: ("institutional_approval_id", "institutional_approval_authority"),
         6: ("does not match the conditions", "approved_protocol_version"),
+        # A BARE "is unset" MATCHED THE WRONG REFUSALS. `approval.problems`
+        # emits "<field> is unset" for the three dates, but also
+        # "approval_source_id is unset" and "approval_scope_hash is unset" --
+        # so an approval with no registered document reported criterion 7,
+        # about DATES, as its blocker while criterion 8, about provenance,
+        # stayed green. Being told the wrong thing is wrong is worse than
+        # being told nothing: it sends whoever reads the milestone to fix a
+        # date that was never the problem. Name the three date fields.
         7: ("must precede culturing", "expired", "is not an ISO date",
-            "is unset"),
+            "approval_effective_date is unset",
+            "approval_expiration_date is unset",
+            "culturing_start_date is unset"),
         8: ("does not resolve", "not an approval",
-            "neither a locator nor a digest"),
+            "neither a locator nor a digest",
+            "approval_source_id is unset"),
         9: ("is not the target system",),
     }
     met = {i: not any(k in text for k in keys) for i, keys in patterns.items()}

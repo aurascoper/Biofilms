@@ -248,3 +248,46 @@ def test_criteria_with_no_consumer_are_named(requirements):
     assert "spatial:require_independent_validation_sample" in decorative
     assert "spatial:maximum_biovolume_fraction_error" in set(report["hard"])
     assert "spatial:maximum_porosity_error" in set(report["derived"])
+
+
+@pytest.mark.parametrize("kwargs,expect_number,must_stay_met", [
+    ({"approval_source_id": ""},          8, (7,)),  # provenance, NOT dates
+    ({"scope_hash": " "},                 2, (7,)),  # binding, NOT dates
+    ({"approval_effective_date": ""},     7, (8,)),  # an actual date
+    ({"approval_expiration_date": ""},    7, (8,)),
+    ({"culturing_start_date": ""},        7, (8,)),
+])
+def test_an_unset_field_blames_the_criterion_it_actually_belongs_to(
+        kwargs, expect_number, must_stay_met):
+    """BEING TOLD THE WRONG THING IS WRONG IS WORSE THAN BEING TOLD NOTHING.
+
+    Criterion 7 matched a bare `"is unset"`, and `approval.problems` emits that
+    phrase for the three dates AND for `approval_source_id` and
+    `approval_scope_hash`. So an approval with no registered document reported
+    criterion 7 — about dates — as its blocker, while criterion 8, about
+    provenance, stayed green. Whoever read that milestone would have gone to
+    fix a date that was never the problem.
+
+    The blocker list is the whole output of this function. If it names the
+    wrong criterion it is not a partial answer, it is a misdirection.
+    """
+    from test_approval import SOURCES, TODAY, row
+
+    unmet = [c for c, ok in status.authorization_criteria(
+        [row(**kwargs)], SOURCES, today=TODAY) if not ok]
+    assert any(c.startswith(f"{expect_number}.") for c in unmet), (
+        f"expected criterion {expect_number} to be the blocker, got: {unmet}")
+    # and nothing fell through to the unmapped catch, which would mean the
+    # criteria still cannot see this refusal at all
+    assert not any(c.startswith("UNMAPPED") for c in unmet), unmet
+
+    # THE HALF THAT ACTUALLY CATCHES THE BUG. Asserting the right criterion is
+    # present does NOT detect a misdirection -- with the bare `"is unset"`
+    # pattern restored, criterion 8 still fires for an unset source id and this
+    # test passed while criterion 7 was also, wrongly, being reported. A blocker
+    # list that names an extra criterion sends someone to fix a field that was
+    # never the problem, so the criteria that are NOT implicated must stay met.
+    for number in must_stay_met:
+        assert not any(c.startswith(f"{number}.") for c in unmet), (
+            f"criterion {number} is reported unmet, but {kwargs} has nothing to "
+            f"do with it; blockers were: {unmet}")
