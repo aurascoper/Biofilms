@@ -247,10 +247,20 @@ def test_the_canonical_tables_are_unreachable_after_a_partial_run(tmp_path):
             SimpleNamespace(publish=True, outdir=tmp_path),
             "budget exhausted before scenario 3")
 
-    # the same run without --publish is fine, and goes somewhere harmless
+    # AND THE OTHER ROUTE TO THE SAME DIRECTORY. `--publish` is one way in;
+    # `--outdir data/calibration` is another, and it reached the canonical
+    # tables without passing any check at all. The guard is on the destination
+    # now, so every path to that directory goes through it.
+    for outdir in (canonical, canonical / "sub"):
+        with pytest.raises(SystemExit, match="stopped early"):
+            pilot.resolve_output_dir(
+                SimpleNamespace(publish=False, outdir=outdir),
+                "budget exhausted before scenario 3")
+
+    # the same run pointed somewhere harmless is fine
     assert pilot.resolve_output_dir(
         SimpleNamespace(publish=False, outdir=tmp_path),
-        "budget exhausted before scenario 3") == tmp_path
+        "budget exhausted before scenario 3") == tmp_path.resolve()
     # and a COMPLETE run may publish, or the guard would make the pilot useless
     assert pilot.resolve_output_dir(
         SimpleNamespace(publish=True, outdir=tmp_path), None) == canonical

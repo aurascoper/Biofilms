@@ -490,6 +490,9 @@ def t_critical_999(df: int) -> float | None:
     return T_CRIT_999[max(below)] if below else None
 
 
+CANONICAL_TABLES = (REPO / "data" / "calibration").resolve()
+
+
 def resolve_output_dir(args, stopped_early):
     """Where the tables go -- and the ONLY way to reach the canonical ones.
 
@@ -500,8 +503,17 @@ def resolve_output_dir(args, stopped_early):
     guard and the target in one function makes the canonical directory
     unobtainable without passing it.
     """
-    refuse_partial_publish(args.publish, stopped_early)
-    return (REPO / "data" / "calibration") if args.publish else args.outdir
+    target = (CANONICAL_TABLES if args.publish
+              else Path(args.outdir).expanduser().resolve())
+    # GUARD THE DESTINATION, NOT THE FLAG. `--publish` is one route to the
+    # canonical tables; `--outdir data/calibration` is another, and it reached
+    # them without passing any check at all -- so a budget-exhausted run could
+    # still overwrite the published evidence with partial rows, which is the
+    # precise loss this refusal exists to prevent. A flag is a proxy for the
+    # thing that matters; the directory IS the thing that matters.
+    if target == CANONICAL_TABLES or CANONICAL_TABLES in target.parents:
+        refuse_partial_publish(True, stopped_early)
+    return target
 
 
 def distinguishable_from_zero(e2, se, m) -> bool:
