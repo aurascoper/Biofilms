@@ -187,6 +187,26 @@ def species_legend(present_ids=None) -> list[tuple]:
     return [(i, SPECIES_LABELS[i - 1], SPECIES_COLOURS[i - 1]) for i in ids]
 
 
+def species_palette(legend) -> tuple[list[str], tuple[float, float]]:
+    """Colormap and colour limits giving each species id its OWN palette slot.
+
+    ONE SLOT PER ID ACROSS THE SPANNED RANGE, not one per species present.
+    Handing a renderer the three colours of {1, 2, 7} with limits spanning 1..7
+    makes it distribute three colours over six units, so species 2 draws in
+    whatever colour falls at that fraction while the legend labels it with the
+    second palette entry. The picture and its key then disagree -- which is
+    precisely the failure a fixed palette exists to prevent, arriving through
+    the code that implements the fixed palette.
+
+    Half-unit padding puts each integer id in the middle of its own band, so a
+    species keeps its colour no matter which others are present.
+    """
+    lo = min(i for i, _, _ in legend)
+    hi = max(i for i, _, _ in legend)
+    return ([SPECIES_COLOURS[i - 1] for i in range(lo, hi + 1)],
+            (lo - 0.5, hi + 0.5))
+
+
 def occupied_mask(cell_id) -> np.ndarray:
     """Voxels holding biomass.
 
@@ -295,10 +315,9 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
         if layer.colour_by == "species":
             data, _ = read_layer(path, layer_name)
             legend = species_legend(data)
+            cmap, clim = species_palette(legend)
             p.add_mesh(occupied, scalars=layer_name, show_scalar_bar=False,
-                       cmap=[colour for _, _, colour in legend],
-                       clim=(min(i for i, _, _ in legend),
-                             max(i for i, _, _ in legend)))
+                       cmap=cmap, clim=clim)
             p.add_legend([(label, colour) for _, label, colour in legend])
         else:
             p.add_mesh(occupied, scalars=layer_name,

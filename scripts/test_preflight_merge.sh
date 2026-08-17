@@ -67,6 +67,54 @@ check "no codex review blocks"         1 "[]"                 ""
 check "resolved threads clear"         0 "$(thread P1 true)"  "$HEAD_SHA"
 check "no threads at all clears"       0 "[]"                 "$HEAD_SHA"
 
+# ---------------------------------------------------------------------------
+# The pagination path, which PREFLIGHT_FIXTURE bypasses entirely.
+#
+# Every control above supplies an already-flattened response, so removing
+# --paginate, $endCursor, pageInfo or the jq fold left them all green -- the
+# fixture hook that made the gate testable also hid the newest thing added to
+# it. So: a fake `gh` on PATH that emits TWO pages, with the only unresolved
+# thread on page two. A gate that reads one page reports "Clear to merge".
+printf '\n  pagination — the fixture cannot reach this\n  %s\n' \
+       "──────────────────────────────────────────"
+
+FAKEBIN="$TMP/bin"; mkdir -p "$FAKEBIN"
+cat >"$FAKEBIN/gh" <<'FAKE'
+#!/usr/bin/env bash
+# `gh repo view` -> the repo; `gh api graphql --paginate` -> two pages, exactly
+# as the real command emits them: one JSON document per page, concatenated.
+if [[ "$1" == "repo" ]]; then echo "aurascoper/Biofilms"; exit 0; fi
+page() {  # $1 hasNextPage, $2 threads-json
+  cat <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"paged fixture","headRefOid":"abc1234def5678",
+  "reviews":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+    "submittedAt":"2026-08-16T00:00:00Z",
+    "body":"**Reviewed commit:** \`abc1234def5678\`"}]},
+  "reviewThreads":{"pageInfo":{"hasNextPage":$1,"endCursor":"CUR"},
+                   "nodes":$2}}}}}
+JSON
+}
+# Page one: nothing but a RESOLVED thread. Page two: the open P1.
+page true  '[{"isResolved":true,"isOutdated":false,"path":"p1.py","line":1,
+             "comments":{"nodes":[{"author":{"login":"x"},"body":"resolved","url":"u"}]}}]'
+if [[ "$*" == *--paginate* ]]; then
+  page false '[{"isResolved":false,"isOutdated":false,"path":"page2.py","line":9,
+                "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+                "body":"![P1 Badge](x) only visible on page two","url":"u"}]}}]'
+fi
+FAKE
+chmod +x "$FAKEBIN/gh"
+
+out="$(PATH="$FAKEBIN:$PATH" "$GATE" 1 2>&1)"; got=$?
+if [[ "$got" == 1 ]] && grep -q "page2.py" <<<"$out"; then
+  printf '  ok    a thread on page two still blocks (exit 1)\n'
+else
+  printf '  FAIL  page-two thread not seen: exit %s\n' "$got"
+  sed 's/^/        | /' <<<"$out"
+  fail=1
+fi
+
 printf '  %s\n' "──────────────────────────────────────────"
 if (( fail )); then printf '  FAILED\n\n'; exit 1; fi
 printf '  all pass\n\n'

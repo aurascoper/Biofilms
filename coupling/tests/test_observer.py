@@ -87,6 +87,31 @@ def test_pyvista_is_imported_function_locally_only():
     assert "    import pyvista as pv" in src
 
 
+def _unresolved_globals(fn):
+    """Names `fn` loads as globals that resolve to nothing.
+
+    LOAD_GLOBAL, not `co_names`. `co_names` mixes global lookups with attribute
+    names -- `pv.Plotter` contributes "Plotter" -- so a check built on it has to
+    guess which entries are real, and the first version of this test guessed by
+    requiring the name be UPPERCASE *and* an actual export of viewer.py. That
+    matched the one bug in front of it and nothing else: a misspelling like
+    `CATGORICAL` is not a viewer export, `occupied_maks` is not uppercase, and
+    both would have sailed through while `plot_layer` raised NameError on any
+    host with a renderer. A check narrowed until it matches exactly one known
+    defect has stopped being a check.
+
+    The bytecode already draws the distinction, so ask it instead of inferring.
+    """
+    import builtins
+    import dis
+
+    return sorted({
+        ins.argval for ins in dis.get_instructions(fn)
+        if ins.opname == "LOAD_GLOBAL"
+        and ins.argval not in vars(observer)
+        and not hasattr(builtins, ins.argval)})
+
+
 def test_every_global_the_render_path_uses_actually_resolves():
     """THE BARE TIER MUST STILL BE ABLE TO FAIL ON THE RENDER PATH.
 
@@ -96,34 +121,42 @@ def test_every_global_the_render_path_uses_actually_resolves():
     it: pyvista is absent from CI and from the dev environment, so all eight
     render tests SKIPPED and the suite reported green over a dead function.
 
-    "8 skipped" is not a neutral line in a test report — it is the uncovered
-    surface, and this is the check that covers the part of it that needs no
-    renderer. Name resolution is decidable statically, so it is checked
-    statically.
+    "8 skipped" is not a neutral line in a test report -- it is the uncovered
+    surface, and this is the check that covers the part of it needing no
+    renderer. Name resolution is decidable statically, so decide it statically.
     """
-    import builtins
+    for name in dir(observer):
+        fn = getattr(observer, name)
+        if not callable(fn) or not hasattr(fn, "__code__"):
+            continue
+        if fn.__code__.co_filename != observer.__file__:
+            continue
+        assert not _unresolved_globals(fn), (
+            f"observer.{name} loads {_unresolved_globals(fn)} as globals, and "
+            "nothing defines them; this raises NameError wherever it runs")
 
-    for fn in (observer.plot_layer, observer.to_image_data,
-               observer.species_legend, observer.display_plan,
-               observer.grid_geometry, observer.provenance_panel):
-        unresolved = [name for name in fn.__code__.co_names
-                      if name not in vars(observer)
-                      and not hasattr(builtins, name)
-                      # attribute access shares co_names with global lookups;
-                      # `pv.Plotter` puts "Plotter" here. Locals are the import
-                      # site for those, so anything bound locally is fine.
-                      and name not in fn.__code__.co_varnames]
-        # Attribute names on objects are indistinguishable from globals in
-        # co_names, so this cannot be a bare emptiness assert. What it CAN do is
-        # require that no unresolved name is one the module also uses as a
-        # module-level constant elsewhere -- which is exactly the CATEGORICAL
-        # case. Cross-check against the names viewer.py exports.
-        from biofilm_openmc import viewer
-        leaked = [n for n in unresolved
-                  if n.isupper() and hasattr(viewer, n)]
-        assert not leaked, (
-            f"{fn.__name__} uses {leaked} from viewer.py without importing "
-            "them; this raises NameError wherever the code actually runs")
+
+def test_the_name_check_catches_a_misspelling():
+    """THE CONTROL FOR THE CONTROL.
+
+    The test above passes when it finds nothing, so it is worth exactly as much
+    as its ability to find something. Its previous version could find only an
+    uppercase name that viewer.py really exports -- it would have missed
+    `CATGORICAL` and `occupied_maks`, which are the realistic ways this breaks.
+    """
+    src = ("def broken(x):\n"
+           "    if x in (CATGORICAL, BOOLEAN):\n"
+           "        return occupied_maks(x)\n"
+           "    return np.zeros(3)\n")
+    ns = {}
+    exec(compile(src, "<broken>", "exec"), ns)
+
+    found = _unresolved_globals(ns["broken"])
+    assert "CATGORICAL" in found, "a misspelled constant must be caught"
+    assert "occupied_maks" in found, "a misspelled lowercase helper too"
+    # ...and the names that DO resolve in observer are not reported
+    assert "BOOLEAN" not in found
+    assert "np" not in found
 
 
 # --------------------------------------------------------- what it must say
@@ -371,3 +404,39 @@ def test_a_dangling_occupancy_reference_is_refused_at_write_time(kwargs, expect)
                        occupancy_from="cell_id")
     assert not [p for p in bundle_problems(grids, layers)
                 if "occupancy" in p], bundle_problems(grids, layers)
+
+
+def test_a_species_keeps_its_colour_whatever_subset_is_present():
+    """THE INVARIANT THE PALETTE EXISTS FOR, broken by the palette code.
+
+    `species_legend` correctly returns only the species present, each with its
+    fixed colour. Passing those colours straight to the renderer with limits
+    spanning the id range then distributes them ACROSS that range: for ids
+    {1, 2, 7} three colours are spread over six units, so species 2 draws in
+    whatever falls at that fraction while the legend labels it with the second
+    palette entry. The picture disagrees with its own key.
+
+    So the check is not "the right colours appear" but "the same organism lands
+    in the same slot under different subsets", which is the actual claim.
+    """
+    from biofilm_openmc.observer import species_palette
+
+    def slot_of(species_id, present):
+        cmap, (lo, hi) = species_palette(species_legend(np.array(present)))
+        # where the renderer places this id: which band of a uniform colormap
+        # the value falls into
+        index = int((species_id - lo) / (hi - lo) * len(cmap))
+        return cmap[min(index, len(cmap) - 1)]
+
+    for sid in (1, 2, 7):
+        alone = slot_of(sid, [sid])
+        assert alone == SPECIES_COLOURS[sid - 1], sid
+
+    # the uneven subset from the finding
+    for sid in (1, 2, 7):
+        assert slot_of(sid, [1, 2, 7]) == SPECIES_COLOURS[sid - 1], (
+            f"species {sid} changes colour when {{1,2,7}} are present")
+
+    # and a contiguous subset that does not start at 1
+    for sid in (3, 4, 5):
+        assert slot_of(sid, [3, 4, 5]) == SPECIES_COLOURS[sid - 1], sid
