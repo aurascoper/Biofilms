@@ -357,6 +357,92 @@ def plants(
     return _to_geojson(out)
 
 
+# ── Correlation bands (links) ─────────────────────────────────────────────────
+def _find(layer: str, color_key: str, name_contains: str | None = None) -> dict | None:
+    """Find a site in a layer by color_key (and optional name substring)."""
+    for p in LAYERS.get(layer, []):
+        if p["color_key"] != color_key:
+            continue
+        if name_contains and name_contains.lower() not in p["name"].lower():
+            continue
+        return p
+    return None
+
+
+def _link(from_pt: dict, to_pt: dict, link_type: str, color: str, label: str) -> dict:
+    return {
+        "type": "Feature",
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [
+                [from_pt["longitude"], from_pt["latitude"]],
+                [to_pt["longitude"], to_pt["latitude"]],
+            ],
+        },
+        "properties": {
+            "link_type": link_type,
+            "color": color,
+            "label": label,
+            "from": from_pt["name"],
+            "to": to_pt["name"],
+        },
+    }
+
+
+def _build_links() -> dict:
+    links: list[dict] = []
+
+    # ── Nuclear supply chain (real): mine → enrichment → reactor → reprocess → waste ──
+    nuclear_chain = [
+        # (from stage, to stage, color, label)
+        ("uranium_mine", "enrichment", "#8B4513", "uranium → enrichment"),
+        ("enrichment", "reprocessing", "#7D3C98", "enrichment → reprocessing"),
+        ("reprocessing", "waste_storage", "#C0392B", "reprocessing → waste"),
+    ]
+    for from_stage, to_stage, color, label in nuclear_chain:
+        from_pt = _find("nuclear", from_stage)
+        to_pt = _find("nuclear", to_stage)
+        if from_pt and to_pt:
+            links.append(_link(from_pt, to_pt, "nuclear_chain", color, label))
+
+    # ── Battery supply chain (real): mine → gigafactory → recycling ──
+    battery_chain = [
+        ("lithium", "gigafactory", "#F4D03F", "lithium → gigafactory"),
+        ("cobalt", "gigafactory", "#5DADE2", "cobalt → gigafactory"),
+        ("nickel", "gigafactory", "#27AE60", "nickel → gigafactory"),
+        ("gigafactory", "recycling", "#E67E22", "gigafactory → recycling"),
+    ]
+    for from_stage, to_stage, color, label in battery_chain:
+        from_pt = _find("battery", from_stage)
+        to_pt = _find("battery", to_stage)
+        if from_pt and to_pt:
+            links.append(_link(from_pt, to_pt, "battery_chain", color, label))
+
+    # ── World grid → stars (narrative bridge): Earth grid cells to star systems ──
+    # Connect a few high-capacity grid cells to the nearest star systems.
+    star_pts = LAYERS.get("stars", [])
+    grid_pts = LAYERS.get("worldgrid", [])
+    if star_pts and grid_pts:
+        # Pick a few representative grid cells (largest capacity) and connect
+        # each to a star system (narrative, not geographic).
+        top_grid = sorted(grid_pts, key=lambda p: -p["capacity_mw"])[:4]
+        for i, g in enumerate(top_grid):
+            s = star_pts[i % len(star_pts)]
+            links.append(
+                _link(g, s, "worldgrid_stars", "#4D96FF", "Earth grid → star system")
+            )
+
+    return {"type": "FeatureCollection", "features": links}
+
+
+LINKS = _build_links()
+
+
+@app.get("/api/links")
+def links():
+    return LINKS
+
+
 @app.get("/")
 def index():
     return FileResponse(ROOT / "static" / "index.html")
