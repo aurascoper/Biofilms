@@ -20,14 +20,14 @@
   #hud .sub { font-size:11px; color:var(--ink-soft); margin-bottom:10px; }
   #hud .stat { font-size:12px; color:var(--ink-soft); margin-bottom:8px; }
   #hud .stat b { color:var(--ink); }
-  #legend { margin-top:6px; }
+  #legend { margin-top:6px; max-height:200px; overflow-y:auto; }
   #legend .row { display:flex; align-items:center; gap:8px; font-size:11px;
     color:var(--ink-soft); margin-bottom:3px; }
   #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
   #legend .row b { color:var(--ink); font-weight:600; }
   #controls { position:fixed; bottom:16px; left:16px; z-index:10;
     background:var(--panel); border:1px solid var(--line); border-radius:10px;
-    padding:10px 14px; display:flex; gap:8px; align-items:center; }
+    padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   #controls label { font-size:11px; color:var(--ink-soft); }
   #controls select, #controls input { background:#0d1424; color:var(--ink);
     border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:11px; }
@@ -42,15 +42,24 @@
 </head>
 <body>
 <div id="globe"></div>
-<div id="loading">Loading power-plant globe…</div>
+<div id="loading">Loading energy globe…</div>
 <div id="hud">
   <h1>Primary Fuel Source Geolocator</h1>
-  <div class="sub">3D geo-spatial · WRI Global Power Plant Database</div>
-  <div class="stat">Plants: <b id="stat-count">—</b> · Capacity: <b id="stat-cap">—</b> MW</div>
+  <div class="sub" id="hud-sub">3D geo-spatial · WRI Global Power Plant Database</div>
+  <div class="stat">Sites: <b id="stat-count">—</b> · Capacity: <b id="stat-cap">—</b> MW</div>
   <div id="legend"></div>
 </div>
 <div id="controls">
-  <label>Fuel</label>
+  <label>Layer</label>
+  <select id="layer-filter">
+    <option value="power">Power Plants</option>
+    <option value="nuclear">Nuclear Fuel Cycle</option>
+    <option value="battery">Battery Fuel Cycle</option>
+    <option value="gridcoin">Gridcoin/BOINC</option>
+    <option value="worldgrid">Energy World Grid</option>
+    <option value="stars">Star Systems</option>
+  </select>
+  <label>Fuel/Stage</label>
   <select id="fuel-filter"><option value="">All</option></select>
   <label>Min MW</label>
   <input id="min-cap" type="number" value="0" min="0" style="width:70px">
@@ -62,8 +71,9 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 const API = '';
-let scene, camera, renderer, controls, globeGroup, raycaster, mouse;
+let scene, camera, renderer, controls, globeGroup, starGroup, raycaster, mouse;
 let plants = [], markers = [], fuelColors = {};
+let currentLayer = 'power';
 
 init();
 loadFuels();
@@ -83,7 +93,7 @@ function init() {
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.minDistance = 1.4; controls.maxDistance = 8;
 
-  // Stars
+  // Background starfield
   const stars = new THREE.Points(
     new THREE.BufferGeometry().setFromPoints(
       Array.from({length:2000}, () => new THREE.Vector3(
@@ -98,7 +108,7 @@ function init() {
   const sphere = new THREE.Mesh(geo, mat);
   globeGroup.add(sphere);
 
-  // Graticule (lat/long lines)
+  // Graticule
   const lineMat = new THREE.LineBasicMaterial({ color:0x1e2a44, transparent:true, opacity:0.5 });
   for (let lat=-80; lat<=80; lat+=20) {
     const pts=[]; for (let lon=-180; lon<=180; lon+=5) pts.push(latLonToVec3(lat,lon,1.001));
@@ -109,6 +119,10 @@ function init() {
     globeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
   }
   scene.add(globeGroup);
+
+  // Star-system group (celestial sphere, hidden by default)
+  starGroup = new THREE.Group();
+  scene.add(starGroup);
 
   // Lights
   scene.add(new THREE.AmbientLight(0x404060, 0.6));
@@ -135,6 +149,15 @@ function latLonToVec3(lat, lon, r=1.0) {
     r*Math.sin(phi)*Math.sin(theta));
 }
 
+// RA (hours) + Dec (deg) -> celestial sphere point
+function raDecToVec3(ra, dec, r=2.0) {
+  const phi = (90-dec)*Math.PI/180, theta = ra*15*Math.PI/180;
+  return new THREE.Vector3(
+    r*Math.sin(phi)*Math.cos(theta),
+    r*Math.cos(phi),
+    r*Math.sin(phi)*Math.sin(theta));
+}
+
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
@@ -142,9 +165,11 @@ function animate() {
 }
 
 async function loadFuels() {
-  const r = await fetch(API+'/api/fuels'); const d = await r.json();
+  const layer = currentLayer;
+  const r = await fetch(API+'/api/fuels?layer='+layer); const d = await r.json();
   fuelColors = {}; const legend = document.getElementById('legend');
   const sel = document.getElementById('fuel-filter');
+  legend.innerHTML=''; sel.innerHTML='<option value="">All</option>';
   d.fuels.forEach(f => {
     fuelColors[f.fuel] = f.color;
     const row = document.createElement('div'); row.className='row';
@@ -156,15 +181,24 @@ async function loadFuels() {
 }
 
 async function loadStats() {
-  const r = await fetch(API+'/api/stats'); const d = await r.json();
-  document.getElementById('stat-count').textContent = d.plant_count;
+  const layer = currentLayer;
+  const r = await fetch(API+'/api/stats?layer='+layer); const d = await r.json();
+  document.getElementById('stat-count').textContent = d.count;
   document.getElementById('stat-cap').textContent = d.total_capacity_mw.toLocaleString();
+  const sub = document.getElementById('hud-sub');
+  sub.textContent = layer==='power' ? '3D geo-spatial · WRI Global Power Plant Database'
+    : layer==='nuclear' ? 'Nuclear fuel cycle · mines, enrichment, reprocessing, waste'
+    : layer==='battery' ? 'Battery fuel cycle · lithium/cobalt/nickel, gigafactories, recycling'
+    : layer==='gridcoin' ? 'Gridcoin/BOINC energy grid · project servers'
+    : layer==='worldgrid' ? 'Energy world grid · 4° bins (joined from lattice board)'
+    : 'Star systems · SPECULATIVE exoplanet energy layer';
 }
 
 async function loadPlants() {
+  const layer = currentLayer;
   const fuel = document.getElementById('fuel-filter').value;
   const minCap = document.getElementById('min-cap').value || 0;
-  const q = new URLSearchParams({ min_capacity: minCap, limit: 5000 });
+  const q = new URLSearchParams({ layer, min_capacity: minCap, limit: 5000 });
   if (fuel) q.set('fuel', fuel);
   const r = await fetch(API+'/api/plants?'+q); const d = await r.json();
   plants = d.features;
@@ -173,21 +207,39 @@ async function loadPlants() {
 }
 
 function renderMarkers() {
+  // Clear globe markers
   markers.forEach(m => globeGroup.remove(m));
   markers = [];
+  // Clear star markers
+  while (starGroup.children.length) starGroup.remove(starGroup.children[0]);
+
+  const isStars = currentLayer === 'stars';
   const maxCap = Math.max(...plants.map(p => p.properties.capacity_mw||0), 1);
   plants.forEach(p => {
     const cap = p.properties.capacity_mw||0;
-    const size = 0.004 + 0.03*Math.sqrt(cap/maxCap);
+    const size = isStars ? 0.05 : (0.004 + 0.03*Math.sqrt(cap/maxCap));
     const color = new THREE.Color(p.properties.color || '#BDC3C7');
     const geo = new THREE.SphereGeometry(size, 8, 8);
     const mat = new THREE.MeshBasicMaterial({ color });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(latLonToVec3(p.geometry.coordinates[1], p.geometry.coordinates[0], 1.01));
+    if (isStars) {
+      const ra = parseFloat(p.properties.extra && p.properties.extra.ra) || 0;
+      const dec = parseFloat(p.properties.extra && p.properties.extra.dec) || 0;
+      mesh.position.copy(raDecToVec3(ra, dec, 2.0));
+      starGroup.add(mesh);
+    } else {
+      mesh.position.copy(latLonToVec3(p.geometry.coordinates[1], p.geometry.coordinates[0], 1.01));
+      globeGroup.add(mesh);
+    }
     mesh.userData = p.properties;
-    globeGroup.add(mesh);
     markers.push(mesh);
   });
+
+  // Toggle visibility
+  globeGroup.visible = !isStars;
+  starGroup.visible = isStars;
+  controls.minDistance = isStars ? 0.5 : 1.4;
+  controls.maxDistance = isStars ? 10 : 8;
 }
 
 function onMouseMove(e) {
@@ -201,16 +253,23 @@ function onMouseMove(e) {
     const p = hits[0].object.userData;
     tip.style.display='block';
     tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+14)+'px';
+    let extra = '';
+    if (p.extra && p.extra.distance_ly) extra += `<div class="t-row">Distance: ${p.extra.distance_ly} ly · ${p.extra.star_type||''}</div>`;
+    if (p.note) extra += `<div class="t-row">${p.note}</div>`;
     tip.innerHTML = `<div class="t-name">${p.name||'Unnamed'}</div>
-      <div class="t-row">${p.country||''} · ${p.primary_fuel||''}</div>
+      <div class="t-row">${p.country||''} · ${p.color_key||''}</div>
       <div class="t-row">Capacity: ${(p.capacity_mw||0).toLocaleString()} MW</div>
-      <div class="t-row">Gen 2013: ${(p.generation_gwh_2013||0).toLocaleString()} GWh</div>`;
+      ${extra}`;
   } else {
     tip.style.display='none';
   }
 }
 
-document.getElementById('apply').addEventListener('click', loadPlants);
+document.getElementById('apply').addEventListener('click', () => { loadFuels(); loadStats(); loadPlants(); });
+document.getElementById('layer-filter').addEventListener('change', (e) => {
+  currentLayer = e.target.value;
+  loadFuels(); loadStats(); loadPlants();
+});
 </script>
 </body>
 </html>
