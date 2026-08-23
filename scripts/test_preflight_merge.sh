@@ -85,10 +85,24 @@ cat >"$FAKEBIN/gh" <<'FAKE'
 # `gh repo view` -> the repo; `gh api graphql --paginate` -> two pages, exactly
 # as the real command emits them: one JSON document per page, concatenated.
 if [[ "$1" == "repo" ]]; then echo "aurascoper/Biofilms"; exit 0; fi
-# The gate makes TWO paginated calls now -- reviewThreads and comments. Answer
-# the comments one with an empty page; this control is about reviewThreads.
+# The gate makes TWO paginated calls -- reviewThreads and comments. The
+# comments one gets TWO pages with the finding only on page two, and page two
+# is emitted only when --paginate is present AND the query carries the cursor
+# contract. A fixture holding all the comments at once proves nothing about
+# pagination; this is the only path that does.
 if [[ "$*" == *"comments(first:100"* ]]; then
-  echo '{"data":{"repository":{"pullRequest":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}'
+  cpage() { cat <<CJSON
+{"data":{"repository":{"pullRequest":{"comments":{
+  "pageInfo":{"hasNextPage":$1,"endCursor":"CC"},"nodes":$2}}}}}
+CJSON
+  }
+  cpage true '[{"author":{"login":"aurascoper"},"createdAt":"2026-08-17T19:00:00Z","body":"page one chatter"}]'
+  if [[ "$*" == *--paginate* ]] \
+     && [[ "$*" == *'$endCursor: String'* || "$*" == *'$endCursor:String'* ]] \
+     && [[ "$*" == *'after: $endCursor'* || "$*" == *'after:$endCursor'* ]] \
+     && [[ "$*" == *hasNextPage* ]]; then
+    cpage false '[{"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-08-17T19:05:00Z","body":"### Codex Review\n\nhttps://github.com/o/r/blob/abc1234def5678/f.py#L9-L9\n**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Finding only on comment page two**\n"}]'
+  fi
   exit 0
 fi
 page() {  # $1 hasNextPage, $2 threads-json
@@ -237,14 +251,15 @@ else
   sed 's/^/        | /' "$TMP/out"; fail=1
 fi
 
-# AND THE REAL QUERY MUST DECLARE THE CURSOR CONTRACT for comments, which the
-# fixture path cannot exercise -- same reasoning as the reviewThreads check.
-if grep -q 'comments(first:100, after:$endCursor)' "$HERE/preflight_merge.sh" \
-   && grep -A3 'comments(first:100' "$HERE/preflight_merge.sh" | grep -q 'pageInfo { hasNextPage endCursor }'; then
-  printf '  ok    the comments query declares after:$endCursor and pageInfo\n'
+# THROUGH THE REAL QUERY, not a grep over it. The fake serves the finding only
+# on comment page TWO, and only when --paginate and the cursor contract are
+# both present -- so removing either leaves the gate seeing page one alone.
+out="$(PATH="$FAKEBIN:$PATH" "$GATE" 1 2>&1)"; got=$?
+if [[ "$got" == 1 ]] && grep -q "Finding only on comment page two" <<<"$out"; then
+  printf '  ok    a finding on comment page two blocks (real --paginate path)\n'
 else
-  printf '  FAIL  the comments connection is not paginated in the real query\n'
-  fail=1
+  printf '  FAIL  comment page two never fetched: exit %s\n' "$got"
+  sed 's/^/        | /' <<<"$out"; fail=1
 fi
 
 printf '  %s\n' "──────────────────────────────────────────"

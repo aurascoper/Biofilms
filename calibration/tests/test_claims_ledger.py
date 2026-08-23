@@ -519,9 +519,16 @@ _NEGATION_BEFORE = re.compile(r"\b(?:not|no|never|none|nor|cannot|n't)\b", re.I)
 # too coarse: "This is not a measurement, but all other findings stand." had its
 # reassurance suppressed by a `not` belonging to the previous clause, so any
 # correction whose sentence contained an earlier negation got a free pass.
-# Commas, colons and coordinating conjunctions end the negation's reach.
+# Commas, colons and conjunctions end the negation's reach. The first version
+# said "coordinating conjunctions" and then listed mostly SUBORDINATING ones --
+# although, though, whereas, while -- so "not a measurement and all other
+# findings stand" kept its free pass. All seven coordinators are here now
+# (FANBOYS), which is what the comment claimed all along.
 _CLAUSE_BOUNDARY = re.compile(
-    r"[.;:,\n]|\b(?:but|yet|however|although|though|whereas|while|still)\b", re.I)
+    r"[.;:,\n]"
+    r"|\b(?:and|but|or|nor|for|yet|so)\b"                    # coordinating
+    r"|\b(?:however|although|though|whereas|while|still)\b",  # and the rest
+    re.I)
 
 
 def blanket_reassurance_hits(text: str) -> list[str]:
@@ -663,6 +670,9 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
         "This is not a measurement, but all other findings stand.",
         "This is not a measurement: all other findings stand.",
         "Although the range moved, all other findings stand.",
+        "This is not a measurement and all other findings stand.",
+        "This is not a measurement or all other findings stand.",
+        "This is not a measurement so all other findings stand.",
     ]
     for phrase in blanket:
         assert blanket_reassurance_hits(phrase), f"missed: {phrase}"
