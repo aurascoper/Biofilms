@@ -319,6 +319,19 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             # write_bundle refuses this, so a bundle in hand cannot reach here.
             raise ValueError(
                 f"layer {layer_name!r} declares no absence semantics")
+        elif layer.background == 0:
+            # THE SAME DOMAIN CONTRACT AS occupancy_from, applied to a layer
+            # rendered from its OWN data. `bundle_problems` already refuses
+            # any background-0 source holding a negative value other than
+            # OUT_OF_DOMAIN, so a background-0 layer's own field is a valid
+            # occupancy source for itself -- and must be masked the same way:
+            # `occupied_mask`, not equality-against-background alone, or the
+            # -1 wall cells (present, e.g., in subvoxel_refinement.py's
+            # cell_id layers) survive an `!= 0` check and render as data.
+            image.cell_data["_occupied"] = occupied_mask(
+                np.asarray(image.cell_data[layer_name])).astype(np.uint8)
+            occupied = image.threshold(0.5, scalars="_occupied")
+            occupied.set_active_scalars(layer_name)
         else:
             # Drop ONLY the declared background value. `invert=True` on an
             # equality band removes that one value and keeps both sides, so a

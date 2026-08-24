@@ -21,8 +21,8 @@ from biofilm_openmc.observer import (SPECIES_COLOURS, SPECIES_LABELS,
                                      display_plan, grid_geometry,
                                      occupied_mask, provenance_panel,
                                      species_legend)
-from biofilm_openmc.viewer import (UNDECLARED, Grid, Layer, manifest,
-                                   write_bundle)
+from biofilm_openmc.viewer import (OUT_OF_DOMAIN, UNDECLARED, Grid, Layer,
+                                   manifest, write_bundle)
 
 LATTICE = Grid("cpm_labels", (4, 4, 4), (0.0, 0.0, 0.0), (0.25, 0.25, 0.25))
 REFINED = Grid("dose_refinement_4", (16, 16, 16), (0.0, 0.0, 0.0),
@@ -714,6 +714,45 @@ def test_an_out_of_range_species_id_is_not_drawn_either(tmp_path):
     assert total == 1, (
         f"{total} cells rendered; the out-of-range label 9 is still drawn "
         "even though the legend cannot name it")
+
+
+@_needs_pyvista
+def test_the_out_of_domain_sentinel_is_excluded_from_a_direct_label_layer(
+        tmp_path):
+    """PR #12 finding: a `cell_id`-style layer rendered WITHOUT
+    `occupancy_from` (background declared directly on the layer itself) used
+    to threshold only `!= 0`, which drops the declared background but keeps
+    every `OUT_OF_DOMAIN` (-1) wall cell — `subvoxel_refinement.py` emits
+    exactly this pair (0 background, -1 outside the domain) on its cell_id
+    layers. `bundle_problems` already refuses any other negative value
+    against a background-0 source, so -1 is the only sentinel a background-0
+    layer can carry, and it must be excluded the same way `occupied_mask`
+    excludes it in the `occupancy_from` path — not just the equality-band
+    background check.
+    """
+    field = np.zeros((4, 4, 4), np.int32)
+    field[0, 0, 0] = 2                # real, in-domain data
+    field[1, 1, 1] = OUT_OF_DOMAIN     # outside the biological domain
+    path = tmp_path / "sentinel.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("cell_id", "cpm_labels", "dimensionless",
+                        "categorical", field, background=0)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+
+    plotter = observer.plot_layer(path, "cell_id")
+    meshes = [a.mapper.dataset for a in plotter.renderer.actors.values()
+              if getattr(a, "mapper", None) is not None
+              and getattr(a.mapper, "dataset", None) is not None
+              and a.mapper.dataset.n_cells]
+    drawn = sum(m.n_cells for m in meshes)
+    assert drawn == 1, (
+        f"{drawn} cells drawn; the OUT_OF_DOMAIN wall cell must not render "
+        "alongside the one real cell")
+    for m in meshes:
+        assert OUT_OF_DOMAIN not in np.asarray(m.cell_data["cell_id"])
 
 
 @_needs_pyvista
