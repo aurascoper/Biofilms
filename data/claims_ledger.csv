@@ -6,8 +6,10 @@
 # rewritten: they record what was said at audit time, and repointing them would falsify it.
 #
 # ENFORCED, since calibration/tests/test_claims_ledger.py: no claim marked `delete` may
-# reappear in the current manuscript. 30 of the 34 are checked mechanically and the other four
-# are NAMED as needing human review rather than passed over.
+# reappear in the current manuscript. 20 of the 34 are checked mechanically and the other
+# fourteen are NAMED as needing human review rather than passed over (see LEDGER-GUARD-01:
+# the earlier "30 of 34" figure counted rows that yield a searchable phrase, not rows the
+# guard can actually detect).
 # plus the claims made by the work that has landed since those documents were written.
 #
 # WHY THIS EXISTS. The README and the preprint were written 2026-04-13. The calibration

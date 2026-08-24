@@ -1085,7 +1085,7 @@ function main()
     println("="^72)
     println("  Cellular Potts Model — Radiotropic Biofilm System")
     println("  Based on Kinder & Faulkner (2026)")
-    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("="^72)
     println()
 
@@ -1537,7 +1537,7 @@ function main_coupled()
     println("="^72)
     println("  CPM + Radiodialysis Membrane Transport (Coupled)")
     println("  Kinder & Faulkner (2026) — Equations (1)–(3)")
-    println("  H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("  PDE: ∂c/∂t = ∇·(D ∇c) - uptake·c + k_des·s (cylindrical)")
     println("="^72)
     println()
@@ -1549,7 +1549,7 @@ function main_coupled()
             params.N, N_SPECIES, params.n_cells_per_species)
     @printf("  Radiolysis:   Nr=%d  D_eff=%.3g  P₀=%.3g  α=%.3g\n",
             rp.Nr, rp.D_eff, rp.P0, rp.alpha_P)
-    @printf("  Membrane:     Ḋ(R)=%.1f Gy/s  c_ext=%.2f  k_dam=%.3g\n\n",
+    @printf("  Membrane:     Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)  c_ext=%.2f  k_dam=%.3g\n\n",
             rp.Ddot_R, rp.c_ext, rp.k_dam)
 
     n_mcs = 100
