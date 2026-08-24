@@ -46,3 +46,7 @@ end
 @testset "Console report honesty" begin
     include("console_report_tests.jl")
 end
+
+@testset "Manuscript claims" begin
+    include("manuscript_claims_tests.jl")
+end

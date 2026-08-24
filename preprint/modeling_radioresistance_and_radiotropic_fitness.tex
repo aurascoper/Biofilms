@@ -232,6 +232,24 @@ competing microbial populations in chemostat systems \cite{campillo2017}, where 
 differential equations revealed long-term competitive outcomes differing from deterministic
 predictions.
 
+\subsection{Coupling Transport-Code Radiation Fields to Cell-Based Models}
+
+One-way transfer of a Monte Carlo transport code's dose field into a discrete cell-based model
+is an established, validated method class, though not previously instantiated with OpenMC.
+Liu et al.'s RADCELL toolkit couples Geant4/Geant4-DNA to CompuCell3D, extracting tumour
+geometry from the Cellular Potts model and returning per-cell dose and DNA damage
+\cite{radcell2021}. Garc\'{i}a Garc\'{i}a et al.'s TOPAS-Tissue couples TOPAS/TOPAS-nBio to
+CompuCell3D and validated the one-way dose transfer against a clonogenic survival assay,
+recovering literature-consistent linear-quadratic coefficients \cite{garciagarcia2024}. Cogno
+et al.\ coupled the BioDynaMo agent-based framework to TOPAS-nBio to model radiation-induced
+lung fibrosis, describing theirs as the first coupled agent-based/Monte-Carlo model for that
+specific biological endpoint \cite{cogno2024}. A targeted search found no published coupling
+of OpenMC to a Cellular Potts Model or to any other cell-scale biological or agent-based
+model; every documented OpenMC coupling is to nuclear-engineering multiphysics rather than
+biology. The one-way CPM--OpenMC path in Section~\ref{sec:results} therefore extends an
+established transport-code-to-cell-model paradigm to a new transport code and a new
+biological target, rather than introducing the paradigm itself.
+
 \subsection{Bioremediation Context}
 
 The practical motivation for modeling these communities lies in nuclear bioremediation.
@@ -278,7 +296,18 @@ candidate --- Zhdanova et al.'s 2004 report of directed hyphal growth toward a $
 with \textit{C.\ sphaerospermum} 3176 among the responders --- and that record is blocked twice
 over: whether its dose gradient was measured or calculated is unverified, and directed hyphal
 elongation has no representation in a model whose agents are isotropic biomass parcels with no
-elongation or connectivity term. Three further audit verdicts bound what public data can do for
+elongation or connectivity term. Directed-growth modelling of fungal hyphae along a sensed
+gradient is a mature capability elsewhere: the Neighbour-Sensing model \cite{meskauskas2004}
+computes each hyphal tip's growth vector from local fields and their gradients, and the
+Vesicle-Supply-Center / hyphoid tip-growth model \cite{bartnickigarcia1989} gives the
+underlying tip-elongation geometry; adapting either to a computed radiation dose field is the
+model revision this framework would need to represent tropism directly rather than through a
+parcel's acceptance bias. The nearest existing radiation-fungus model
+\cite{shuryak2014} predicts dose-rate-dependent proliferation \emph{magnitude} in irradiated
+\textit{C.\ neoformans}, not directional growth; no published model drives hyphal tropism from
+a computed radiation dose field, which is a gap this framework shares with the wider
+literature rather than a shortfall unique to isotropic biomass parcels. Three further audit
+verdicts bound what public data can do for
 this model at all: the CPM spatial machinery can be exercised but not calibrated on public data
 (\texttt{PUBLIC\_DATA\_CAN\_VALIDATE\_PIPELINE\_ONLY}); no public source pairs a calibrated
 hydrated volume with wet mass, dry mass and matched blanks
@@ -364,11 +393,16 @@ $N \equiv N(t,\mathbf{x})$.  The nine terms encode:
 
 \paragraph{This subsection is specification, not method.}
 No program in this work integrates Eq.~\ref{eq:psde}. There is no fitness field $F_s$ in any
-source file: a case-insensitive search for it across every \texttt{.jl} and \texttt{.R} file
-returns only the manuscript title in header comments. What the three R codes advance is a set of
-particle positions under overdamped first-order Euler steps, and the CPM advances a lattice
-configuration by Metropolis acceptance --- neither is a discretisation of a field equation in
-$F_s$.
+source file. A case-insensitive search for the identifier \texttt{F\_s} across this repository's
+Julia and R simulation sources --- \texttt{biofilms\_potts.jl}, \texttt{biofilms\_potts\_jacc.jl},
+the three R codes, and the supporting scripts \texttt{validate\_serial.jl},
+\texttt{export\_checkpoint.jl} and \texttt{scoby\_3d.jl} --- returns no match at all. The word
+``fitness'' itself appears in exactly two places in that code, both header-comment attributions
+of this manuscript's own title (\texttt{biofilms\_potts.jl} and
+\texttt{biofilms\_radiodialysis.R}), never as an implemented quantity. What the three R codes
+advance is a set of particle positions under overdamped first-order Euler steps, and the CPM
+advances a lattice configuration by Metropolis acceptance --- neither is a discretisation of a
+field equation in $F_s$.
 
 Four of the nine terms are additionally unrepresentable rather than merely unimplemented. The
 deterministic reaction $R_s$ is nutrient-dependent \emph{growth}, and the CPM has none:
@@ -422,10 +456,17 @@ current state; (2) adjust the phase-locking deviation $\Delta_s$; (3) advance vi
 
 \paragraph{This subsection is specification, not method.}
 No program in this work performs symplectic integration. Eq.~\ref{eq:hamiltonian} carries a kinetic
-term, but no simulation reported here holds a velocity or momentum state: the R models advance
-positions under overdamped first-order Euler steps and the CPM is a Metropolis Markov chain, which
-has no trajectory whose symplectic form could be preserved. Implementing it is listed in
-Section~\ref{sec:limitations}.
+term, but no simulation reported here holds an independently-integrated momentum state: the R
+models advance positions under overdamped first-order Euler steps and the CPM is a Metropolis
+Markov chain, neither of which has a trajectory whose symplectic form could be preserved. No
+identifier named \texttt{momentum} exists anywhere in this repository's simulation sources.
+\texttt{biofilms\_3d.R} does hold an array its own comment calls a ``velocity state,'' used to
+carry the reflection direction across a cylindrical wall boundary --- but it is recomputed in
+full from the current position and forces at every step ($\dot{\mathbf{x}} = \mu\mathbf{F} +
+\boldsymbol{\xi}$, the defining property of the overdamped limit), never advanced by its own
+equation of motion, and so is not the persisted inertial degree of freedom a symplectic
+integrator requires; the word survives in a comment where the physics does not. Implementing
+genuine symplectic integration is listed in Section~\ref{sec:limitations}.
 
 \subsection{Radiation Field Models}
 
@@ -523,6 +564,14 @@ with stress relaxation time $\tau = \eta/E$ governing biofilm restructuring dyna
 To model contaminant ingress through the bioreactor membrane under radiation-driven
 permeability change, we introduce a minimal three-equation system coupling mobile
 contaminant transport, biosorption/bioreduction, and membrane structural damage.
+
+\emph{Radiodialysis} is a term coined for this three-equation system and is not an
+established term in radiation chemistry, membrane science, or radiobiology; a targeted
+search finds no scientific usage of it outside this work. The established descriptors for
+the underlying phenomenon are \emph{radiolysis} (of water, into reactive oxygen species) and
+the resulting \emph{lipid peroxidation}, and the literature on radiation-driven change in
+membrane permeability itself uses the descriptive phrase ``radiation-induced membrane
+permeability change'' (or hyperpermeability) rather than any single coined term.
 
 \paragraph{Mobile contaminant --- cylindrical reaction-diffusion.}
 The concentration $c(r,t)$ of a dissolved contaminant (e.g.\ aqueous U(VI), Cs$^+$) in the
@@ -933,7 +982,10 @@ and experimental programme.
 Growth, survival, directed hyphal elongation, phase-locking, horizontal gene transfer, and
 viscoelastic mechanics are absent from the executed simulations. They cannot be recovered by fitting
 new coefficients to the present state variables. Adding baseline growth and death is the minimum
-model revision required before radiotrophy or radioresistance can be fitted.
+model revision required before radiotrophy or radioresistance can be fitted. For directed hyphal
+elongation specifically, Section~\ref{sec:radiotrophy_status} names the adaptable machinery ---
+a Neighbour-Sensing- or VSC-style tip-growth term \cite{meskauskas2004,bartnickigarcia1989} ---
+rather than an unbounded open problem.
 
 \paragraph{Identifiability.}
 Only the product of the melanin-production scale and the melanin-coupling scale reaches the CPM
@@ -1017,7 +1069,48 @@ institutional approvals have been issued; no such campaign or approval is claime
 manuscript.
 
 % ---- References ---------------------------------------------
-\begin{thebibliography}{47}
+\begin{thebibliography}{53}
+
+\bibitem{radcell2021}
+Liu, R., Higley, K.A., Swat, M.H., Chaplain, M.A.J., Powathil, G.G., Glazier, J.A. (2021).
+Development of a coupled simulation toolkit for computational radiation biology based on
+Geant4 and CompuCell3D.
+\textit{Physics in Medicine \& Biology}, 66(4), 045026.
+\url{https://doi.org/10.1088/1361-6560/abd4f9}
+
+\bibitem{garciagarcia2024}
+Garc\'{i}a Garc\'{i}a, O.R., Ortiz, R., Moreno-Barbosa, E., D-Kondo, N., Faddegon, B.,
+Ramos-M\'{e}ndez, J. (2024).
+TOPAS-Tissue: a framework for the simulation of the biological response to ionizing radiation
+at the multi-cellular level.
+\textit{International Journal of Molecular Sciences}, 25(18), 10061.
+\url{https://doi.org/10.3390/ijms251810061}
+
+\bibitem{cogno2024}
+Cogno, N., Bauer, R., Durante, M. (2024).
+Mechanistic model of radiotherapy-induced lung fibrosis using coupled 3D agent-based and
+Monte Carlo simulations.
+\textit{Communications Medicine}, 4, 16.
+\url{https://doi.org/10.1038/s43856-024-00442-w}
+
+\bibitem{meskauskas2004}
+Me\v{s}kauskas, A., Fricker, M.D., Moore, D. (2004).
+Simulating colonial growth of fungi with the Neighbour-Sensing model of hyphal growth.
+\textit{Mycological Research}, 108(11), 1241--1256.
+\url{https://doi.org/10.1017/S0953756204001261}
+
+\bibitem{bartnickigarcia1989}
+Bartnicki-Garcia, S., Hergert, F., Gierz, G. (1989).
+Computer simulation of fungal morphogenesis and the mathematical basis for hyphal
+(tip) growth.
+\textit{Protoplasma}, 153, 46--57.
+\url{https://doi.org/10.1007/BF01322464}
+
+\bibitem{shuryak2014}
+Shuryak, I., Bryan, R.A., Nosanchuk, J.D., Dadachova, E. (2014).
+Mathematical modeling predicts enhanced growth of X-ray irradiated pigmented fungi.
+\textit{PLoS ONE}, 9(1), e85561.
+\url{https://doi.org/10.1371/journal.pone.0085561}
 
 \bibitem{zhdanova2000}
 Zhdanova, N.N., Zakharchenko, V.A., Vember, V.V., Nakonechnaya, L.T. (2000).
