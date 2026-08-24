@@ -724,11 +724,13 @@ def test_the_out_of_domain_sentinel_is_excluded_from_a_direct_label_layer(
     to threshold only `!= 0`, which drops the declared background but keeps
     every `OUT_OF_DOMAIN` (-1) wall cell — `subvoxel_refinement.py` emits
     exactly this pair (0 background, -1 outside the domain) on its cell_id
-    layers. `bundle_problems` already refuses any other negative value
-    against a background-0 source, so -1 is the only sentinel a background-0
-    layer can carry, and it must be excluded the same way `occupied_mask`
-    excludes it in the `occupancy_from` path — not just the equality-band
-    background check.
+    layers. It must be excluded the same way `occupied_mask` excludes it in
+    the `occupancy_from` path — not just the equality-band background check.
+
+    See the next test for the other half: `bundle_problems`'s
+    `_has_unknown_sentinel` check only runs for a layer reached THROUGH
+    `occupancy_from`, so this path must not assume a direct layer's own
+    negative values are all OUT_OF_DOMAIN.
     """
     field = np.zeros((4, 4, 4), np.int32)
     field[0, 0, 0] = 2                # real, in-domain data
@@ -753,6 +755,44 @@ def test_the_out_of_domain_sentinel_is_excluded_from_a_direct_label_layer(
         "alongside the one real cell")
     for m in meshes:
         assert OUT_OF_DOMAIN not in np.asarray(m.cell_data["cell_id"])
+
+
+@_needs_pyvista
+def test_a_direct_layers_own_negative_labels_are_not_assumed_to_be_the_sentinel(
+        tmp_path):
+    """The other half of the same finding. `_has_unknown_sentinel` -- the
+    check that would refuse a background-0 source holding a negative value
+    other than OUT_OF_DOMAIN -- runs only for a layer reached THROUGH
+    `occupancy_from`. A layer rendered directly from its own background-0
+    data is never validated against it, so the rendering path must not
+    assume its negative values are all OUT_OF_DOMAIN: excluding everything
+    `<= 0` (as `occupied_mask` does) would silently drop a legitimate other
+    negative label along with the sentinel and the background.
+    """
+    field = np.zeros((4, 4, 4), np.int32)
+    field[0, 0, 0] = 2                # real, in-domain data
+    field[1, 1, 1] = OUT_OF_DOMAIN     # the actual sentinel
+    field[2, 2, 2] = -7                # an unrelated negative label, not a sentinel
+    path = tmp_path / "unknown_negative.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("cell_id", "cpm_labels", "dimensionless",
+                        "categorical", field, background=0)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+
+    plotter = observer.plot_layer(path, "cell_id")
+    meshes = [a.mapper.dataset for a in plotter.renderer.actors.values()
+              if getattr(a, "mapper", None) is not None
+              and getattr(a.mapper, "dataset", None) is not None
+              and a.mapper.dataset.n_cells]
+    drawn = sum(m.n_cells for m in meshes)
+    assert drawn == 2, (
+        f"{drawn} cells drawn, expected 2: the real cell and the -7 label "
+        "cell; only OUT_OF_DOMAIN and the declared background may be excluded")
+    values = {v for m in meshes for v in np.asarray(m.cell_data["cell_id"])}
+    assert values == {2, -7}, values
 
 
 @_needs_pyvista

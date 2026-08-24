@@ -320,16 +320,18 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             raise ValueError(
                 f"layer {layer_name!r} declares no absence semantics")
         elif layer.background == 0:
-            # THE SAME DOMAIN CONTRACT AS occupancy_from, applied to a layer
-            # rendered from its OWN data. `bundle_problems` already refuses
-            # any background-0 source holding a negative value other than
-            # OUT_OF_DOMAIN, so a background-0 layer's own field is a valid
-            # occupancy source for itself -- and must be masked the same way:
-            # `occupied_mask`, not equality-against-background alone, or the
-            # -1 wall cells (present, e.g., in subvoxel_refinement.py's
-            # cell_id layers) survive an `!= 0` check and render as data.
-            image.cell_data["_occupied"] = occupied_mask(
-                np.asarray(image.cell_data[layer_name])).astype(np.uint8)
+            # NOT `occupied_mask` (`> 0`): that assumes the domain contract
+            # `_has_unknown_sentinel` enforces for an `occupancy_from` SOURCE
+            # applies here too, but that check runs only for layers reached
+            # through `occupancy_from` -- a layer rendered directly from its
+            # own background-0 data is never validated against it, so a
+            # legitimate other negative value (a real label, not a sentinel)
+            # would be silently discarded by a blanket `> 0`. Exclude ONLY
+            # the two known sentinels by equality: the declared background
+            # and OUT_OF_DOMAIN. Anything else negative is data.
+            raw = np.asarray(image.cell_data[layer_name])
+            keep = (raw != layer.background) & (raw != OUT_OF_DOMAIN)
+            image.cell_data["_occupied"] = keep.astype(np.uint8)
             occupied = image.threshold(0.5, scalars="_occupied")
             occupied.set_active_scalars(layer_name)
         else:
