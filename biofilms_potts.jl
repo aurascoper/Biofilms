@@ -1528,6 +1528,23 @@ end
 # ---- Radiodialysis-coupled main -----------------------------
 
 """
+    print_membrane_report(rp, rd, n_mcs)
+
+Print the membrane-integrity/permeability/dose summary. Split out of
+`main_coupled()` so it's testable without a full simulation run, and so a
+negative control can capture exactly what it prints: no fabricated physical
+units (Gy, cm/s) attached to a quantity this repository cannot calibrate —
+see docs/research/session_claims_2026-08-24_redteam.md and PR #12.
+"""
+function print_membrane_report(rp::RadiolysisParams, rd::RadiolysisState, n_mcs::Int)
+    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
+    @printf("  Final P_eff / P0 = %.4f  (dimensionless ratio, exact by construction from alpha_P·Ddot_R·dt_rd·n_MCS — not a measurement)\n",
+            exp(rp.alpha_P * rp.Ddot_R * rd.t))
+    @printf("  Final P_eff, absolute: not computed in this work (P0 = %.3g cm/s is a Nafion-117 literature prior, not a calibration)\n", rp.P0)
+    @printf("  D_cum (dimensionless placeholder) after %d MCS: %.1f  (no seconds_per_mcs conversion exists — not Gy)\n", n_mcs, rp.Ddot_R * rd.t)
+end
+
+"""
     main_coupled()
 
 Run the fully coupled CPM + radiodialysis simulation and print
@@ -1561,11 +1578,7 @@ function main_coupled()
 
     @printf("\n  Simulation completed in %.1f seconds.\n", elapsed)
     @printf("  Surviving cells: %d\n", length(state.cells))
-    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
-    @printf("  Final P_eff = %.5f cm/s  (×%.1f baseline)\n",
-            rp.P0 * exp(rp.alpha_P * rp.Ddot_R * rd.t),
-            exp(rp.alpha_P * rp.Ddot_R * rd.t))
-    @printf("  Cumulative dose at membrane: %.1f Gy\n", rp.Ddot_R * rd.t)
+    print_membrane_report(rp, rd, n_mcs)
 
     # Contaminant uptake summary
     println("\n  CONTAMINANT UPTAKE SUMMARY")
