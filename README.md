@@ -786,7 +786,12 @@ No calibration test skips: the pilot ND2 file is present on this machine, so `te
 The OpenMC integration tier is manual opt-in: activate the `openmc-biofilms`
 environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
 `.github/workflows/coupling-tests.yml` — `julia-tests`, `python-unit`, `calibration-unit`, and
-`openmc-integration` behind a `workflow_dispatch` input.
+`openmc-integration` behind a `workflow_dispatch` input (API tier only; no nuclear data, so
+the five `tests/integration/` modules still skip there). Real-data-backed verification of the
+golden-tally fixture (`coupling/tests/fixtures/golden_tally_water_phantom.json`) is a separate
+workflow, `.github/workflows/golden-tally-verification.yml`, triggered by `workflow_dispatch`
+or a push touching the files that could invalidate the pin (the OpenMC/nuclear-data version)
+— not on a schedule, since the fixture's values only change when those do.
 
 What the tests pin:
 

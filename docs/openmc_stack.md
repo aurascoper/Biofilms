@@ -80,3 +80,26 @@ micromamba run -n openmc-biofilms pip install -e contract -e "coupling[dev]"
 
 Accounting is always passed / failed / SKIPPED — no `-m` deselection, so
 nothing hides from the report.
+
+## Golden-tally fixture
+
+`coupling/tests/fixtures/golden_tally_water_phantom.json` pins 12 REAL OpenMC
+runs (2 outer draws x 3 replicates x {baseline, feedback}, water-phantom
+geometry, feedback density x1.35 — the same `DENSITY_SCALE` lever
+`openmc_nested_pilot.py` already uses) — the raw per-source heating tally,
+not anything derived from it. `coupling/tests/test_gate_composition.py`
+replays the pin through the real `specific_energy_per_source ->
+debiased_squared_effect -> decide()` chain in the ordinary (no-OpenMC) test
+tier, closing the one seam nothing else in this repo tests: a gate decision
+made from something a tally actually produced, not from hand-fabricated
+`numpy` arrays.
+
+Regenerate with `coupling/scripts/regenerate_golden_tally.py` under this
+env (needs `OPENMC_CROSS_SECTIONS`, same as everything else here). It
+refuses to overwrite the committed fixture unless all 12 runs complete,
+matching `openmc_nested_pilot.py`'s `writes_canonical_tables` /
+`refuse_partial_publish` guard. Legitimately changes only if OpenMC or the
+nuclear-data library changes — the fixture header records both — which is
+what `.github/workflows/golden-tally-verification.yml` regenerates and
+diffs against on exactly that trigger, same compare-only-in-CI discipline
+as `tests/contract_csv.jl` for the serial fixture.

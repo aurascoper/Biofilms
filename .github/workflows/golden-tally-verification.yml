@@ -1,0 +1,131 @@
+name: golden-tally-verification
+
+# ENABLING, not extending -- this tier of coupling-tests.yml's old
+# openmc-integration job never actually dispatched (0 runs across 91 logged
+# CI runs) and never set up nuclear data, so a first run would have skipped
+# every data-gated test and still reported green: the empty-suite pattern.
+# This job sets up real ENDF/B-VIII.0 data and asserts the data-gated tests
+# actually ran (a non-skipped count, not just exit code 0), so its first
+# green means something.
+#
+# TRIGGER: workflow_dispatch, plus `paths:` on the two things that could
+# actually invalidate the pinned golden-tally fixture -- the OpenMC version
+# pin (this file) and the nuclear-data pin (docs/openmc_stack.md) -- rather
+# than a `schedule:`. The fixture's values only change when OpenMC or the
+# data library changes, which is an event, not a clock; a nightly job that
+# is green 364 days a year is a check nobody reads. Ordinary code changes
+# are already covered by coupling/tests/test_gate_composition.py running
+# against the committed fixture in the ordinary (no-OpenMC) tier of
+# coupling-tests.yml.
+
+on:
+  push:
+    branches: [master, "feat/**", "ci/**", "research/**"]
+    paths:
+      - ".github/workflows/golden-tally-verification.yml"
+      - "docs/openmc_stack.md"
+      - "coupling/scripts/regenerate_golden_tally.py"
+      - "coupling/tests/fixtures/golden_tally_water_phantom.json"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: golden-tally-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Real nuclear-data download (3.3 GB archive) + 12 small transport runs.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-name: openmc-biofilms
+          create-args: >-
+            -c conda-forge
+            openmc=0.15.3
+            h5py
+            numpy
+            pytest
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - name: Instantiate Julia dependencies for interop tests
+        run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
+
+      - name: Install package
+        shell: micromamba-shell {0}
+        run: pip install -e contract && pip install -e "coupling[dev]"
+
+      - name: Download and verify nuclear data
+        # The archive SHA-256 is the identity pin (docs/openmc_stack.md:
+        # "the archive digest is the stronger identity... it pins every data
+        # file, not just the index"). Refuse to proceed on a mismatch rather
+        # than silently run against different data than the fixture was
+        # generated with.
+        run: |
+          mkdir -p "$HOME/openmc-data"
+          cd "$HOME/openmc-data"
+          curl -L -o endfb-viii.0-hdf5.tar.xz \
+            https://anl.box.com/shared/static/uhbxlrx7hvxqw27psymfbhi7bx7s6u6a.xz
+          echo "200cc6b97aa8cacc3f70ebc169bb91cf39381875fc80fb91ec5d84292da9b970  endfb-viii.0-hdf5.tar.xz" \
+            | sha256sum -c -
+          echo "200cc6b97aa8cacc3f70ebc169bb91cf39381875fc80fb91ec5d84292da9b970" \
+            > endfb-viii.0-hdf5.tar.xz.sha256
+          tar -xJf endfb-viii.0-hdf5.tar.xz
+
+      - name: Run API + integration tier, with a JUnit record
+        shell: micromamba-shell {0}
+        env:
+          OPENMC_CROSS_SECTIONS: /root/openmc-data/endfb-viii.0-hdf5/cross_sections.xml
+        run: |
+          cd coupling
+          xvfb-run -a pytest -rs tests --junitxml=results.xml
+
+      - name: Assert the data-gated tests actually ran
+        # THE ENABLING CHECK. Exit code 0 is what a fully-skipped run also
+        # reports. Parse the JUnit record and require every test under
+        # tests/integration/ to be non-skipped -- if OPENMC_CROSS_SECTIONS
+        # setup silently broke, this fails loudly instead of reporting the
+        # same green a do-nothing run would.
+        run: |
+          python3 - <<'PYEOF'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          tree = ET.parse("coupling/results.xml")
+          integration = [tc for tc in tree.iter("testcase")
+                         if "tests.integration." in tc.get("classname", "")
+                         or "tests/integration/" in tc.get("file", "")]
+          if not integration:
+              print("FAIL: no tests/integration/ testcases found in the JUnit "
+                    "record at all -- the tier did not run, not just skip")
+              sys.exit(1)
+          skipped = [tc for tc in integration if tc.find("skipped") is not None]
+          if skipped:
+              names = [tc.get("name") for tc in skipped]
+              print(f"FAIL: {len(skipped)}/{len(integration)} integration "
+                    f"tests were SKIPPED, not run: {names}. Nuclear-data "
+                    "setup did not take effect -- this run means nothing.")
+              sys.exit(1)
+          print(f"OK: {len(integration)} integration tests ran, none skipped.")
+          PYEOF
+
+      - name: Regenerate the golden tally and diff against the committed fixture
+        shell: micromamba-shell {0}
+        env:
+          OPENMC_CROSS_SECTIONS: /root/openmc-data/endfb-viii.0-hdf5/cross_sections.xml
+        run: python3 coupling/scripts/regenerate_golden_tally.py
+
+      - name: Fail if the fixture drifted
+        # COMPARE-ONLY, matching tests/contract_csv.jl for the serial
+        # fixture -- this job never commits a regenerated fixture, it only
+        # detects that the committed one no longer matches what today's
+        # OpenMC + nuclear data actually produce.
+        run: git diff --exit-code -- coupling/tests/fixtures/golden_tally_water_phantom.json
