@@ -157,6 +157,37 @@ citation — the audit found none to reuse.
 
 ---
 
+## §12 code action item — already resolved, not open
+
+The compatibility audit's §12 "Exact radiotrophic data" verdict closes with a directive:
+"the unsourced inline comments at `biofilms_potts.jl:22` and `:24` should become
+cited-and-contested or be removed." Worth recording that this was checked against the
+current file and git history, not assumed — **it's already done**, and had been for nine
+days before this session started.
+
+Commit `01b0f4d` ("Fold the contracts to radioresistance and radiotropism"), 2026-08-15
+01:36:14 — the same day as the audit — rewrote the file:
+
+- `"C. neoformans", # 1 — radiotrophic yeast, melanized` → `# 1 — melanized yeast,
+  radiotropic in this model`; `"C. sphaerospermum", # 3 — radiotrophic filamentous fungus`
+  → `# 3 — melanized filamentous fungus, radiotropic here` — the exact line the audit's own
+  corrective pilot (§1.5 of `radiotrophic_pilot_recommendations.md`) named as its
+  documentation target.
+- `const RADIOTROPHIC` renamed to `const RADIOTROPIC`.
+- The two contested `β_ion` values (CN, CS) now carry inline citations to
+  `docs/research/radiotrophic_compatibility_audit.md` with `CONTESTED` flags, in place of
+  asserting a benefit.
+- A new header block stating precisely what the model represents (radiotropism) versus
+  what it structurally cannot (radiotrophy, radioresistance — "no quantity of data changes
+  that without a model revision").
+
+The line numbers 22/24 the audit cited belong to the pre-fix revision (`f4e8dbf`, what the
+audit was run against); after this commit's header rewrite the file grew by roughly nine
+lines and the flagged content no longer exists at those lines, or in any uncited form,
+anywhere in the file. No code edit was needed as part of this session's red-team pass.
+
+---
+
 ## Summary
 
 | # | Claim | Verdict |
