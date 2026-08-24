@@ -196,6 +196,7 @@ def test_a_valid_approval_meets_every_criterion():
 
 @pytest.mark.parametrize("field,bad", [
     ("strain_identities", "unknown"),
+    ("biosafety_level_by_strain", "unknown"),
     ("containment_facility", "TBD"),
     ("risk_assessment_reference", "pending"),
     ("institutional_approval_id", "d approved"),

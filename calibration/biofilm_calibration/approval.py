@@ -45,6 +45,7 @@ _MUST_NAME_SOMETHING = (
     "institutional_approval_authority",
     "containment_facility",
     "strain_identities",
+    "biosafety_level_by_strain",
     "risk_assessment_reference",
     # WITHOUT THIS THE SCOPE DIGEST BINDS NOTHING USEFUL. `approved_protocol_version`
     # is one of the SCOPE_COLUMNS, so a blank value simply hashes as blank and the
