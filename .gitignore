@@ -389,3 +389,8 @@ calibration/*.egg-info/
 *.nd2
 *.tif
 *.tiff
+
+# Built preprint. The .tex is the source; the PDF is a build artifact and
+# was swept into a commit once by `git add -A` after being explicitly left
+# out of the one before it.
+preprint/*.pdf
