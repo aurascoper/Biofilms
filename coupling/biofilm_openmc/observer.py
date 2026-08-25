@@ -401,3 +401,52 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
     elif layer.derivation_note:
         p.add_text(layer.derivation_note, position="upper_edge", font_size=7)
     return p
+
+
+def plot_overlay(path, label_layer, dose_layer, *, plotter=None,
+                 cylinder=None, manifest=None):
+    """Draw a label layer and a dose layer in ONE scene, in physical space.
+
+    THIS IS THE DIAGNOSTIC, NOT THE CHECK. `tests/test_grid_coregistration.py`
+    is what fails when the two grids disagree; this is what a reader opens
+    afterwards to see HOW they disagree. A picture nobody is obliged to look at
+    cannot be a gate, and pretending otherwise would be the
+    check-that-cannot-fail this repository keeps finding.
+
+    It composes rather than reimplements: `plot_layer` already accepts a
+    `plotter`, and both layers are positioned by `to_image_data` from their own
+    grid's declared `origin_cm`/`spacing_cm`. So the two grids land in the same
+    world frame BECAUSE the bundle says where they are -- if one is offset, the
+    picture shows it offset, which is the entire point. Nothing here recomputes
+    a coordinate.
+
+    The dose layer keeps whatever banner `display_plan` gives it. An upsampled
+    dose field drawn over labels is exactly the case `_banner` exists for, and
+    `plot_layer` refuses to suppress it.
+
+    `cylinder`, when given, is `(x0, y0, r, z_lo, z_hi)` in cm -- the CSG
+    boundary the rectilinear lattice sits inside. Voxels at the curved wall are
+    partially inside, which is why `mesh_material_volumes` raytraces them
+    instead of counting bins; drawing the surface beside the lattice is how a
+    reader sees which voxels those are. It is wireframe and unlit on purpose:
+    it is geometry being quoted, not a field being read.
+    """
+    import pyvista as pv
+
+    doc = manifest or read_manifest(path)
+    p = plotter or pv.Plotter()
+
+    plot_layer(path, label_layer, plotter=p, manifest=doc)
+    plot_layer(path, dose_layer, plotter=p, manifest=doc)
+
+    if cylinder is not None:
+        x0, y0, r, z_lo, z_hi = (float(v) for v in cylinder)
+        surface = pv.Cylinder(center=(x0, y0, 0.5 * (z_lo + z_hi)),
+                              direction=(0.0, 0.0, 1.0),
+                              radius=r, height=(z_hi - z_lo),
+                              resolution=64, capping=False)
+        p.add_mesh(surface, style="wireframe", opacity=0.35,
+                   lighting=False, color="grey")
+        p.add_text("grey wireframe: CSG boundary, not data",
+                   position="lower_right", font_size=7)
+    return p

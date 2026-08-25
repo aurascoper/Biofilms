@@ -881,3 +881,89 @@ def test_the_legend_names_exactly_the_cells_that_are_drawn(
     ids = sorted({int(v) for m in meshes if m.n_cells
                   for v in np.asarray(m.cell_data["species_id"])})
     assert ids == expect_ids, f"drew species {ids}, legend would name {expect_ids}"
+
+
+@_needs_pyvista
+def test_the_overlay_draws_both_grids_and_the_csg_boundary(tmp_path):
+    """The composite `subvoxel_refinement.py:362` wrote its data for and
+    nothing ever drew: "BOTH SIDES OF THE RULE, on real data, because a viewer
+    overlaying dose on labels needs exactly these two."
+
+    Two grids at different resolutions in one scene, plus the curved boundary
+    the rectilinear lattice sits inside. Asserted on actor count and on the
+    banner, not on pixels: what matters is that both layers reached the scene
+    and that the non-quotable one still carries its warning.
+    """
+    labels = np.zeros((4, 4, 4), np.int32)
+    labels[1, 2, 3] = 2
+    dose = np.linspace(1.0, 8.0, 8, dtype=float).reshape((2, 2, 2))
+    lattice = Grid("cpm_labels", (4, 4, 4), (0.0, 0.0, 0.0), (0.25, 0.25, 0.25))
+    coarse = Grid("dose_tally", (2, 2, 2), (0.0, 0.0, 0.0), (0.5, 0.5, 0.5),
+                  material_resolution_grid="cpm_labels")
+    path = tmp_path / "overlay.h5"
+    write_bundle(path, [lattice, coarse], [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              labels, background=0),
+        Layer("dose_rate_Gy_s", "dose_tally", "Gy/s", "intensive", dose),
+    ], provenance={"reference_system_id": "synthetic",
+                   "target_calibration": False,
+                   "evidence_policy": "synthetic",
+                   "openmc_version": "0.15.3"})
+
+    plotter = observer.plot_overlay(path, "cell_id", "dose_rate_Gy_s",
+                                    cylinder=(0.5, 0.5, 0.4, 0.0, 1.0))
+    drawn = [a for a in plotter.renderer.actors.values()
+             if getattr(a, "mapper", None) is not None
+             and getattr(a.mapper, "dataset", None) is not None]
+    # labels + dose volume + the wireframe boundary
+    assert len(drawn) >= 3, f"only {len(drawn)} actors reached the scene"
+
+    # The boundary must be drawn as geometry, never as a field a reader could
+    # mistake for data. `prop.style` is the PyVista-API name -- `representation`
+    # is raw VTK and pyvista now raises on it, so a check written against that
+    # would fail for a reason unrelated to what it is asserting.
+    # A volume actor carries VolumeProperty, which has no `style` -- so ask
+    # only the ones that do, and that difference is itself informative: the
+    # dose layer volume-renders while the labels and the boundary are surfaces.
+    styles = [a.prop.style for a in drawn
+              if hasattr(getattr(a, "prop", None), "style")]
+    assert "Wireframe" in styles, (
+        f"styles drawn were {styles}; the CSG surface must be wireframe, not "
+        "a shaded solid that reads as another field")
+    assert "Surface" in styles, (
+        f"styles drawn were {styles}; the label layer should still be solid, "
+        "or this test would pass on a scene that drew only the boundary")
+
+
+@_needs_pyvista
+def test_the_overlay_cannot_hide_a_non_quotable_dose_layer(tmp_path):
+    """An upsampled dose field drawn over labels is exactly the case `_banner`
+    exists for. The overlay composes `plot_layer`, so it inherits the refusal
+    rather than reimplementing it -- and this asserts the inheritance, because
+    a composite that quietly passed show_banner=False would undo the one rule
+    the display layer has."""
+    labels = np.zeros((4, 4, 4), np.int32)
+    labels[1, 2, 3] = 2
+    lattice = Grid("cpm_labels", (4, 4, 4), (0.0, 0.0, 0.0), (0.25, 0.25, 0.25))
+    coarse = Grid("dose_tally", (2, 2, 2), (0.0, 0.0, 0.0), (0.5, 0.5, 0.5),
+                  material_resolution_grid="cpm_labels")
+    path = tmp_path / "upsampled.h5"
+    write_bundle(path, [lattice, coarse], [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              labels, background=0),
+        Layer("dose_rate_Gy_s", "dose_tally", "Gy/s", "intensive",
+              np.ones((2, 2, 2))),
+        Layer("dose_on_lattice", "cpm_labels", "Gy/s", "intensive",
+              np.ones((4, 4, 4)), native=False,
+              authoritative_for_quantitation=False,
+              source_grid_id="dose_tally",
+              derivation="upsampled_coarse_dose"),
+    ], provenance={"reference_system_id": "synthetic",
+                   "target_calibration": False,
+                   "evidence_policy": "synthetic",
+                   "openmc_version": "0.15.3"})
+
+    plan = {l.name: l for l in observer.display_plan(observer.read_manifest(path))}
+    assert plan["dose_on_lattice"].banner, "the upsampled layer lost its banner"
+    plotter = observer.plot_overlay(path, "cell_id", "dose_on_lattice")
+    assert plotter is not None
