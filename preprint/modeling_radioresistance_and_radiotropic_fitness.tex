@@ -121,7 +121,11 @@ subsets of it. The CPM represents seven named species as computational biomass p
 than individual organisms, and has neither biomass growth nor a dose-dependent survival process,
 so the implemented phenotype is radiotropism and the model cannot test radiotrophy or
 radioresistance. The transport workflow is explicitly non-calibrating: no target physical
-parameter is inferred, and every parameter is a literature-anchored prior rather than a fit.
+parameter is inferred and no value is fitted to this system. The parameters are not uniform in
+provenance and are not reported as though they were: most are literature priors or values
+derived from them, several are flagged as weakly supported, and the melanin coupling through
+which radiation actually reaches the acceptance dynamics is a declared modelling choice ---
+hard-coded, uncited, and absent from the parameter table.
 
 What the work establishes is a reproducible computational foundation, and a specific list of the
 measurements, uncertainty controls, and model revisions required before any physical or
@@ -676,6 +680,18 @@ incompatible with the present entity semantics, because a simulated cell ID deno
 computational biomass parcel rather than one organism. The biological basis for the
 $\beta_{s,\mathrm{ion}}$ row is weaker than for species with measured survival curves and is
 retained only as a flagged literature prior.
+
+\emph{The most consequential coefficient in the model is not in this table at all.} The melanin
+acceptance term hard-codes a coupling of $0.5$ against the local melanin field rather than
+using the declared per-species $\alpha_{M}$, and that hard-coded value --- not any tabulated
+row --- is the coefficient through which radiation actually reaches the CPM dynamics. It has no
+citation, no entry in Table~\ref{tab:params}, and no configuration file exposes it. It is a
+declared modelling choice and is recorded as one
+(\texttt{PP-T2-29}, \texttt{flagged\_weak}, in \texttt{data/species\_parameter\_provenance.csv}).
+Stating it here matters because the 15.5\% acceptance shift reported in
+Section~\ref{sec:results} is this coefficient's effect: the largest measured quantity in the
+manuscript rests on the least evidenced parameter in it, and a reader who assumed the table
+covered every parameter would not learn that from the table.
 
 \emph{Seven of the twenty-six rows are on a per-cell basis this model cannot admit, and the
 conversion that would re-base them does not exist.} The three $\alpha_M$ rows are
