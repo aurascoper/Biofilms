@@ -26,7 +26,14 @@ viewer = ["pyvista>=0.44"]
 # the eight render tests SKIPPED everywhere, and a NameError, a mis-slotted
 # species palette and a crash on an empty field all shipped behind those skips
 # in a single session. A skip is uncovered surface, not a neutral fact.
-dev = ["pytest", "pyvista>=0.44"]
+#
+# PyYAML for the same reason, one step earlier. test_gate_composition.py parses
+# golden-tally-verification.yml's `on:` block to prove every fixture-producing
+# module is in BOTH trigger filters -- a substring search over the file text
+# passed while the pull_request trigger was missing entirely. It resolves today
+# only as a transitive dependency of something else, which works until whatever
+# pulls it stops, so state it rather than inherit it.
+dev = ["pytest", "pyvista>=0.44", "pyyaml"]
 
 [tool.setuptools.packages.find]
 include = ["biofilm_openmc*"]

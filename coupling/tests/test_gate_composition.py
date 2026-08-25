@@ -145,9 +145,19 @@ def _modules_that_produce_the_fixture() -> set[Path]:
     return out
 
 
+def _workflow_triggers() -> dict:
+    """The workflow's `on:` block, PARSED. Not grepped: a substring search over
+    the file text finds a path listed under `push:` alone and reports the
+    `pull_request:` filter covered too, which is exactly the hole this file
+    had. YAML also parses the bare key `on` as the boolean True."""
+    import yaml
+    doc = yaml.safe_load(_WORKFLOW.read_text())
+    return doc[True] if True in doc else doc["on"]
+
+
 def test_every_fixture_producing_module_triggers_verification():
-    """THE CONTROL FOR THE WORKFLOW'S `paths:` FILTER, which is a hand-copied
-    list and therefore something that drifts.
+    """THE CONTROL FOR THE WORKFLOW'S `paths:` FILTERS, which are hand-
+    maintained lists and therefore things that drift.
 
     The filter's first version covered only the OpenMC pin and the
     nuclear-data pin, on the stated premise that nothing else can change what
@@ -157,12 +167,11 @@ def test_every_fixture_producing_module_triggers_verification():
     verdict` above keeps replaying the committed JSON and passing. A stale
     pin that nothing can invalidate is a check that cannot fail.
 
-    So derive the list from the script's actual imports and require the
-    workflow to name each one. Add an import to `_run_one` without touching
-    the filter and this fails, which is the whole point -- the failure names
-    the file to add.
+    So derive the list from the script's actual imports and require EVERY
+    path-filtered trigger to name each one. Add an import to `_run_one`
+    without touching the filters and this fails, naming the file to add.
     """
-    workflow = _WORKFLOW.read_text()
+    triggers = _workflow_triggers()
     producers = _modules_that_produce_the_fixture()
 
     # The walk itself must find something, or this test passes vacuously the
@@ -171,10 +180,42 @@ def test_every_fixture_producing_module_triggers_verification():
         f"only found {sorted(map(str, producers))}; the import walk is not "
         "resolving the modules it is supposed to check")
 
-    missing = sorted(str(p) for p in producers
-                     if f'"{p.as_posix()}"' not in workflow)
-    assert not missing, (
-        f"{_REGEN.name} imports {missing}, so a change to any of them changes "
-        f"the real tally -- but {_WORKFLOW.name}'s paths: filter does not "
-        "list them, so verification would not run and the committed fixture "
-        "would go stale while CI stayed green. Add them to the filter.")
+    for event in ("push", "pull_request"):
+        listed = set(triggers.get(event, {}).get("paths", []))
+        missing = sorted(p.as_posix() for p in producers
+                         if p.as_posix() not in listed)
+        assert not missing, (
+            f"{_REGEN.name} imports {missing}, so a change to any of them "
+            f"changes the real tally -- but {_WORKFLOW.name}'s `{event}:` "
+            "paths filter does not list them, so verification would not run "
+            "and the committed fixture would go stale while CI stayed green.")
+
+
+def test_a_pull_request_can_reach_this_workflow_at_all():
+    """THE TRIGGER-LEVEL CONTROL. The test above proves the paths are right;
+    it cannot notice that an entire EVENT is absent, and that was the real
+    defect: `push` is branch-filtered to master/feat/ci/research, so a PR from
+    `fix/**` -- or from any fork, which matches no branch filter -- never
+    reached this job, while coupling-tests.yml passed by replaying the
+    committed tally. A fixture-producing change could merge with the pin never
+    revalidated.
+
+    Asserting the paths without asserting the event is the hole that let it
+    ship, so assert the event, and assert the two lists are the SAME list --
+    not merely equal today. YAML anchors give one source; two copies drift,
+    and the copy that drifts is the pre-merge one nobody watches.
+    """
+    triggers = _workflow_triggers()
+
+    assert "pull_request" in triggers, (
+        "no pull_request trigger: this job cannot run before a merge from any "
+        "branch outside the push filter, which includes every fork")
+    assert triggers["pull_request"].get("paths"), (
+        "the pull_request trigger has no paths filter, so it either never "
+        "fires or fires on everything -- both are wrong for a 45-minute job")
+    assert triggers["pull_request"]["paths"] == triggers["push"]["paths"]
+    # Same list object, from the YAML anchor -- not two lists that happen to
+    # match on the day someone last synchronised them.
+    assert triggers["pull_request"]["paths"] is triggers["push"]["paths"], (
+        "the two path lists are equal but separate, so they can drift; use "
+        "the `&fixture_inputs` / `*fixture_inputs` anchor")

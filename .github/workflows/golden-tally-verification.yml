@@ -28,12 +28,21 @@ name: golden-tally-verification
 # makes it a copy that can drift, so
 # `test_gate_composition.py::test_every_fixture_producing_module_triggers_
 # verification` walks the script's real imports and fails if one is not
-# listed here.
+# listed here, in BOTH triggers.
+#
+# AND `pull_request` IS NOT OPTIONAL, which the first version of this file got
+# wrong. `push` here is branch-filtered to master/feat/ci/research, so a PR
+# from `fix/**` -- or from a fork, which cannot match any branch filter --
+# never fired this job at all, while coupling-tests.yml went green replaying
+# the committed tally. A change to a fixture-producing module could merge
+# without real OpenMC ever regenerating the result it invalidated: green
+# against a pin nothing revalidated. `model-contracts.yml` already mirrors its
+# push paths into a filtered `pull_request` for exactly this reason.
 
 on:
   push:
     branches: [master, "feat/**", "ci/**", "research/**"]
-    paths:
+    paths: &fixture_inputs
       - ".github/workflows/golden-tally-verification.yml"
       - "docs/openmc_stack.md"
       - "coupling/scripts/regenerate_golden_tally.py"
@@ -45,6 +54,11 @@ on:
       - "coupling/biofilm_openmc/materials.py"
       - "coupling/biofilm_openmc/mesh.py"
       - "coupling/biofilm_openmc/model.py"
+  # ANCHORED, not copied. Two hand-maintained path lists drift, and the one
+  # that drifts is the one nobody watches -- here that would be the PR trigger,
+  # the only one that fires before a merge.
+  pull_request:
+    paths: *fixture_inputs
   workflow_dispatch: {}
 
 permissions:
