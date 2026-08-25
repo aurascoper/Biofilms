@@ -58,6 +58,15 @@
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf}
 
+% --- Line breaking --------------------------------------------
+% The prose carries long \texttt{} filenames (biofilms\_potts\_jacc.jl and
+% friends), which TeX will not hyphenate, so four paragraphs set overfull --
+% the worst by 42pt, better than half an inch into the right margin on a
+% printed page. A TeX primitive rather than a package: it lets the paragraph
+% builder stretch interword space as a last resort on the lines that would
+% otherwise overrun, and leaves every line that already fits untouched.
+\emergencystretch=3em
+
 % (no datetime2 in basic install)
 
 % ============================================================
