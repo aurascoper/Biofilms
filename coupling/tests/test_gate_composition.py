@@ -25,6 +25,7 @@ pinned heating tally through the real, live repo code -- specific_energy_per_sou
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -113,3 +114,67 @@ def test_scaling_the_dose_changes_the_verdict():
         "scaling the feedback dose 5x did not change the verdict -- the "
         "pipeline runs but the gate's output does not depend on its input")
     assert scaled_verdict.verdict == PASS_SYNTHETIC_GATE
+
+
+_REPO = Path(__file__).resolve().parents[2]
+_REGEN = _REPO / "coupling" / "scripts" / "regenerate_golden_tally.py"
+_WORKFLOW = (_REPO / ".github" / "workflows"
+             / "golden-tally-verification.yml")
+
+
+def _modules_that_produce_the_fixture() -> set[Path]:
+    """Every first-party module `regenerate_golden_tally.py` imports, as
+    repo-relative paths. Walks the real AST -- including the function-local
+    imports inside `_run_one`, which is where all of them live -- so an
+    import added later is picked up without anyone remembering to."""
+    tree = ast.parse(_REGEN.read_text())
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            names.add(node.module)
+        elif isinstance(node, ast.Import):
+            names.update(a.name for a in node.names)
+
+    out: set[Path] = set()
+    for name in names:
+        parts = name.split(".")
+        for base in ("coupling", "coupling/scripts"):
+            candidate = _REPO / base / (Path(*parts).as_posix() + ".py")
+            if candidate.exists():
+                out.add(candidate.relative_to(_REPO))
+    return out
+
+
+def test_every_fixture_producing_module_triggers_verification():
+    """THE CONTROL FOR THE WORKFLOW'S `paths:` FILTER, which is a hand-copied
+    list and therefore something that drifts.
+
+    The filter's first version covered only the OpenMC pin and the
+    nuclear-data pin, on the stated premise that nothing else can change what
+    real transport produces. False: `_run_one` imports config, model, mesh,
+    materials and dose to build and tally the phantom, and edits to any of
+    them move the real output while `test_pinned_transport_composes_into_a_
+    verdict` above keeps replaying the committed JSON and passing. A stale
+    pin that nothing can invalidate is a check that cannot fail.
+
+    So derive the list from the script's actual imports and require the
+    workflow to name each one. Add an import to `_run_one` without touching
+    the filter and this fails, which is the whole point -- the failure names
+    the file to add.
+    """
+    workflow = _WORKFLOW.read_text()
+    producers = _modules_that_produce_the_fixture()
+
+    # The walk itself must find something, or this test passes vacuously the
+    # moment the AST parse or the path resolution breaks.
+    assert len(producers) >= 6, (
+        f"only found {sorted(map(str, producers))}; the import walk is not "
+        "resolving the modules it is supposed to check")
+
+    missing = sorted(str(p) for p in producers
+                     if f'"{p.as_posix()}"' not in workflow)
+    assert not missing, (
+        f"{_REGEN.name} imports {missing}, so a change to any of them changes "
+        f"the real tally -- but {_WORKFLOW.name}'s paths: filter does not "
+        "list them, so verification would not run and the committed fixture "
+        "would go stale while CI stayed green. Add them to the filter.")

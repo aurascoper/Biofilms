@@ -27,9 +27,31 @@ let
     report = String(read(pipe_rd))
     close(pipe_rd)
 
-    # The two specific fabricated lines this finding named must be gone.
-    @test !occursin(r"Final P_eff = [\d.]+ cm/s", report)
-    @test !occursin(r"Cumulative dose at membrane: [\d.]+ Gy", report)
+    # THE DETECTORS FIRST. An absence assertion run only against corrected
+    # output is a check that cannot fail: weaken either pattern -- a typo, a
+    # stray escape, `cm/s` drifting to `cm s^-1` -- and it stops matching
+    # anything at all, while the test stays green and reports the fabricated
+    # units are gone. So give each one the known-bad string it was written to
+    # catch, taken from the report as it actually printed before the fix, and
+    # require it to bite before its absence from production output means
+    # anything.
+    P_EFF_UNITS = r"Final P_eff = [\d.]+ cm/s"
+    DOSE_UNITS  = r"Cumulative dose at membrane: [\d.]+ Gy"
+
+    known_bad_p_eff = "  Final P_eff = 0.0123 cm/s\n"
+    known_bad_dose  = "  Cumulative dose at membrane: 4.56 Gy\n"
+    @test occursin(P_EFF_UNITS, known_bad_p_eff)
+    @test occursin(DOSE_UNITS, known_bad_dose)
+    # And each must be specific to its own line, not a pattern loose enough to
+    # fire on any report text -- which would make the absence assertions below
+    # pass for the wrong reason too.
+    @test !occursin(P_EFF_UNITS, known_bad_dose)
+    @test !occursin(DOSE_UNITS, known_bad_p_eff)
+
+    # Only now: the two specific fabricated lines this finding named are gone
+    # from what `print_membrane_report` actually prints.
+    @test !occursin(P_EFF_UNITS, report)
+    @test !occursin(DOSE_UNITS, report)
 
     # The honest replacements must be present.
     @test occursin("not Gy", report)

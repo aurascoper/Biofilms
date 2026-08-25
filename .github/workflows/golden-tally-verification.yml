@@ -8,15 +8,27 @@ name: golden-tally-verification
 # actually ran (a non-skipped count, not just exit code 0), so its first
 # green means something.
 #
-# TRIGGER: workflow_dispatch, plus `paths:` on the two things that could
-# actually invalidate the pinned golden-tally fixture -- the OpenMC version
-# pin (this file) and the nuclear-data pin (docs/openmc_stack.md) -- rather
-# than a `schedule:`. The fixture's values only change when OpenMC or the
-# data library changes, which is an event, not a clock; a nightly job that
-# is green 364 days a year is a check nobody reads. Ordinary code changes
-# are already covered by coupling/tests/test_gate_composition.py running
-# against the committed fixture in the ordinary (no-OpenMC) tier of
-# coupling-tests.yml.
+# TRIGGER: workflow_dispatch plus `paths:`, not a `schedule:` -- a nightly
+# job that is green 364 days a year is a check nobody reads. The filter has
+# to cover everything that can change what real OpenMC produces.
+#
+# THE FIRST VERSION OF THIS FILTER WAS WRONG, and its comment said why in a
+# sentence that was false: "the fixture's values only change when OpenMC or
+# the data library change." They also change when any module that PRODUCES
+# the tally changes. `regenerate_golden_tally.py:_run_one()` imports
+# biofilm_openmc's config, model, mesh, materials and dose, and
+# `_nuclear_data_id` comes from openmc_nested_pilot.py; edit any of them and
+# real transport output moves while test_gate_composition.py keeps replaying
+# the old JSON and every check stays green against a stale pin. That is the
+# gate-that-cannot-fail shape, one level up from the seam the fixture exists
+# to close.
+#
+# The list below is enumerated rather than a blanket `coupling/**` so this
+# 45-minute job does not fire on every unrelated coupling edit --  which
+# makes it a copy that can drift, so
+# `test_gate_composition.py::test_every_fixture_producing_module_triggers_
+# verification` walks the script's real imports and fails if one is not
+# listed here.
 
 on:
   push:
@@ -26,6 +38,13 @@ on:
       - "docs/openmc_stack.md"
       - "coupling/scripts/regenerate_golden_tally.py"
       - "coupling/tests/fixtures/golden_tally_water_phantom.json"
+      # The fixture-producing modules, per the control test named above.
+      - "coupling/scripts/openmc_nested_pilot.py"
+      - "coupling/biofilm_openmc/config.py"
+      - "coupling/biofilm_openmc/dose.py"
+      - "coupling/biofilm_openmc/materials.py"
+      - "coupling/biofilm_openmc/mesh.py"
+      - "coupling/biofilm_openmc/model.py"
   workflow_dispatch: {}
 
 permissions:

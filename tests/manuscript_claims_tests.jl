@@ -134,9 +134,16 @@ let
         println("  unused \\bibitem keys ($(length(unused))): ", join(sort(collect(unused)), ", "))
     end
     # KNOWN, PRE-EXISTING, NOT FIXED IN THIS PASS: 15 defined-but-unused entries, a separate
-    # finding from PP-REF-* cleanup work, not something this change is responsible for. This
-    # is @test_broken rather than @test or a silent skip on purpose: if the count ever reaches
-    # zero, Test reports an UNEXPECTED PASS and someone has to notice and remove this marker,
-    # so the finding can't quietly rot in either direction.
+    # finding from PP-REF-* cleanup work, not something this change is responsible for.
+    #
+    # PIN THE COUNT, because @test_broken alone does not. It fails on zero and passes on
+    # every other number, so 15 drifting to 16 -- a NEW unused entry, exactly what this
+    # testset exists to prevent -- is indistinguishable from the status quo, and 15 dropping
+    # to 14 loses the record of what was left. The ordinary assertion is the one with teeth
+    # in both directions; @test_broken stays alongside it so reaching zero still reports an
+    # UNEXPECTED PASS and forces someone to delete this whole block rather than let the
+    # finding rot.
+    KNOWN_UNUSED = 15
+    @test length(unused) == KNOWN_UNUSED
     @test_broken isempty(unused)
 end

@@ -319,29 +319,30 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             # write_bundle refuses this, so a bundle in hand cannot reach here.
             raise ValueError(
                 f"layer {layer_name!r} declares no absence semantics")
-        elif layer.background == 0:
-            # NOT `occupied_mask` (`> 0`): that assumes the domain contract
-            # `_has_unknown_sentinel` enforces for an `occupancy_from` SOURCE
-            # applies here too, but that check runs only for layers reached
-            # through `occupancy_from` -- a layer rendered directly from its
-            # own background-0 data is never validated against it, so a
-            # legitimate other negative value (a real label, not a sentinel)
-            # would be silently discarded by a blanket `> 0`. Exclude ONLY
-            # the two known sentinels by equality: the declared background
-            # and OUT_OF_DOMAIN. Anything else negative is data.
+        else:
+            # ONE BRANCH FOR EVERY DECLARED BACKGROUND. This was split by
+            # `background == 0` and the two halves disagreed about the
+            # sentinel: the zero half excluded OUT_OF_DOMAIN, the other
+            # dropped only the declared background via an inverted equality
+            # band, so a layer declaring background 5 and carrying -1 drew
+            # the out-of-domain wall as label data. Nothing refuses that
+            # encoding either -- `_has_unknown_sentinel` runs in
+            # `bundle_problems` ONLY under `if layer.occupancy_from is not
+            # None`, so a directly-rendered layer is never validated against
+            # the domain contract at all.
+            #
+            # NOT `occupied_mask` (`> 0`): that assumes the same contract,
+            # and would silently discard a legitimate negative label (a real
+            # -7, not a sentinel) on a layer nothing validated. Exclude ONLY
+            # the two values that ARE sentinels, by equality -- the declared
+            # background and the schema's reserved OUT_OF_DOMAIN. Anything
+            # else, negative or not, is data. Background -1 collapses the two
+            # terms, which is correct: it is one value either way.
             raw = np.asarray(image.cell_data[layer_name])
             keep = (raw != layer.background) & (raw != OUT_OF_DOMAIN)
             image.cell_data["_occupied"] = keep.astype(np.uint8)
             occupied = image.threshold(0.5, scalars="_occupied")
             occupied.set_active_scalars(layer_name)
-        else:
-            # Drop ONLY the declared background value. `invert=True` on an
-            # equality band removes that one value and keeps both sides, so a
-            # sentinel below the data (cell_id 0) and one above it are handled
-            # by the same call without the caller ranking them.
-            occupied = image.threshold(
-                (layer.background, layer.background), scalars=layer_name,
-                invert=True)
         if occupied.n_cells == 0:
             # AN EMPTY FIELD MUST STILL DRAW, because "nothing is here" is a
             # result a reader needs to see. Thresholding an all-background

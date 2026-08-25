@@ -356,13 +356,95 @@ def test_a_partial_scenario_set_cannot_replace_a_complete_one(
     args = SimpleNamespace(
         publish=publish,
         outdir=(pilot.CANONICAL_TABLES if to_canonical else tmp_path),
-        levers=complete, include_near_threshold=complete)
+        levers=complete, include_near_threshold=complete,
+        # Adequate sampling, so this parametrization tests scenario coverage
+        # and nothing else. Stated rather than defaulted: a `getattr(args,
+        # "outer_draws", 4)` would let a caller that never sets the field pass
+        # the sample-count check by omission, which is rule 3.
+        outer_draws=4, replicates=3)
 
     if refuses:
         with pytest.raises(SystemExit, match="canonical tables"):
             pilot.refuse_incomplete_scenarios(args)
     else:
         assert pilot.refuse_incomplete_scenarios(args) is None
+
+
+@pytest.mark.parametrize("outer_draws,replicates,refuses,names", [
+    # THE TWO KNOWN-BAD CASES. Both have the complete scenario set and both
+    # complete without stopping early, so every other publication guard in
+    # this file passes them through.
+    (1, 3, True,  ["--outer-draws"]),    # decide() -> NOT_EVALUATED, always
+    (4, 2, True,  ["--replicates"]),     # debiased_squared_effect -> NaN
+    (1, 2, True,  ["--outer-draws", "--replicates"]),   # both, both named
+    # THE BOUNDARY, in both directions -- an assertion that never meets the
+    # value it must accept is as untested as one that never meets the value it
+    # must reject.
+    (2, 3, False, []),                   # exactly the minimum: allowed
+    (4, 3, False, []),                   # the argparse defaults: allowed
+])
+def test_an_undersampled_run_cannot_replace_a_published_one(
+        outer_draws, replicates, refuses, names, tmp_path):
+    """Sampling is the OTHER half of the publication prerequisite.
+
+    `--levers --include-near-threshold --outer-draws 1` is a complete scenario
+    set at a sample size that can never produce a verdict: `t_critical_999(0)`
+    is None, so `distinguishable_from_zero` is False for every effect no
+    matter how large. Below three replicates `debiased_squared_effect` returns
+    NaN outright. Either way the run SUCCEEDS -- nothing stops early, nothing
+    raises -- and `resolve_output_dir` hands it data/calibration/, where it
+    overwrites four-draw/three-replicate evidence with blanks.
+
+    The minimums are read off those two functions, not off the argparse
+    defaults, so this test fails if the estimators' own thresholds move and
+    the guard does not follow.
+    """
+    from types import SimpleNamespace
+
+    args = SimpleNamespace(
+        publish=True, outdir=tmp_path,
+        levers=True, include_near_threshold=True,
+        outer_draws=outer_draws, replicates=replicates)
+
+    if not refuses:
+        assert pilot.refuse_incomplete_scenarios(args) is None
+        return
+
+    with pytest.raises(SystemExit, match="under-sampled") as excinfo:
+        pilot.refuse_incomplete_scenarios(args)
+    # AND IT MUST NAME WHAT IT REFUSED. A refusal that says only "too few"
+    # leaves the operator guessing which flag, and the 1/2 case must name
+    # both rather than stopping at the first.
+    message = str(excinfo.value)
+    for flag in names:
+        assert flag in message, message
+    for flag in ({"--outer-draws", "--replicates"} - set(names)):
+        assert flag not in message, message
+
+
+def test_the_undersampling_minimums_match_the_estimators_that_set_them():
+    """The guard's numbers are derived, so prove they still are.
+
+    `MIN_REPLICATES` exists because `debiased_squared_effect` returns NaN
+    below it; `MIN_OUTER_DRAWS` because `t_critical_999(m - 1)` is None below
+    it. Both are copied constants, and a copied constant drifts silently --
+    so read the real functions rather than trusting the comment next to them.
+    """
+    import numpy as np
+
+    from biofilm_openmc.feedback_uq import debiased_squared_effect
+
+    assert pilot.t_critical_999(pilot.MIN_OUTER_DRAWS - 1) is not None
+    assert pilot.t_critical_999(pilot.MIN_OUTER_DRAWS - 2) is None
+
+    rows = [np.array([1.0, 2.0, 3.0]) for _ in range(pilot.MIN_REPLICATES)]
+    mass = np.array([1.0, 1.0, 1.0])
+    assert np.isfinite(
+        debiased_squared_effect(rows, rows, mass).e_squared)
+    assert not np.isfinite(
+        debiased_squared_effect(rows[:pilot.MIN_REPLICATES - 1],
+                                rows[:pilot.MIN_REPLICATES - 1],
+                                mass).e_squared)
 
 
 def test_main_refuses_an_incomplete_scenario_set_before_it_imports_openmc(

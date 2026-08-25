@@ -796,6 +796,48 @@ def test_a_direct_layers_own_negative_labels_are_not_assumed_to_be_the_sentinel(
 
 
 @_needs_pyvista
+def test_the_sentinel_is_excluded_for_a_nonzero_background_too(tmp_path):
+    """THE SIBLING BRANCH, and the reason the two were merged into one.
+
+    The first fix for this finding covered only `background == 0` and left
+    the other half dropping the declared background alone, via an inverted
+    equality band. A layer declaring a nonzero background -- perfectly legal,
+    and exercised right below by `test_the_legend_names_exactly_the_cells_
+    that_are_drawn`'s in-range-background cases -- that also carries the
+    schema's reserved OUT_OF_DOMAIN therefore rendered the wall as label
+    data, the exact bug the first fix was written to remove.
+
+    Nothing refuses this encoding upstream either: `bundle_problems`'s
+    `_has_unknown_sentinel` sits inside `if layer.occupancy_from is not
+    None`, so it never sees a directly-rendered layer. Which makes this the
+    known-bad input the guard has to bite on; before the merge it drew 2.
+    """
+    field = np.full((4, 4, 4), 5, np.int32)   # 5 is the declared background
+    field[0, 0, 0] = 2                        # real, in-domain data
+    field[1, 1, 1] = OUT_OF_DOMAIN            # the reserved sentinel
+    path = tmp_path / "nonzero_background_sentinel.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("cell_id", "cpm_labels", "dimensionless",
+                        "categorical", field, background=5)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+
+    plotter = observer.plot_layer(path, "cell_id")
+    meshes = [a.mapper.dataset for a in plotter.renderer.actors.values()
+              if getattr(a, "mapper", None) is not None
+              and getattr(a.mapper, "dataset", None) is not None
+              and a.mapper.dataset.n_cells]
+    drawn = sum(m.n_cells for m in meshes)
+    assert drawn == 1, (
+        f"{drawn} cells drawn, expected 1: declaring a nonzero background "
+        "does not make OUT_OF_DOMAIN renderable label data")
+    values = {v for m in meshes for v in np.asarray(m.cell_data["cell_id"])}
+    assert values == {2}, values
+
+
+@_needs_pyvista
 @pytest.mark.parametrize("values,background,expect_ids,expect_cells", [
     # the ordinary case: background outside the species range
     ({(0, 0, 0): 2, (1, 1, 1): 3}, 0, [2, 3], 2),

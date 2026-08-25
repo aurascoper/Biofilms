@@ -499,13 +499,36 @@ def writes_canonical_tables(args) -> bool:
     return target == CANONICAL_TABLES or CANONICAL_TABLES in target.parents
 
 
+# The sample counts below which this pipeline's own estimators return nothing
+# usable. NOT chosen, and not the argparse defaults dressed up as a policy --
+# read off the two functions that refuse:
+#   * `t_critical_999(m - 1)` is None at m = 1, so `distinguishable_from_zero`
+#     is False for every effect and `decide()` reports NOT_EVALUATED.
+#   * `debiased_squared_effect` returns all-NaN below three replicates ("a
+#     variance nobody can estimate is not a usable gate input").
+MIN_OUTER_DRAWS = 2
+MIN_REPLICATES = 3
+
+
 def refuse_incomplete_scenarios(args) -> None:
-    """A partial scenario set must not replace a complete one.
+    """A partial scenario set must not replace a complete one -- and neither
+    may an under-sampled one.
 
     CHECKED BEFORE ANY TRANSPORT RUNS. A refusal that arrives after the
     histories have been paid for is a refusal that costs what it was meant to
     save -- the same reason the scan path rejects an unsupported refinement
     factor up front rather than failing on a reshape at the end.
+
+    THE SCENARIO SET WAS ONLY HALF THE PREREQUISITE. Coverage and sampling are
+    two independent ways for a canonical run to be worth less than what it
+    overwrites, and guarding only the first let `--outer-draws 1` or
+    `--replicates 2` through with both scenario flags on. Those runs do not
+    fail -- they complete, `stopped_early` is False, `resolve_output_dir`
+    opens data/calibration/, and the four-draw/three-replicate tables the
+    reports cite are replaced by rows whose estimates are structurally
+    NOT_EVALUATED or NaN. A blank cell where a measured number used to be is
+    the failure this repository exists to prevent, and it arrives looking like
+    a successful run.
     """
     if not writes_canonical_tables(args):
         return
@@ -518,6 +541,29 @@ def refuse_incomplete_scenarios(args) -> None:
             f"omits {', '.join(missing)}. A partial scenario set must not "
             "replace a complete one: the rows it would drop are the provenance "
             "for numbers the reports cite.")
+
+    # NAME WHAT WAS REFUSED, and name what refuses it -- a message saying only
+    # "too few draws" sends the reader to argparse, where the number is a
+    # default and not a reason.
+    undersampled = [
+        (flag, got, need, why) for flag, got, need, why in (
+            ("--outer-draws", int(args.outer_draws), MIN_OUTER_DRAWS,
+             "t_critical_999 has no value at 0 degrees of freedom, so "
+             "distinguishable_from_zero is False for every effect and decide() "
+             "reports NOT_EVALUATED"),
+            ("--replicates", int(args.replicates), MIN_REPLICATES,
+             "debiased_squared_effect returns NaN below three replicates: the "
+             "estimator admits two, its jackknife does not, and a variance "
+             "nobody can estimate is not a usable gate input"),
+        ) if got < need]
+    if undersampled:
+        detail = "; ".join(f"{flag}={got} (needs >= {need}): {why}"
+                           for flag, got, need, why in undersampled)
+        raise SystemExit(
+            "this run writes the canonical tables in data/calibration/, and is "
+            f"under-sampled: {detail}. It would complete without stopping "
+            "early and overwrite the published tables with rows that cannot "
+            "carry a verdict.")
 
 
 def resolve_output_dir(args, stopped_early):
