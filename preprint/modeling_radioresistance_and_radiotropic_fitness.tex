@@ -656,8 +656,84 @@ $P_{\mathrm{eff}}(t)$ are imposed as independent functions and do not form a clo
 feedback law. Equations~\ref{eq:membrane_damage}--\ref{eq:peff} should therefore be read as
 candidate model components whose physical linkage remains to be selected and calibrated.
 
+\subsection{Planned Radiation--Transport Feedback, and What It Would Assume}
+\label{sec:planned_feedback}
+
+\paragraph{This subsection is specification, not method.} Nothing described here is implemented.
+There is no damage scalar, no radiation-sensitivity constant, and no adsorption capacity in any
+source file; the sorbate in Eqs.~\ref{eq:mobile}--\ref{eq:robin} is dimensionless, with
+$c_{\mathrm{ext}}$ normalised to unity and no chemical identity attached. It is written down
+because the assumptions a future two-way coupling would rest on are decidable now, and declaring
+them before the measurement exists is cheaper than discovering them afterwards.
+
+\emph{The existing sorption term is reversible and uncapped.} Eq.~\ref{eq:immobile} already
+carries a desorption channel, $-(k_{\mathrm{des}} + k_{\mathrm{loss}})s$, so the implemented
+solver is not the irreversible sink that a na\"ive $k_{\mathrm{ads}}c(1 - X/X_{\max})$ form would
+give --- that form has a steady state only at $X = X_{\max}$ for any $c > 0$, which is a black
+hole rather than a sponge, and never uses an affinity constant at all. What the implemented form
+lacks is a \emph{capacity ceiling}: it is first-order in $c$ with no site limitation, so its
+equilibrium is linear in concentration, a Henry isotherm rather than a Langmuir one. Recovering
+Langmuir requires both terms and the ceiling,
+$S = k_{\mathrm{ads}}c\,(X_{\max} - X) - k_{\mathrm{des}}X$, whose steady state is
+$X = X_{\max}\,bc/(1 + bc)$ with $b = k_{\mathrm{ads}}/k_{\mathrm{des}}$. Three distinct forms
+are in play and they are not interchangeable.
+
+\emph{An affinity constant does not supply a rate.} $b$ is thermodynamic and, at equilibrium, is
+the \emph{ratio} $k_{\mathrm{ads}}/k_{\mathrm{des}}$; infinitely many rate pairs share one ratio.
+An equilibrium isotherm therefore yields $q_{\max}$ and $b$ and yields neither rate. A solver that
+needs $k_{\mathrm{ads}}$ needs timed sampling, or must carry it as an unmeasured prior and say so.
+
+\emph{A one-way coupling is a design choice, not a physical result.} Running the transport code
+once and never returning the composition field asserts
+$\partial\mu(\mathbf{r})/\partial c(\mathbf{r},t) \approx 0$, where $\mu$ is the local linear
+attenuation coefficient. That is a statement about what was computed, not about physics, and it
+is a reasonable simplification only while the sorbate is dilute and low-$Z$. For a high-$Z$
+sorbate such as uranium, a sink term that concentrates mass by design raises the local electron
+density and effective atomic number exactly where the model has put it, and the assumption is
+weakest precisely where the interesting behaviour is. \textbf{The resulting error is not
+one-signed.} A loaded voxel would have its local deposition \emph{under}-estimated, since
+photoelectric absorption in high-$Z$ material deposits energy where the material is; regions
+behind it would be \emph{over}-estimated, since attenuation that never occurred in the model
+never removed those photons. For a spatially heterogeneous model the sign reversal is the more
+consequential half. Two further caveats belong with it: the matrix term is not static either ---
+the CPM changes occupancy, so $\mu_{\mathrm{matrix}}$ varies over a run, and at low loading that
+is plausibly the larger effect --- and preferential absorption of low-energy photons hardens the
+local spectrum, which is \emph{beam} hardening, an ordinary transport phenomenon and not an
+adaptive biological response.
+
+\emph{A single-parameter exponential damage scalar is a strong structural prior.} A form such as
+$\gamma = 1 - e^{-\lambda D}$, applied as
+$D_{\mathrm{eff}} = D_{\mathrm{eff},0} + \gamma\,(D_w - D_{\mathrm{eff},0})$, has the property
+that $\lambda \to 0$ recovers the unirradiated baseline exactly, which is worth stating: the
+architecture permits the null. \textbf{Permitting the null is not the same as being falsifiable
+against reality.} With $\gamma \in [0,1]$ the diffusivity can move only \emph{from}
+$D_{\mathrm{eff},0}$ \emph{toward} $D_w$, so the family cannot express a radiation-induced
+\emph{decrease} in effective diffusivity --- yet ionising radiation of polymers causes chain
+scission \emph{and} crosslinking, and which dominates is polymer- and dose-dependent. For a
+polysaccharide matrix a tightening response is physically plausible and structurally
+inexpressible, which is a stronger restriction than monotonicity alone. Threshold and biphasic
+responses are excluded on the same grounds, and fitting $\lambda$ would still return a number.
+
+\emph{Dose and dose rate are not interchangeable, and the gap here is not marginal.} Writing
+damage as a function of accumulated dose alone assumes dose--time reciprocity. In aqueous systems
+the dominant damage pathway is indirect, through radiolysis products whose steady-state
+concentration is set by competing generation and recombination kinetics --- both rate-dependent.
+The regimes involved are far apart: a reactor irradiation delivers of order
+$\mathrm{Gy}\,\mathrm{min}^{-1}$, while the environmental settings this work cites as motivation
+are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, roughly ten orders of magnitude apart. A
+sensitivity constant calibrated in one regime is not transferable to the other by construction,
+and that is a statement with a number attached rather than a general caution.
+
+\emph{A derived parameter inherits the weakest basis it was built from.} A volumetric capacity
+formed as $X_{\max} = q_{\max}\rho_{\mathrm{dry}}$ multiplies a measured sorption capacity by a
+density that is, until paired hydrated-volume measurements exist, a prior. The product is a
+prior. It is also on a suspended-biomass basis if $q_{\max}$ was measured that way, and this
+model's requirement register (\texttt{D-RHOWET}) is coupon-paired, so such a value is a bound and
+a starting point rather than the measurement the gate asks for. Recording that at the point the
+number is produced is the same discipline Section~\ref{sec:params} applies to Table~\ref{tab:params}.
+
 % ---- 4. Parameter Estimation ----------------------------------
-\section{Parameter Estimation}
+\section{Parameter Estimation}\label{sec:params}
 
 Biologically justified parameter ranges for the six primary modelled species, derived from
 published experimental data, are given in Table~\ref{tab:params}. Three declarations govern how

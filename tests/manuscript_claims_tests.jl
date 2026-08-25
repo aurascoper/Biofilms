@@ -147,3 +147,35 @@ let
     @test length(unused) == KNOWN_UNUSED
     @test_broken isempty(unused)
 end
+
+# ------------------------------------------------- planned feedback is unimplemented
+#
+# Section 3.11 is the third "specification, not method" subsection, and like the other two
+# its claim is checkable: nothing it describes exists in code. The capacity ceiling, the
+# damage scalar and the bulk-water diffusivity limit are all absent -- but k_ads is NOT,
+# because biofilms_radiodialysis.R really does carry a rate constant. The prose says "no
+# adsorption capacity", meaning the ceiling, and this distinguishes the two rather than
+# checking a looser word that would fail against correct code.
+
+let
+    control = _scan_text([("fake.R", "X_max <- 1.0\nq_max <- 2.0\n")], r"\b(X_max|q_max)\b"i)
+    @test length(control) == 2   # the detector finds planted hits before it is trusted
+
+    # The capacity ceiling and the damage scalar do not exist.
+    for pattern in (r"\bX_max\b"i, r"\bq_max\b"i, r"\bLangmuir\b"i,
+                    r"\bgamma_damage\b"i, r"\blambda_rad\b"i, r"\bD_w\b"i)
+        @test isempty(_scan(SIM_FILES, pattern))
+    end
+
+    # ...but the RATE constant does, and the prose must not be read as denying it.
+    # A test asserting "no k_ads anywhere" would fail against correct code, which is
+    # how an over-broad absence claim gets discovered only after it ships.
+    k_ads_hits = _scan(SIM_FILES, r"\bk_ads\b"i)
+    @test !isempty(k_ads_hits)
+    @test any(occursin("radiodialysis", basename(p)) for (p, _, _) in k_ads_hits)
+
+    # And the sorption term in that file is reversible: k_des is present, so the
+    # manuscript's claim that the implemented solver is not an irreversible sink is
+    # checked rather than asserted.
+    @test !isempty(_scan(SIM_FILES, r"\bk_des\b"i))
+end
