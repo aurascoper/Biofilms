@@ -13,15 +13,49 @@
 # output, so a spec that differs between local and CI shows up as fixture
 # drift with no obvious cause. Keeping one spec is a correctness fix.
 #
-# vtk is a RENDER dependency, not a transport one, and it is here rather than
-# in the render venv because openmc's own `mesh.write_data_to_vtk` imports it
-# function-locally (openmc/mesh.py:618) and raises ModuleNotFoundError without
-# it. Verified before adding: a dry-run solve moves neither openmc, numpy,
-# hdf5, h5py nor python. It rebuilds moab and tempest-remap at the SAME
-# versions and bumps libnetcdf 4.10.0 -> 4.10.1, which is the only real
-# version change and therefore the one to watch. moab is a DAGMC dependency
-# and this repository's geometry is pure CSG -- no DAGUniverse, no .h5m
-# anywhere in coupling/ -- so moab is linked but not in the transport path.
+# pyvista is a RENDER dependency, not a transport one, and it is here rather
+# than in the render venv because openmc's own `mesh.write_data_to_vtk` imports
+# vtk function-locally (openmc/mesh.py:618) and raises ModuleNotFoundError
+# without it. moab is a DAGMC dependency and this repository's geometry is pure
+# CSG -- no DAGUniverse, no .h5m anywhere in coupling/ -- so moab is linked but
+# not in the transport path.
+#
+# IT SAYS `pyvista` AND NOT `vtk`, AND THAT IS THE WHOLE POINT. This line first
+# read `vtk`, and the golden-tally job failed on every run from six minutes
+# after that commit landed until this one:
+#
+#     Attempting uninstall: vtk
+#       Found existing installation: vtk 9.7.0
+#     error: uninstall-no-record-file
+#     x Cannot uninstall vtk 9.7.0
+#     `-> The package's contents are unknown: no RECORD file was found for vtk.
+#
+# Both workflows run `pip install -e "coupling[dev]"` inside this env, and that
+# extra carries `pyvista>=0.44`; pyvista 0.48.4 requires `vtk>=9.2.2,<9.7.0`
+# while conda-forge resolved an unpinned `vtk` to 9.7.0. pip therefore had to
+# replace it and could not, because a conda-built distribution ships no RECORD
+# and pip refuses to delete files it has no manifest for. Reproduced locally
+# before the fix, in a throwaway env built from this file; the local pip is
+# older and says `uninstall-distutils-installed-package` instead, which is the
+# same refusal under a different name.
+#
+# NAMING A PACKAGE IN BOTH MANAGERS IS SAFE ONLY WHILE THEIR CONSTRAINTS AGREE,
+# and nothing here was watching whether they did. Naming `pyvista` gives the
+# pair to ONE resolver: conda picks a vtk its own pyvista accepts, and pip finds
+# `pyvista>=0.44` already satisfied and never reaches for vtk at all. The
+# alternative -- pinning `vtk<9.7` here -- is pyvista's own ceiling copied into
+# a second file by hand, which is the fourth-copy drift this file exists to end.
+# `test_the_installed_vtk_satisfies_pyvistas_own_requirement` fails if the two
+# ever separate again.
+#
+# Verified by dry-run solve before the change, against the installed env: it
+# moves neither openmc (0.15.3 dagmc_nompi_py313h6424856_102), python, numpy,
+# hdf5, libnetcdf, moab nor tempest-remap. It swaps vtk 9.7.0 for vtk-base
+# 9.6.2 -- which carries the Python module, so openmc's `import vtk` still
+# resolves -- and adds pyvista 0.48.4 (noarch). h5py moves build 102 -> 104 at
+# the SAME version 3.16.0; that bump appears in the `vtk<9.7` candidate too, so
+# it is conda-forge drift rather than a consequence of this line, and it is the
+# one to watch.
 name: openmc-biofilms
 channels:
   - conda-forge
@@ -30,4 +64,4 @@ dependencies:
   - h5py
   - numpy
   - pytest
-  - vtk
+  - pyvista

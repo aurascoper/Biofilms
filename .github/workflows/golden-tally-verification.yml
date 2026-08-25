@@ -45,6 +45,16 @@ on:
     paths: &fixture_inputs
       - ".github/workflows/golden-tally-verification.yml"
       - "docs/openmc_stack.md"
+      # THE ENTRY MOVES WITH THE SPEC. `docs/openmc_stack.md` is listed above
+      # because it USED to carry the package list; collapsing the three copies
+      # into environment.yml moved that list out from under this trigger and
+      # left the filter watching the file that no longer holds it. The job
+      # builds its transport env from environment.yml directly, so an env-only
+      # change -- bumping the OpenMC pin, say -- would have matched neither
+      # trigger, and coupling-tests.yml's env-backed job is workflow_dispatch
+      # only. The fixture would stay pinned to a transport stack nothing reran.
+      # The doc stays listed: it still carries the nuclear-data identity.
+      - "environment.yml"
       - "coupling/scripts/regenerate_golden_tally.py"
       - "coupling/tests/fixtures/golden_tally_water_phantom.json"
       # The fixture-producing modules, per the control test named above.

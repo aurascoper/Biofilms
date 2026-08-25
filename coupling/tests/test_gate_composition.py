@@ -238,12 +238,40 @@ def test_the_transport_environment_has_exactly_one_spec():
       * the doc must NAME the file rather than reproduce its dependency list.
 
     A doc that quotes the list is a fourth copy wearing prose.
+
+    AND THE TRIGGER HAS TO WATCH IT. Collapsing the copies moved the package
+    list out from under this workflow's `paths:` filter, which still named
+    docs/openmc_stack.md -- the file that used to hold it. The check above
+    cannot see that: it derives its list from the regeneration script's
+    IMPORTS, and environment.yml is data, not a module. So assert it here,
+    where the single spec is the subject.
     """
+    import re
     import yaml
 
     spec = yaml.safe_load(_ENV_FILE.read_text())
-    packages = {str(d).split("=")[0].strip() for d in spec["dependencies"]}
-    assert {"openmc", "vtk"} <= packages, packages
+    # Split on the first comparison character, not just `=`. `str(d).split("=")`
+    # leaves `vtk<9.7` whole, so a version-bounded entry would fail the
+    # membership test below for the wrong reason -- reading as "the package is
+    # missing" when it is present and merely pinned.
+    packages = {re.split(r"[=<>!~ ]", str(d))[0].strip()
+                for d in spec["dependencies"]}
+    # pyvista, NOT vtk, and deliberately: vtk arrives as pyvista's dependency
+    # so that ONE resolver owns the pair. Naming vtk here let conda pick 9.7.0
+    # while `pip install -e coupling[dev]` needed pyvista's `<9.7.0`, and pip
+    # cannot uninstall a conda-installed package -- see environment.yml, and
+    # `test_the_installed_vtk_satisfies_pyvistas_own_requirement` below.
+    assert {"openmc", "pyvista"} <= packages, packages
+
+    triggers = _workflow_triggers()
+    for event in ("push", "pull_request"):
+        listed = set(triggers.get(event, {}).get("paths", []))
+        assert "environment.yml" in listed, (
+            f"{_WORKFLOW.name}'s `{event}:` paths filter does not list "
+            "environment.yml, but the job builds its transport env from that "
+            "file -- so changing the OpenMC pin alone would regenerate no "
+            "fixture, and the committed tally would stay pinned to a stack "
+            "nothing reran")
 
     # PARSED, not grepped -- the same lesson as the paths-filter check above.
     # A substring scan for "create-args" fires on the COMMENT explaining that
@@ -269,3 +297,64 @@ def test_the_transport_environment_has_exactly_one_spec():
     assert "openmc=0.15.3" not in doc, (
         "docs/openmc_stack.md restates the pinned version, which is a fourth "
         "copy of environment.yml's contents -- name the file instead")
+
+
+def test_the_installed_vtk_satisfies_pyvistas_own_requirement():
+    """PIP CANNOT UNINSTALL A CONDA PACKAGE.
+
+    Both workflows run `pip install -e "coupling[dev]"` inside the conda env
+    built from environment.yml. If the vtk conda resolved falls outside the
+    range pyvista declares, pip has to replace it and cannot -- a conda-built
+    distribution ships no RECORD, so pip refuses to delete files it has no
+    manifest for. The install dies before any test runs:
+
+        error: uninstall-no-record-file
+        x Cannot uninstall vtk 9.7.0
+
+    That is not hypothetical. environment.yml named `vtk` unpinned, conda-forge
+    served 9.7.0, pyvista 0.48.4 requires `<9.7.0`, and the golden-tally job
+    failed on every run from the minute that line landed. Naming `pyvista`
+    instead hands the pair to one resolver -- this asserts it stayed handed
+    over.
+
+    ASSERTED AGAINST THE LIVE ENVIRONMENT, because neither half of the conflict
+    is written down here: conda decides the version, pyvista's own metadata
+    decides the range, and this repository states neither. A check that read
+    environment.yml would be reading the file that has nothing to say about it.
+    """
+    import pytest
+    from importlib.metadata import PackageNotFoundError, requires, version
+    from packaging.requirements import Requirement
+
+    # DISTRIBUTIONS, NOT IMPORTS. `pytest.importorskip("pyvista")` was the
+    # first version of this line and it is the wrong gate twice over: pyvista
+    # imports a dozen optional things, so one missing transitive dependency
+    # turns the guard into a skip -- and a render stack too broken to import
+    # is precisely the state worth failing on, not the state worth excusing.
+    # The check is metadata-only; it never needs the module. Skip only when
+    # the distribution is genuinely absent.
+    try:
+        installed, pyvista_version = version("vtk"), version("pyvista")
+    except PackageNotFoundError as exc:
+        pytest.skip(f"{exc.name} is not installed, so the pip/conda seam this "
+                    "guards does not exist here -- it exists in every tier "
+                    "that installs [dev]")
+    wanted = [Requirement(r) for r in (requires("pyvista") or [])]
+    wanted = [r for r in wanted
+              if r.name == "vtk" and r.marker is None]
+
+    # The control: if pyvista ever stops constraining vtk, this test would pass
+    # against anything, which is the shape it exists to refuse.
+    assert wanted, (
+        "pyvista declares no unconditional vtk requirement, so this check "
+        f"proves nothing; its metadata now reads {requires('pyvista')}")
+
+    for req in wanted:
+        assert req.specifier.contains(installed, prereleases=True), (
+            f"conda installed vtk {installed}, but pyvista "
+            f"{pyvista_version} requires {req}. pip will try to replace it "
+            "on `pip install -e coupling[dev]` and cannot, so the install "
+            "fails before a single test runs. Do not pin vtk in "
+            "environment.yml to patch this -- that copies pyvista's ceiling "
+            "into a second file by hand. Name only pyvista and let conda "
+            "resolve both.")
