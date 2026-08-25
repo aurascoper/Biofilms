@@ -219,3 +219,53 @@ def test_a_pull_request_can_reach_this_workflow_at_all():
     assert triggers["pull_request"]["paths"] is triggers["push"]["paths"], (
         "the two path lists are equal but separate, so they can drift; use "
         "the `&fixture_inputs` / `*fixture_inputs` anchor")
+
+
+_ENV_FILE = _REPO / "environment.yml"
+_STACK_DOC = _REPO / "docs" / "openmc_stack.md"
+
+
+def test_the_transport_environment_has_exactly_one_spec():
+    """THE FOURTH COPY IS THE ONE THAT DRIFTS.
+
+    The package list lived in three places -- this doc and the inline
+    `create-args` of both workflows -- and two bugs came straight out of that:
+    a cross-sections path written twice and a `paths:` filter that covered
+    less than its comment claimed. Collapsing to `environment.yml` fixes it
+    only if nothing quietly restates the contents, so:
+
+      * both workflows must consume the file, never inline args, and
+      * the doc must NAME the file rather than reproduce its dependency list.
+
+    A doc that quotes the list is a fourth copy wearing prose.
+    """
+    import yaml
+
+    spec = yaml.safe_load(_ENV_FILE.read_text())
+    packages = {str(d).split("=")[0].strip() for d in spec["dependencies"]}
+    assert {"openmc", "vtk"} <= packages, packages
+
+    # PARSED, not grepped -- the same lesson as the paths-filter check above.
+    # A substring scan for "create-args" fires on the COMMENT explaining that
+    # create-args was removed, which is a check failing for the opposite of
+    # its reason.
+    for wf in ("golden-tally-verification.yml", "coupling-tests.yml"):
+        doc = yaml.safe_load((_REPO / ".github" / "workflows" / wf).read_text())
+        setups = [s for job in doc["jobs"].values() for s in job["steps"]
+                  if "setup-micromamba" in str(s.get("uses", ""))]
+        assert setups, f"{wf} no longer sets up the transport env"
+        for step in setups:
+            args = step.get("with", {})
+            assert args.get("environment-file") == "environment.yml", (
+                f"{wf} does not build the env from environment.yml: {args}")
+            assert "create-args" not in args, (
+                f"{wf} still builds the env from inline args, so it is a "
+                "second spec that can drift from environment.yml")
+
+    doc = _STACK_DOC.read_text()
+    assert "environment.yml" in doc, "the doc must name the single spec"
+    # The version pin is the thing worth restating nowhere: if it appears in
+    # the doc, the doc can disagree with the file about which OpenMC is pinned.
+    assert "openmc=0.15.3" not in doc, (
+        "docs/openmc_stack.md restates the pinned version, which is a fourth "
+        "copy of environment.yml's contents -- name the file instead")

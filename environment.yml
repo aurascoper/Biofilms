@@ -1,0 +1,33 @@
+# The pinned transport environment. ONE SPEC, consumed by everything.
+#
+# This existed three times -- docs/openmc_stack.md, and the create-args of both
+# coupling-tests.yml and golden-tally-verification.yml -- which is how the
+# `/root` cross-sections path and the incomplete paths filter both happened.
+# Three hand-maintained copies of one fact drift, and the copy that drifts is
+# the one nobody is looking at. Both workflows now read this file, and a test
+# asserts docs/openmc_stack.md quotes it verbatim rather than restating it.
+#
+# WHY THE ENVS MUST NOT DIVERGE: CI regenerates
+# coupling/tests/fixtures/golden_tally_water_phantom.json and diffs it against
+# the committed copy. A different environment can produce different transport
+# output, so a spec that differs between local and CI shows up as fixture
+# drift with no obvious cause. Keeping one spec is a correctness fix.
+#
+# vtk is a RENDER dependency, not a transport one, and it is here rather than
+# in the render venv because openmc's own `mesh.write_data_to_vtk` imports it
+# function-locally (openmc/mesh.py:618) and raises ModuleNotFoundError without
+# it. Verified before adding: a dry-run solve moves neither openmc, numpy,
+# hdf5, h5py nor python. It rebuilds moab and tempest-remap at the SAME
+# versions and bumps libnetcdf 4.10.0 -> 4.10.1, which is the only real
+# version change and therefore the one to watch. moab is a DAGMC dependency
+# and this repository's geometry is pure CSG -- no DAGUniverse, no .h5m
+# anywhere in coupling/ -- so moab is linked but not in the transport path.
+name: openmc-biofilms
+channels:
+  - conda-forge
+dependencies:
+  - openmc=0.15.3
+  - h5py
+  - numpy
+  - pytest
+  - vtk

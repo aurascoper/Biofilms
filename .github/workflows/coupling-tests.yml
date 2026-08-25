@@ -120,13 +120,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: mamba-org/setup-micromamba@v1
         with:
-          environment-name: openmc-biofilms
-          create-args: >-
-            -c conda-forge
-            openmc=0.15.3
-            h5py
-            numpy
-            pytest
+          # ONE SPEC -- environment.yml declares the name too, so stating it
+          # here would be a third copy of a fact the file already carries.
+          environment-file: environment.yml
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.12"

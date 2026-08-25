@@ -6,11 +6,19 @@ seed/particles/batches, and the nuclear-data identity used.
 
 ## Environment
 
-Created with micromamba (conda-forge):
+Created with micromamba from the repository's single spec:
 
 ```
-micromamba create -n openmc-biofilms -c conda-forge "openmc=0.15.3" h5py numpy pytest
+micromamba create -f environment.yml
 ```
+
+`environment.yml` is the only place the package list lives. It used to be
+restated here and inline in the `create-args` of both workflows — three
+hand-maintained copies, which is how this workflow's `/root` cross-sections
+path and its incomplete `paths:` filter both happened. The dependency list is
+deliberately **not** repeated in this document; read the file. A test asserts
+this section names it rather than quoting it, because a quotation is a fourth
+copy.
 
 Resolved on the development machine (2026-08-13):
 

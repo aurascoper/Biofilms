@@ -78,13 +78,11 @@ jobs:
 
       - uses: mamba-org/setup-micromamba@v1
         with:
-          environment-name: openmc-biofilms
-          create-args: >-
-            -c conda-forge
-            openmc=0.15.3
-            h5py
-            numpy
-            pytest
+          # ONE SPEC. This was inline create-args, a second hand-maintained
+          # copy of environment.yml's contents; see that file for why three
+          # copies of one spec is the drift that produced this workflow's
+          # first two bugs.
+          environment-file: environment.yml
 
       - uses: julia-actions/setup-julia@v2
         with:
