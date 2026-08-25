@@ -156,7 +156,8 @@ Biofilms/
 ├── validate_serial.jl             # Serial-vs-JACC statistical comparison
 ├── export_checkpoint.jl           # HDF5 checkpoint / transport-snapshot export
 ├── scoby_3d.jl                    # empty (0 bytes)
-├── Project.toml, Manifest.toml, LocalPreferences.toml
+├── Project.toml                   # Manifest.toml and LocalPreferences.toml exist locally
+│                                  # but are gitignored — a clone resolves its own
 │
 ├── calibration/                   # biofilm-calibration (Python, numpy-only)
 │   ├── biofilm_calibration/
@@ -881,7 +882,14 @@ this declaration only fixes `Pkg.instantiate()`, not what the split marker's own
 
 **Fixed:** `CairoMakie` was previously undeclared, so `julia --project=. biofilms_potts.jl` failed
 at the `using CairoMakie` line (now `:1885`) unless CairoMakie happened to already be present in
-the default environment. It is now declared in `Project.toml` and resolved in `Manifest.toml`.
+the default environment. It is now declared in `Project.toml`.
+
+That is a **declaration, not a lock.** `Manifest.toml` is gitignored (`.gitignore:377`), so a
+clean checkout has no resolved dependency graph and `Pkg.instantiate()` resolves versions afresh
+against whatever the registry offers that day. An earlier version of this line said CairoMakie
+was "resolved in `Manifest.toml`" — true of the working tree it was written in, and false of
+every clone, which is the same shape of error as an absence claim that names only the one place
+someone looked.
 
 **R** — `deSolve`, `shiny`, `plotly`, `ggplot2`, `dplyr`, `MASS`, `class` (the last two for
 `reactor_decision_tree.R`).
