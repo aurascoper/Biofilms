@@ -102,6 +102,15 @@ jobs:
         # file, not just the index"). Refuse to proceed on a mismatch rather
         # than silently run against different data than the fixture was
         # generated with.
+        #
+        # AND THE PATH IS EXPORTED FROM HERE, not written again by hand. The
+        # first version of this file hardcoded `/root/openmc-data/...` in the
+        # two steps below while this one wrote to `$HOME` (= /home/runner), so
+        # openmc's import died on EACCES traversing /root -- 6 collection
+        # errors on the job's first real run. Two copies of one path, in the
+        # same file that had just grown a YAML anchor to stop exactly that.
+        # `$GITHUB_ENV` makes the consumers read where the data actually
+        # landed.
         run: |
           mkdir -p "$HOME/openmc-data"
           cd "$HOME/openmc-data"
@@ -112,11 +121,12 @@ jobs:
           echo "200cc6b97aa8cacc3f70ebc169bb91cf39381875fc80fb91ec5d84292da9b970" \
             > endfb-viii.0-hdf5.tar.xz.sha256
           tar -xJf endfb-viii.0-hdf5.tar.xz
+          xs="$HOME/openmc-data/endfb-viii.0-hdf5/cross_sections.xml"
+          test -r "$xs" || { echo "extracted, but $xs is not readable"; exit 1; }
+          echo "OPENMC_CROSS_SECTIONS=$xs" >> "$GITHUB_ENV"
 
       - name: Run API + integration tier, with a JUnit record
         shell: micromamba-shell {0}
-        env:
-          OPENMC_CROSS_SECTIONS: /root/openmc-data/endfb-viii.0-hdf5/cross_sections.xml
         run: |
           cd coupling
           xvfb-run -a pytest -rs tests --junitxml=results.xml
@@ -152,8 +162,6 @@ jobs:
 
       - name: Regenerate the golden tally and diff against the committed fixture
         shell: micromamba-shell {0}
-        env:
-          OPENMC_CROSS_SECTIONS: /root/openmc-data/endfb-viii.0-hdf5/cross_sections.xml
         run: python3 coupling/scripts/regenerate_golden_tally.py
 
       - name: Fail if the fixture drifted

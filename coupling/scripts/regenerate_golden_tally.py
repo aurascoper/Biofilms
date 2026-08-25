@@ -27,9 +27,12 @@ every one of the 12 runs actually completed.
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 from pathlib import Path
+
+import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "coupling"))
@@ -83,6 +86,33 @@ density_g_cm3 = {density}
   H = 0.111894
   O = 0.888106
 """
+
+
+# SIGNIFICANT FIGURES, NOT FULL REPR -- and the number is chosen against the
+# tally's own uncertainty. `json.dumps` writes 16 digits of a heating value
+# whose Monte Carlo relative standard deviation, measured on this very fixture,
+# has a median of 27% per cell (min 3.8%, max 100% in the empty corners). Those
+# trailing digits are not measurement, and pinning them makes the committed file
+# assert a precision it does not have -- while requiring every one of them to
+# reproduce on another machine for `git diff --exit-code` to pass.
+#
+# The precedent this fixture cites does exactly this: tests/fixtures/
+# serial_seed42.csv pins 5 decimals, and its header says a different Julia minor
+# version may legitimately change the bytes. ROUNDING IS THE TOLERANCE. Six
+# figures sits ~5 orders of magnitude below the noise, so nothing physical is
+# lost and the comparison stops depending on the last ulp.
+SIGNIFICANT_FIGURES = 6
+
+
+def _round_sig(x: float) -> float:
+    if not math.isfinite(x) or x == 0.0:
+        return x
+    return round(x, SIGNIFICANT_FIGURES - 1 - int(math.floor(math.log10(abs(x)))))
+
+
+def _round_nested(a):
+    """Elementwise over an ndarray, returned as plain lists for JSON."""
+    return np.vectorize(_round_sig)(np.asarray(a, dtype=float)).tolist()
 
 
 def _nuclear_data_id() -> str:
@@ -139,8 +169,8 @@ def main():
                 mass_kg_by_label.setdefault(label, m)
                 runs[label].append({
                     "outer": outer, "replicate": rep, "seed": seed,
-                    "heating_mean_eV_per_src": mean_eV.tolist(),
-                    "heating_sd_eV_per_src": sd_eV.tolist(),
+                    "heating_mean_eV_per_src": _round_nested(mean_eV),
+                    "heating_sd_eV_per_src": _round_nested(sd_eV),
                 })
                 completed += 1
                 print(f"  [{completed}/{expected}] {label} outer={outer} "
@@ -158,16 +188,29 @@ def main():
                         "own DENSITY_SCALE lever), 2 outer draws x 3 "
                         "replicates. Regenerate with "
                         "coupling/scripts/regenerate_golden_tally.py under "
-                        "the openmc-biofilms env. Legitimately changes only "
-                        "if OpenMC or the nuclear data library changes."),
+                        "the openmc-biofilms env."),
+        "what_legitimately_changes_these_numbers": (
+            "A change to OpenMC, to the nuclear data library, or to any module "
+            "that produces the tally (config, model, mesh, materials, dose -- "
+            "see golden-tally-verification.yml's paths filter, which the "
+            "test_gate_composition.py control keeps in step with this script's "
+            "real imports). NOT a change in the last digits: values are stored "
+            "to 6 significant figures because the tally's own Monte Carlo "
+            "relative sd has a median of 27% per cell, so digits past the "
+            "sixth are not measurement. Same convention, and same reason, as "
+            "tests/fixtures/serial_seed42.csv pinning 5 decimals."),
+        "significant_figures": SIGNIFICANT_FIGURES,
         "openmc_version": openmc.__version__,
         "nuclear_data_id": _nuclear_data_id(),
         "n_outer": N_OUTER,
         "n_replicates": N_REPLICATES,
         "density_baseline_g_cm3": DENSITY_BASELINE,
         "density_feedback_g_cm3": DENSITY_FEEDBACK,
-        "mass_kg_baseline": mass_kg_by_label["baseline"].tolist(),
-        "mass_kg_feedback": mass_kg_by_label["feedback"].tolist(),
+        # Rounded on the same convention, though these are exact CSG geometry
+        # rather than sampled: one precision rule for the file, so a reader
+        # does not have to know which arrays were which.
+        "mass_kg_baseline": _round_nested(mass_kg_by_label["baseline"]),
+        "mass_kg_feedback": _round_nested(mass_kg_by_label["feedback"]),
         "mesh_dimension": list(mass_kg_by_label["baseline"].shape),
         "runs": runs,
     }

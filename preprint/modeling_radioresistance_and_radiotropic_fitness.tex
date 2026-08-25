@@ -94,25 +94,38 @@
 % ---- Abstract ------------------------------------------------
 \begin{abstract}
 \noindent
-We present a computational framework and implementation audit for multispecies biofilm models under
-heterogeneous ionising-radiation fields. A proposed partial stochastic differential equation
-(PSDE) organises diffusion, directed motility, nutrient, radiation, melanin, interaction and
-forcing terms, while four executed simulations---two Langevin models, a Cellular Potts Model
-(CPM), and a radial radiodialysis solver---realise only subsets of that formalism. The CPM represents
-seven named species as computational biomass parcels rather than individual organisms. In the
-shipped parameterisation, the melanin term changes Metropolis acceptance by approximately
-15.5\%, whereas the direct per-species radiation term changes it by approximately one part in
-$10^5$ for the two negatively signed species; only the product of melanin production and melanin
-coupling reaches the dynamics and is identifiable. A single-seed radial pattern is opposite to the
-direction implied by the direct tropism coefficient and is not clearly separated from the approximate seeding
-null with six parcels per species. A synthetic, explicitly non-calibrating CPM--OpenMC workflow
-executes one-way photon transport, constructive-solid-geometry mass normalisation, dose conversion,
-coordinate transfer, and cell-, lineage- and generation-level attribution, but no target physical
-parameter is inferred. The implemented biological phenotype is therefore radiotropism, not
-radiotrophy or radioresistance: the current CPM has neither biomass growth nor a survival process.
-The work establishes a reproducible computational foundation and identifies the measurements,
-uncertainty controls, and model revisions required before physical or biological feedback claims can
-be evaluated.
+We couple a Cellular Potts Model (CPM) of a multispecies biofilm to OpenMC Monte Carlo photon
+transport, and audit what the coupled implementation does and does not support. The one-way path
+executes end to end: geometry export, photon transport, constructive-solid-geometry mass
+normalisation, dose conversion, coordinate transfer, and cell-, lineage- and generation-level
+attribution, with orientation and conservation checks across the exchange boundary. One-way
+transfer of a transport code's dose field into a cell-based model is an established, validated
+method class, but a targeted search located no prior coupling of OpenMC to a Cellular Potts Model
+or to any other cell-scale biological model; every documented OpenMC coupling is to
+nuclear-engineering multiphysics. This work therefore extends an established paradigm to a new
+transport code and a new biological target rather than introducing the paradigm.
+
+Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
+measured results. The melanin term changes Metropolis acceptance by approximately 15.5\%, whereas
+the direct per-species radiation term changes it by approximately one part in $10^5$ for the two
+negatively signed species; only the product of melanin production and melanin coupling reaches
+the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
+opposite to the direction implied by the direct tropism coefficient and is not clearly separated
+from the approximate seeding null at six parcels per species.
+
+The boundaries are declared rather than discovered late. A proposed partial stochastic
+differential equation organises diffusion, directed motility, nutrient, radiation, melanin,
+interaction and forcing terms; it is a specification, and the four executed
+simulations---two Langevin models, the CPM, and a radial radiodialysis solver---realise only
+subsets of it. The CPM represents seven named species as computational biomass parcels rather
+than individual organisms, and has neither biomass growth nor a dose-dependent survival process,
+so the implemented phenotype is radiotropism and the model cannot test radiotrophy or
+radioresistance. The transport workflow is explicitly non-calibrating: no target physical
+parameter is inferred, and every parameter is a literature-anchored prior rather than a fit.
+
+What the work establishes is a reproducible computational foundation, and a specific list of the
+measurements, uncertainty controls, and model revisions required before any physical or
+biological feedback claim can be evaluated.
 \end{abstract}
 \noindent\textbf{Keywords:} biofilm modelling; Cellular Potts Model; ionising radiation;
 radiotropism; radioresistance; OpenMC; uncertainty quantification
@@ -125,12 +138,14 @@ radiotropism; radioresistance; OpenMC; uncertainty quantification
 Microbial communities possess an extraordinary ability to adapt and survive under extreme
 environmental stressors, such as elevated radiation levels. Within such communities, melanized
 fungi and other extremophilic microorganisms have evolved specialized mechanisms that allow them
-to persist in high-radiation environments. This study aims to develop a comprehensive mathematical
-framework that captures the complex interplay between these organisms' nonlinear interactions,
-radiation sensitivities, and chemotactic behaviors within biofilm communities. By leveraging a
-combined approach that integrates Langevin dynamics, reaction-diffusion modeling, and a
-Hamiltonian-based formulation, we simulate and explore the spatiotemporal evolution of these
-communities under radiation stress and other external influences.
+to persist in high-radiation environments. This study develops a mathematical framework for the interplay between
+these organisms' nonlinear interactions, radiation sensitivities, and chemotactic behaviours
+within biofilm communities, and couples it to Monte Carlo photon transport. Drawing on Langevin
+dynamics, reaction-diffusion modelling, and a Hamiltonian-based formulation, we simulate the
+spatial organisation of computational biomass parcels under an imposed radiation field. The
+framework is deliberately not comprehensive, and Section~\ref{sec:framework} says where: four of
+its nine specified terms have no counterpart in any executed program, and the manuscript marks
+each one rather than leaving the gap for a reader to find.
 
 The practical motivation for this work lies in nuclear bioremediation. Contaminated sites such
 as the Chernobyl Exclusion Zone and the Hanford Nuclear Reservation host complex microbial
@@ -326,7 +341,7 @@ modelled species with both a calibrated 3-D biomass field and a characterised ra
 is therefore a literature-anchored prior, and a literature prior is not a calibration.
 
 % ---- 3. Mathematical Framework --------------------------------
-\section{Mathematical Framework}
+\section{Mathematical Framework}\label{sec:framework}
 
 \subsection{Symbols and Notation}
 
