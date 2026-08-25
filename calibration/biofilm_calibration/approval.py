@@ -59,6 +59,18 @@ def _entries(value) -> list[str]:
     return [p.strip() for p in str(value or "").split(";") if p.strip()]
 
 
+def _match_key(value: str) -> str:
+    """Normalise for comparison ONLY -- typography, never identity.
+
+    Case and run-length of internal whitespace are how a hand-typed identifier
+    varies between two cells that mean the same organism. Nothing here can turn
+    one strain into another, which is the property that makes it safe: the
+    comparison is looser about how a name is written and exactly as strict
+    about which name it is.
+    """
+    return " ".join(str(value).split()).casefold()
+
+
 def _biosafety_mapping_problems(row) -> list[str]:
     """Whether `biosafety_level_by_strain` is a per-strain MAPPING at all.
 
@@ -70,16 +82,26 @@ def _biosafety_mapping_problems(row) -> list[str]:
     one organism and clearing the institutional milestone for both.
 
     THE CONVENTION IS THE PRODUCER'S, NOT INVENTED HERE. `acquisition.py`
-    declares this field as "per-strain, e.g. 'SO:BSL1;CN:BSL2' -- never a
-    single level". This checks that declaration and nothing beyond it.
+    declares this field as keyed by the `strain_identities` entry VERBATIM.
+    This checks that declaration and nothing beyond it.
 
-    WHAT IT DOES NOT DO, stated because a reader will otherwise assume it: it
-    does not bind a key to a strain by name. Nothing declares how `DR` relates
-    to `D. radiodurans R1`, and inferring one from initials would be the
-    consumer inventing semantics the producer never stated. So this is a
-    STRUCTURAL check -- shape, count, distinctness -- and a mapping that names
-    the right number of distinct strains with the wrong keys still passes here.
-    Only a human reading the approval can catch that.
+    AND A COUNT IS NOT A BINDING. This check was structural once -- shape,
+    count, distinctness -- and said so in a docstring that called key-to-strain
+    binding impossible: nothing declared how `DR` related to `D. radiodurans
+    R1`, so inferring it from initials would have been the consumer inventing
+    semantics. True, and the wrong conclusion. `XX:BSL1;YY:BSL2` against two
+    declared strains has the right shape, the right count and distinct keys, so
+    it passed, and every authorization criterion then reported met with
+    biosafety evidence for NEITHER declared organism. An approval that names no
+    organism this row declares covers none of them, which is the same failure
+    the count check was written to catch, one size larger.
+
+    The fix was not to guess the convention but to make the producer state one,
+    and the one it states removes the guesswork entirely: the key IS the
+    identifier. Matching is case-insensitive and collapses whitespace --
+    typography, not identity -- so a strain identifier containing ':' cannot be
+    written as a key at all and is refused against `strain_identities` rather
+    than misreported as a malformed pair.
     """
     value = row.get("biosafety_level_by_strain")
     if is_placeholder(value):
@@ -88,6 +110,19 @@ def _biosafety_mapping_problems(row) -> list[str]:
     strains = _entries(row.get("strain_identities"))
     pairs = _entries(value)
     out: list[str] = []
+
+    # REFUSED AGAINST THE FIELD THAT IS ACTUALLY WRONG. A strain identifier
+    # carrying ':' cannot be a key, and letting it through would surface below
+    # as "not a strain:level pair" -- pointing the reader at the mapping when
+    # the mapping is the only correct thing about the row.
+    unexpressible = [s for s in strains if ":" in s]
+    if unexpressible:
+        out.append(
+            f"strain_identities entries {unexpressible} contain ':', so they "
+            "cannot be used as biosafety_level_by_strain keys, which are the "
+            "identifiers verbatim. Rename the strain or the approval cannot "
+            "state a level for it")
+        return out
 
     malformed = [p for p in pairs if p.count(":") != 1
                  or not p.split(":")[0].strip()
@@ -114,12 +149,30 @@ def _biosafety_mapping_problems(row) -> list[str]:
             f"biosafety_level_by_strain repeats a strain key in {keys}; one "
             "entry per strain, or a level is silently overridden")
 
-    if strains and len(pairs) != len(strains):
-        out.append(
-            f"biosafety_level_by_strain covers {len(pairs)} strain(s) and "
-            f"strain_identities declares {len(strains)}. An approval that "
-            "omits a strain does not cover it, and the omission must not be "
-            "readable as coverage")
+    # THE BINDING. This replaces a count comparison, which `XX:BSL1;YY:BSL2`
+    # satisfied against two declared strains while naming neither of them. Sets,
+    # not lengths -- and reported in both directions, because an uncovered
+    # strain and a key naming nothing declared are different mistakes with the
+    # same cause and different repairs.
+    if strains:
+        declared = {_match_key(s): s for s in strains}
+        keyed = {_match_key(k): k for k in keys}
+        uncovered = [declared[n] for n in declared if n not in keyed]
+        unrecognised = [keyed[n] for n in keyed if n not in declared]
+        if uncovered or unrecognised:
+            detail = []
+            if uncovered:
+                detail.append(f"declares {uncovered} with no level")
+            if unrecognised:
+                detail.append(
+                    f"names {unrecognised}, which strain_identities does not "
+                    "declare")
+            out.append(
+                "biosafety_level_by_strain is keyed by the strain_identities "
+                "entry verbatim, and this row " + " and ".join(detail) + ". An "
+                "approval that omits a strain does not cover it, and one that "
+                "names an organism this row never declared is evidence about "
+                "something else -- neither omission may read as coverage")
     return out
 
 

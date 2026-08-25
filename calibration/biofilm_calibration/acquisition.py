@@ -74,6 +74,9 @@ BASELINE_CONDITION = TableSchema(
         "assigned levels. Current guidance is protocol-driven risk assessment",
         "rather than a level label, so the chain is: exact strain IDs ->",
         "institutional review -> containment decision -> approved procedures.",
+        "biosafety_level_by_strain is KEYED BY THOSE EXACT IDs, not by an",
+        "abbreviation of them: the level has to attach to the organism the",
+        "committee reviewed, and only the identifier says which that is.",
         "AN APPROVAL IS EVIDENCE, NOT A DECLARATION. The identifier alone is",
         "not enough: the gate also requires an issuing authority, a resolvable",
         "approval document, dates bracketing the culturing, and a scope digest",
@@ -89,9 +92,20 @@ BASELINE_CONDITION = TableSchema(
         # C. neoformans strains are commonly BSL-2, so assuming one facility
         # class from a species list is wrong.
         Column("strain_identities"),
+        # THE KEY IS THE STRAIN IDENTIFIER, VERBATIM. Stated here because the
+        # gate cannot invent it: an abbreviation like `DR:BSL1` declares no
+        # relationship to `D. radiodurans R1`, so a consumer that read one from
+        # initials would be inventing semantics this file never gave it. With
+        # the identifier as its own key there is no convention to infer -- the
+        # two fields name the same strings or the approval does not cover the
+        # organism it claims to.
         Column("biosafety_level_by_strain",
-               doc="per-strain, e.g. 'SO:BSL1;CN:BSL2' — never a single level "
-                   "for the consortium"),
+               doc="per-strain, keyed by the strain_identities entry VERBATIM, "
+                   "e.g. 'D. radiodurans R1:BSL1; C. neoformans H99:BSL2' — "
+                   "never a single level for the consortium, and never an "
+                   "abbreviation. Matched ignoring case and surrounding "
+                   "whitespace only, so a strain identifier containing ':' "
+                   "cannot be expressed and is refused at the gate"),
         # AN APPROVAL IS EVIDENCE, NOT A DECLARATION, so the identifier alone
         # is not enough: it must name an authority, resolve to a registered
         # document, carry dates that bracket the culturing, and bind the scope
