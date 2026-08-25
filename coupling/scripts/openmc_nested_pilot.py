@@ -84,8 +84,9 @@ from biofilm_openmc.materials import (mesh_material_masses_kg,
                                       mesh_material_volumes, voxel_mass_kg)
 from biofilm_openmc.mesh import resolve_mesh_dimension, upsample_field
 from biofilm_openmc.snapshot import load_snapshot
-from biofilm_openmc.synthetic_gate import (S0Verdict, ThresholdPolicy,
-                                           VarianceBudget, decide)
+from biofilm_openmc.synthetic_gate import (PASS_SYNTHETIC_GATE, S0Verdict,
+                                           ThresholdPolicy, VarianceBudget,
+                                           decide)
 
 # THE GATE DECIDES ON THE DEBIASED SQUARED EFFECT, not on the raw norm. The
 # same 0.10 and 0.02 magnitudes are declared, squared, because the statistic is
@@ -499,14 +500,45 @@ def writes_canonical_tables(args) -> bool:
     return target == CANONICAL_TABLES or CANONICAL_TABLES in target.parents
 
 
-# The sample counts below which this pipeline's own estimators return nothing
-# usable. NOT chosen, and not the argparse defaults dressed up as a policy --
-# read off the two functions that refuse:
-#   * `t_critical_999(m - 1)` is None at m = 1, so `distinguishable_from_zero`
-#     is False for every effect and `decide()` reports NOT_EVALUATED.
-#   * `debiased_squared_effect` returns all-NaN below three replicates ("a
-#     variance nobody can estimate is not a usable gate input").
-MIN_OUTER_DRAWS = 2
+# MIN_OUTER_DRAWS WAS 2, AND 2 WAS DERIVED FROM THE WRONG PROPERTY. The
+# question asked was "where does `t_critical_999` stop returning None?" -- its
+# DOMAIN. What a floor needs is its usable RANGE. At df = 1 the function
+# returns 318.3: a value, and not an attainable one. A run at two draws can
+# return PASS_SYNTHETIC_GATE and can essentially never be significant, so the
+# two published claims contradict each other by construction.
+#
+# THE REPLACEMENT IS DERIVED FROM THE SHAPE OF THE CURVE, NOT FROM WHICH
+# RESULTS SURVIVE. "The floor where every currently-significant result still
+# clears" is a criterion chosen after seeing which findings exist, and its
+# margin here is 1.2% -- one observation away from giving 5.
+#
+#     draws m   df   t_crit(0.999)   ratio to next
+#         2      1       318.3           14.3x
+#         3      2        22.33           2.19x
+#         4      3        10.21           1.42x
+#         5      4         7.173
+#
+# m = 4 is the first point at which one additional draw no longer more than
+# HALVES the bar. Below it the design sits where the critical value moves
+# violently per draw; at and above it the curve has flattened. This is a
+# knee-of-the-curve heuristic about design stability -- NOT a power
+# calculation, and nothing here claims otherwise.
+#
+# AND alpha = 0.999 ONE-TAILED IS HALF OF WHY THIS FLOOR IS NEEDED. At 0.95,
+# t_crit(df = 1) is 6.31 rather than 318.3. The floor is partly compensating
+# for an aggressive alpha at tiny df, and the two parameters interact: raising
+# the floor and lowering alpha would fix the same symptom. Recorded, not
+# changed -- alpha is a declared decision policy, and moving it is not a side
+# effect of a guard fix.
+#
+# Note when comparing against the pilot's observed t-values: those were
+# computed at m = 4, and at m = 3 the STATISTICS THEMSELVES change. `se` rises
+# roughly 15% as sqrt(n) goes 2 -> 1.73, so t falls while t_crit rises; the
+# flip is worse than holding an m = 4 t against an m = 3 critical value shows.
+MIN_OUTER_DRAWS = 4
+# Unchanged, and this one IS read off the estimator that refuses:
+# `debiased_squared_effect` returns all-NaN below three replicates ("a variance
+# nobody can estimate is not a usable gate input").
 MIN_REPLICATES = 3
 
 
@@ -548,9 +580,10 @@ def refuse_incomplete_scenarios(args) -> None:
     undersampled = [
         (flag, got, need, why) for flag, got, need, why in (
             ("--outer-draws", int(args.outer_draws), MIN_OUTER_DRAWS,
-             "t_critical_999 has no value at 0 degrees of freedom, so "
-             "distinguishable_from_zero is False for every effect and decide() "
-             "reports NOT_EVALUATED"),
+             "below this the t_critical_999 curve moves violently per draw -- "
+             "318.3 at df=1, 22.33 at df=2, 10.21 at df=3 -- so the "
+             "significance test is either impossible or effectively "
+             "unattainable, and a PASS verdict cannot be corroborated by it"),
             ("--replicates", int(args.replicates), MIN_REPLICATES,
              "debiased_squared_effect returns NaN below three replicates: the "
              "estimator admits two, its jackknife does not, and a variance "
@@ -566,7 +599,112 @@ def refuse_incomplete_scenarios(args) -> None:
             "carry a verdict.")
 
 
-def resolve_output_dir(args, stopped_early):
+_NO_SIGNIFICANCE_FIELD = object()
+
+
+def publication_block(verdict_row) -> dict | None:
+    """Whether one scenario's verdict may enter the published record.
+
+    THE CONTRADICTION THIS EXISTS FOR. `decide()` reads quantile bounds;
+    `distinguishable_from_zero` runs a t-test against zero; nothing reconciles
+    them, and both are recorded side by side. Two draws of 0.05 with se = 0.01
+    return PASS_SYNTHETIC_GATE and `distinguishable_from_zero = False` -- the
+    run asserts an effect cleared the threshold and, one field later, that it
+    is not separable from no effect at all.
+
+    REFUSING PICKS NEITHER, AND THAT IS THE POINT. Downgrading the PASS would
+    settle the disagreement in the t-test's favour; keeping it settles it in
+    the bounds' favour. Neither is this function's call to make. It blocks
+    publication and leaves the question where it belongs.
+
+    IT FIRES IN ONE DIRECTION ONLY, and a later reader must not "complete" it:
+
+      * PASS + not-distinguishable is contradictory.
+      * NON-PASS + not-distinguishable is COHERENT and must publish. A real
+        effect that did not clear the threshold is exactly what the pilot's
+        `noise_floor` (t = 0.369) and `lever_density_x1.35` (t = 1.840) rows
+        are, and a symmetric guard would refuse both.
+      * NON-PASS + distinguishable is also coherent and must publish --
+        `lever_Fe_5pct` (EFFECT_BELOW_THRESHOLD, t = 10.33) and
+        `near_threshold` (INDETERMINATE_NUMERICS, t = 81.0) are live rows.
+
+    THREE STATES, NOT TWO. `.get()` would return None both for "the test ran
+    and could not decide" and for "the field was never populated", and those
+    are different facts -- so membership is tested before value. An absent key
+    is a malformed row and blocks with its own reason, because rule 3 says
+    refuse the case you do not recognise rather than wave it through.
+
+    Returns None when the row may publish, else a dict CARRYING THE VALUES. A
+    bare `True` would be the sentinel problem returning: it says a block
+    happened and nothing about what. The record has to explain itself so
+    nobody re-derives it six months from now.
+    """
+    verdict = verdict_row.get("verdict")
+    if verdict != PASS_SYNTHETIC_GATE:
+        return None
+
+    if "distinguishable_from_zero" not in verdict_row:
+        significance = _NO_SIGNIFICANCE_FIELD
+        reason = ("a PASS verdict with no significance field at all: the row "
+                  "is malformed, and an unrecognised state is refused rather "
+                  "than assumed publishable")
+    else:
+        significance = verdict_row["distinguishable_from_zero"]
+        if significance is True:
+            return None
+        if significance is None:
+            reason = ("a PASS verdict whose significance test never ran: "
+                      "no usable rows at the finest mesh, so there is nothing "
+                      "corroborating the bounds that produced the PASS")
+        else:
+            reason = ("a PASS verdict the significance test contradicts: the "
+                      "quantile lower bound cleared the effect threshold "
+                      "while t did not clear its critical value. Neither "
+                      "claim is overridden here -- the disagreement is the "
+                      "finding, and it is not publishable as either one")
+
+    return {
+        "reason": reason,
+        "verdict": verdict,
+        "distinguishable_from_zero": (
+            None if significance is _NO_SIGNIFICANCE_FIELD else significance),
+        "significance_field_present": significance is not _NO_SIGNIFICANCE_FIELD,
+        "t_versus_zero": verdict_row.get("t_versus_zero"),
+        "t_critical_0.999": verdict_row.get("t_critical_0.999"),
+        "n_outer_draws": verdict_row.get("n_outer_draws"),
+    }
+
+
+def refuse_contradictory_publication(verdicts) -> None:
+    """Refuse to publish a run that contradicted itself.
+
+    READS THE FLAG, NEVER RECOMPUTES IT. `publication_block` runs once, before
+    the verdict JSON is written, and stamps its result onto the row. Two
+    independent implementations of "is this contradictory" will eventually
+    disagree, and then a row is blocked by one and not the other.
+    """
+    blocked = {s: v["publication_block"] for s, v in verdicts.items()
+               if v.get("publication_block")}
+    if not blocked:
+        return
+    detail = "; ".join(f"{s}: {b['reason']} "
+                       f"(verdict={b['verdict']}, "
+                       f"distinguishable_from_zero={b['distinguishable_from_zero']}, "
+                       f"t={b['t_versus_zero']}, "
+                       f"t_crit={b['t_critical_0.999']}, "
+                       f"n_outer_draws={b['n_outer_draws']})"
+                       for s, b in sorted(blocked.items()))
+    raise SystemExit(
+        "this run writes the canonical tables in data/calibration/, and "
+        f"{len(blocked)} scenario(s) contradicted themselves: {detail}. "
+        "The full rows are kept, flagged, in openmc_nested_pilot_verdict.json "
+        "-- flagged, not retired. NAME WHAT WAS REFUSED: add a row to "
+        "data/claims_ledger.csv recording this refusal, because a run that "
+        "published nothing and a run that never happened are otherwise "
+        "indistinguishable in this repository's history.")
+
+
+def resolve_output_dir(args, stopped_early, verdicts):
     """Where the tables go -- and the ONLY way to reach the canonical ones.
 
     THE REFUSAL IS THE DOOR, not a sign next to it. Testing
@@ -575,10 +713,30 @@ def resolve_output_dir(args, stopped_early):
     data/calibration/ in write mode after a budget-exhausted run. Putting the
     guard and the target in one function makes the canonical directory
     unobtainable without passing it.
+
+    `verdicts` IS REQUIRED, WITH NO DEFAULT. A `verdicts=None` default would
+    mean a call site added later passes nothing and the contradiction guard
+    silently never fires -- the same failure the fake-args convention avoids by
+    stating every field instead of reaching for `getattr` defaults. Required
+    means a stale call site raises TypeError at once.
+
+    AND BE HONEST ABOUT WHAT THE CONTRADICTION GUARD DOES NOT PROTECT. "Guard
+    the destination" implies the destination holds the harm. For the
+    stopped-early check it does. For the contradiction it does NOT: the two
+    files gated here carry PER-ROW e_squared, not verdicts, and the artifact
+    that ends up carrying a contradictory verdict is
+    data/calibration/openmc_scenario_registry.csv, written BY HAND from
+    openmc_nested_pilot_verdict.json -- which is written earlier, deliberately,
+    and is not gated at all. The real protection is the loud SystemExit and the
+    flag on the row a transcriber reads. These tables are refused as
+    collateral: a run that contradicted itself should not quietly replace
+    committed evidence with its rows either. A later reader who takes the CSVs
+    for the exposure will reason from a wrong model of this.
     """
     # GUARD THE DESTINATION, NOT THE FLAG -- see `writes_canonical_tables`.
     if writes_canonical_tables(args):
         refuse_partial_publish(True, stopped_early)
+        refuse_contradictory_publication(verdicts)
     return (CANONICAL_TABLES if args.publish
             else Path(args.outdir).expanduser().resolve())
 
@@ -810,6 +968,15 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
                         "transport_sd_per_row_jackknife"):
                 v[key] = None
 
+    # FLAG, DO NOT RETIRE. Stamped here -- after the significance fields exist
+    # and BEFORE the verdict JSON is written a few lines down -- so a blocked
+    # run's record survives with the contradiction NAMED rather than merely
+    # reconstructible by a reader who happens to notice PASS and
+    # `distinguishable_from_zero: false` sitting in the same object. The
+    # canonical-table guard later reads this field; it does not recompute it.
+    for v in verdicts.values():
+        v["publication_block"] = publication_block(v)
+
     prov = git_provenance(str(REPO))
     budget_doc = {
         "schema_version": 1, "tier": "S0", "target_calibration": False,
@@ -914,7 +1081,7 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
     # publishing then replaces the complete evidence tables with partial rows --
     # the exact data loss the guard exists to prevent, arriving by a different
     # door.
-    data_dir = resolve_output_dir(args, stopped_early)
+    data_dir = resolve_output_dir(args, stopped_early, verdicts)
     _write(data_dir / "openmc_effect_samples.csv",
            "# openmc_effect_samples — one row per transport replicate.\n"
            "# tier S0, target_calibration = false.\n"
