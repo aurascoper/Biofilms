@@ -17,11 +17,24 @@
 #                   be sought; what is required is that the choice is written down
 #                   with its justification.
 #
-# A row's status is about the INPUT, not about the work item:
-#   not_started            nothing exists yet
-#   satisfied              the value exists and its gate accepts it
-#   blocked_on_model       awaits a model change, not a measurement
-#   awaits_upstream        cannot begin until another row is satisfied
+# A row's status is about the INPUT, not about the work item. THESE ARE THE
+# ONLY ACCEPTED VALUES, and they are `STATUSES` in
+# calibration/scripts/reference_d_status.py — load_requirements() raises on
+# anything else:
+#   awaiting_declaration          a modeller must decide it
+#   awaiting_approval             an institution must issue it
+#   awaiting_measurement          a laboratory must produce it
+#   awaiting_derivation           computable once its inputs exist
+#   awaiting_analysis             needs a study, not a measurement
+#   awaiting_evaluated_data       published data, looked up
+#   unsupported_by_current_model  needs a model change, not data
+#   satisfied                     the value exists and its gate accepts it
+#
+# This list previously named `not_started`, `blocked_on_model` and
+# `awaits_upstream`, none of which the loader accepts: a row written by
+# following this file's own instructions could not load. The code is the
+# contract, so the prose was corrected to it — and a test now asserts the two
+# agree, because the drift was invisible for as long as nobody wrote a new row.
 #
 # UNIQUENESS KEY: requirement_id
 # Blank cells mean NOT SUPPLIED. They are never read as zero or as a default.

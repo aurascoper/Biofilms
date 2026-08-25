@@ -21,6 +21,17 @@ sys.path.insert(0, str(REPO / "calibration" / "scripts"))
 
 import reference_d_status as status  # noqa: E402
 
+DATA = REPO / "data" / "calibration"
+REQUIREMENTS_PATH = DATA / "reference_d_requirements.csv"
+ISOTHERM_PATH = DATA / "suspended_isotherm_proposal.csv"
+
+# Words the preamble once documented that `load_requirements` never accepted.
+# Named so the vocabulary check can tell "a status I do not recognise" from
+# "ordinary English in a comment" -- without this the scan would find nothing
+# and pass vacuously against any text at all.
+_RETIRED_STATUS_WORDS = frozenset(
+    {"not_started", "blocked_on_model", "awaits_upstream"})
+
 
 @pytest.fixture(scope="module")
 def requirements():
@@ -364,3 +375,75 @@ def test_the_condition_id_cannot_change_which_criterion_is_blamed(gid):
     assert blockers(approval_effective_date="") == ["7"]
     assert blockers(strain_identities="unknown") == ["1"]
     assert blockers() == []
+
+
+# ------------------------------------------- the preamble is part of the table
+
+def test_the_documented_status_vocabulary_is_the_enforced_one():
+    """A TABLE THAT MISDOCUMENTS ITSELF IS A TRAP, and this one did.
+
+    The preamble named `not_started`, `blocked_on_model` and `awaits_upstream`;
+    `load_requirements` accepts none of them. Anyone adding a row by following
+    the file's own instructions wrote something that could not load, and the
+    drift was invisible for exactly as long as nobody added a row -- the same
+    shape as a guard nothing exercises.
+
+    The code is the contract, so the prose was corrected to it rather than the
+    reverse. Note the two repairs look identical and mean opposite things: if
+    those three words had been a design somebody intended, deleting them would
+    have discarded it. `unsupported_by_current_model` already covers what
+    `blocked_on_model` described, so at most `awaits_upstream` was lost.
+    """
+    preamble = [l for l in REQUIREMENTS_PATH.read_text().splitlines()
+                if l.startswith("#")]
+    documented = {w for line in preamble for w in line.replace("#", "").split()
+                  if w in status.STATUSES or w in _RETIRED_STATUS_WORDS}
+
+    assert documented, "the preamble documents no status values at all"
+    assert documented <= set(status.STATUSES), (
+        f"the preamble documents {sorted(documented - set(status.STATUSES))}, "
+        "which load_requirements() refuses")
+    # And every enforced value is documented, or the table under-describes
+    # itself in the other direction.
+    assert set(status.STATUSES) <= documented, (
+        f"STATUSES has {sorted(set(status.STATUSES) - documented)} that the "
+        "preamble never mentions")
+
+
+def test_the_status_vocabulary_check_catches_a_reintroduced_stale_word():
+    """The negative control: the assertion above must fail on the text it
+    replaced, not merely pass on the text that replaced it."""
+    stale = "#   blocked_on_model       awaits a model change, not a measurement"
+    documented = {w for w in stale.replace("#", "").split()
+                  if w in status.STATUSES or w in _RETIRED_STATUS_WORDS}
+    assert documented == {"blocked_on_model"}
+    assert not documented <= set(status.STATUSES)
+
+
+# ------------------------------------------- the non-authoritative side tables
+
+def test_no_gate_reads_the_suspended_isotherm_proposal():
+    """SAME ISOLATION reference_d_condition_proposal.csv HAS, and for the same
+    reason: a planning worksheet must never become a second, softer path to a
+    verdict.
+
+    `suspended_isotherm_proposal.csv` records a phase-one measurement that
+    cannot satisfy D-RHOWET (no coupon) and cannot enter the solver (no units:
+    biofilms_radiodialysis.R normalises c_ext to 1.0). Both blockers are
+    written down before the measurement exists, which is the whole point -- the
+    alternative is discovering them after there is a number to defend.
+    """
+    import inspect
+
+    from biofilm_calibration.spatial import report
+
+    src = inspect.getsource(report.evaluate)
+    assert "suspended_isotherm" not in src, (
+        "the gate must not read the non-authoritative isotherm proposal")
+
+    rows = [l for l in ISOTHERM_PATH.read_text().splitlines()
+            if l and not l.startswith("#")][1:]
+    assert rows, "the proposal table is empty"
+    for row in rows:
+        assert ",false," in row or row.rstrip().endswith(",false"), (
+            f"every row must carry authoritative_for_campaign = false: {row[:60]}")
