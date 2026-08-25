@@ -57,3 +57,65 @@ let
     @test occursin("not Gy", report)
     @test occursin("not computed in this work", report)
 end
+
+# ---------------------------------------------------------------- every producer
+#
+# THE FIRST FIX COVERED ONE HELPER AND THE SUITE ONLY EXERCISED THAT HELPER, so
+# the summary honestly declined to state an absolute permeability while two live
+# `[RD]` lines in `main_coupled` and the Shiny status in
+# `biofilms_radiodialysis.R` kept printing one -- the R line with `cm/s`
+# attached, which is the fabricated unit the whole finding was about. A reader
+# running either program still received the withdrawn value through an ordinary
+# report path.
+#
+# SCAN EVERY LINE, NOT ONLY LINES CONTAINING `printf`. The first version of this
+# scan filtered to lines mentioning printf/sprintf, and in R the format string
+# sits on its own line below the `sprintf(` call -- so the offending line was
+# never examined and the negative control passed against the reverted bug. A
+# filter that narrows the search to where the author expected the defect is not
+# a search.
+
+let
+    sources = [joinpath(REPO, f) for f in
+               ("biofilms_potts.jl", "biofilms_radiodialysis.R")]
+
+    # `P_eff=` / `P_eff(t)=` followed by a format specifier: an absolute value
+    # about to be printed. The ratio forms write `P_eff/P0=` and do not match.
+    ABSOLUTE = r"P_eff(\([^)]*\))?\s*=\s*%"
+
+    # The detector must find a planted hit before its absence means anything.
+    @test occursin(ABSOLUTE, "  \"P_eff=%.5f cm/s\",")
+    @test occursin(ABSOLUTE, "  \"P_eff(t_end)=%.4f cm/s\",")
+    @test !occursin(ABSOLUTE, "  \"P_eff/P0=%.5f\",")
+    @test !occursin(ABSOLUTE, "  \"P_eff(t_end)/P0=%.4f (dimensionless)\",")
+
+    offenders = Tuple{String,Int,String}[]
+    for path in sources
+        for (i, line) in enumerate(eachline(path))
+            startswith(strip(line), "#") && continue
+            occursin(ABSOLUTE, line) || continue
+            # Allowed ONLY where the line says the absolute value is not
+            # computed -- the honest replacement the summary already carries.
+            occursin("not computed", line) && continue
+            push!(offenders, (basename(path), i, strip(line)))
+        end
+    end
+    if !isempty(offenders)
+        for (f, i, l) in offenders
+            println("  absolute P_eff still reported: $f:$i  $(first(l, 70))")
+        end
+    end
+    @test isempty(offenders)
+
+    # And no live report may attach cm/s to a permeability number.
+    unit_hits = Tuple{String,Int}[]
+    for path in sources
+        for (i, line) in enumerate(eachline(path))
+            startswith(strip(line), "#") && continue
+            (occursin("P_eff", line) && occursin("cm/s", line) &&
+             !occursin("not computed", line)) || continue
+            push!(unit_hits, (basename(path), i))
+        end
+    end
+    @test isempty(unit_hits)
+end

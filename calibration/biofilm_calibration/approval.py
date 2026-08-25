@@ -55,6 +55,79 @@ _MUST_NAME_SOMETHING = (
     "approved_protocol_version",
 )
 
+def _entries(value) -> list[str]:
+    return [p.strip() for p in str(value or "").split(";") if p.strip()]
+
+
+def _biosafety_mapping_problems(row) -> list[str]:
+    """Whether `biosafety_level_by_strain` is a per-strain MAPPING at all.
+
+    ADDING THE FIELD TO `_MUST_NAME_SOMETHING` MADE IT REACHABLE, NOT VALID.
+    That closed the fail-open on placeholder text and left a wider one: any
+    non-filler string cleared the check. `"BSL2"` -- a single level for a
+    mixed-BSL consortium, which is the precise error the schema warns about --
+    passed. So did `"DR:BSL1"` against two declared strains, silently covering
+    one organism and clearing the institutional milestone for both.
+
+    THE CONVENTION IS THE PRODUCER'S, NOT INVENTED HERE. `acquisition.py`
+    declares this field as "per-strain, e.g. 'SO:BSL1;CN:BSL2' -- never a
+    single level". This checks that declaration and nothing beyond it.
+
+    WHAT IT DOES NOT DO, stated because a reader will otherwise assume it: it
+    does not bind a key to a strain by name. Nothing declares how `DR` relates
+    to `D. radiodurans R1`, and inferring one from initials would be the
+    consumer inventing semantics the producer never stated. So this is a
+    STRUCTURAL check -- shape, count, distinctness -- and a mapping that names
+    the right number of distinct strains with the wrong keys still passes here.
+    Only a human reading the approval can catch that.
+    """
+    value = row.get("biosafety_level_by_strain")
+    if is_placeholder(value):
+        return []          # already refused by the placeholder pass
+
+    strains = _entries(row.get("strain_identities"))
+    pairs = _entries(value)
+    out: list[str] = []
+
+    malformed = [p for p in pairs if p.count(":") != 1
+                 or not p.split(":")[0].strip()
+                 or not p.split(":")[1].strip()]
+    if malformed:
+        out.append(
+            f"biosafety_level_by_strain has entries that are not "
+            f"strain:level pairs: {malformed}. A single level for a "
+            "mixed-BSL consortium is the error this field exists to prevent "
+            "-- biosafety follows strains, not species")
+        return out
+
+    levels = [p.split(":")[1].strip().upper().replace("-", "")
+              for p in pairs]
+    unknown = [lv for lv in levels if lv not in _BIOSAFETY_LEVELS]
+    if unknown:
+        out.append(
+            f"biosafety_level_by_strain names levels {unknown}, which are not "
+            f"recognised biosafety levels {sorted(_BIOSAFETY_LEVELS)}")
+
+    keys = [p.split(":")[0].strip() for p in pairs]
+    if len(set(keys)) != len(keys):
+        out.append(
+            f"biosafety_level_by_strain repeats a strain key in {keys}; one "
+            "entry per strain, or a level is silently overridden")
+
+    if strains and len(pairs) != len(strains):
+        out.append(
+            f"biosafety_level_by_strain covers {len(pairs)} strain(s) and "
+            f"strain_identities declares {len(strains)}. An approval that "
+            "omits a strain does not cover it, and the omission must not be "
+            "readable as coverage")
+    return out
+
+
+# The levels an approval may name. Not a guess: BSL-1..4 is the standard
+# containment scale, and anything outside it is a value nobody issuing an
+# approval would write.
+_BIOSAFETY_LEVELS = frozenset({"BSL1", "BSL2", "BSL3", "BSL4"})
+
 # What the approval was issued AGAINST. Editing any of these after the fact
 # changes what would have been reviewed, so the digest covers exactly them —
 # not the whole row, which carries bookkeeping that no committee ever saw.
@@ -151,6 +224,9 @@ def classified(rows, sources=None, *,
                     f"{field} = {(row.get(field) or '')!r} names nothing. An "
                     "approval is evidence produced by an institution; filler "
                     "text has no evidentiary force whatever it says")
+
+        for text in _biosafety_mapping_problems(row):
+            add("biosafety_level_by_strain", text)
 
         if row.get("is_target_system") != "true":
             add("is_target_system",

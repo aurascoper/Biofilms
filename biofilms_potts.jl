@@ -1466,8 +1466,11 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                            rd.c[end])
     push!(trajectory, cs0)
     print_snapshot(snap0)
-    @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
-            rd.t, rd.m, rp.P0 * exp(rp.alpha_P * rd.t * rp.Ddot_R),
+    # RATIO, NOT AN ABSOLUTE. P0 is an uncalibrated placeholder, so
+    # `P0 * exp(...)` carries its arbitrariness into a number that looks
+    # measured. P_eff/P0 is dimensionless and is what the manuscript reports.
+    @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
+            rd.t, rd.m, exp(rp.alpha_P * rd.t * rp.Ddot_R),
             rd.c[end], mean(rd.c))
 
     for mcs in 1:n_mcs
@@ -1517,8 +1520,8 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                                   mean(rd.c), mean(rd.s), rd.c[end])
             push!(trajectory, cs)
             print_snapshot(snap)
-            @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
-                    rd.t, rd.m, P_eff_now, rd.c[end], mean(rd.c), mean(rd.s))
+            @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
+                    rd.t, rd.m, P_eff_now / rp.P0, rd.c[end], mean(rd.c), mean(rd.s))
         end
     end
 

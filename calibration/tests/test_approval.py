@@ -269,3 +269,57 @@ def test_every_refusal_states_its_own_subject():
     # and prose is derived from the same list, so the two cannot disagree
     assert approval.problems([broken], SOURCES, today=TODAY) == \
         [r.text for r in seen]
+
+
+# ------------------------------------------- the mapping must BE a mapping
+
+@pytest.mark.parametrize("value,refuses,why", [
+    ("DR:BSL1;CN:BSL2", False, "the complete, well-formed mapping"),
+    # THE PRECISE ERROR THE SCHEMA WARNS ABOUT: acquisition.py documents this
+    # field as "per-strain ... never a single level".
+    ("BSL2", True, "one level for a mixed-BSL consortium"),
+    # Covers one of two declared strains. The omitted organism is not approved,
+    # and the omission must not read as coverage.
+    ("DR:BSL1", True, "fewer entries than declared strains"),
+    ("all strains are safe", True, "prose, not a mapping"),
+    ("DR:BSL1;DR:BSL2", True, "a repeated key silently overrides a level"),
+    ("DR:BSL9;CN:BSL2", True, "BSL9 is not a containment level"),
+    ("DR:;CN:BSL2", True, "an empty level is not a level"),
+    (":BSL1;CN:BSL2", True, "an empty strain key names no organism"),
+])
+def test_the_per_strain_mapping_is_parsed_not_merely_nonempty(value, refuses, why):
+    """ADDING THE FIELD TO THE PLACEHOLDER LIST MADE IT REACHABLE, NOT VALID.
+
+    That fix closed the fail-open on filler text and left a wider one open:
+    any non-filler string cleared the check, so `"BSL2"` -- a single level for
+    a consortium whose strains sit at different levels -- passed, and after
+    recomputing the scope hash all nine authorization criteria reported met.
+
+    Two rounds on the same field is the point: a guard that is reachable is
+    not thereby a guard that discriminates.
+    """
+    found = [p for p in problems(row(biosafety_level_by_strain=value))
+             if "biosafety_level_by_strain" in p]
+    assert bool(found) == refuses, f"{why}: {value!r} -> {found}"
+
+
+def test_the_mapping_check_does_not_claim_to_bind_keys_to_strain_names():
+    """WHAT IT CANNOT CATCH, ASSERTED SO NOBODY ASSUMES OTHERWISE.
+
+    Nothing declares how the key `DR` relates to `D. radiodurans R1`, so
+    inferring one from initials would be the consumer inventing semantics the
+    producer never stated. A mapping naming the right NUMBER of distinct
+    strains with the wrong keys therefore passes here, and only a human
+    reading the approval catches it.
+
+    This test exists so that limit is a recorded property rather than a
+    surprise -- and so that if someone later adds real key-to-strain binding,
+    this test fails and forces the docstring to be corrected with it.
+    """
+    wrong_keys = "XX:BSL1;YY:BSL2"   # right shape, right count, wrong organisms
+    found = [p for p in problems(row(biosafety_level_by_strain=wrong_keys))
+             if "biosafety_level_by_strain" in p]
+    assert not found, (
+        "the structural check now appears to bind keys to strain names; if "
+        "that is deliberate, update _biosafety_mapping_problems' docstring, "
+        "which currently states it does not")
