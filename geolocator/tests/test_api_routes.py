@@ -38,7 +38,8 @@ def test_empty_result_is_distinguishable_from_unknown_layer():
 # ── freshness is surfaced, per layer ─────────────────────────────────────────
 def test_health_reports_class_and_authority_per_layer():
     d = client.get("/api/health").json()
-    assert set(d["freshness"]) == set(LAYER_IDS) | {"market_bars", "blue_marble"}
+    assert set(d["freshness"]) == set(LAYER_IDS) | {
+        "market_bars", "blue_marble", "market_correlation"}
     for name, st in d["freshness"].items():
         assert st["layer_class"] in ("live", "reference", "authored")
         assert st["status"] in (
@@ -118,3 +119,41 @@ def test_index_and_legacy_are_not_accidentally_cacheable_forever():
     for path in ("/", "/legacy"):
         cc = client.get(path).headers.get("cache-control", "")
         assert "max-age" not in cc or "no-cache" in cc
+
+
+# ── the measured band's producer is optional, and its absence is explicit ────
+def test_absent_market_adapter_is_declared_not_silent():
+    """An uninstalled producer must not read as "no correlations found".
+
+    Absence of the producer and a null result from the producer are different
+    facts. Collapsing them is the same error this codebase refuses everywhere
+    else, and a swallowed ImportError collapses them by default.
+    """
+    from geolocator.api import market_adapter_installed
+
+    st = client.get("/api/health").json()["freshness"]["market_correlation"]
+    assert st["layer_class"] == "live"
+    if market_adapter_installed():
+        assert st["installed"] is True
+    else:
+        assert st["installed"] is False
+        assert st["status"] == "unavailable"
+        assert "not installed" in st["reason"]
+        assert "geolocator.market" in st["reason"]
+
+
+def test_adapter_contract_is_published_so_it_can_be_supplied():
+    """A future user must be able to add a producer without editing api.py."""
+    from geolocator.api import market_adapter_installed
+
+    st = client.get("/api/links").json()["measured_freshness"]
+    assert st["id"] == "market_correlation"
+    if not market_adapter_installed():
+        assert "fuel_correlations()" in st["contract"]
+
+
+def test_missing_adapter_does_not_take_the_other_bands_with_it():
+    feats = client.get("/api/links").json()["features"]
+    statuses = {f["properties"]["status"] for f in feats}
+    assert "structural" in statuses
+    assert len(feats) > 0

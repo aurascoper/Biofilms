@@ -132,6 +132,10 @@ export function createLayerManager() {
       out.push(`generated: ${s.source_timestamp}`);
       if (s.age_s != null) out.push(`age: ${fmtAge(s.age_s)}`);
     }
+    // An optional producer that is not installed is a different fact from a
+    // producer that ran and found nothing. Say which.
+    if (s.installed === false && s.reason) out.push(s.reason);
+    if (s.contract) out.push(`to enable: ${s.contract}`);
     if (s.error) out.push(`error: ${s.error}`);
     return out.join('\n');
   }

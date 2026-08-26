@@ -176,6 +176,11 @@ def test_reference_vintage_and_measured_staleness_coexist():
 
 
 def test_lattice_boundary_is_untouched_by_imagery():
+    # /api/lattice memoises for a couple of seconds; clear it so this assertion
+    # is about a live projection and not about whatever ran before it.
+    from geolocator import lattice as _lat
+    _lat._cache["at"] = None
+    _lat._cache["doc"] = None
     d = client.get("/api/lattice").json()
     assert set(d["mission"]) <= set(
         __import__("geolocator.lattice", fromlist=["x"]).MISSION_FIELDS)
