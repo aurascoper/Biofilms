@@ -9,7 +9,7 @@
  * not have". A trading symbol has no coordinates either. So it lives beside the
  * globe, not on it, and the join between them is the measured band.
  *
- * FIDELITY TO THE BOARD ON :4199
+ * FIDELITY TO THE UPSTREAM BOARD
  * hash32 / ruleBits / caStep / buildAutomaton below are the board's own
  * functions. Its seed string is twelve fields, the last five of which come from
  * an open position -- and when a cell has no position those five evaluate to "".
@@ -92,7 +92,7 @@ function buildAutomaton(c, cols = COLS, rows = ROWS) {
 export function createLatticePanel(root) {
   root.innerHTML = `
     <div class="lat-head">
-      <span class="lat-eyebrow">MEXC · STREAM</span>
+      <span class="lat-eyebrow">LATTICE · STREAM</span>
       <span class="lat-chip" id="lat-chip">—</span>
     </div>
     <div class="lat-mission" id="lat-mission"></div>
@@ -240,7 +240,7 @@ export function createLatticeLayer({ panel, manager }) {
     name: 'Trading Lattice',
     icon: '▤',
     layerClass: 'live',
-    source: 'lattice board :4199 (redacted)',
+    source: 'local lattice source (redacted)',
     enabledByDefault: true,
     refreshInterval: 5000,      // the board itself is rewritten roughly every 60s
     enable: () => { document.getElementById('lattice').classList.add('on'); return update(); },

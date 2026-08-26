@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-geolocator/lattice.py — the redaction boundary between the trading lattice and
-this globe.
+geolocator/lattice.py — the redaction boundary for the local lattice source.
 
-The lattice board on :4199 serves a live trading book. It offers a redacted
-`?view=stream` mode, and this module asks for it -- but does not *trust* it.
-`view=stream` is a property the lattice board establishes, and the lattice board
-is free to change what it means without telling us. This process binds 0.0.0.0
-with CORS "*", has no auth, and has already been exposed through a Cloudflare
-tunnel, so a field added upstream tomorrow must not be able to become public
+The upstream is a loopback-only service holding private state. It offers a
+redacted `?view=stream` mode, and this module asks for it -- but does not
+*trust* it: `view=stream` is a property the upstream establishes and is free to
+redefine without telling us. This process binds 0.0.0.0 with CORS "*" and has
+no auth, so a field added upstream tomorrow must not be able to become public
 data by default.
 
 So nothing is forwarded. A NEW document is built key by key from an allowlist:
@@ -19,10 +17,9 @@ So nothing is forwarded. A NEW document is built key by key from an allowlist:
     nested object -- a key allowlist with unbounded values is not a boundary
   - `view` is a server constant and is never read from the client
 
-What is deliberately NOT here: equity, available, margin_used, positions, and
-by default has_position. The first four are already stripped upstream; they are
-named here so that re-adding one is a visible edit to this list rather than an
-accident.
+What is deliberately NOT here: any financial-state field, and by default the
+per-symbol position-presence flag. They are named in the code below so that
+re-admitting one is a visible edit to an explicit list rather than an accident.
 """
 
 from __future__ import annotations
@@ -126,7 +123,7 @@ def _unavailable(reason: str) -> dict:
         "status": UNAVAILABLE,
         "authority": None,
         "age_s": None,
-        "source": "lattice board :4199",
+        "source": "local lattice source",
         "mission": None,
         "cells": [],
         "econ": None,
@@ -170,7 +167,7 @@ def _build(upstream: dict) -> dict:
         "status": status,
         "authority": "source-timestamp" if semantic else None,
         "age_s": age,
-        "source": "lattice board :4199",
+        "source": "local lattice source",
         "mission": _pick(state.get("mission"), MISSION_FIELDS),
         "cells": cells,
         "econ": econ,
@@ -179,7 +176,7 @@ def _build(upstream: dict) -> dict:
 
 
 def get_lattice() -> dict:
-    """The only thing the browser ever sees of the trading book."""
+    """The only view of the upstream this process ever serves."""
     now = now_utc()
     at = _cache["at"]
     if at is not None and (now - at).total_seconds() < CACHE_TTL_S:

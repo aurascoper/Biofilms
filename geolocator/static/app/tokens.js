@@ -10,7 +10,7 @@
  *  - Type is the SYSTEM mono stack, not JetBrains Mono. Upstream vendors its
  *    fonts; this page has no build step and already dies without two CDN
  *    scripts, and a webfont would be a third. The system stack also matches the
- *    lattice board on :4199, which is the other half of this fused surface.
+ *    lattice board, which is the other half of this fused surface.
  *
  *  - Tokens are exported as JS AND written to :root as custom properties from
  *    the same object. The canvas draws from the object, the panels style from

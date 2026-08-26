@@ -10,7 +10,7 @@ energy layers:
   nuclear   — nuclear fuel cycle (mines, enrichment, reprocessing, waste)
   battery   — battery fuel cycle (lithium/cobalt/nickel, gigafactories, recycling)
   gridcoin  — Gridcoin/BOINC energy grid (project servers)
-  worldgrid — gridded world energy model (joined from lattice board port 4199)
+  worldgrid — gridded world energy model (joined from the local lattice source)
   stars     — speculative star-system energy layer (exoplanet hosts)
 
 Endpoints:
@@ -55,7 +55,7 @@ REPO = ROOT.parent
 DATA_CSV = REPO / "power_plant_database_global.csv"
 SAMPLE_CSV = ROOT / "sample_power_plants.csv"
 DATA_DIR = ROOT / "data"
-# Energy world grid from the lattice board (port 4199)
+# Energy world grid from the local lattice source
 ENERGY_WORLD_JSON = Path(
     os.environ.get(
         "ENERGY_WORLD_JSON",
@@ -76,7 +76,8 @@ app.add_middleware(
 # ── caching policy, stated once ───────────────────────────────────────────────
 #
 #   /api/*   no-store    live and derived data. /api/lattice carries a redacted
-#                        view of a trading book; it has no business on disk.
+#                        view of a private local source; it has no business on
+#                        disk.
 #                        The imagery raster is the one exception below.
 #   /app/*   no-cache    versionless ES modules. May be STORED, must be
 #                        REVALIDATED. Without this, StaticFiles sends only
@@ -224,7 +225,7 @@ def _load_layer_csv(path: Path) -> dict:
     return {"items": out, "meta": {}}
 
 
-# ── Energy world grid (from lattice board port 4199) ─────────────────────────
+# ── Energy world grid (from the local lattice source) ────────────────────────
 def _load_worldgrid(path: Path) -> dict:
     """Convert energy_world.json 4°-bin grid into GeoJSON points.
 
@@ -666,7 +667,7 @@ def links():
 
 @app.get("/api/lattice")
 def lattice():
-    """The only view of the trading book this process ever serves.
+    """The only view of the upstream lattice this process ever serves.
 
     `view` is a server constant inside geolocator.lattice, never a parameter.
     The response is rebuilt from an allowlist rather than forwarded, so a field
