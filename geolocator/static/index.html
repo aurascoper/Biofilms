@@ -5,304 +5,163 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Primary Fuel Source Geolocator · 3D Globe</title>
 <style>
+  /* Colour and type come from app/tokens.js, which writes these custom
+     properties onto :root. The values below are only a pre-paint fallback so
+     the shell does not flash white before the module graph resolves. */
   :root {
-    --bg: #0a0e1a; --panel: rgba(16,22,40,0.85); --ink: #e8ecf4;
-    --ink-soft: #9aa7c0; --line: #1e2a44; --accent: #5d9bff;
+    --bg:#040c10; --panel:rgba(4,12,16,0.82); --panel-sel:rgba(5,18,24,0.94);
+    --line:rgba(190,232,242,0.18); --line-sel:rgba(107,232,255,0.72);
+    --ink:rgba(232,240,244,0.96); --ink-soft:rgba(147,161,173,0.92);
+    --accent:#6be8ff; --radius:4px;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --lat-w:290px;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  html,body { height:100%; background:var(--bg); color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  #globe { position:fixed; inset:0; }
-  #hud { position:fixed; top:16px; left:16px; z-index:10; max-width:300px;
-    background:var(--panel); border:1px solid var(--line); border-radius:10px;
-    padding:14px 16px; backdrop-filter:blur(6px); }
-  #hud h1 { font-size:15px; font-weight:600; margin-bottom:2px; }
-  #hud .sub { font-size:11px; color:var(--ink-soft); margin-bottom:10px; }
-  #hud .stat { font-size:12px; color:var(--ink-soft); margin-bottom:8px; }
-  #hud .stat b { color:var(--ink); }
-  #legend { margin-top:6px; max-height:200px; overflow-y:auto; }
-  #legend .row { display:flex; align-items:center; gap:8px; font-size:11px;
+  html,body { height:100%; background:var(--bg); color:var(--ink); font-family:var(--mono);
+    font-size:11px; overflow:hidden; }
+  #globe { position:fixed; inset:0 var(--lat-w) 0 0; }
+  #detection-root { position:fixed; inset:0 var(--lat-w) 0 0; pointer-events:none; z-index:5; }
+
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    backdrop-filter:blur(6px); }
+  .eyebrow { font-size:9.5px; letter-spacing:0.13em; text-transform:uppercase; color:var(--ink-soft); }
+
+  /* ── HUD ─────────────────────────────────────────────────────────────── */
+  #hud { position:fixed; top:14px; left:14px; z-index:10; width:274px; padding:12px 14px; }
+  #hud.hidden { display:none; }
+  #hud h1 { font-size:12px; font-weight:600; letter-spacing:0.04em; margin-bottom:3px; }
+  #hud .sub { font-size:9.5px; letter-spacing:0.11em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:9px; }
+  .stat { font-size:11px; color:var(--ink-soft); margin-bottom:6px; }
+  .stat b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  #stat-trunc { color:#e07b39; }
+  #legend { margin-top:6px; max-height:170px; overflow-y:auto; }
+  #legend .row { display:flex; align-items:center; gap:7px; font-size:10.5px;
     color:var(--ink-soft); margin-bottom:3px; }
-  #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
+  .swatch { width:9px; height:9px; border-radius:2px; flex:0 0 auto; }
   #legend .row b { color:var(--ink); font-weight:600; }
-  #controls { position:fixed; bottom:16px; left:16px; z-index:10;
-    background:var(--panel); border:1px solid var(--line); border-radius:10px;
-    padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  #controls label { font-size:11px; color:var(--ink-soft); }
-  #controls select, #controls input { background:#0d1424; color:var(--ink);
-    border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:11px; }
-  #tooltip { position:fixed; z-index:20; pointer-events:none; background:var(--panel);
-    border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:11px;
-    color:var(--ink); display:none; max-width:260px; }
+  #measured { display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--line);
+    font-size:10.5px; color:var(--ink-soft); }
+  #measured .row { margin-bottom:3px; }
+  #measured b { color:var(--ink); }
+
+  /* ── layer registry ──────────────────────────────────────────────────── */
+  #controls { position:fixed; bottom:14px; left:14px; z-index:10; width:274px; padding:9px 10px; }
+  #layer-panel { display:flex; flex-direction:column; gap:2px; margin-bottom:8px; }
+  .layer-row { display:flex; align-items:center; gap:7px; width:100%; padding:4px 6px;
+    background:transparent; border:1px solid transparent; border-radius:3px;
+    color:var(--ink-soft); font:inherit; font-size:10.5px; cursor:pointer; text-align:left; }
+  .layer-row:hover { border-color:var(--line); }
+  .layer-row.on { background:var(--panel-sel); border-color:var(--line); color:var(--ink); }
+  .l-icon { width:13px; flex:0 0 auto; opacity:0.85; }
+  .l-name { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .l-count { font-variant-numeric:tabular-nums; opacity:0.6; font-size:9.5px; }
+  .l-chip, .lat-chip { border:1px solid currentColor; border-radius:2px; padding:0 4px;
+    font-size:8.5px; letter-spacing:0.08em; flex:0 0 auto; }
+  .filters { display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+    padding-top:8px; border-top:1px solid var(--line); }
+  .filters label { color:var(--ink-soft); font-size:9.5px; letter-spacing:0.1em;
+    text-transform:uppercase; }
+  .filters select, .filters input { background:#061219; color:var(--ink); font:inherit;
+    font-size:10.5px; border:1px solid var(--line); border-radius:3px; padding:3px 6px; }
+  .filters input { width:62px; }
+
+  /* ── sensor styles ───────────────────────────────────────────────────── */
+  #styles { position:fixed; bottom:14px; left:50%; transform:translateX(calc(-50% - var(--lat-w)/2));
+    z-index:10; padding:6px 10px; display:flex; gap:9px; align-items:center; }
+  #style-name { color:var(--accent); letter-spacing:0.12em; font-size:10px; }
+  #style-keys { display:flex; gap:3px; }
+  .sk { border:1px solid var(--line); border-radius:2px; padding:0 4px; font-size:9px;
+    color:var(--ink-soft); }
+  .sk.on { border-color:var(--accent); color:var(--accent); }
+  .sk.bad { opacity:0.3; text-decoration:line-through; }
+  #styles .hint { color:var(--ink-soft); font-size:9px; letter-spacing:0.08em; }
+
+  /* ── lattice ─────────────────────────────────────────────────────────── */
+  #lattice { position:fixed; top:0; right:0; bottom:0; width:var(--lat-w); z-index:10;
+    border-left:1px solid var(--line); background:var(--panel); backdrop-filter:blur(6px);
+    padding:12px; overflow-y:auto; opacity:0.35; transition:opacity 0.2s; }
+  #lattice.on { opacity:1; }
+  .lat-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .lat-eyebrow { font-size:9.5px; letter-spacing:0.13em; text-transform:uppercase; color:var(--ink-soft); }
+  .lat-mission { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px; }
+  .lat-mission .k { color:var(--ink-soft); letter-spacing:0.08em; text-transform:uppercase;
+    font-size:8.5px; margin-right:4px; }
+  .lat-mission .v { color:var(--ink); }
+  #lat-canvas { display:block; width:100%; }
+  .lat-functor { display:flex; flex-wrap:wrap; gap:3px; align-items:center; margin:10px 0 8px;
+    font-size:8.5px; letter-spacing:0.06em; }
+  .fn { border:1px solid var(--line); border-radius:2px; padding:1px 4px; color:var(--ink-soft); }
+  .fn.dim { opacity:0.35; }
+  .fn-arr { color:var(--ink-soft); opacity:0.5; }
+  .lat-foot { font-size:9.5px; color:var(--ink-soft); border-top:1px solid var(--line);
+    padding-top:7px; }
+  .lat-foot .caveat { margin-top:5px; opacity:0.75; line-height:1.45; }
+
+  /* ── detection ───────────────────────────────────────────────────────── */
+  .det-box { position:absolute; display:none; border:1px solid var(--accent);
+    background:rgba(4,12,16,0.56); border-radius:2px; }
+  .det-id { position:absolute; left:0; top:100%; font-size:8.5px; color:var(--ink);
+    background:rgba(4,12,16,0.56); padding:0 2px; white-space:nowrap; letter-spacing:0.04em; }
+
+  /* ── chrome ──────────────────────────────────────────────────────────── */
+  #tooltip { position:fixed; z-index:20; pointer-events:none; background:var(--panel-sel);
+    border:1px solid var(--line-sel); border-radius:var(--radius); padding:7px 10px;
+    font-size:10.5px; color:var(--ink); display:none; max-width:250px; line-height:1.5; }
   #tooltip .t-name { font-weight:600; margin-bottom:2px; }
   #tooltip .t-row { color:var(--ink-soft); }
+  #provenance { position:fixed; bottom:4px; left:50%;
+    transform:translateX(calc(-50% - var(--lat-w)/2)); z-index:9; font-size:8.5px;
+    color:var(--ink-soft); opacity:0.55; letter-spacing:0.05em; pointer-events:none; }
+  #keys { position:fixed; top:14px; right:calc(var(--lat-w) + 14px); z-index:10;
+    padding:5px 9px; font-size:9px; color:var(--ink-soft); letter-spacing:0.08em; }
   #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    background:var(--bg); z-index:30; font-size:14px; color:var(--ink-soft); }
+    background:var(--bg); z-index:30; font-size:11px; color:var(--ink-soft);
+    letter-spacing:0.14em; text-transform:uppercase; }
+  @media (max-width:900px) { :root { --lat-w:0px; } #lattice { display:none; } }
 </style>
 </head>
 <body>
 <div id="globe"></div>
+<div id="detection-root"></div>
 <div id="loading">Loading energy globe…</div>
-<div id="hud">
+
+<div id="hud" class="panel">
   <h1>Primary Fuel Source Geolocator</h1>
-  <div class="sub" id="hud-sub">3D geo-spatial · WRI Global Power Plant Database</div>
+  <div class="sub">3D geo-spatial · energy × market lattice</div>
   <div class="stat">Sites: <b id="stat-count">—</b> · Capacity: <b id="stat-cap">—</b> MW</div>
+  <div class="stat" id="stat-trunc" style="display:none"></div>
   <div id="legend"></div>
+  <div id="measured"></div>
 </div>
-<div id="controls">
-  <label>Layer</label>
-  <select id="layer-filter">
-    <option value="power">Power Plants</option>
-    <option value="nuclear">Nuclear Fuel Cycle</option>
-    <option value="battery">Battery Fuel Cycle</option>
-    <option value="gridcoin">Gridcoin/BOINC</option>
-    <option value="worldgrid">Energy World Grid</option>
-    <option value="stars">Star Systems</option>
-  </select>
-  <label>Fuel/Stage</label>
-  <select id="fuel-filter"><option value="">All</option></select>
-  <label>Min MW</label>
-  <input id="min-cap" type="number" value="0" min="0" style="width:70px">
-  <button id="apply" style="background:var(--accent);color:#04101f;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer">Apply</button>
-  <label><input type="checkbox" id="show-links" checked> Bands</label>
+
+<div id="controls" class="panel">
+  <div id="layer-panel"></div>
+  <div class="filters">
+    <label>Fuel/Stage</label>
+    <select id="fuel-filter"><option value="">All</option></select>
+    <label>Min MW</label>
+    <input id="min-cap" type="number" value="0" min="0">
+  </div>
 </div>
+
+<div id="styles" class="panel">
+  <span class="eyebrow">Sensor</span>
+  <span id="style-name">NORMAL</span>
+  <span id="style-keys"></span>
+</div>
+
+<div id="keys" class="panel">H hud · D detection <span id="det-state">OFF</span> · 1–7 sensor</div>
+<div id="lattice"><div id="lattice-body"></div></div>
 <div id="tooltip"></div>
+<div id="provenance"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-<script>
-const API = '';
-let scene, camera, renderer, controls, globeGroup, starGroup, linkGroup, raycaster, mouse;
-let plants = [], markers = [], fuelColors = [], links = [];
-let currentLayer = 'power';
-
-init();
-loadFuels();
-loadStats();
-loadPlants();
-loadLinks();
-
-function init() {
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 1000);
-  camera.position.set(0, 0, 3.2);
-  renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  document.getElementById('globe').appendChild(renderer.domElement);
-
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.minDistance = 1.4; controls.maxDistance = 8;
-
-  // Background starfield
-  const stars = new THREE.Points(
-    new THREE.BufferGeometry().setFromPoints(
-      Array.from({length:2000}, () => new THREE.Vector3(
-        (Math.random()-0.5)*200, (Math.random()-0.5)*200, (Math.random()-0.5)*200))),
-    new THREE.PointsMaterial({ color:0xffffff, size:0.15, transparent:true, opacity:0.6 }));
-  scene.add(stars);
-
-  // Globe
-  const geo = new THREE.SphereGeometry(1, 64, 64);
-  const mat = new THREE.MeshPhongMaterial({ color:0x0d1424, transparent:true, opacity:0.92 });
-  globeGroup = new THREE.Group();
-  const sphere = new THREE.Mesh(geo, mat);
-  globeGroup.add(sphere);
-
-  // Graticule
-  const lineMat = new THREE.LineBasicMaterial({ color:0x1e2a44, transparent:true, opacity:0.5 });
-  for (let lat=-80; lat<=80; lat+=20) {
-    const pts=[]; for (let lon=-180; lon<=180; lon+=5) pts.push(latLonToVec3(lat,lon,1.001));
-    globeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
-  }
-  for (let lon=-180; lon<180; lon+=20) {
-    const pts=[]; for (let lat=-90; lat<=90; lat+=5) pts.push(latLonToVec3(lat,lon,1.001));
-    globeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
-  }
-  scene.add(globeGroup);
-
-  // Star-system group (celestial sphere, hidden by default)
-  starGroup = new THREE.Group();
-  scene.add(starGroup);
-
-  // Correlation band group (arcs)
-  linkGroup = new THREE.Group();
-  scene.add(linkGroup);
-
-  // Lights
-  scene.add(new THREE.AmbientLight(0x404060, 0.6));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-  dir.position.set(2,1,3); scene.add(dir);
-
-  raycaster = new THREE.Raycaster();
-  mouse = new THREE.Vector2();
-  renderer.domElement.addEventListener('mousemove', onMouseMove);
-  renderer.domElement.addEventListener('click', onMouseMove);
-
-  window.addEventListener('resize', () => {
-    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  });
-  animate();
-}
-
-function latLonToVec3(lat, lon, r=1.0) {
-  const phi = (90-lat)*Math.PI/180, theta = (lon+180)*Math.PI/180;
-  return new THREE.Vector3(
-    -r*Math.sin(phi)*Math.cos(theta),
-    r*Math.cos(phi),
-    r*Math.sin(phi)*Math.sin(theta));
-}
-
-// RA (hours) + Dec (deg) -> celestial sphere point
-function raDecToVec3(ra, dec, r=2.0) {
-  const phi = (90-dec)*Math.PI/180, theta = ra*15*Math.PI/180;
-  return new THREE.Vector3(
-    r*Math.sin(phi)*Math.cos(theta),
-    r*Math.cos(phi),
-    r*Math.sin(phi)*Math.sin(theta));
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
-}
-
-async function loadFuels() {
-  const layer = currentLayer;
-  const r = await fetch(API+'/api/fuels?layer='+layer); const d = await r.json();
-  fuelColors = {}; const legend = document.getElementById('legend');
-  const sel = document.getElementById('fuel-filter');
-  legend.innerHTML=''; sel.innerHTML='<option value="">All</option>';
-  d.fuels.forEach(f => {
-    fuelColors[f.fuel] = f.color;
-    const row = document.createElement('div'); row.className='row';
-    row.innerHTML = `<span class="swatch" style="background:${f.color}"></span><b>${f.fuel}</b> (${f.count})`;
-    legend.appendChild(row);
-    const opt = document.createElement('option'); opt.value=f.fuel; opt.textContent=f.fuel;
-    sel.appendChild(opt);
-  });
-}
-
-async function loadStats() {
-  const layer = currentLayer;
-  const r = await fetch(API+'/api/stats?layer='+layer); const d = await r.json();
-  document.getElementById('stat-count').textContent = d.count;
-  document.getElementById('stat-cap').textContent = d.total_capacity_mw.toLocaleString();
-  const sub = document.getElementById('hud-sub');
-  sub.textContent = layer==='power' ? '3D geo-spatial · WRI Global Power Plant Database'
-    : layer==='nuclear' ? 'Nuclear fuel cycle · mines, enrichment, reprocessing, waste'
-    : layer==='battery' ? 'Battery fuel cycle · lithium/cobalt/nickel, gigafactories, recycling'
-    : layer==='gridcoin' ? 'Gridcoin/BOINC energy grid · project servers'
-    : layer==='worldgrid' ? 'Energy world grid · 4° bins (joined from lattice board)'
-    : 'Star systems · SPECULATIVE exoplanet energy layer';
-}
-
-async function loadPlants() {
-  const layer = currentLayer;
-  const fuel = document.getElementById('fuel-filter').value;
-  const minCap = document.getElementById('min-cap').value || 0;
-  const q = new URLSearchParams({ layer, min_capacity: minCap, limit: 5000 });
-  if (fuel) q.set('fuel', fuel);
-  const r = await fetch(API+'/api/plants?'+q); const d = await r.json();
-  plants = d.features;
-  renderMarkers();
-  document.getElementById('loading').style.display='none';
-}
-
-async function loadLinks() {
-  const r = await fetch(API+'/api/links'); const d = await r.json();
-  links = d.features;
-  renderLinks();
-}
-
-function renderLinks() {
-  while (linkGroup.children.length) linkGroup.remove(linkGroup.children[0]);
-  const show = document.getElementById('show-links').checked;
-  if (!show) return;
-  links.forEach(l => {
-    const [lon1, lat1] = l.geometry.coordinates[0];
-    const [lon2, lat2] = l.geometry.coordinates[1];
-    const a = latLonToVec3(lat1, lon1, 1.01);
-    const b = latLonToVec3(lat2, lon2, 1.01);
-    // Arc between the two points, bulging outward
-    const mid = a.clone().add(b).multiplyScalar(0.5).normalize().multiplyScalar(1.3);
-    const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
-    const pts = curve.getPoints(32);
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: l.properties.color, transparent:true, opacity:0.6 });
-    linkGroup.add(new THREE.Line(geo, mat));
-  });
-}
-
-function renderMarkers() {
-  // Clear globe markers
-  markers.forEach(m => globeGroup.remove(m));
-  markers = [];
-  // Clear star markers
-  while (starGroup.children.length) starGroup.remove(starGroup.children[0]);
-
-  const isStars = currentLayer === 'stars';
-  const maxCap = Math.max(...plants.map(p => p.properties.capacity_mw||0), 1);
-  plants.forEach(p => {
-    const cap = p.properties.capacity_mw||0;
-    const size = isStars ? 0.05 : (0.004 + 0.03*Math.sqrt(cap/maxCap));
-    const color = new THREE.Color(p.properties.color || '#BDC3C7');
-    const geo = new THREE.SphereGeometry(size, 8, 8);
-    const mat = new THREE.MeshBasicMaterial({ color });
-    const mesh = new THREE.Mesh(geo, mat);
-    if (isStars) {
-      const ra = parseFloat(p.properties.extra && p.properties.extra.ra) || 0;
-      const dec = parseFloat(p.properties.extra && p.properties.extra.dec) || 0;
-      mesh.position.copy(raDecToVec3(ra, dec, 2.0));
-      starGroup.add(mesh);
-    } else {
-      mesh.position.copy(latLonToVec3(p.geometry.coordinates[1], p.geometry.coordinates[0], 1.01));
-      globeGroup.add(mesh);
-    }
-    mesh.userData = p.properties;
-    markers.push(mesh);
-  });
-
-  // Toggle visibility
-  globeGroup.visible = !isStars;
-  starGroup.visible = isStars;
-  linkGroup.visible = !isStars;
-  controls.minDistance = isStars ? 0.5 : 1.4;
-  controls.maxDistance = isStars ? 10 : 8;
-}
-
-function onMouseMove(e) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
-  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
-  raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(markers);
-  const tip = document.getElementById('tooltip');
-  if (hits.length) {
-    const p = hits[0].object.userData;
-    tip.style.display='block';
-    tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+14)+'px';
-    let extra = '';
-    if (p.extra && p.extra.distance_ly) extra += `<div class="t-row">Distance: ${p.extra.distance_ly} ly · ${p.extra.star_type||''}</div>`;
-    if (p.note) extra += `<div class="t-row">${p.note}</div>`;
-    tip.innerHTML = `<div class="t-name">${p.name||'Unnamed'}</div>
-      <div class="t-row">${p.country||''} · ${p.color_key||''}</div>
-      <div class="t-row">Capacity: ${(p.capacity_mw||0).toLocaleString()} MW</div>
-      ${extra}`;
-  } else {
-    tip.style.display='none';
-  }
-}
-
-document.getElementById('apply').addEventListener('click', () => { loadFuels(); loadStats(); loadPlants(); });
-document.getElementById('layer-filter').addEventListener('change', (e) => {
-  currentLayer = e.target.value;
-  loadFuels(); loadStats(); loadPlants();
-});
-document.getElementById('show-links').addEventListener('change', renderLinks);
-</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+<script type="module" src="./app/main.js"></script>
 </body>
 </html>

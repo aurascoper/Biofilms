@@ -38,11 +38,16 @@ from __future__ import annotations
 import csv
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from geolocator.freshness import AUTHORED, LIVE, REFERENCE, TrackedSource
+from geolocator.lattice import get_lattice
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -124,8 +129,7 @@ def _f(v) -> float:
 
 
 # ── Power plants (WRI) ────────────────────────────────────────────────────────
-def _load_plants() -> list[dict]:
-    path = DATA_CSV if DATA_CSV.exists() else SAMPLE_CSV
+def _load_plants(path: Path) -> dict:
     plants: list[dict] = []
     with open(path, newline="", encoding="utf-8", errors="replace") as fh:
         reader = csv.DictReader(fh)
@@ -147,13 +151,11 @@ def _load_plants() -> list[dict]:
                     "owner": row.get("owner") or "",
                 }
             )
-    return plants
+    return {"items": plants, "meta": {}}
 
 
 # ── Generic CSV layer loader (nuclear, battery, gridcoin, stars) ──────────────
-def _load_layer_csv(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
+def _load_layer_csv(path: Path) -> dict:
     out: list[dict] = []
     with open(path, newline="", encoding="utf-8", errors="replace") as fh:
         for row in csv.DictReader(fh):
@@ -180,18 +182,19 @@ def _load_layer_csv(path: Path) -> list[dict]:
                     },
                 }
             )
-    return out
+    return {"items": out, "meta": {}}
 
 
 # ── Energy world grid (from lattice board port 4199) ─────────────────────────
-def _load_worldgrid() -> list[dict]:
-    """Convert energy_world.json 4°-bin grid into GeoJSON points."""
-    if not ENERGY_WORLD_JSON.exists():
-        return []
-    try:
-        d = json.loads(ENERGY_WORLD_JSON.read_text())
-    except Exception:
-        return []
+def _load_worldgrid(path: Path) -> dict:
+    """Convert energy_world.json 4°-bin grid into GeoJSON points.
+
+    `provenance` is carried out alongside the points because it holds this
+    dataset's only semantic timestamp (`retrieved`). Dropping it here is what
+    used to leave the filesystem mtime as the sole -- and misleading --
+    freshness signal.
+    """
+    d = json.loads(path.read_text())
     nx = int(d.get("nx", 90))
     ny = int(d.get("ny", 45))
     bin_deg = float(d.get("bin_deg", 4.0))
@@ -202,8 +205,9 @@ def _load_worldgrid() -> list[dict]:
         if len(row) < 5:
             continue
         gx, gy, fuel_idx, mw, plants = row[0], row[1], row[2], row[3], row[4]
+        # gy is stored north-to-south (row 0 = +90°), so latitude counts down.
         lon = -180.0 + (float(gx) + 0.5) * bin_deg
-        lat = -90.0 + (float(gy) + 0.5) * bin_deg
+        lat = 90.0 - (float(gy) + 0.5) * bin_deg
         fuel = fuels[int(fuel_idx)] if 0 <= int(fuel_idx) < len(fuels) else "Other"
         out.append(
             {
@@ -219,7 +223,7 @@ def _load_worldgrid() -> list[dict]:
                 "extra": {},
             }
         )
-    return out
+    return {"items": out, "meta": {"provenance": d.get("provenance") or {}}}
 
 
 # ── Layer registry ────────────────────────────────────────────────────────────
@@ -230,22 +234,121 @@ LAYER_FILES = {
     "stars": DATA_DIR / "star_systems.csv",
 }
 
-PLANTS = _load_plants()
-LAYERS: dict[str, list[dict]] = {
-    "power": PLANTS,
-    "nuclear": _load_layer_csv(LAYER_FILES["nuclear"]),
-    "battery": _load_layer_csv(LAYER_FILES["battery"]),
-    "gridcoin": _load_layer_csv(LAYER_FILES["gridcoin"]),
-    "worldgrid": _load_worldgrid(),
-    "stars": _load_layer_csv(LAYER_FILES["stars"]),
+POWER_CSV = DATA_CSV if DATA_CSV.exists() else SAMPLE_CSV
+
+
+def _worldgrid_retrieved(payload) -> str | None:
+    return ((payload or {}).get("meta", {}).get("provenance") or {}).get("retrieved")
+
+
+# `power` and `worldgrid` are the same dataset seen two ways: energy_world.json's
+# provenance documents the very CSV loaded here ("grid recomputed from the
+# canonical CSV", plants: 34936). So the grid's `retrieved` date is a real
+# cross-reference for the CSV's vintage, not a hand-maintained guess -- which is
+# why the CSV, which carries no timestamp of its own, still gets an authority.
+def _power_vintage(_payload) -> str | None:
+    try:
+        return _worldgrid_retrieved(SOURCES["worldgrid"].payload())
+    except Exception:
+        return None
+
+
+# Reload is stat-driven (st_mtime_ns + st_size + st_ino). Freshness comes from
+# inside the data. The four authored CSVs pass timestamp_of=None on purpose:
+# they carry no semantic timestamp, so they report FALLBACK forever rather than
+# letting an mtime impersonate one.
+_EMPTY_LAYER = {"items": [], "meta": {}}
+_layer_count = lambda d: len((d or {}).get("items", []))
+
+SOURCES: dict[str, TrackedSource] = {
+    "power": TrackedSource(
+        id="power", path=POWER_CSV, layer_class=REFERENCE,
+        loader=_load_plants, timestamp_of=_power_vintage, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "worldgrid": TrackedSource(
+        id="worldgrid", path=ENERGY_WORLD_JSON, layer_class=REFERENCE,
+        loader=_load_worldgrid, timestamp_of=_worldgrid_retrieved, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "nuclear": TrackedSource(
+        id="nuclear", path=LAYER_FILES["nuclear"], layer_class=AUTHORED,
+        loader=_load_layer_csv, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "battery": TrackedSource(
+        id="battery", path=LAYER_FILES["battery"], layer_class=AUTHORED,
+        loader=_load_layer_csv, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "gridcoin": TrackedSource(
+        id="gridcoin", path=LAYER_FILES["gridcoin"], layer_class=AUTHORED,
+        loader=_load_layer_csv, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "stars": TrackedSource(
+        id="stars", path=LAYER_FILES["stars"], layer_class=AUTHORED,
+        loader=_load_layer_csv, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
 }
+LAYER_IDS = tuple(SOURCES.keys())
+
+
+def _max_bar_ts(path: Path) -> dict:
+    """Newest daily bar in the cache. `ts` is epoch SECONDS."""
+    import sqlite3
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        row = con.execute("SELECT MAX(ts), COUNT(*) FROM bars").fetchone()
+    finally:
+        con.close()
+    if not row or row[0] is None:
+        return {"max_ts": None, "rows": 0}
+    return {"max_ts": int(row[0]), "rows": int(row[1])}
+
+
+# The measured correlation band is only as current as its newest bar. Daily
+# bars, so the thresholds are days: fine at one day old, degraded at two,
+# stale past four. Nothing tells this layer it is behind -- it reports it.
+MARKET_SOURCE = TrackedSource(
+    id="market_bars",
+    path=Path(__file__).resolve().parent / "data" / "market_bars.sqlite",
+    layer_class=LIVE,
+    loader=_max_bar_ts,
+    timestamp_of=lambda d: (
+        datetime.fromtimestamp(d["max_ts"], tz=timezone.utc) if (d or {}).get("max_ts") else None
+    ),
+    degraded_after_s=2 * 86400,
+    stale_after_s=4 * 86400,
+    empty={"max_ts": None, "rows": 0},
+    count_of=lambda d: (d or {}).get("rows", 0),
+)
 SOURCE = "WRI Global Power Plant Database" if DATA_CSV.exists() else "built-in sample"
 
 
-def _to_geojson(items: list[dict]) -> dict:
+def layer_items(layer: str) -> list[dict]:
+    """Items for a KNOWN layer. Unknown ids 404 instead of returning [].
+
+    Returning an empty FeatureCollection for a typo made "no such layer" and
+    "no data in this layer" indistinguishable from the client.
+    """
+    src = SOURCES.get(layer)
+    if src is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"unknown layer {layer!r}; known layers: {', '.join(LAYER_IDS)}",
+        )
+    return (src.payload() or {}).get("items", [])
+
+
+def _all_states() -> dict:
+    return {k: v.state().as_dict() for k, v in SOURCES.items()}
+
+
+def _to_geojson(items: list[dict], layer: str = "power") -> dict:
+    """Palette is per layer. This took the "power" map for every layer, so every
+    nuclear, battery, gridcoin and stars feature shipped grey while /api/fuels
+    returned the correct colour, leaving the legend and the globe disagreeing.
+    """
+    palette = LAYER_COLORS.get(layer, {})
     feats = []
     for p in items:
-        color = LAYER_COLORS.get("power", {}).get(p["color_key"], "#BDC3C7")
+        color = palette.get(p["color_key"], "#BDC3C7")
         feats.append(
             {
                 "type": "Feature",
@@ -272,32 +375,44 @@ def _to_geojson(items: list[dict]) -> dict:
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 def health():
+    states = _all_states()
+    states["market_bars"] = MARKET_SOURCE.state().as_dict()
     return {
         "status": "ok",
         "source": SOURCE,
-        "plant_count": len(PLANTS),
-        "layers": {k: len(v) for k, v in LAYERS.items()},
+        "plant_count": len(layer_items("power")),
+        "layers": {k: states[k].get("count") or 0 for k in LAYER_IDS},
+        "freshness": states,
     }
 
 
 @app.get("/api/layers")
 def layers():
+    states = _all_states()
     return {
         "layers": [
             {
                 "id": k,
-                "count": len(v),
-                "color_field": "primary_fuel" if k == "power" else "stage",
+                "count": states[k].get("count") or 0,
+                # worldgrid is coloured by fuel, not by stage -- it aliases
+                # FUEL_COLORS. The old ternary told the legend otherwise.
+                "color_field": "primary_fuel" if k in ("power", "worldgrid") else "stage",
                 "colors": LAYER_COLORS.get(k, {}),
+                "layer_class": states[k].get("layer_class"),
+                "status": states[k].get("status"),
+                "authority": states[k].get("authority"),
+                "source_timestamp": states[k].get("source_timestamp"),
+                "vintage": states[k].get("vintage"),
+                "note": states[k].get("note"),
             }
-            for k, v in LAYERS.items()
+            for k in LAYER_IDS
         ]
     }
 
 
 @app.get("/api/fuels")
 def fuels(layer: str = Query("power")):
-    items = LAYERS.get(layer, [])
+    items = layer_items(layer)
     counts: dict[str, int] = {}
     for p in items:
         counts[p["color_key"]] = counts.get(p["color_key"], 0) + 1
@@ -312,7 +427,7 @@ def fuels(layer: str = Query("power")):
 
 @app.get("/api/stats")
 def stats(layer: str = Query("power")):
-    items = LAYERS.get(layer, [])
+    items = layer_items(layer)
     total_cap = sum(p["capacity_mw"] for p in items)
     by_fuel: dict[str, float] = {}
     by_country: dict[str, int] = {}
@@ -340,7 +455,7 @@ def plants(
     country: str | None = Query(None),
     limit: int = Query(5000, ge=1, le=50000),
 ):
-    items = LAYERS.get(layer, [])
+    items = layer_items(layer)
     out = []
     for p in items:
         if fuel and p["color_key"] != fuel:
@@ -354,95 +469,171 @@ def plants(
         out.append(p)
         if len(out) >= limit:
             break
-    return _to_geojson(out)
+    return _to_geojson(out, layer)
 
 
 # ── Correlation bands (links) ─────────────────────────────────────────────────
-def _find(layer: str, color_key: str, name_contains: str | None = None) -> dict | None:
-    """Find a site in a layer by color_key (and optional name substring)."""
-    for p in LAYERS.get(layer, []):
-        if p["color_key"] != color_key:
-            continue
-        if name_contains and name_contains.lower() not in p["name"].lower():
-            continue
-        return p
-    return None
+def _endpoint(pt: dict, frame: str) -> dict:
+    """One end of a band, tagged with the frame it lives in.
+
+    Terrestrial sites have lat/lon. Stars have no terrestrial position at all, so
+    they carry ra/dec and the client resolves them onto the celestial shell. Fuels
+    have no position of any kind, so they carry only a name.
+
+    That last frame exists because a correlation between two price series has no
+    location. Anchoring it at each fuel's largest cell put Gas and Oil 4 degrees
+    apart in Japan; anchoring at capacity-weighted centroids put Gas on the
+    Greenland ice sheet and Coal in Mongolia, where neither fuel exists. Both
+    invent geography the statistic does not have, so the measured band gets none.
+    """
+    if frame == "fuel":
+        return {"frame": "fuel", "name": pt}
+    if frame == "celestial":
+        extra = pt.get("extra") or {}
+        return {
+            "frame": "celestial",
+            "name": pt["name"],
+            "ra": _f(extra.get("ra")),
+            "dec": _f(extra.get("dec")),
+        }
+    return {
+        "frame": "geo",
+        "name": pt["name"],
+        "lat": pt["latitude"],
+        "lon": pt["longitude"],
+    }
 
 
-def _link(from_pt: dict, to_pt: dict, link_type: str, color: str, label: str) -> dict:
+def _band(a: dict, b: dict, band: str, status: str, color: str,
+          label: str, stats: dict | None = None) -> dict:
+    """A band. `status` is the epistemic tag and drives how the UI draws it.
+
+    structural  - a real relationship in the data, no statistics claimed
+    measured    - carries a statistic, and must ship the numbers behind it
+    speculative - generated fiction, must never read as either of the above
+    """
+    both_geo = a["frame"] == "geo" and b["frame"] == "geo"
+    props = {"band": band, "status": status, "color": color, "label": label,
+             "a": a, "b": b}
+    if stats:
+        props["stats"] = stats
     return {
         "type": "Feature",
         "geometry": {
             "type": "LineString",
-            "coordinates": [
-                [from_pt["longitude"], from_pt["latitude"]],
-                [to_pt["longitude"], to_pt["latitude"]],
-            ],
-        },
-        "properties": {
-            "link_type": link_type,
-            "color": color,
-            "label": label,
-            "from": from_pt["name"],
-            "to": to_pt["name"],
-        },
+            "coordinates": [[a["lon"], a["lat"]], [b["lon"], b["lat"]]],
+        } if both_geo else None,
+        "properties": props,
     }
 
 
+# Stage pairs that genuinely abut in the fuel cycle. All-pairs within a step is
+# deliberate: uranium is a fungible global commodity, so "any mine can feed any
+# enricher" is closer to true than naming one route. These are adjacency, not
+# shipments, and the label says so.
+#
+# enrichment -> reprocessing is absent on purpose. Reprocessing takes irradiated
+# fuel out of a reactor, and this layer has no reactor stage, so that edge would
+# skip a step the data does not contain.
+STRUCTURAL_STEPS = [
+    ("nuclear", "uranium_mine", "enrichment", "#8B4513", "mined uranium feeds enrichment"),
+    ("nuclear", "reprocessing", "waste_storage", "#C0392B", "reprocessing feeds waste storage"),
+    ("battery", "lithium", "gigafactory", "#F4D03F", "lithium feeds cell manufacturing"),
+    ("battery", "cobalt", "gigafactory", "#5DADE2", "cobalt feeds cell manufacturing"),
+    ("battery", "nickel", "gigafactory", "#27AE60", "nickel feeds cell manufacturing"),
+    ("battery", "gigafactory", "recycling", "#E67E22", "cells feed recycling"),
+]
+
+
+def _stage(layer: str, key: str) -> list[dict]:
+    return [p for p in layer_items(layer) if p["color_key"] == key]
+
+
 def _build_links() -> dict:
-    links: list[dict] = []
+    bands: list[dict] = []
 
-    # ── Nuclear supply chain (real): mine → enrichment → reactor → reprocess → waste ──
-    nuclear_chain = [
-        # (from stage, to stage, color, label)
-        ("uranium_mine", "enrichment", "#8B4513", "uranium → enrichment"),
-        ("enrichment", "reprocessing", "#7D3C98", "enrichment → reprocessing"),
-        ("reprocessing", "waste_storage", "#C0392B", "reprocessing → waste"),
-    ]
-    for from_stage, to_stage, color, label in nuclear_chain:
-        from_pt = _find("nuclear", from_stage)
-        to_pt = _find("nuclear", to_stage)
-        if from_pt and to_pt:
-            links.append(_link(from_pt, to_pt, "nuclear_chain", color, label))
+    # Structural: fuel-cycle stage adjacency.
+    for layer, src, dst, color, label in STRUCTURAL_STEPS:
+        for a in _stage(layer, src):
+            for b in _stage(layer, dst):
+                bands.append(_band(_endpoint(a, "geo"), _endpoint(b, "geo"),
+                                   f"{layer}_chain", "structural", color, label))
 
-    # ── Battery supply chain (real): mine → gigafactory → recycling ──
-    battery_chain = [
-        ("lithium", "gigafactory", "#F4D03F", "lithium → gigafactory"),
-        ("cobalt", "gigafactory", "#5DADE2", "cobalt → gigafactory"),
-        ("nickel", "gigafactory", "#27AE60", "nickel → gigafactory"),
-        ("gigafactory", "recycling", "#E67E22", "gigafactory → recycling"),
-    ]
-    for from_stage, to_stage, color, label in battery_chain:
-        from_pt = _find("battery", from_stage)
-        to_pt = _find("battery", to_stage)
-        if from_pt and to_pt:
-            links.append(_link(from_pt, to_pt, "battery_chain", color, label))
+    # Measured: fuel-basket return correlations, market-controlled. Carries no
+    # geometry by design (see _endpoint). The client renders it as a paired
+    # highlight of both fuels' cells, not as an arc. Only pairs surviving
+    # Benjamini-Hochberg appear at all.
+    try:
+        from geolocator.market import fuel_correlations
+        for d in fuel_correlations():
+            if not d.get("significant"):
+                continue
+            bands.append(_band(
+                _endpoint(d["a"], "fuel"), _endpoint(d["b"], "fuel"),
+                "fuel_correlation", "measured", "#5D9BFF",
+                f"{d['a']} and {d['b']} returns move together",
+                stats={"r_partial": d["r"], "r_raw": d["r_raw"], "n": d["n"],
+                       "p": d["p"], "control": "QQQSTOCK_USDT",
+                       "basis": "daily log returns, market-controlled"},
+            ))
+    except Exception:
+        pass  # no bar cache yet; the structural and speculative bands still ship
 
-    # ── World grid → stars (narrative bridge): Earth grid cells to star systems ──
-    # Connect a few high-capacity grid cells to the nearest star systems.
-    star_pts = LAYERS.get("stars", [])
-    grid_pts = LAYERS.get("worldgrid", [])
-    if star_pts and grid_pts:
-        # Pick a few representative grid cells (largest capacity) and connect
-        # each to a star system (narrative, not geographic).
-        top_grid = sorted(grid_pts, key=lambda p: -p["capacity_mw"])[:4]
-        for i, g in enumerate(top_grid):
-            s = star_pts[i % len(star_pts)]
-            links.append(
-                _link(g, s, "worldgrid_stars", "#4D96FF", "Earth grid → star system")
-            )
+    # Speculative: the compute grid reaching toward the two nearest candidate
+    # relay systems. Thematic, not derived from anything measured.
+    relays = [p for p in layer_items("stars") if p["color_key"] == "gridcoin_relay"]
+    for server in layer_items("gridcoin"):
+        for star in relays:
+            bands.append(_band(
+                _endpoint(server, "geo"), _endpoint(star, "celestial"),
+                "gridcoin_relay", "speculative", "#4D96FF",
+                "SPECULATIVE: compute grid toward a candidate relay system",
+            ))
 
-    return {"type": "FeatureCollection", "features": links}
+    return {"type": "FeatureCollection", "features": bands}
 
 
-LINKS = _build_links()
+_LINKS_CACHE: dict = {"key": None, "doc": None}
+
+_LINK_SOURCES = ("nuclear", "battery", "gridcoin", "stars")
 
 
 @app.get("/api/links")
 def links():
-    return LINKS
+    """Rebuilt only when a contributing source actually changed on disk."""
+    key = tuple(SOURCES[k].state().fingerprint for k in _LINK_SOURCES)
+    key += (MARKET_SOURCE.state().fingerprint,)
+    if _LINKS_CACHE["key"] != key or _LINKS_CACHE["doc"] is None:
+        _LINKS_CACHE["doc"] = _build_links()
+        _LINKS_CACHE["key"] = key
+    doc = dict(_LINKS_CACHE["doc"])
+    doc["measured_freshness"] = MARKET_SOURCE.state().as_dict()
+    return doc
+
+
+@app.get("/api/lattice")
+def lattice():
+    """The only view of the trading book this process ever serves.
+
+    `view` is a server constant inside geolocator.lattice, never a parameter.
+    The response is rebuilt from an allowlist rather than forwarded, so a field
+    added upstream cannot become public data here by default.
+    """
+    return get_lattice()
 
 
 @app.get("/")
 def index():
     return FileResponse(ROOT / "static" / "index.html")
+
+
+@app.get("/legacy")
+def legacy():
+    """The pre-fusion globe, byte-for-byte, as a rollback path."""
+    return FileResponse(ROOT / "static" / "index.legacy.html")
+
+
+# The page is ES modules with no build step, so the browser fetches each one by
+# path. Mounted LAST: a mount at /app would otherwise shadow nothing here, but
+# keeping it after the routes makes the precedence obvious rather than lucky.
+app.mount("/app", StaticFiles(directory=ROOT / "static" / "app"), name="app")
