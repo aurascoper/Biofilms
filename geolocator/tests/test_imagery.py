@@ -186,11 +186,25 @@ def test_lattice_boundary_is_untouched_by_imagery(isolated_lattice_cache, monkey
     """
     from geolocator import lattice as _lat
 
+    # The upstream deliberately CARRIES the fields the boundary must drop, which
+    # is what makes this a negative control rather than a shape check. With a
+    # clean fixture the assertions below cannot fail: widen MISSION_FIELDS to
+    # admit "equity" and a sanitised upstream still passes, because there was
+    # never anything present for the boundary to have leaked.
     upstream = {
         "state": {
             "generated": "2099-01-01T00:00:00+00:00",
-            "mission": {"phase": "TEST", "entries_allowed": False},
-            "cells": [],
+            "mission": {
+                "phase": "TEST",
+                "entries_allowed": False,
+                "equity": 1234.56,
+                "margin_used": 9876.54,
+            },
+            "cells": [
+                {"symbol": "AAA_USDT", "quote": "USDT", "class": "crypto",
+                 "rank": 1, "has_position": True, "position_size": 4.2,
+                 "signal": None},
+            ],
             "econ": None,
         }
     }
@@ -199,7 +213,9 @@ def test_lattice_boundary_is_untouched_by_imagery(isolated_lattice_cache, monkey
     d = client.get("/api/lattice").json()
     assert set(d["mission"]) <= set(_lat.MISSION_FIELDS)
     assert d["position_presence_exposed"] is False
-    assert "equity" not in json.dumps(d).lower()
+    body = json.dumps(d).lower()
+    for forbidden in ("equity", "margin_used", "position_size", "has_position"):
+        assert forbidden not in body, forbidden
 
 
 def test_legacy_page_is_still_byte_identical():
