@@ -175,15 +175,29 @@ def test_reference_vintage_and_measured_staleness_coexist():
         assert bm["vintage"] < mb["source_timestamp"][:4]
 
 
-def test_lattice_boundary_is_untouched_by_imagery():
-    # /api/lattice memoises for a couple of seconds; clear it so this assertion
-    # is about a live projection and not about whatever ran before it.
+def test_lattice_boundary_is_untouched_by_imagery(isolated_lattice_cache, monkeypatch):
+    """This test owns both memo state and upstream input.
+
+    It used to clear lattice._cache in place and then hit whatever happened to
+    be listening on the developer's loopback port. That made module order and
+    local process state part of the assertion. A boundary test should instead
+    supply the exact upstream document it is proving the imagery work leaves
+    untouched.
+    """
     from geolocator import lattice as _lat
-    _lat._cache["at"] = None
-    _lat._cache["doc"] = None
+
+    upstream = {
+        "state": {
+            "generated": "2099-01-01T00:00:00+00:00",
+            "mission": {"phase": "TEST", "entries_allowed": False},
+            "cells": [],
+            "econ": None,
+        }
+    }
+    monkeypatch.setattr(_lat, "_fetch_upstream", lambda: upstream)
+
     d = client.get("/api/lattice").json()
-    assert set(d["mission"]) <= set(
-        __import__("geolocator.lattice", fromlist=["x"]).MISSION_FIELDS)
+    assert set(d["mission"]) <= set(_lat.MISSION_FIELDS)
     assert d["position_presence_exposed"] is False
     assert "equity" not in json.dumps(d).lower()
 
