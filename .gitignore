@@ -389,3 +389,11 @@ calibration/*.egg-info/
 *.nd2
 *.tif
 *.tiff
+
+# geolocator market bar cache (regenerable via python3 -m geolocator.market backfill)
+geolocator/data/market_bars.sqlite
+
+# fetched reference imagery — runtime cache, re-fetchable from NASA GIBS.
+# Large binary reference data gets an explicit distribution decision, not a
+# silent commit.
+geolocator/cache/
