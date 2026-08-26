@@ -34,13 +34,17 @@ HOSTILE_UPSTREAM = {
             "phase_reason": "drawdown ok",
             "entries_allowed": True,
             "timestamp": "2099-01-01T00:00:00+00:00",
-            "equity": 1234.56,               # must never escape
-            "peak_equity": 9876.54,          # must never escape
+            # Deliberately synthetic. Real account figures must never be used
+            # as fixtures: this file is the test that PROVES the boundary hides
+            # financial state, so putting genuine numbers in it would disclose
+            # exactly what the boundary exists to withhold.
+            "equity": 1234.56,              # must never escape
+            "peak_equity": 9876.54,         # must never escape
             "drawdown_pct": 87.5,           # must never escape
         },
         "buckets": {
-            "USDT": {"equity": 400.0, "available": 120.0,
-                     "margin_used": 280.0, "positions": [{"symbol": "BTC_USDT", "im": 44.0}]},
+            "USDT": {"equity": 1111.11, "available": 222.22,
+                     "margin_used": 888.88, "positions": [{"symbol": "BTC_USDT", "im": 44.44}]},
         },
         "cells": [
             {
