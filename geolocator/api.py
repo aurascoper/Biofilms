@@ -36,6 +36,7 @@ Run:
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import os
 from datetime import datetime, timezone
@@ -357,6 +358,56 @@ def _max_bar_ts(path: Path) -> dict:
 # The measured correlation band is only as current as its newest bar. Daily
 # bars, so the thresholds are days: fine at one day old, degraded at two,
 # stale past four. Nothing tells this layer it is behind -- it reports it.
+# ── optional market adapter ───────────────────────────────────────────────────
+#
+# The measured correlation band needs a price source, and a price source is
+# operator plumbing: venue API access plus a symbol universe. It is therefore an
+# OPTIONAL ADAPTER rather than core code, and this deployment may legitimately
+# ship without one.
+#
+# Contract — supply a module importable as `geolocator.market` exposing:
+#
+#     fuel_correlations() -> list[dict]
+#         each dict: {a, b, r, r_raw, n, p, significant}
+#         a, b            fuel names as they appear in FUEL_COLORS
+#         r, r_raw        partial and raw correlation
+#         n, p            sample size and p-value
+#         significant     bool; only True entries are rendered
+#
+# Nothing else in this file needs to change to add one.
+MARKET_ADAPTER_MODULE = "geolocator.market"
+
+
+def market_adapter_installed() -> bool:
+    try:
+        return importlib.util.find_spec(MARKET_ADAPTER_MODULE) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def market_correlation_state() -> dict:
+    """State of the measured band's producer.
+
+    An absent adapter must not read as "no correlations found". Absence of the
+    producer and a null result from the producer are different facts, and
+    collapsing them is the same error this codebase refuses everywhere else.
+    """
+    if not market_adapter_installed():
+        return {
+            "id": "market_correlation",
+            "layer_class": LIVE,
+            "status": "unavailable",
+            "installed": False,
+            "reason": f"optional local market adapter not installed ({MARKET_ADAPTER_MODULE})",
+            "contract": "module exposing fuel_correlations() -> list[dict]",
+        }
+    state = MARKET_SOURCE.state().as_dict()
+    state.update({"id": "market_correlation", "installed": True})
+    if state.get("status") == "unavailable":
+        state["reason"] = "market adapter installed, but its bar cache is empty or missing"
+    return state
+
+
 MARKET_SOURCE = TrackedSource(
     id="market_bars",
     path=Path(__file__).resolve().parent / "data" / "market_bars.sqlite",
@@ -429,6 +480,7 @@ def _to_geojson(items: list[dict], layer: str = "power") -> dict:
 def health():
     states = _all_states()
     states["market_bars"] = MARKET_SOURCE.state().as_dict()
+    states["market_correlation"] = market_correlation_state()
     states["blue_marble"] = imagery.state()
     return {
         "status": "ok",
@@ -618,7 +670,7 @@ def _build_links() -> dict:
     # highlight of both fuels' cells, not as an arc. Only pairs surviving
     # Benjamini-Hochberg appear at all.
     try:
-        from geolocator.market import fuel_correlations
+        from geolocator.market import fuel_correlations  # optional adapter
         for d in fuel_correlations():
             if not d.get("significant"):
                 continue
@@ -631,7 +683,11 @@ def _build_links() -> dict:
                        "basis": "daily log returns, market-controlled"},
             ))
     except Exception:
-        pass  # no bar cache yet; the structural and speculative bands still ship
+        # Swallowed on purpose: a missing or failing adapter must not take the
+        # structural and speculative bands with it. The ABSENCE is not silent --
+        # market_correlation_state() reports it explicitly on /api/health and
+        # /api/links, so "no adapter" never renders as "no correlations".
+        pass
 
     # Speculative: the compute grid reaching toward the two nearest candidate
     # relay systems. Thematic, not derived from anything measured.
@@ -661,7 +717,7 @@ def links():
         _LINKS_CACHE["doc"] = _build_links()
         _LINKS_CACHE["key"] = key
     doc = dict(_LINKS_CACHE["doc"])
-    doc["measured_freshness"] = MARKET_SOURCE.state().as_dict()
+    doc["measured_freshness"] = market_correlation_state()
     return doc
 
 
