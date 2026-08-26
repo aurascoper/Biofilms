@@ -95,6 +95,7 @@ class SourceState:
     source_timestamp: str | None = None
     age_s: float | None = None
     vintage: str | None = None
+    retrieved_at: str | None = None
     reloaded_at: str | None = None
     fingerprint: str | None = None
     count: int | None = None
@@ -121,6 +122,12 @@ class TrackedSource:
     loader: Callable[[Path], Any]
     timestamp_of: Callable[[Any], Any] | None = None
     count_of: Callable[[Any], int] | None = None
+    # A reference dataset's authority is its DECLARED VINTAGE, which is often not
+    # a date at all -- "1.3.0", "2004". Requiring a parseable timestamp here was
+    # what pushed the WRI layer into borrowing its retrieval date and reporting
+    # transport metadata under a `dataset-vintage` label.
+    vintage_of: Callable[[Any], Any] | None = None
+    retrieved_of: Callable[[Any], Any] | None = None
     vintage: str | None = None
     degraded_after_s: float = 90.0
     stale_after_s: float = 180.0
@@ -186,6 +193,20 @@ class TrackedSource:
         if self._error:
             state.status = UNAVAILABLE
             return state
+
+        if self.retrieved_of:
+            got = self.retrieved_of(self._payload)
+            state.retrieved_at = str(got) if got else None
+
+        # A declared vintage settles a reference layer outright. No clock is
+        # consulted, because a versioned snapshot does not drift toward wrong.
+        if self.layer_class == REFERENCE:
+            declared = self.vintage_of(self._payload) if self.vintage_of else self.vintage
+            if declared:
+                state.status = NOMINAL
+                state.authority = "dataset-vintage"
+                state.vintage = str(declared)
+                return state
 
         semantic = parse_ts(self.timestamp_of(self._payload)) if self.timestamp_of else None
 

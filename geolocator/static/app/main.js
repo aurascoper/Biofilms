@@ -207,9 +207,12 @@ fetch('/api/layers', { cache: 'no-store' })
   .then((r) => r.json())
   .then((d) => {
     const power = d.layers.find((l) => l.id === 'power') || {};
+    // vintage is a WRI release ("1.3.0"), retrieved_at is a date. Slicing the
+    // first as if it were the second is how this line briefly read
+    // "retrieved 1.3.0".
     powerProvenance =
-      `WRI Global Power Plant Database v1.3.0 · CC BY 4.0 · retrieved ${(power.vintage || '').slice(0, 10) || '—'} · ` +
-      `${(power.count || 0).toLocaleString()} plants`;
+      `WRI Global Power Plant Database v${power.vintage || '?'} · CC BY 4.0 · ` +
+      `retrieved ${power.retrieved_at || '—'} · ${(power.count || 0).toLocaleString()} plants`;
     renderProvenance();
   })
   .catch(() => {});

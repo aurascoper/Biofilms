@@ -72,6 +72,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── caching policy, stated once ───────────────────────────────────────────────
+#
+#   /api/*   no-store    live and derived data. /api/lattice carries a redacted
+#                        view of a trading book; it has no business on disk.
+#                        The imagery raster is the one exception below.
+#   /app/*   no-cache    versionless ES modules. May be STORED, must be
+#                        REVALIDATED. Without this, StaticFiles sends only
+#                        Last-Modified and ETag, and a browser may apply
+#                        heuristic freshness and reuse a module blind --
+#                        observed directly: after an edit, layerManager.js came
+#                        back with transferSize 0 while its siblings took 304s,
+#                        so the page ran a mixed old/new module graph and the
+#                        symptom presented as an application bug.
+#   /        no-cache    HTML that references those versionless modules.
+#
+# Nothing here is content-hashed, so nothing here earns a long immutable cache.
+# The day an asset is served from a content-addressed URL, it wants
+# `max-age=31536000, immutable` instead -- and that belongs in this table.
+NO_STORE_PREFIX = "/api/"
+REVALIDATE_PATHS = ("/app/", "/", "/legacy")
+# Public imagery is large, unchanging and not sensitive; revalidating is enough,
+# and a 304 on 209 KB is worth having.
+REVALIDATE_EXCEPTIONS = ("/api/imagery/blue-marble",)
+
+
+@app.middleware("http")
+async def cache_policy(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith(REVALIDATE_EXCEPTIONS):
+        response.headers["Cache-Control"] = "no-cache"
+    elif path.startswith(NO_STORE_PREFIX):
+        response.headers["Cache-Control"] = "no-store"
+    elif path.startswith(REVALIDATE_PATHS) or path in REVALIDATE_PATHS:
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 # ── Fuel color palette (Tableau-style categorical ramp) ───────────────────────
 FUEL_COLORS = {
     "Coal": "#8B4513",
@@ -238,20 +276,27 @@ LAYER_FILES = {
 POWER_CSV = DATA_CSV if DATA_CSV.exists() else SAMPLE_CSV
 
 
-def _worldgrid_retrieved(payload) -> str | None:
-    return ((payload or {}).get("meta", {}).get("provenance") or {}).get("retrieved")
+# The vendored WRI snapshot declares its own provenance beside it, so `power`
+# no longer borrows a retrieval date from the derived grid and label it a
+# vintage. The distinction is the whole point of the model: 1.3.0 is what the
+# data depicts, 2026-08-17 is when the bytes arrived.
+WRI_PROVENANCE_JSON = REPO / "power_plant_database_global.provenance.json"
+
+WRI_PROVENANCE = TrackedSource(
+    id="wri_provenance", path=WRI_PROVENANCE_JSON, layer_class=REFERENCE,
+    loader=lambda p: json.loads(p.read_text()), empty={},
+)
 
 
-# `power` and `worldgrid` are the same dataset seen two ways: energy_world.json's
-# provenance documents the very CSV loaded here ("grid recomputed from the
-# canonical CSV", plants: 34936). So the grid's `retrieved` date is a real
-# cross-reference for the CSV's vintage, not a hand-maintained guess -- which is
-# why the CSV, which carries no timestamp of its own, still gets an authority.
-def _power_vintage(_payload) -> str | None:
+def _wri(field: str):
     try:
-        return _worldgrid_retrieved(SOURCES["worldgrid"].payload())
+        return (WRI_PROVENANCE.payload() or {}).get(field)
     except Exception:
         return None
+
+
+def _worldgrid_retrieved(payload) -> str | None:
+    return ((payload or {}).get("meta", {}).get("provenance") or {}).get("retrieved")
 
 
 # Reload is stat-driven (st_mtime_ns + st_size + st_ino). Freshness comes from
@@ -264,11 +309,16 @@ _layer_count = lambda d: len((d or {}).get("items", []))
 SOURCES: dict[str, TrackedSource] = {
     "power": TrackedSource(
         id="power", path=POWER_CSV, layer_class=REFERENCE,
-        loader=_load_plants, timestamp_of=_power_vintage, empty=_EMPTY_LAYER, count_of=_layer_count,
+        loader=_load_plants, empty=_EMPTY_LAYER, count_of=_layer_count,
+        vintage_of=lambda _p: _wri("vintage"),
+        retrieved_of=lambda _p: _wri("retrieved"),
     ),
     "worldgrid": TrackedSource(
+        # Recomputed from the same WRI release, so it carries the same vintage.
         id="worldgrid", path=ENERGY_WORLD_JSON, layer_class=REFERENCE,
-        loader=_load_worldgrid, timestamp_of=_worldgrid_retrieved, empty=_EMPTY_LAYER, count_of=_layer_count,
+        loader=_load_worldgrid, empty=_EMPTY_LAYER, count_of=_layer_count,
+        vintage_of=lambda _p: _wri("vintage"),
+        retrieved_of=_worldgrid_retrieved,
     ),
     "nuclear": TrackedSource(
         id="nuclear", path=LAYER_FILES["nuclear"], layer_class=AUTHORED,
@@ -405,6 +455,7 @@ def layers():
                 "authority": states[k].get("authority"),
                 "source_timestamp": states[k].get("source_timestamp"),
                 "vintage": states[k].get("vintage"),
+                "retrieved_at": states[k].get("retrieved_at"),
                 "note": states[k].get("note"),
             }
             for k in LAYER_IDS
@@ -666,29 +717,7 @@ def legacy():
     return FileResponse(ROOT / "static" / "index.legacy.html")
 
 
-class RevalidatingStatic(StaticFiles):
-    """Static files that must be revalidated, never reused blind.
-
-    The page is a versionless ES-module graph: every module lives at a stable
-    path with no content hash. StaticFiles sends Last-Modified and ETag but no
-    Cache-Control, which lets a browser apply HEURISTIC freshness and reuse a
-    module WITHOUT revalidating -- observed in the field: after an edit,
-    layerManager.js was served from cache with transferSize 0 while its siblings
-    took 304s, so the page ran a mixed old/new module graph and the symptom
-    looked like an application bug rather than a stale asset.
-
-    `no-cache` does not mean "do not store"; it means "revalidate before use".
-    Unchanged modules still answer 304 with an empty body, so this costs one
-    conditional request per module and removes the whole class of failure.
-    """
-
-    def file_response(self, *args, **kwargs):
-        response = super().file_response(*args, **kwargs)
-        response.headers["Cache-Control"] = "no-cache"
-        return response
-
-
 # The page is ES modules with no build step, so the browser fetches each one by
 # path. Mounted LAST: a mount at /app would otherwise shadow nothing here, but
 # keeping it after the routes makes the precedence obvious rather than lucky.
-app.mount("/app", RevalidatingStatic(directory=ROOT / "static" / "app"), name="app")
+app.mount("/app", StaticFiles(directory=ROOT / "static" / "app"), name="app")
