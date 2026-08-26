@@ -55,8 +55,8 @@ The pin is deliberate: 0.160 dropped the non-module `OrbitControls` path this pa
 | Nuclear / battery fuel-cycle sites | Hand-authored from IAEA, WNA, DOE, USGS and company disclosures | see `source` column per row |
 | BOINC project server locations | Public project pages | — |
 | Star systems | Real exoplanet hosts; `energy_class` is fiction and is labelled SPECULATIVE in the UI | — |
-| MEXC daily futures bars | MEXC public futures kline API | — |
-| Trading lattice cells | Local lattice board on :4199, redacted at the boundary | not published |
+| Daily futures bars | Public venue kline API | — |
+| Lattice cells | Local lattice source, redacted at the boundary | not published |
 
 If NASA Blue Marble Next Generation imagery is added later, it is public domain and NASA Earth
 Observatory credit belongs in the provenance footer.
