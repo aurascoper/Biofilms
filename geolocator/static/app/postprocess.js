@@ -17,10 +17,16 @@ import { noirShader } from './styles/noir.js';
 import { snowShader } from './styles/snow.js';
 import { animeShader } from './styles/anime.js';
 
+/* These are VISUAL TRANSFORMS of a true-colour reference raster, not sensor
+ * observations. Nothing here measures infrared or intensified light, so the
+ * labels carry SIM and the panel is headed SENSOR VIEW rather than THERMAL DATA.
+ * GIBS does publish genuine thermal and radiance layers; when one of those is
+ * added it registers as its own measured layer, and only then does an unqualified
+ * FLIR label become truthful. */
 const STYLES = [
   { key: '1', id: 'normal', label: 'NORMAL', shader: null },
-  { key: '2', id: 'surveillance', label: 'NVG', shader: nightVisionShader },
-  { key: '3', id: 'thermal', label: 'FLIR', shader: thermalShader },
+  { key: '2', id: 'surveillance', label: 'NVG SIM', shader: nightVisionShader },
+  { key: '3', id: 'thermal', label: 'FLIR SIM', shader: thermalShader },
   { key: '4', id: 'retro', label: 'CRT', shader: retroShader },
   { key: '5', id: 'noir', label: 'NOIR', shader: noirShader },
   { key: '6', id: 'snow', label: 'SNOW', shader: snowShader },

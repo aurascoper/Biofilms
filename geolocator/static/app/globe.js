@@ -54,9 +54,13 @@ export function createGlobe(container) {
 
   // Earth is permanent now, never hidden.
   const earthGroup = new THREE.Group();
-  earthGroup.add(new THREE.Mesh(
+  // BARE_EARTH is the no-imagery colour. Held here because the imagery layer has
+  // to restore it exactly when it detaches, and a texture on a near-black Phong
+  // material renders as near-black.
+  const earthMesh = new THREE.Mesh(
     new THREE.SphereGeometry(1, 64, 64),
-    new THREE.MeshPhongMaterial({ color: 0x061219, transparent: true, opacity: 0.92 })));
+    new THREE.MeshPhongMaterial({ color: 0x061219, transparent: true, opacity: 0.92 }));
+  earthGroup.add(earthMesh);
   const lineMat = new THREE.LineBasicMaterial(
     { color: 0x11313d, transparent: true, opacity: 0.5 });
   for (let lat = -80; lat <= 80; lat += 20) {
@@ -83,5 +87,6 @@ export function createGlobe(container) {
   const raycaster = new THREE.Raycaster();
   raycaster.params.Line = { threshold: 0.01 };
 
-  return { scene, camera, renderer, controls, markerRoot, bandRoot, raycaster };
+  return { scene, camera, renderer, controls, markerRoot, bandRoot, raycaster,
+           earthMesh, graticuleMaterial: lineMat, BARE_EARTH: 0x061219 };
 }

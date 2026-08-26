@@ -69,26 +69,51 @@ export function createLayerManager() {
     renderPanel();
   }
 
+  const rowNodes = new Map();
+
+  /* Rows are built ONCE and then updated in place.
+   *
+   * The first version rebuilt panel.innerHTML on every refresh, and refresh is
+   * called by the lattice layer every 5 seconds -- so eleven buttons were being
+   * destroyed and recreated forever, throwing away hover and focus state and
+   * dropping any click that landed mid-rebuild. Nothing about a status chip
+   * changing requires new nodes. */
   function renderPanel() {
     if (!panel) return;
-    panel.innerHTML = '';
     for (const [id, rec] of layers) {
       if (rec.mod.showInTogglePanel === false) continue;
       const s = rec.mod.getStats?.() || {};
-      const state = feedState(id);
-      const feed = FEED[state];
+      const feed = FEED[feedState(id)];
 
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'layer-row' + (rec.enabled ? ' on' : '');
-      row.title = describe(rec.mod, s);
-      row.innerHTML =
-        `<span class="l-icon">${rec.mod.icon || '•'}</span>` +
-        `<span class="l-name">${rec.mod.name}</span>` +
-        `<span class="l-count">${s.count == null ? '' : Number(s.count).toLocaleString()}</span>` +
-        `<span class="l-chip" style="color:${feed.color};border-color:${feed.color}">${feed.label}</span>`;
-      row.addEventListener('click', () => setEnabled(id, !rec.enabled));
-      panel.appendChild(row);
+      let node = rowNodes.get(id);
+      if (!node) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'layer-row';
+        row.innerHTML =
+          `<span class="l-icon">${rec.mod.icon || '•'}</span>` +
+          `<span class="l-name">${rec.mod.name}</span>` +
+          `<span class="l-count"></span><span class="l-chip"></span>`;
+        row.addEventListener('click', () => setEnabled(id, !layers.get(id).enabled));
+        panel.appendChild(row);
+        node = {
+          row,
+          count: row.querySelector('.l-count'),
+          chip: row.querySelector('.l-chip'),
+        };
+        rowNodes.set(id, node);
+      }
+
+      const count = s.count == null ? '' : Number(s.count).toLocaleString();
+      if (node.count.textContent !== count) node.count.textContent = count;
+      if (node.chip.textContent !== feed.label) node.chip.textContent = feed.label;
+      if (node.chip.style.color !== feed.color) {
+        node.chip.style.color = feed.color;
+        node.chip.style.borderColor = feed.color;
+      }
+      node.row.classList.toggle('on', rec.enabled);
+      const tip = describe(rec.mod, s);
+      if (node.row.title !== tip) node.row.title = tip;
     }
   }
 

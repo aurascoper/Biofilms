@@ -4,6 +4,7 @@
 
 import { installTokens, BAND_STATUS, FEED } from './tokens.js';
 import { createGlobe } from './globe.js';
+import { createImageryLayer, imageryCredit } from './imagery.js';
 import { createLayerManager, fmtAge } from './layerManager.js';
 import { createSiteSystem, createBandSystem, PLANT_LIMIT } from './layers.js';
 import { createLatticePanel, createLatticeLayer } from './hud/latticePanel.js';
@@ -15,6 +16,16 @@ installTokens();
 const $ = (id) => document.getElementById(id);
 const globe = createGlobe($('globe'));
 const manager = createLayerManager();
+
+/* ── base imagery ─────────────────────────────────────────────────────────── */
+/* Registered first so it heads the panel as the base layer, and so a provider
+ * outage is visible before anything drawn on top of it. */
+let imageryMeta = null;
+const imageryLayer = createImageryLayer({
+  globe, manager,
+  onState: (meta) => { imageryMeta = meta; renderProvenance(); },
+});
+manager.register(imageryLayer);
 
 /* ── site layers ──────────────────────────────────────────────────────────── */
 const sites = createSiteSystem({
@@ -183,12 +194,24 @@ bandsys.load();
 latticeLayer.update();
 setInterval(latticeLayer.update, latticeLayer.refreshInterval);
 
+let powerProvenance = '';
+
+/* Attribution is a licence condition, not decoration: it is rendered from the
+ * metadata the server actually served, and it disappears when imagery does. */
+function renderProvenance() {
+  $('provenance').textContent = [imageryCredit(imageryMeta), powerProvenance]
+    .filter(Boolean).join('   ·   ');
+}
+
 fetch('/api/layers', { cache: 'no-store' })
   .then((r) => r.json())
   .then((d) => {
     const power = d.layers.find((l) => l.id === 'power') || {};
-    $('provenance').textContent =
+    powerProvenance =
       `WRI Global Power Plant Database v1.3.0 · CC BY 4.0 · retrieved ${(power.vintage || '').slice(0, 10) || '—'} · ` +
       `${(power.count || 0).toLocaleString()} plants`;
+    renderProvenance();
   })
   .catch(() => {});
+
+imageryLayer.update();

@@ -47,6 +47,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from geolocator.freshness import AUTHORED, LIVE, REFERENCE, TrackedSource
+from geolocator import imagery
 from geolocator.lattice import get_lattice
 
 ROOT = Path(__file__).resolve().parent
@@ -377,6 +378,7 @@ def _to_geojson(items: list[dict], layer: str = "power") -> dict:
 def health():
     states = _all_states()
     states["market_bars"] = MARKET_SOURCE.state().as_dict()
+    states["blue_marble"] = imagery.state()
     return {
         "status": "ok",
         "source": SOURCE,
@@ -622,6 +624,37 @@ def lattice():
     return get_lattice()
 
 
+@app.get("/api/imagery/blue-marble/meta")
+def imagery_meta():
+    """The imagery contract: provider, vintage, projection, attribution, and the
+    SHA-256 of the exact bytes /api/imagery/blue-marble will serve."""
+    return imagery.state()
+
+
+@app.get("/api/imagery/blue-marble")
+def imagery_raster():
+    """Raster bytes only.
+
+    There is deliberately no parameter here. The GetMap request lives in
+    geolocator.imagery as a server constant, so no caller can steer the URL,
+    the layer, the projection or the dimensions. An /api/imagery?url=... shape
+    would be an open proxy.
+    """
+    st = imagery.state()
+    path = imagery.raster_path()
+    if path is None:
+        raise HTTPException(status_code=503, detail=st.get("note") or "imagery unavailable")
+    return FileResponse(
+        path,
+        media_type=imagery.MEDIA_TYPE,
+        headers={
+            "X-Imagery-Attribution": imagery.ATTRIBUTION,
+            "X-Imagery-Vintage": imagery.DATASET_VINTAGE,
+            "X-Imagery-Sha256": st.get("content_sha256") or "",
+        },
+    )
+
+
 @app.get("/")
 def index():
     return FileResponse(ROOT / "static" / "index.html")
@@ -633,7 +666,29 @@ def legacy():
     return FileResponse(ROOT / "static" / "index.legacy.html")
 
 
+class RevalidatingStatic(StaticFiles):
+    """Static files that must be revalidated, never reused blind.
+
+    The page is a versionless ES-module graph: every module lives at a stable
+    path with no content hash. StaticFiles sends Last-Modified and ETag but no
+    Cache-Control, which lets a browser apply HEURISTIC freshness and reuse a
+    module WITHOUT revalidating -- observed in the field: after an edit,
+    layerManager.js was served from cache with transferSize 0 while its siblings
+    took 304s, so the page ran a mixed old/new module graph and the symptom
+    looked like an application bug rather than a stale asset.
+
+    `no-cache` does not mean "do not store"; it means "revalidate before use".
+    Unchanged modules still answer 304 with an empty body, so this costs one
+    conditional request per module and removes the whole class of failure.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # The page is ES modules with no build step, so the browser fetches each one by
 # path. Mounted LAST: a mount at /app would otherwise shadow nothing here, but
 # keeping it after the routes makes the precedence obvious rather than lucky.
-app.mount("/app", StaticFiles(directory=ROOT / "static" / "app"), name="app")
+app.mount("/app", RevalidatingStatic(directory=ROOT / "static" / "app"), name="app")

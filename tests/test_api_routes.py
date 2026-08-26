@@ -38,7 +38,7 @@ def test_empty_result_is_distinguishable_from_unknown_layer():
 # ── freshness is surfaced, per layer ─────────────────────────────────────────
 def test_health_reports_class_and_authority_per_layer():
     d = client.get("/api/health").json()
-    assert set(d["freshness"]) == set(LAYER_IDS) | {"market_bars"}
+    assert set(d["freshness"]) == set(LAYER_IDS) | {"market_bars", "blue_marble"}
     for name, st in d["freshness"].items():
         assert st["layer_class"] in ("live", "reference", "authored")
         assert st["status"] in (
@@ -92,3 +92,29 @@ def test_links_still_ship_the_epistemic_statuses():
     for f in feats:
         if f["properties"]["a"]["frame"] == "fuel":
             assert f["geometry"] is None
+
+
+# ── versionless module graph must always revalidate ──────────────────────────
+@pytest.mark.parametrize("mod", [
+    "/app/main.js", "/app/layerManager.js", "/app/imagery.js", "/app/styles/thermal.js",
+])
+def test_app_modules_are_never_served_without_revalidation(mod):
+    """Every module lives at a stable path with no content hash.
+
+    Without an explicit Cache-Control, StaticFiles sends only Last-Modified and
+    ETag, which lets a browser apply heuristic freshness and reuse a module
+    WITHOUT revalidating. That was observed in the field: after an edit,
+    layerManager.js came back with transferSize 0 while its siblings took 304s,
+    so the page ran a mixed old/new module graph and the symptom presented as an
+    application bug. `no-cache` means revalidate-before-use, not do-not-store --
+    unchanged modules still answer 304.
+    """
+    r = client.get(mod)
+    assert r.status_code == 200
+    assert r.headers.get("cache-control") == "no-cache", mod
+
+
+def test_index_and_legacy_are_not_accidentally_cacheable_forever():
+    for path in ("/", "/legacy"):
+        cc = client.get(path).headers.get("cache-control", "")
+        assert "max-age" not in cc or "no-cache" in cc
