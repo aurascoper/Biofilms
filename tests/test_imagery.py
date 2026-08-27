@@ -175,17 +175,47 @@ def test_reference_vintage_and_measured_staleness_coexist():
         assert bm["vintage"] < mb["source_timestamp"][:4]
 
 
-def test_lattice_boundary_is_untouched_by_imagery():
-    # /api/lattice memoises for a couple of seconds; clear it so this assertion
-    # is about a live projection and not about whatever ran before it.
+def test_lattice_boundary_is_untouched_by_imagery(isolated_lattice_cache, monkeypatch):
+    """This test owns both memo state and upstream input.
+
+    It used to clear lattice._cache in place and then hit whatever happened to
+    be listening on the developer's loopback port. That made module order and
+    local process state part of the assertion. A boundary test should instead
+    supply the exact upstream document it is proving the imagery work leaves
+    untouched.
+    """
     from geolocator import lattice as _lat
-    _lat._cache["at"] = None
-    _lat._cache["doc"] = None
+
+    # The upstream deliberately CARRIES the fields the boundary must drop, which
+    # is what makes this a negative control rather than a shape check. With a
+    # clean fixture the assertions below cannot fail: widen MISSION_FIELDS to
+    # admit "equity" and a sanitised upstream still passes, because there was
+    # never anything present for the boundary to have leaked.
+    upstream = {
+        "state": {
+            "generated": "2099-01-01T00:00:00+00:00",
+            "mission": {
+                "phase": "TEST",
+                "entries_allowed": False,
+                "equity": 1234.56,
+                "margin_used": 9876.54,
+            },
+            "cells": [
+                {"symbol": "AAA_USDT", "quote": "USDT", "class": "crypto",
+                 "rank": 1, "has_position": True, "position_size": 4.2,
+                 "signal": None},
+            ],
+            "econ": None,
+        }
+    }
+    monkeypatch.setattr(_lat, "_fetch_upstream", lambda: upstream)
+
     d = client.get("/api/lattice").json()
-    assert set(d["mission"]) <= set(
-        __import__("geolocator.lattice", fromlist=["x"]).MISSION_FIELDS)
+    assert set(d["mission"]) <= set(_lat.MISSION_FIELDS)
     assert d["position_presence_exposed"] is False
-    assert "equity" not in json.dumps(d).lower()
+    body = json.dumps(d).lower()
+    for forbidden in ("equity", "margin_used", "position_size", "has_position"):
+        assert forbidden not in body, forbidden
 
 
 def test_legacy_page_is_still_byte_identical():

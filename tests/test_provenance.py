@@ -64,8 +64,26 @@ def test_snapshot_is_declared_immutable_not_a_cache(prov):
 # ── the layers must report the declaration, not a retrieval date ─────────────
 @pytest.mark.parametrize("layer", ["power", "worldgrid"])
 def test_reference_layers_report_the_declared_vintage(layer):
+    """`worldgrid` derives from a file OUTSIDE this repository.
+
+    Its source is the lattice board's energy_world.json, which a public clone
+    legitimately does not have -- CI found this within minutes of existing,
+    because every local run passed only on the machine that happened to hold
+    that file. Absent, the layer must report `unavailable` with no vintage;
+    present, it must report the declared release. Both are correct answers, and
+    asserting only the first would be asserting the author's filesystem.
+    """
     st = SOURCES[layer].state()
     assert st.layer_class == "reference"
+    if st.status == "unavailable":
+        assert layer == "worldgrid", "only the cross-repo source may be absent"
+        # UNAVAILABLE has two causes: the file is absent, or its loader threw.
+        # Only the first is a portability fact; the second is a parsing
+        # regression, and accepting both would make this allowance hide the very
+        # class of bug the suite exists to catch.
+        assert st.error and st.error.startswith("missing:"), st.error
+        assert st.vintage is None and st.authority is None
+        return
     assert st.status == "nominal"
     assert st.authority == "dataset-vintage"
     assert st.vintage == "1.3.0", "a WRI release version, not a date"
@@ -73,14 +91,28 @@ def test_reference_layers_report_the_declared_vintage(layer):
 
 @pytest.mark.parametrize("layer", ["power", "worldgrid"])
 def test_retrieval_date_is_never_the_vintage(layer):
-    """The bug this replaced: `retrieved` was reported under `dataset-vintage`."""
+    """The bug this replaced: `retrieved` was reported under `dataset-vintage`.
+
+    Skipped for a layer whose source is absent -- there is no retrieval date to
+    confuse with a vintage when nothing was retrieved.
+    """
     st = SOURCES[layer].state()
+    if st.status == "unavailable":
+        assert layer == "worldgrid"
+        # Absent is a skip. Broken is a failure. See the note above.
+        assert st.error and st.error.startswith("missing:"), st.error
+        pytest.skip(f"{layer} source not present in this checkout")
     assert st.retrieved_at == "2026-08-17"
     assert st.vintage != st.retrieved_at
     assert st.source_timestamp is None
 
 
 def test_reference_layers_never_go_stale_by_clock():
+    """A reference layer may be absent, but it must never be STALE.
+
+    That is the whole distinction: not having the data and having old data are
+    different states, and only one of them is a clock measurement.
+    """
     f = client.get("/api/health").json()["freshness"]
     for name in ("power", "worldgrid", "blue_marble"):
         assert f[name]["status"] != "stale", name
