@@ -77,6 +77,11 @@ def test_reference_layers_report_the_declared_vintage(layer):
     assert st.layer_class == "reference"
     if st.status == "unavailable":
         assert layer == "worldgrid", "only the cross-repo source may be absent"
+        # UNAVAILABLE has two causes: the file is absent, or its loader threw.
+        # Only the first is a portability fact; the second is a parsing
+        # regression, and accepting both would make this allowance hide the very
+        # class of bug the suite exists to catch.
+        assert st.error and st.error.startswith("missing:"), st.error
         assert st.vintage is None and st.authority is None
         return
     assert st.status == "nominal"
@@ -93,6 +98,9 @@ def test_retrieval_date_is_never_the_vintage(layer):
     """
     st = SOURCES[layer].state()
     if st.status == "unavailable":
+        assert layer == "worldgrid"
+        # Absent is a skip. Broken is a failure. See the note above.
+        assert st.error and st.error.startswith("missing:"), st.error
         pytest.skip(f"{layer} source not present in this checkout")
     assert st.retrieved_at == "2026-08-17"
     assert st.vintage != st.retrieved_at
