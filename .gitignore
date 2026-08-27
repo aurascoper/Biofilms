@@ -380,3 +380,4 @@ geolocator/data/market_bars.sqlite
 # Large binary reference data gets an explicit distribution decision, not a
 # silent commit (see the 11.9 MB WRI CSV already in history).
 geolocator/cache/
+.hermes/

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Biofilms geolocator 3D globe server — long-lived, reboot-survivable.
+  KeepAlive=true → respawns on exit/crash; ThrottleInterval=15 caps respawn rate.
+  Serves geolocator/static/index.html + /api/* on 0.0.0.0:8000 (all interfaces,
+  so it's reachable via Tailscale 100.x.y.z as well as localhost).
+  Uses stable /usr/local/bin/python3 (3.13) which has fastapi+uvicorn.
+  Install: symlink into ~/Library/LaunchAgents and `launchctl bootstrap gui/$(id -u)`.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aurascoper.geolocator</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>geolocator.api:app</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>8000</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aurascoper/Developer/Biofilms</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>15</integer>
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aurascoper/Developer/Biofilms/logs/geolocator.launchd.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aurascoper/Developer/Biofilms/logs/geolocator.launchd.err</string>
+</dict>
+</plist>
