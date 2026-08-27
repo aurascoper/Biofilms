@@ -36,6 +36,7 @@ Run:
 from __future__ import annotations
 
 import csv
+import hashlib
 import importlib.util
 import json
 import os
@@ -61,6 +62,14 @@ ENERGY_WORLD_JSON = Path(
     os.environ.get(
         "ENERGY_WORLD_JSON",
         str(Path.home() / "Developer/live_trading/research/lattice_board/data/energy_world.json"),
+    )
+)
+# Rev 6A physical-state overlay -- a symlink agri_yield_pipeline's export script retargets to
+# its latest dated, content-hashed export each run. Read-only; never imported as code.
+AGRI_OVERLAY_JSON = Path(
+    os.environ.get(
+        "AGRI_OVERLAY_JSON",
+        str(Path.home() / "Developer/agri_yield_pipeline/data/overlay/latest.json"),
     )
 )
 
@@ -158,6 +167,14 @@ LAYER_COLORS: dict[str, dict[str, str]] = {
         "stellar_lens": "#6BCB77",
         "gridcoin_relay": "#4D96FF",
         "radio_silent": "#9AA7C0",
+    },
+    "agri_overlay": {
+        # Same severity naming as agri_yield_pipeline's own field-stress seam
+        # (src/stress_alerts.py:_severity -- "stress"/"warn"/"info").
+        "Stress": "#C0392B",
+        "Warn": "#E07B39",
+        "Normal": "#27AE60",
+        "No data": "#9AA7C0",
     },
 }
 
@@ -267,6 +284,84 @@ def _load_worldgrid(path: Path) -> dict:
     return {"items": out, "meta": {"provenance": d.get("provenance") or {}}}
 
 
+def _agri_stress_class(cell: dict) -> str:
+    """Same info/warn/stress convention agri_yield_pipeline's own field-stress seam already
+    uses (src/stress_alerts.py:_severity), applied to the county-level NDVI z here."""
+    z = (cell.get("ndvi") or {}).get("z")
+    if z is None:
+        return "No data"
+    az = abs(z)
+    if az >= 2.0:
+        return "Stress"
+    if az >= 1.5:
+        return "Warn"
+    return "Normal"
+
+
+def _load_agri_overlay(path: Path) -> dict:
+    """Rev 6A agri_yield_pipeline physical-state overlay (see that repo's
+    scripts/export_physical_overlay.py). An untrusted cross-repo file read -- hash-verifies the
+    cells payload against the export's own embedded cells_sha256 before accepting it, same
+    discipline as the corruption check in live_trading's energy_market_bridge_probe*.py snapshot
+    loaders. Never imports agri_yield_pipeline's code, only reads its frozen JSON export."""
+    d = json.loads(path.read_text())
+    cells = d.get("cells") or []
+    expected = d.get("cells_sha256")
+    if expected is not None:
+        actual = hashlib.sha256(
+            json.dumps(cells, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        if actual != expected:
+            raise ValueError(
+                f"agri overlay corruption: cells hash mismatch "
+                f"(recorded {expected[:12]}..., actual {actual[:12]}...)"
+            )
+    items: list[dict] = []
+    for cell in cells:
+        lat, lon = cell.get("lat"), cell.get("lon")
+        if lat is None or lon is None or not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            continue
+        ndvi = cell.get("ndvi") or {}
+        z = ndvi.get("z")
+        items.append(
+            {
+                "name": cell.get("name") or "",
+                "country": cell.get("state") or "",
+                "latitude": lat,
+                "longitude": lon,
+                "color_key": _agri_stress_class(cell),
+                # Reused as a numeric marker-size magnitude, not a true capacity -- this
+                # layer has no MW figure. |NDVI z| keeps larger markers on the more
+                # anomalous counties. capacity_mw is a repo-wide invariant of always being
+                # a float (see _f()); /api/stats and /api/plants both compare/sum it
+                # unconditionally, so a missing z becomes 0.0, not None -- caught by the
+                # public test suite before this ever shipped.
+                "capacity_mw": abs(z) if z is not None else 0.0,
+                "status": cell.get("kind") or "county",
+                "source": "agri_yield_pipeline",
+                "note": f"NDVI z={z:.2f}" if z is not None else "no NDVI baseline for this county",
+                "extra": {
+                    "ndvi": cell.get("ndvi"),
+                    "weather": cell.get("weather"),
+                    "yield_sensitivity": cell.get("yield_sensitivity"),
+                    "sar_vv_db": cell.get("sar_vv_db"),
+                },
+            }
+        )
+    return {
+        "items": items,
+        "meta": {
+            "provenance": d.get("provenance") or {},
+            "source_git_sha": d.get("source_git_sha"),
+            "generated_at": d.get("generated_at"),
+        },
+    }
+
+
+def _agri_vintage(payload) -> str | None:
+    return ((payload or {}).get("meta") or {}).get("generated_at")
+
+
 # ── Layer registry ────────────────────────────────────────────────────────────
 LAYER_FILES = {
     "nuclear": DATA_DIR / "nuclear_fuel_cycle.csv",
@@ -337,6 +432,15 @@ SOURCES: dict[str, TrackedSource] = {
     "stars": TrackedSource(
         id="stars", path=LAYER_FILES["stars"], layer_class=AUTHORED,
         loader=_load_layer_csv, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "agri_overlay": TrackedSource(
+        # Rev 6A: county-level NDVI/weather/yield-sensitivity physical-state overlay from
+        # agri_yield_pipeline. No trading claim; see that repo's plan for scope. REFERENCE, not
+        # LIVE -- the vintage is the export's generated_at, never today's clock.
+        id="agri_overlay", path=AGRI_OVERLAY_JSON, layer_class=REFERENCE,
+        loader=_load_agri_overlay, empty=_EMPTY_LAYER, count_of=_layer_count,
+        vintage_of=_agri_vintage,
+        retrieved_of=_agri_vintage,
     ),
 }
 LAYER_IDS = tuple(SOURCES.keys())
@@ -499,9 +603,12 @@ def layers():
             {
                 "id": k,
                 "count": states[k].get("count") or 0,
-                # worldgrid is coloured by fuel, not by stage -- it aliases
-                # FUEL_COLORS. The old ternary told the legend otherwise.
-                "color_field": "primary_fuel" if k in ("power", "worldgrid") else "stage",
+                # worldgrid is coloured by fuel, not by stage -- it aliases FUEL_COLORS.
+                # agri_overlay is coloured by NDVI stress class, not a fuel/stage/cycle
+                # concept at all. A two-way ternary here has already once told the legend
+                # something false for one layer; a dict keeps each layer's own answer.
+                "color_field": {"power": "primary_fuel", "worldgrid": "primary_fuel",
+                                 "agri_overlay": "stress_class"}.get(k, "stage"),
                 "colors": LAYER_COLORS.get(k, {}),
                 "layer_class": states[k].get("layer_class"),
                 "status": states[k].get("status"),
