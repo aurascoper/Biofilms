@@ -1,0 +1,91 @@
+name: geolocator-tests
+
+# The geolocator has had no CI coverage since it landed. `coupling-tests` runs
+# pytest against contract/, coupling/ and calibration/; `model-contracts` is
+# path-scoped to analysis/, R, Julia and preprint material. Neither reaches
+# geolocator/**, so every green badge on #14, #15 and #16 was silent about the
+# code those PRs actually changed, and the only real gate was someone
+# remembering to run the suite by hand.
+
+on:
+  push:
+    branches: [master, "feat/**", "ci/**", "research/**", "publish/**"]
+    paths:
+      - "geolocator/**"
+      - "power_plant_database_global.csv"
+      - "power_plant_database_global.provenance.json"
+      - ".gitattributes"
+      - ".github/workflows/geolocator-tests.yml"
+  pull_request:
+    paths:
+      - "geolocator/**"
+      - "power_plant_database_global.csv"
+      - "power_plant_database_global.provenance.json"
+      - ".gitattributes"
+      - ".github/workflows/geolocator-tests.yml"
+  # The live-provider tier is scheduled and manual only. It must never gate a PR.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: geolocator-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── blocking tier: deterministic, no network ───────────────────────────────
+  geolocator-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the geolocator's own test dependencies
+        # Deliberately not `-e .`: the geolocator is a self-contained subsystem
+        # and does not participate in the contract/coupling package graph.
+        run: pip install fastapi httpx pytest
+      - name: Verify the vendored dataset survived checkout intact
+        # `.gitattributes` pins the CSV `-text` precisely so this holds on every
+        # runner. If line-ending normalisation ever creeps back, the declared
+        # SHA-256 stops meaning anything and this fails loudly rather than
+        # letting the provenance test pass by accident on one platform.
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib, sys
+          csv = pathlib.Path("power_plant_database_global.csv")
+          decl = json.loads(pathlib.Path("power_plant_database_global.provenance.json").read_text())
+          got = hashlib.sha256(csv.read_bytes()).hexdigest()
+          print(f"declared {decl['sha256']}\nactual   {got}\nbytes    {csv.stat().st_size} (declared {decl['bytes']})")
+          sys.exit(0 if got == decl["sha256"] and csv.stat().st_size == decl["bytes"] else 1)
+          PY
+      - name: pytest
+        run: pytest -rs geolocator/tests
+
+  # ── non-blocking tier: does NASA's endpoint still answer? ──────────────────
+  #
+  # Kept separate on purpose. "Our geolocator contracts hold" and "GIBS happened
+  # to answer this runner" are different claims, and letting the second gate a
+  # PR would make an outage look like a defect in this repository. The imagery
+  # layer already treats an unreachable provider as UNAVAILABLE -- a first-class
+  # state, not a failure -- so the blocking tier above proves that behaviour
+  # against a synthetic upstream and this tier proves interoperability.
+  gibs-interoperability:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install fastapi httpx pytest
+      - name: pytest against the real GIBS endpoint
+        env:
+          GEOLOCATOR_LIVE_GIBS: "1"
+        run: pytest -rs geolocator/tests/test_imagery.py
