@@ -21,6 +21,14 @@
 #
 #  Zero-flux (symmetry) at r = 0.
 #
+#  TWO GEOMETRIES, one stencil.  default_parms() gives the cylindrical
+#  reactor above (biofilm lumped into a uniform scalar sink over a 1 cm
+#  radius).  slab_parms() gives depth across a single biofilm — z = 0
+#  substratum, z = L_f bulk-liquid face — which is the only one of the two
+#  that can be compared with micron-scale in-film measurements.  Geometry
+#  enters solely through the face weights built by face_weights(); the
+#  axis/substratum node is identical in both and is unchanged.
+#
 #  Spatial discretisation: finite-volume method of lines (Nr cells).
 #  Time integration: deSolve::ode (LSODA adaptive stiff solver).
 #
@@ -57,8 +65,15 @@ radiodialysis_rhs <- function(t, y, parms) {
     # Cumulative absorbed dose at the membrane (Gy), linear in t
     D_cum <- Ddot_R * t
 
-    # Radiation-driven effective permeability (Lara et al. 2023, Eq. 6)
-    P_eff <- P0 * exp(alpha_P * D_cum)
+    # Outer-face transfer coefficient (cm s⁻¹).  The producer declares which
+    # physical quantity this is; the stencil below must not assume one.
+    #   cylindrical : radiation-evolving Nafion permeability P_eff(t)
+    #                 (Lara et al. 2023, Eq. 6)
+    #   slab        : external liquid-film mass-transfer coefficient k_L,
+    #                 time-invariant.  This is NOT P_eff and must not be named
+    #                 or reported as one — commit e4021c0 withdrew P_eff from
+    #                 every producer for carrying a fabricated unit.
+    bc_coef <- if (identical(geom, "slab")) k_L else P0 * exp(alpha_P * D_cum)
 
     # --------------------------------------------------------
     # (3) Membrane damage ODE
@@ -71,43 +86,43 @@ radiodialysis_rhs <- function(t, y, parms) {
     uptake_rate <- k_ads * X_total + k_red * X_red  # s⁻¹
 
     # --------------------------------------------------------
-    # (1) Mobile species — cylindrical diffusion + reaction
+    # (1) Mobile species — diffusion + reaction (geometry via w_plus/w_minus)
     # --------------------------------------------------------
     dc_dt <- numeric(Nr)
 
-    # i = 1 (r = 0): L'Hôpital limit → ∂c/∂t = 2 D_eff ∂²c/∂r²
+    # i = 1: identical in both geometries, and unchanged by the slab work.
+    #   cylindrical  r = 0, symmetry, L'Hôpital limit → 2 D_eff ∂²c/∂r²
+    #   slab         z = 0, substratum, no-flux ghost c₀ = c₂ → 2 D_eff ∂²c/∂z²
+    # The reflected ghost is c₀ = c₂, NOT c₀ = c₁; the latter drops the whole
+    # scheme from second order to first.  Reads no metric weight (both are NA).
     dc_dt[1] <- D_eff * 2.0 * (c_vec[2] - c_vec[1]) / dr^2 +
                 (-uptake_rate * c_vec[1] + k_des * s_vec[1])
 
-    # i = 2 .. Nr-1: interior finite-volume stencil
+    # i = 2 .. Nr-1: interior finite-volume stencil.
+    # Geometry enters only through the face weights w_plus / w_minus, built
+    # once in the parameter constructor:
+    #   cylindrical  w± = (r ± dr/2) / r     slab  w± = 1
     if (Nr > 2) {
       for (i in 2:(Nr - 1)) {
-        r_i      <- r_grid[i]
-        r_plus   <- r_i + 0.5 * dr
-        r_minus  <- r_i - 0.5 * dr
-        diff_cyl <- D_eff *
-          (r_plus  * (c_vec[i + 1] - c_vec[i]) -
-           r_minus * (c_vec[i]     - c_vec[i - 1])) /
-          (r_i * dr^2)
-        dc_dt[i] <- diff_cyl +
+        diff_op <- D_eff *
+          (w_plus[i]  * (c_vec[i + 1] - c_vec[i]) -
+           w_minus[i] * (c_vec[i]     - c_vec[i - 1])) / dr^2
+        dc_dt[i] <- diff_op +
           (-uptake_rate * c_vec[i] + k_des * s_vec[i])
       }
     }
 
-    # i = Nr (r = R): Robin BC via ghost-point (Donnan / Nafion membrane)
-    #   ghost: c[Nr+1] = c[Nr-1] - 2 dr P_eff (c[Nr] - c_ext) / D_eff
+    # i = Nr: Robin BC via ghost-point.
+    #   cylindrical  r = R, the Donnan / Nafion membrane
+    #   slab         z = L_f, the biofilm / bulk-liquid interface
+    #   ghost: c[Nr+1] = c[Nr-1] - 2 dr bc_coef (c[Nr] - c_ext) / D_eff
     {
-      i       <- Nr
-      r_i     <- r_grid[i]
-      r_plus  <- r_i + 0.5 * dr
-      r_minus <- r_i - 0.5 * dr
       c_ghost <- c_vec[Nr - 1] -
-        2.0 * dr * P_eff * (c_vec[Nr] - c_ext) / D_eff
-      diff_cyl <- D_eff *
-        (r_plus  * (c_ghost   - c_vec[Nr]) -
-         r_minus * (c_vec[Nr] - c_vec[Nr - 1])) /
-        (r_i * dr^2)
-      dc_dt[Nr] <- diff_cyl +
+        2.0 * dr * bc_coef * (c_vec[Nr] - c_ext) / D_eff
+      diff_op <- D_eff *
+        (w_plus[Nr]  * (c_ghost   - c_vec[Nr]) -
+         w_minus[Nr] * (c_vec[Nr] - c_vec[Nr - 1])) / dr^2
+      dc_dt[Nr] <- diff_op +
         (-uptake_rate * c_vec[Nr] + k_des * s_vec[Nr])
     }
 
@@ -127,12 +142,42 @@ radiodialysis_rhs <- function(t, y, parms) {
 #  literature-consistent estimates for low-level nuclear waste
 #  remediation context.
 # ------------------------------------------------------------
+
+# ------------------------------------------------------------
+#  Diffusion face weights.  The ONLY thing geometry changes.
+#
+#    cylindrical (1/r) ∂/∂r (r D ∂c/∂r)  ->  w± = (r ± dr/2) / r
+#    slab (Cartesian)  ∂/∂z (D ∂c/∂z)    ->  w± = 1
+#
+#  Node 1 is deliberately NA: it uses the reflected-ghost form
+#  (c₀ = c₂ -> factor 2), which is identical for the cylindrical
+#  axis (L'Hôpital) and the slab substratum (no-flux), and reads
+#  no metric weight.  NA so that a future reader who *does* index
+#  it fails loudly rather than picking up a silently wrong number.
+# ------------------------------------------------------------
+face_weights <- function(r_grid, geom) {
+  stopifnot(geom %in% c("cylindrical", "slab"))
+  dr <- r_grid[2] - r_grid[1]
+  if (identical(geom, "slab")) {
+    w_plus <- rep(1.0, length(r_grid)); w_minus <- rep(1.0, length(r_grid))
+  } else {
+    w_plus  <- (r_grid + 0.5 * dr) / r_grid
+    w_minus <- (r_grid - 0.5 * dr) / r_grid
+  }
+  w_plus[1] <- NA_real_; w_minus[1] <- NA_real_
+  list(w_plus = w_plus, w_minus = w_minus)
+}
+
 default_parms <- function(Nr = 40, R = 1.0) {
   r_grid <- seq(0, R, length.out = Nr)
+  w      <- face_weights(r_grid, "cylindrical")
   list(
     # --- Spatial grid ---
     r_grid  = r_grid,
     R       = R,
+    geom    = "cylindrical",
+    w_plus  = w$w_plus,
+    w_minus = w$w_minus,
 
     # --- Transport ---
     D_eff   = 1e-3,    # effective diffusivity (cm² s⁻¹), Table 2 range 1e-4..1e-2
@@ -160,6 +205,99 @@ default_parms <- function(Nr = 40, R = 1.0) {
     # --- Boundary ---
     c_ext   = 1.0      # external contaminant concentration (normalised)
   )
+}
+
+# ------------------------------------------------------------
+#  Slab preset: depth across a biofilm, NOT radius across a reactor.
+#
+#    z = 0    substratum          (no-flux)
+#    z = L_f  bulk-liquid face    (Robin, external mass transfer k_L)
+#
+#  Same three equations, same stencil, Cartesian face weights.  Written to
+#  be comparable with micron-scale in-film measurements (e.g. SECM metal
+#  profiles), which the cylindrical preset cannot produce: there the biofilm
+#  is a spatially uniform scalar sink over a 1 cm reactor radius.
+#
+#  Three semantics are declared here rather than inherited (AGENTS.md rule 4):
+#    * the Robin coefficient is k_L, a liquid-film mass-transfer coefficient,
+#      NOT the membrane permeability P_eff;
+#    * the radiation terms are switched off — there is no membrane at a
+#      biofilm/liquid interface, so k_dam = Ddot_R = 0 and m(t) stays 1;
+#    * D_eff is a MOLECULAR diffusivity.  The cylindrical preset's 1e-3 cm² s⁻¹
+#      is ~100x the self-diffusivity of water: it is a reactor-scale dispersion
+#      coefficient and is meaningless on a 100 µm domain.
+#
+#  X_total has NO default on purpose.  See the stop() below.
+# ------------------------------------------------------------
+slab_parms <- function(Nr = 40, L_f = 0.01, X_total,
+                       D_eff = 1e-5, k_L = 1e-3) {
+  if (missing(X_total)) {
+    stop(
+      "slab_parms(): X_total must be stated explicitly, not defaulted.\n",
+      "  The biofilm dry-mass basis is exactly what RADIODIALYSIS: BLOCKED\n",
+      "  names (README.md:350-353).  It sets the uptake rate\n",
+      "    U = k_ads*X_total + k_red*X_red,\n",
+      "  and the penetration depth lambda = sqrt(D_eff/k_eff) scales as\n",
+      "  1/sqrt(U), so whether ANY gradient is resolvable across L_f is\n",
+      "  downstream of that gate.  Pass a value and label it a test value.",
+      call. = FALSE
+    )
+  }
+  z_grid <- seq(0, L_f, length.out = Nr)
+  w      <- face_weights(z_grid, "slab")
+  list(
+    # --- Spatial grid: depth, not radius ---
+    r_grid  = z_grid,   # name kept so run_radiodialysis() is reused unchanged
+    R       = L_f,      # film thickness (cm)
+    geom    = "slab",
+    w_plus  = w$w_plus,
+    w_minus = w$w_minus,
+
+    # --- Transport ---
+    D_eff   = D_eff,   # molecular diffusivity in the film (cm² s⁻¹)
+
+    # --- Biosorption / bioreduction (unchanged from the cylindrical preset) ---
+    k_ads   = 0.05,
+    k_red   = 0.02,
+    k_des   = 0.005,
+    k_loss  = 0.001,   # the ONLY true sink at steady state; see note below
+
+    # --- Biomass ---
+    X_total = X_total, # caller-declared; gated, see stop() above
+    X_red   = 0.3,
+
+    # --- Outer face: liquid-film mass transfer, NOT membrane permeability ---
+    k_L     = k_L,     # (cm s⁻¹).  P0 / alpha_P are deliberately absent.
+
+    # --- Radiation: off.  No membrane exists at a biofilm/liquid interface ---
+    k_dam   = 0.0,
+    Ddot_R  = 0.0,
+
+    # --- Boundary ---
+    c_ext   = 1.0      # bulk-liquid concentration (normalised)
+  )
+}
+
+# ------------------------------------------------------------
+#  Steady-state penetration depth.
+#
+#  Setting ds/dt = 0 gives s = U c / (k_des + k_loss), and substituting into
+#  the mobile equation shows the sorption/desorption pair is a REVERSIBLE
+#  BUFFER that cancels.  The only true steady sink is precipitation:
+#
+#      k_eff = U * k_loss / (k_des + k_loss)
+#
+#  With the file's constants k_eff/U = 1/6 exactly, so lambda_steady is
+#  sqrt(6) ~ 2.45x the transient value.  This ratio is structural and does
+#  not depend on X_total; the absolute lambda does.
+# ------------------------------------------------------------
+penetration_depth <- function(parms, phase = c("steady", "transient")) {
+  phase <- match.arg(phase)
+  with(parms, {
+    U <- k_ads * X_total + k_red * X_red
+    k <- if (phase == "steady") U * k_loss / (k_des + k_loss) else U
+    sqrt(D_eff / k)
+  })
 }
 
 # ------------------------------------------------------------

@@ -97,6 +97,37 @@ jobs:
             cat("PARSE_OK", f, "\n")
           }
 
+      # parse() is not execution.  It passes on a file whose every numerical
+      # result is wrong, so this job was green over code that ran nowhere.
+      - name: Install deSolve
+        run: sudo apt-get update && sudo apt-get install -y r-cran-desolve
+
+      - name: Run the radiodialysis depth-geometry verifier
+        run: Rscript analysis/verify_biofilm_depth_profile.R --report r-verify.json
+
+      # Assert on the RECEIPT, not on the exit status.  If the setup step above
+      # fails or is dropped, the verifier reports its deSolve check as SKIPPED;
+      # a job that exits 0 having skipped is the ALL-PASS-over-skip bug moved
+      # from R into YAML.  EXPECTED_CHECKS must be bumped deliberately when
+      # checks are added, so silently losing one fails the build.
+      - name: Assert the verifier actually ran everything
+        shell: Rscript {0}
+        run: |
+          EXPECTED_CHECKS <- 13L
+          if (!file.exists("r-verify.json"))
+            stop("no receipt: the verifier did not run to completion")
+          j <- readLines("r-verify.json", warn = FALSE)
+          num <- function(k) as.integer(sub(
+            paste0('.*"', k, '": *([0-9]+).*'), "\\1", j))
+          ran <- num("checks_run"); fail <- num("failures"); skip <- num("skipped")
+          cat(sprintf("receipt: %d run, %d failed, %d skipped\n", ran, fail, skip))
+          if (skip > 0L) stop("verifier skipped ", skip, " check(s): ", j)
+          if (fail > 0L) stop("verifier reported ", fail, " failure(s)")
+          if (ran != EXPECTED_CHECKS)
+            stop("expected ", EXPECTED_CHECKS, " checks, receipt says ", ran,
+                 " -- a check was added or silently lost; update EXPECTED_CHECKS")
+          cat("R verifier ran complete.\n")
+
   manuscript-build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
