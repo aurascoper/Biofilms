@@ -13,13 +13,22 @@ that can be mechanically enforced. A `restate` or `requalify` verdict asks
 whether the revision now says the right thing, which is a judgement about
 meaning and stays with a reviewer.
 
-WHAT THIS DOES NOT CLAIM. It checks 30 of the 34 `delete` rows. The other four
-are paraphrases with elisions and no verbatim fragment long enough to search
-for, and the test NAMES them rather than passing silently over them — the same
+EVERY `delete` ROW IS READ IN THE DOCUMENT IT NAMES. The first version filtered
+`claim_id.startswith("PP-")` and read only the manuscript, which meant the 25
+`delete` verdicts reached on anything else were carried by a test searching a
+file those claims had never been in — a check that could not fail. Scope now
+comes from the `document` column.
+
+WHAT THIS DOES NOT CLAIM. Detection is partial. Of the 34 manuscript rows, 20
+are findable in a document known to contain them; the rest are paraphrases with
+elisions and no verbatim fragment long enough to search for. HANDOUT-01 is not
+findable either, for a different reason: its claim is an equation, and
+`normalise_markup` reduces LaTeX maths to nothing searchable. All of them are
+NAMED in the coverage output rather than passed silently over — the same
 discipline as `reference_d_status.enforcement_report()` naming the declared
 criteria that have no consumer. A test that implied full coverage would be worse
 than no test, because it would retire the manual review that actually covers
-those four.
+them.
 """
 
 from __future__ import annotations
@@ -75,6 +84,34 @@ def _preprint_text() -> str:
     return normalise_markup(PREPRINT.read_text(encoding="utf-8"))
 
 
+# THE ROW SAYS WHICH DOCUMENT IT IS ABOUT; the guard must not decide that from
+# the id. Filtering on `claim_id.startswith("PP-")` meant every `delete` verdict
+# reached on anything but the manuscript — the handout's two among them — was
+# carried by a test that read a file those claims were never in, and so could
+# not fail. Two aliases and one pseudo-document are all that stand between the
+# `document` column and a path.
+DOCUMENT_ALIASES = {
+    "preprint": PREPRINT,
+    "preprint_tex": PREPRINT,
+    "README": REPO / "README.md",
+}
+# Not files: a claim about the repository as a whole, or about what was said to
+# a collaborator. A row naming one cannot be searched, so it is NAMED rather
+# than skipped in silence — an absent row and an unsearchable one otherwise
+# print the same nothing.
+PSEUDO_DOCUMENTS = {"repository", "correspondence"}
+
+
+def document_path(document: str) -> Path | None:
+    if document in PSEUDO_DOCUMENTS:
+        return None
+    return DOCUMENT_ALIASES.get(document, REPO / document)
+
+
+def deleted_rows(rows):
+    return [r for r in rows if r["status"] == "delete"]
+
+
 # The manuscript as first committed, before any revision removed anything. It is
 # the only document known to CONTAIN the deleted claims, which makes it the only
 # valid control for whether this guard detects them.
@@ -96,10 +133,16 @@ def _original_manuscript() -> str | None:
     return normalise_markup(got.stdout) if got.returncode == 0 else None
 
 
-def _detected(rows, text) -> list[str]:
+def _detected(rows, text, documents=("preprint", "preprint_tex")) -> list[str]:
+    """Which `delete` rows for `documents` are findable in `text`.
+
+    Takes the document set explicitly because it is used on CONTROLS — a file
+    known to contain the claims — and a control is only valid for the rows whose
+    document it actually is.
+    """
     out = []
-    for row in rows:
-        if not row["claim_id"].startswith("PP-") or row["status"] != "delete":
+    for row in deleted_rows(rows):
+        if row["document"] not in documents:
             continue
         phrase = distinguishing_phrase(row["claim_text"])
         if phrase and phrase.lower() in text:
@@ -133,29 +176,36 @@ def test_the_ledger_parses_and_is_not_empty(rows):
     assert {"claim_id", "status", "claim_text", "document"} <= set(rows[0])
 
 
-def test_no_deleted_claim_survives_in_the_manuscript(rows):
+def test_no_deleted_claim_survives_in_the_document_it_names(rows):
     """THE ONE THAT MATTERS. Every `delete` verdict was reached because the
     claim was unsupported, fabricated, or checkable and false — a Hamiltonian
     that conserves nothing, a symplectic integrator that is not used, a
     quantum-mechanical noise mechanism that is a Gaussian keyed to a diffusion
-    coefficient. They must not come back."""
-    text = _preprint_text()
+    coefficient. They must not come back.
+
+    Each row is searched in the document it names, not in the manuscript alone.
+    """
+    cache: dict[Path, str] = {}
     survivors = []
-    for row in rows:
-        if not row["claim_id"].startswith("PP-") or row["status"] != "delete":
-            continue
+    for row in deleted_rows(rows):
+        path = document_path(row["document"])
+        if path is None or not path.is_file():
+            continue                                    # named by the test below
+        if path not in cache:
+            cache[path] = normalise_markup(path.read_text(encoding="utf-8",
+                                                          errors="replace"))
         phrase = distinguishing_phrase(row["claim_text"])
-        if phrase and phrase.lower() in text:
-            survivors.append(f"{row['claim_id']}: {phrase[:90]}")
+        if phrase and phrase.lower() in cache[path]:
+            survivors.append(f"{row['claim_id']} in {row['document']}: {phrase[:90]}")
     assert not survivors, (
-        "claims marked `delete` in the ledger are present in the manuscript:\n  "
-        + "\n  ".join(survivors))
+        "claims marked `delete` in the ledger are present in the document that "
+        "carried them:\n  " + "\n  ".join(survivors))
 
 
 def test_the_guard_actually_detects_deleted_claims(rows):
     """THE TEST THAT PROVES THE OTHER ONE MEANS SOMETHING.
 
-    `test_no_deleted_claim_survives_in_the_manuscript` passes when it finds
+    `test_no_deleted_claim_survives_in_the_document_it_names` passes when it finds
     nothing. So does a guard that can find nothing at all — and the first
     version of this file was exactly that: raw substring matching against LaTeX,
     which detected 12 of 30 in the original and would have reported a clean
@@ -180,6 +230,63 @@ def test_the_guard_actually_detects_deleted_claims(rows):
         "guarding — most likely the markup normalisation regressed.")
 
 
+# The handout as first committed, before the azide line and the sorption box
+# were corrected. Same role as ORIGINAL_COMMIT, for the other document the
+# ledger carries `delete` verdicts on.
+HANDOUT_COMMIT = "9319d43"
+HANDOUT_PATH = "preprint/wan_meeting_handout.tex"
+
+
+def test_the_guard_detects_the_handout_claims(rows):
+    r"""THE SAME CONTROL, FOR THE OTHER DOCUMENT.
+
+    Widening the filter from `PP-` to the `document` column is only worth
+    something if the guard can actually bite on what it newly reads. Run it
+    against the pre-correction handout, which contains both deleted claims.
+
+    HANDOUT-01 is NOT expected here and is not counted: its claim is an
+    equation, and `normalise_markup` reduces LaTeX maths to nothing searchable
+    (`X_{\max}` becomes a bare `x`). A prose-phrase guard cannot check a
+    formula, so that row stays with a human — see the coverage report.
+    """
+    import subprocess
+
+    shallow = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+        capture_output=True, text=True)
+    if shallow.stdout.strip() == "true":
+        pytest.skip("shallow clone: the pre-correction handout is not reachable")
+    got = subprocess.run(
+        ["git", "-C", str(REPO), "show", f"{HANDOUT_COMMIT}:{HANDOUT_PATH}"],
+        capture_output=True, text=True)
+    if got.returncode != 0:
+        pytest.skip(f"{HANDOUT_COMMIT}:{HANDOUT_PATH} is not reachable")
+
+    found = _detected(rows, normalise_markup(got.stdout), documents=(HANDOUT_PATH,))
+    assert "HANDOUT-02" in found, (
+        "the guard found no deleted handout claim in the pre-correction "
+        f"handout, which contains them (found: {found}). It is not guarding "
+        "that document.")
+
+
+def test_every_deleted_claim_names_a_document_the_guard_can_read(rows):
+    """A ROW THE GUARD SILENTLY SKIPS IS NOT COVERED, AND MUST SAY SO.
+
+    `test_no_deleted_claim_survives_in_the_document_it_names` passes over any
+    row whose `document` does not resolve to a file. That is legitimate for the
+    declared pseudo-documents and for nothing else: a typo, a renamed file or a
+    new alias would otherwise retire a `delete` verdict without a word.
+    """
+    unreadable = sorted({r["document"] for r in deleted_rows(rows)
+                         if (lambda q: q is None or not q.is_file())(
+                             document_path(r["document"]))}
+                        - PSEUDO_DOCUMENTS)
+    assert not unreadable, (
+        "`delete` rows name documents that cannot be read, so those verdicts "
+        f"are unguarded: {unreadable}. Add a path alias, fix the row, or "
+        "declare it in PSEUDO_DOCUMENTS.")
+
+
 def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
     """Coverage is reported because it is PARTIAL, and reported as the number
     that means something.
@@ -191,8 +298,8 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
     superseded sources rather than verbatim quotes from either. Reporting the
     larger number invited retiring the manual review that covers the rest.
     """
-    deleted = [r for r in rows
-               if r["claim_id"].startswith("PP-") and r["status"] == "delete"]
+    deleted = [r for r in deleted_rows(rows)
+               if r["document"] in ("preprint", "preprint_tex")]
     yields_phrase = [r for r in deleted if distinguishing_phrase(r["claim_text"])]
     original = _original_manuscript()
 
@@ -210,24 +317,36 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
             for cid in missed:
                 print(f"      {cid}")
 
+        # THE OTHER DOCUMENTS ARE READ NOW, so their coverage is reported too —
+        # a row the widened filter reaches but the prose guard cannot match is
+        # still uncovered, and saying "34 delete claims" over it would hide that.
+        others = [r for r in deleted_rows(rows)
+                  if r["document"] not in ("preprint", "preprint_tex")]
+        print(f"  outside the manuscript: {len(others)} `delete` claims in "
+              f"{len({r['document'] for r in others})} documents")
+        print("  NOT textually detectable there — equations and code, not prose:")
+        print("      HANDOUT-01 — the claim is a formula; normalise_markup "
+              "reduces LaTeX maths to nothing searchable")
+
     assert len(yields_phrase) >= 25
 
 
-def test_every_preprint_claim_names_a_document_that_exists(rows):
+def test_every_claim_names_a_document_that_exists(rows):
     """What would have caught the drift this test was written after.
 
     The manuscript was revised and renamed outside the repository while 115
     ledger rows went on describing a file that had been superseded. A row whose
     document cannot be resolved is a row nobody can check.
     """
-    # "repository" is legitimate and not a data error: a PP-numbered claim can
-    # originate in the preprint audit while the thing it describes lives in the
-    # code — PP-T2-29 is a Table 2 value whose evidence is biofilms_potts.jl,
-    # PP-CIT-01 is about Citations.md.
-    known = {"preprint", "preprint_tex", "repository"}
+    # `PSEUDO_DOCUMENTS` is legitimate and not a data error: a PP-numbered claim
+    # can originate in the preprint audit while the thing it describes lives in
+    # the code — PP-T2-29 is a Table 2 value whose evidence is biofilms_potts.jl,
+    # PP-CIT-01 is about Citations.md. `document_path` returns None for those,
+    # and only a resolvable-but-missing path is a fault here.
     unresolved = sorted({r["document"] for r in rows
-                         if r["claim_id"].startswith("PP-")} - known)
-    assert not unresolved, f"PP-* rows name unknown documents: {unresolved}"
+                         if (lambda q: q is not None and not q.is_file())(
+                             document_path(r["document"]))})
+    assert not unresolved, f"rows name documents that do not exist: {unresolved}"
     assert PREPRINT.exists(), (
         f"the ledger's preprint rows describe {PREPRINT.name}, which is not in "
         "the repository")
@@ -264,7 +383,7 @@ def test_claim_ids_are_unique(rows):
     """AN ID THAT NAMES TWO CLAIMS NAMES NEITHER.
 
     The ledger is referenced by id from commit messages, pull requests and the
-    manuscript revision plan, and `test_no_deleted_claim_survives_in_the_manuscript`
+    manuscript revision plan, and `test_no_deleted_claim_survives_in_the_document_it_names`
     reports survivors by id. A duplicate makes every one of those references
     ambiguous — and silently, since nothing read the file as a keyed table.
 

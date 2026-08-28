@@ -851,8 +851,11 @@ integrator the `Project.toml` has never contained. Those claims are catalogued a
 in the claims ledger, 34 of them `delete`.
 
 **And the ledger is now enforced.** `calibration/tests/test_claims_ledger.py` asserts that no
-claim marked `delete` reappears in the manuscript. Until it existed, nothing in the repository
-checked the ledger at all.
+claim marked `delete` reappears in the document that carried it. Until it existed, nothing in
+the repository checked the ledger at all — and until 2026-08-28 it read only the manuscript,
+because it selected rows by `claim_id` prefix rather than by the `document` column each row
+declares. The 25 `delete` verdicts on other documents were unguarded by a test that could not
+have failed for them.
 
 Its real coverage is **20 of the 34**, and the other fourteen are named in the test output as
 still needing a human. An earlier version of this note said "30 of 34", which counted rows that
