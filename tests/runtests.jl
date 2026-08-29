@@ -54,3 +54,9 @@ end
 @testset "Manuscript claims" begin
     include("manuscript_claims_tests.jl")
 end
+
+# The checkerboard decomposition had no acceptance measurement on either branch.
+# Per-kernel agreement above passes when both kernels carry the same artifact,
+# and the serial fixture pins a stream with no sublattices, so nothing here
+# would have reported a parity-correlated bias in accepted moves.
+include("jacc_parity_tests.jl")

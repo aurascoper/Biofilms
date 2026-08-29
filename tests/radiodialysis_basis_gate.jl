@@ -191,6 +191,11 @@
             "tests/checkpoint_io_tests.jl",    # snapshot/restart round trip
             "export_checkpoint.jl",            # interchange export; labels the file
             "tests/radiodialysis_basis_gate.jl",  # this file, testing the gate
+            "tests/jacc_parity_tests.jl",      # CPM acceptance counts; the
+                                              # 10x-uptake testset in that file
+                                              # holds the claim to account
+            "jacc_acceptance_figure.jl",      # fig5; plots the same acceptance
+                                              # quantities, same claim
         ])
         repo = dirname(@__DIR__)
         found = Set{String}()
