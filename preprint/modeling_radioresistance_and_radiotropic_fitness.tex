@@ -958,6 +958,60 @@ Only the product of the melanin-production scale and the melanin-coupling scale 
 so the two are not separately identifiable from this output. This comparison ranks only the two
 radiation-derived terms: hand-specified adhesion differences remain larger than both.
 
+\paragraph{The same ranking as a count of decided moves.}
+Table~\ref{tab:term_magnitudes} compares terms at a single move. The same comparison can be made
+over a run by asking, for each \emph{accepted} move, whether removing one term would have reversed
+it. The question is settled by arithmetic on the uniform variate the acceptance test already drew,
+so no additional randomness enters and the trajectory is unchanged; the byte-level serial contract
+is satisfied with the tally attached and without it.
+
+Two cases arise and they do not overlap. When $\Delta H \le 0$ the move is accepted outright and no
+variate is drawn, so removing a term can raise $\Delta H$ above zero but cannot be shown to reverse
+the move --- it removes the certainty, and the outcome would depend on a number that was never
+generated. These moves are recorded as \emph{contingent} rather than assigned to a term. When
+$\Delta H > 0$ a variate exists, every counterfactual is decidable, and only a term that lowered
+$\Delta H$ can be decisive, since removing one that raised it leaves the move accepted.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Share of accepted moves reversed by removing a single Hamiltonian term, at $N=40$, six
+parcels per species, seed 42. \emph{None} means no single term reverses the move and the sum
+carries it; \emph{contingent} is the $\Delta H \le 0$ case described above. Percentages are of
+accepted moves, not of attempts.}
+\label{tab:decided_moves}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Term removed} & \textbf{100 MCS} & \textbf{400 MCS} \\
+ & (16\,037 accepted) & (53\,603 accepted) \\
+\midrule
+none (the sum)                   & 38.56\% & 65.99\% \\
+$\Delta H_{\mathrm{adh}}$        &  7.53\% &  6.15\% \\
+$\Delta H_{\mathrm{vol}}$        &  4.43\% &  3.97\% \\
+$\Delta H_{\mathrm{rad}}$        & \textbf{0.00\%} & \textbf{0.00\%} \\
+$\Delta H_{\mathrm{mel}}$        &  0.01\% &  0.04\% \\
+more than one term               &  0.09\% &  0.13\% \\
+contingent                       & 49.39\% & 23.72\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The direct radiation term reversed no accepted move at either length, and across seeds 42, 43 and
+44 at 400~MCS it reversed none of 206\,042. This is the one-part-in-$10^5$ bias of
+Table~\ref{tab:term_magnitudes} expressed as a count rather than a ratio, and it follows from it:
+$\beta_{s,\mathrm{ion}}$ is negative for two of the seven species at $-5\times10^{-5}$, so the
+largest radiation contribution that could favour an accepted move is of that order, and reversing
+the move would require the drawn variate to fall within about $10^{-5}$ of the acceptance
+threshold. The melanin term reversed 23 moves in 53\,603. Both figures restate the closing sentence
+above --- the hand-specified adhesion and volume terms are larger than either radiation-derived
+term --- and neither is a measurement of anything outside this model's own acceptance arithmetic.
+
+The complement is the more useful number. Between 66\% and 77\% of accepted moves are reversed by
+removing no single term at all, so the dynamics are carried by the sum rather than owned by any
+component, and the per-voxel statistics are too thin to say more: at 400~MCS the median voxel that
+was written to at all received three accepted moves. A spatial map of which term dominates where is
+therefore not reported, and would be noise if it were.
+
 \subsection{Single-Seed Radial Diagnostic}
 \label{sec:cpm_results}
 
