@@ -87,6 +87,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "release"
+          use-public-rspm: true
       - name: Parse all top-level R models without executing Shiny apps
         shell: Rscript {0}
         run: |
@@ -99,8 +100,18 @@ jobs:
 
       # parse() is not execution.  It passes on a file whose every numerical
       # result is wrong, so this job was green over code that ran nowhere.
+      # Install through R, not apt.  setup-r@v2 provides its own R build and
+      # reads R_LIBS_USER; r-cran-desolve installs into the DISTRO R's
+      # site-library, which that R never looks at.  So the apt step exited 0
+      # with deSolve still missing, and the verifier correctly refused to pass
+      # over the resulting skip.  stopifnot() because install.packages() only
+      # WARNS on an unavailable package (rule 3: refuse, do not default to pass).
       - name: Install deSolve
-        run: sudo apt-get update && sudo apt-get install -y r-cran-desolve
+        shell: Rscript {0}
+        run: |
+          install.packages("deSolve")
+          stopifnot(requireNamespace("deSolve", quietly = TRUE))
+          cat("deSolve", as.character(packageVersion("deSolve")), "\n")
 
       - name: Run the radiodialysis depth-geometry verifier
         run: Rscript analysis/verify_biofilm_depth_profile.R --report r-verify.json
