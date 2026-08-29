@@ -450,3 +450,55 @@ def plot_overlay(path, label_layer, dose_layer, *, plotter=None,
         p.add_text("grey wireframe: CSG boundary, not data",
                    position="lower_right", font_size=7)
     return p
+
+
+def plot_panels(panels, layer_name, *, plotter=None, link_views=True):
+    """The same layer from several bundles, side by side in one scene.
+
+    THIS IS WHAT MAKES A NULL PANEL A COMPARISON RATHER THAN TWO PICTURES.
+    §6.3 reports a single-seed ordering running opposite to its own coefficient
+    and sitting within 1.4 standard errors of the seeding null. A render is the
+    worst carrier there is for that caveat, because nobody reads a picture as a
+    claim they are supposed to check — so the null is drawn beside it and the
+    reader sees what "not separated from the null" looks like.
+
+    Two panels are comparable only if the sole difference between them is the
+    data. Two other things would otherwise differ:
+
+    - **The colour range.** PyVista handles this already, and this function
+      deliberately does NOT: within one `Plotter` the lookup table is shared per
+      scalar name and takes the UNION across subplots, so both panels land on
+      one scale regardless of the order they are added in. An explicit
+      per-panel `clim` was written here first and then deleted, because its
+      negative control could not fail — removing it changed no range on either
+      the `add_mesh` or the `add_volume` branch, in either order. It is a
+      property of the renderer that this function depends on rather than one it
+      provides, which is why `test_panels_share_one_colour_range` guards it: if
+      a PyVista upgrade stops sharing the table, the panels come apart silently
+      and the comparison becomes a lie with nothing on screen to say so.
+      Drawing the same two fields in SEPARATE plotters does not share a scale,
+      and that is the control.
+    - **The camera.** Linked views keep one viewpoint, so a structure is not
+      read as larger because its panel happens to sit closer.
+
+    It composes rather than reimplements, on the `plot_overlay` pattern:
+    `plot_layer` already accepts a `plotter`, and every panel is positioned by
+    `to_image_data` from its own grid's declared origin and spacing. Nothing
+    here recomputes a coordinate or a colour rule.
+
+    `panels` is a sequence of `(title, bundle_path)`.
+    """
+    import pyvista as pv
+
+    panels = list(panels)
+    if not panels:
+        raise ValueError("plot_panels needs at least one panel")
+
+    p = plotter or pv.Plotter(shape=(1, len(panels)))
+    for i, (title, path) in enumerate(panels):
+        p.subplot(0, i)
+        plot_layer(path, layer_name, plotter=p)
+        p.add_text(title, position="lower_edge", font_size=9)
+    if link_views and len(panels) > 1:
+        p.link_views()
+    return p

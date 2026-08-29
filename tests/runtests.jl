@@ -28,6 +28,8 @@ end
     include("deterministic_radiation.jl")
 end
 
+include("delta_h_decomposition.jl")
+
 include("radiodialysis_basis_gate.jl")
 
 @testset "Lifecycle, dose contract, windowed API" begin

@@ -496,12 +496,23 @@ function site_adhesion(lattice, cells, J, x, y, z, N)
 end
 
 """
-Compute ΔH for a proposed copy: source site (sx,sy,sz) copies into target (tx,ty,tz).
-Only recomputes terms affected by the single-site change.
-Returns the total energy change ΔH.
+    compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+
+The four Hamiltonian contributions to a copy attempt, separately.
+
+THIS FUNCTION IS THE OLD BODY OF `compute_delta_H`, WHICH ALREADY COMPUTED ALL
+FOUR AND THEN DISCARDED THEM on its return line. Nothing new is calculated here.
+`compute_delta_H` now sums this in the same order it used to add them, so the
+scalar it returns is bit-identical by construction rather than by luck — same
+operands, same associativity, same result.
+
+It is split rather than retyped because three callers outside this file want the
+scalar, and one of them is `biofilms_potts_jacc.jl`'s cross-implementation check
+against the parallel port. Changing what that reads to prove a rendering point
+would be trading a real guard for a picture.
 """
-function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
-                          tx::Int, ty::Int, tz::Int)
+function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
+                               tx::Int, ty::Int, tz::Int)
     lat = state.lattice
     cells = state.cells
     J = state.J
@@ -571,7 +582,21 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
         ΔH_mel += 0.5 * M_local  # losing a melanin-rich site costs
     end
 
-    return ΔH_adh + ΔH_vol + ΔH_rad + ΔH_mel
+    return (adh = ΔH_adh, vol = ΔH_vol, rad = ΔH_rad, mel = ΔH_mel)
+end
+
+"""
+Compute ΔH for a proposed copy: source site (sx,sy,sz) copies into target (tx,ty,tz).
+Only recomputes terms affected by the single-site change.
+Returns the total energy change ΔH.
+
+Unchanged in value, type and summation order; it now adds up
+`compute_delta_H_terms` instead of four locals with the same names.
+"""
+function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
+                         tx::Int, ty::Int, tz::Int)
+    t = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+    return t.adh + t.vol + t.rad + t.mel
 end
 
 # ============================================================
