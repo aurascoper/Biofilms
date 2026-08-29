@@ -60,3 +60,8 @@ end
 # and the serial fixture pins a stream with no sublattices, so nothing here
 # would have reported a parity-correlated bias in accepted moves.
 include("jacc_parity_tests.jl")
+
+# A bound stated in the paper must be the bound the coefficients have. §6.2
+# asserted 5e-5 where the model gives 7.5e-2, and nothing here could read a
+# number out of the prose to say so.
+include("prose_bounds.jl")

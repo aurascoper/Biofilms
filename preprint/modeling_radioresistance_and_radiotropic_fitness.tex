@@ -925,6 +925,7 @@ $H_{\mathrm{kNN}}$ remains specified but unexercised, and the thorium half-life 
 premise for treating the radiation field as static on the simulated timescale.
 
 \subsection{CPM Radiation-Linked Term Magnitudes}
+\label{sec:cpm_term_magnitudes}
 
 The CPM acceptance rule reveals a strong scale separation between its two radiation-derived terms.
 At the shipped $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$, their per-move energy changes and Metropolis
@@ -934,21 +935,30 @@ biases are shown in Table~\ref{tab:term_magnitudes}.
 \centering
 \small
 \caption{Magnitude of the radiation-linked terms in the CPM acceptance rule at the shipped
-constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$.}
+constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$. \emph{Corrected, version 1.2:} the sign of
+$\Delta H_{\mathrm{rad}}$ is set by the role a cell plays as well as by $\beta_{s,\mathrm{ion}}$,
+and the third row --- a positively signed species \emph{vacating} a site --- was absent from
+version 1.1. Its omission is what made the largest acceptance-favouring radiation contribution
+look like $5\times10^{-5}$ rather than $7.5\times10^{-2}$.}
 \label{tab:term_magnitudes}
 \begin{tabular}{@{}llr@{}}
 \toprule
 \textbf{Term} & $\Delta H$ & \textbf{Acceptance bias} \\
 \midrule
-$\Delta H_{\mathrm{rad}}$, negative $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
-$\Delta H_{\mathrm{rad}}$, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
+$\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
+$\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
+$\Delta H_{\mathrm{rad}}$, target \emph{loses}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $\mathbf{-7.5\times10^{-2}}$ & $\mathbf{1.0151}$ \\
 $\Delta H_{\mathrm{mel}}$ at $M=1.44$ & $-0.720$ & $\mathbf{1.155}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-For the two negatively signed species, the direct radiation term changes acceptance by about one
-part in $10^5$, whereas the melanin term changes it by 15.5\%. Radiation can therefore influence
+For the two negatively signed species \emph{occupying} a site, the direct radiation term changes
+acceptance by about one part in $10^5$, whereas the melanin term changes it by 15.5\%. That
+comparison is between one role of one pair of species and the melanin term, and it does not bound
+$\Delta H_{\mathrm{rad}}$: the third row is the same term at $1.5\times10^{3}$ times the magnitude
+and in the acceptance-favouring direction, only fifteen times smaller than the melanin term rather
+than four orders. Radiation can therefore influence
 the CPM indirectly through the chain
 \[
 I_\gamma \longrightarrow \text{melanin production} \longrightarrow M
@@ -996,15 +1006,32 @@ contingent                       & 49.39\% & 23.72\% \\
 \end{tabular}
 \end{table}
 
-The direct radiation term reversed no accepted move at either length, and across seeds 42, 43 and
-44 at 400~MCS it reversed none of 206\,042. This is the one-part-in-$10^5$ bias of
-Table~\ref{tab:term_magnitudes} expressed as a count rather than a ratio, and it follows from it:
-$\beta_{s,\mathrm{ion}}$ is negative for two of the seven species at $-5\times10^{-5}$, so the
-largest radiation contribution that could favour an accepted move is of that order, and reversing
-the move would require the drawn variate to fall within about $10^{-5}$ of the acceptance
-threshold. The melanin term reversed 23 moves in 53\,603. Both figures restate the closing sentence
-above --- the hand-specified adhesion and volume terms are larger than either radiation-derived
-term --- and neither is a measurement of anything outside this model's own acceptance arithmetic.
+\emph{Corrected, version 1.2; see the correction note in the Data and Code Availability section.}
+The direct radiation term was the sole decisive term in one accepted move of 206\,042 across seeds
+42, 43 and 44 at 400~MCS --- none under seeds 42 and 43, one under seed 44 --- and in none at
+100~MCS. That count is small, but it does \emph{not} follow from the one-part-in-$10^5$ row of
+Table~\ref{tab:term_magnitudes}, and the argument that it did was wrong.
+
+$\Delta H_{\mathrm{rad}}$ is signed by the \emph{role} a cell plays, not only by
+$\beta_{s,\mathrm{ion}}$: the source gaining a site contributes $+\beta_{s,\mathrm{ion}} I_\gamma$
+and the target losing one contributes $-\beta_{s,\mathrm{ion}} I_\gamma$. A move is favoured when
+the total is negative, so a \emph{positively} signed species vacating a site favours acceptance
+exactly as much as a negatively signed one occupying it. The largest such contribution is therefore
+set by $\max_s |\beta_{s,\mathrm{ion}}| = 7.5\times10^{-2}$, not by the smallest magnitude, and it
+is $1.5\times10^{3}$ times the $5\times10^{-5}$ the previous version of this paragraph claimed as a
+bound. Measured over the run, $29.8\%$ of evaluated proposals carry
+$\Delta H_{\mathrm{rad}} < -5\times10^{-5}$ and the extreme reaches $-7.5\times10^{-2}$.
+
+Recomputed on that basis, the expected number of accepted moves that removing
+$\Delta H_{\mathrm{rad}}$ alone would reverse is $16.7$ across the three seeds, against $0.26$ under
+the withdrawn bound; the measured number is $16$ (four, three and nine by seed). The reason the
+table nonetheless reports the term as decisive only once is \emph{absorption}, not absence: in
+fifteen of those sixteen an adhesion or volume term was independently decisive as well, so the move
+is labelled \emph{more than one term}. The defensible statement is that the direct radiation term
+could have decided sixteen accepted moves in 206\,042 and was rarely the only term that did, which
+is a weaker claim than the one this paragraph previously made and is the one the data supports. The
+melanin term reversed 23 moves in 53\,603. Neither figure is a measurement of anything outside this
+model's own acceptance arithmetic.
 
 The complement is the more useful number. Between 66\% and 77\% of accepted moves are reversed by
 removing no single term at all, so the dynamics are carried by the sum rather than owned by any
@@ -1265,11 +1292,32 @@ null, a title attributing melanin accumulation to radiation-driven production, a
 asserting drift toward the source when the run's own ordering runs the other way. No numerical
 value in either figure changed --- the underlying run is the same, and the mean radial positions
 and melanin values quoted in the captions are reproduced exactly --- and no other figure was
-regenerated. Figures 3 and 4 still carry a ``per cent depleted'' label that should read
-non-penetration; the coupled path that produces them is now gated, so the label is corrected in
-the generator and not yet in the artifact. The defect was that the figure generator had been
-corrected two weeks earlier and the committed images had not, with no check able to detect the
-difference; this is recorded as \texttt{FIG-01} to \texttt{FIG-04} in the claims ledger.
+regenerated. Figure~4 still carries a ``per cent depleted'' label that should read
+non-penetration, and is not regenerated here: its quantities are downstream of the gated biomass
+basis. Figure~3 is not --- it plots $m(t)$ and $P_{\mathrm{eff}}/P_0$, neither of which reads that
+basis --- and it has now been rebuilt; see the version 1.2 note below. The defect was that the
+figure generator had been corrected two weeks earlier and the committed images had not, with no
+check able to detect the difference; this is recorded as \texttt{FIG-01} to \texttt{FIG-07} in the
+claims ledger.
+
+\emph{Correction, version 1.2: two items, one numerical and one in an image.}
+Section~\ref{sec:cpm_term_magnitudes} previously bounded the acceptance-favouring contribution of
+$\Delta H_{\mathrm{rad}}$ at $5\times10^{-5}$ and inferred from that bound that the term deciding
+no accepted move was analytically expected rather than an under-sampling artifact. The bound was
+wrong by a factor of $1.5\times10^{3}$: it enumerated only the source-gains-a-site role, and a
+positively signed species vacating a site favours acceptance by up to $7.5\times10^{-2}$.
+Table~\ref{tab:term_magnitudes} gains the missing row and the paragraph beneath
+Table~\ref{tab:decided_moves} is rewritten. \textbf{Two published numbers move.} The count of moves
+for which the direct radiation term was solely decisive is one of 206\,042, not zero --- seed 44
+carries one --- and the number that removing $\Delta H_{\mathrm{rad}}$ alone would reverse is
+sixteen, against $0.26$ predicted under the withdrawn bound and $16.7$ under the corrected one. The
+remaining entries of Table~\ref{tab:decided_moves} were re-measured and reproduce exactly; that is
+a statement about those entries and not about any other result in this paper. Recorded as
+\texttt{PP-62-04} and \texttt{PP-62-09} to \texttt{PP-62-11} in the claims ledger; raised in review
+by Codex on pull request \#23. Figure~3 has separately been rebuilt to remove an in-plot
+``50~Gy cumulative'' annotation that the generator dropped on 14 August 2026 and the committed
+artifact kept, and to separate two labels that had been printing on top of one another; no value in
+it changed.
 
 \section*{Ethics, Biosafety, and Regulatory Statement}
 This manuscript reports software development, computational simulation, code audit, and analysis of
