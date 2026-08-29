@@ -80,6 +80,24 @@ def normalise_markup(source: str) -> str:
     return " ".join(s.split()).lower()
 
 
+def normalise_plaintext(source: str) -> str:
+    """Extracted figure text, whitespace-collapsed and lowercased.
+
+    NOT `normalise_markup`. That function strips `%` to end of line as a LaTeX
+    comment, and figure text carries real percent signs — `c_mean = 1.2% c_ext`
+    — so running it here would silently delete the rest of any line holding one.
+    A normaliser aimed at the wrong language is a guard reading a document it
+    cannot see.
+    """
+    return " ".join(source.split()).lower()
+
+
+def _normalised(path: Path) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return (normalise_plaintext if path.suffix == ".txt"
+            else normalise_markup)(text)
+
+
 def _preprint_text() -> str:
     return normalise_markup(PREPRINT.read_text(encoding="utf-8"))
 
@@ -101,36 +119,74 @@ DOCUMENT_ALIASES = {
 # print the same nothing.
 PSEUDO_DOCUMENTS = {"repository", "correspondence"}
 
+# NOT SOURCE, AND NOT IN THE REPOSITORY. `artifacts/` is gitignored
+# (`.gitignore:76`) and nothing under it is tracked, so a row naming a pilot
+# artifact resolves to a file only on a machine where that pilot has been run.
+# Both document-resolution tests below were therefore passing on local state and
+# would have failed on CI or any clean checkout — a check whose outcome depends
+# on untracked files is rule 1 wearing rule 2's clothes. They are DECLARED here
+# rather than removed from the ledger: the rows are real verdicts on real
+# numbers, they are simply unenforceable from a clean tree, and saying that is
+# the point. When the artifact happens to be present it is still read.
+GENERATED_ARTIFACTS = {
+    "artifacts/pilot/openmc_nested_pilot_budget.json",
+    "artifacts/pilot/openmc_nested_pilot_verdict.json",
+}
+
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+# The figures are the only PUBLISHED artifacts that are not source. A committed
+# PDF carries claim text that no suite could read: `tests/runtests.jl` splits the
+# monolith at `#  13. Figure export` and loads only what is above the cut, so
+# `export_figures` is unreachable from Julia by construction. The generator was
+# corrected on 2026-08-14 and the ledger recorded the verdict three times
+# (RM-G08-01, RM-G10-01, PP-65-08, the last saying in as many words that "the
+# committed PNGs still carry the old reversed zone labels"); the artifact went on
+# saying the retracted thing for two weeks because nothing could fail.
+FIGURES = REPO / "preprint" / "figures"
+
 
 def document_path(document: str) -> Path | None:
     if document in PSEUDO_DOCUMENTS:
         return None
-    return DOCUMENT_ALIASES.get(document, REPO / document)
+    path = DOCUMENT_ALIASES.get(document, REPO / document)
+    # A row may name the artifact a reader actually opens. PDF text is
+    # compressed, so searching the bytes finds nothing; the committed `.txt`
+    # sidecar is what gets read, and the hash test below is what stops a stale
+    # sidecar from standing in for a fresh PDF.
+    if path.suffix == ".pdf":
+        return path.with_suffix(".txt")
+    return path
 
 
 def deleted_rows(rows):
     return [r for r in rows if r["status"] == "delete"]
 
 
-# The manuscript as first committed, before any revision removed anything. It is
-# the only document known to CONTAIN the deleted claims, which makes it the only
-# valid control for whether this guard detects them.
-ORIGINAL_COMMIT = "5980dc5"
-ORIGINAL_PATH = "preprint/modeling_radiotrophic_fitness.md"
+# THE CONTROLS ARE COMMITTED FILES, NOT GIT OBJECTS. Each of these was once
+# recovered with `git show <sha>:<path>` — 5980dc5, 9319d43, and a third that
+# would have been e24dbec — and each time the same exposure was written down and
+# left in place: a squash-merge makes the pinned commit unreachable, `git show`
+# fails, and the control degrades into a skip. Rule 2 says to read a skip as
+# uncovered surface, and a control that can quietly stop controlling is rule 1
+# again one level up. A committed file cannot become unreachable. Provenance is
+# in `fixtures/README.md`.
+ORIGINAL_FIXTURE = "modeling_radiotrophic_fitness_prerevision.md"   # was 5980dc5
 
 
-def _original_manuscript() -> str | None:
-    import subprocess
+def _fixture(name: str) -> str:
+    """A known-bad document, read from disk. Never skips: if a control file is
+    missing that is a failure, not an environment quirk."""
+    path = FIXTURES / name
+    assert path.is_file(), (
+        f"negative-control fixture {name} is missing. The guard it feeds cannot "
+        "fail without it, which makes it not a guard. See fixtures/README.md.")
+    return normalise_markup(path.read_text(encoding="utf-8", errors="replace"))
 
-    shallow = subprocess.run(
-        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
-        capture_output=True, text=True)
-    if shallow.stdout.strip() == "true":
-        return None
-    got = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{ORIGINAL_COMMIT}:{ORIGINAL_PATH}"],
-        capture_output=True, text=True)
-    return normalise_markup(got.stdout) if got.returncode == 0 else None
+
+def _original_manuscript() -> str:
+    return _fixture(ORIGINAL_FIXTURE)
 
 
 def _detected(rows, text, documents=("preprint", "preprint_tex")) -> list[str]:
@@ -192,8 +248,7 @@ def test_no_deleted_claim_survives_in_the_document_it_names(rows):
         if path is None or not path.is_file():
             continue                                    # named by the test below
         if path not in cache:
-            cache[path] = normalise_markup(path.read_text(encoding="utf-8",
-                                                          errors="replace"))
+            cache[path] = _normalised(path)
         phrase = distinguishing_phrase(row["claim_text"])
         if phrase and phrase.lower() in cache[path]:
             survivors.append(f"{row['claim_id']} in {row['document']}: {phrase[:90]}")
@@ -220,10 +275,7 @@ def test_the_guard_actually_detects_deleted_claims(rows):
     matching achieves — so dropping the markup normalisation fails here rather
     than silently halving the guard.
     """
-    original = _original_manuscript()
-    if original is None:
-        pytest.skip("shallow clone: the original manuscript is not reachable")
-    found = _detected(rows, original)
+    found = _detected(rows, _original_manuscript())
     assert len(found) >= 18, (
         f"the guard detected only {len(found)} deleted claims in the "
         "pre-revision manuscript, which contains them. It has stopped "
@@ -231,9 +283,9 @@ def test_the_guard_actually_detects_deleted_claims(rows):
 
 
 # The handout as first committed, before the azide line and the sorption box
-# were corrected. Same role as ORIGINAL_COMMIT, for the other document the
+# were corrected. Same role as ORIGINAL_FIXTURE, for the other document the
 # ledger carries `delete` verdicts on.
-HANDOUT_COMMIT = "9319d43"
+HANDOUT_FIXTURE = "wan_meeting_handout_prefix.tex"          # was 9319d43
 HANDOUT_PATH = "preprint/wan_meeting_handout.tex"
 
 
@@ -249,20 +301,7 @@ def test_the_guard_detects_the_handout_claims(rows):
     (`X_{\max}` becomes a bare `x`). A prose-phrase guard cannot check a
     formula, so that row stays with a human — see the coverage report.
     """
-    import subprocess
-
-    shallow = subprocess.run(
-        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
-        capture_output=True, text=True)
-    if shallow.stdout.strip() == "true":
-        pytest.skip("shallow clone: the pre-correction handout is not reachable")
-    got = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{HANDOUT_COMMIT}:{HANDOUT_PATH}"],
-        capture_output=True, text=True)
-    if got.returncode != 0:
-        pytest.skip(f"{HANDOUT_COMMIT}:{HANDOUT_PATH} is not reachable")
-
-    found = _detected(rows, normalise_markup(got.stdout), documents=(HANDOUT_PATH,))
+    found = _detected(rows, _fixture(HANDOUT_FIXTURE), documents=(HANDOUT_PATH,))
     assert "HANDOUT-02" in found, (
         "the guard found no deleted handout claim in the pre-correction "
         f"handout, which contains them (found: {found}). It is not guarding "
@@ -280,11 +319,11 @@ def test_every_deleted_claim_names_a_document_the_guard_can_read(rows):
     unreadable = sorted({r["document"] for r in deleted_rows(rows)
                          if (lambda q: q is None or not q.is_file())(
                              document_path(r["document"]))}
-                        - PSEUDO_DOCUMENTS)
+                        - PSEUDO_DOCUMENTS - GENERATED_ARTIFACTS)
     assert not unreadable, (
         "`delete` rows name documents that cannot be read, so those verdicts "
         f"are unguarded: {unreadable}. Add a path alias, fix the row, or "
-        "declare it in PSEUDO_DOCUMENTS.")
+        "declare it in PSEUDO_DOCUMENTS / GENERATED_ARTIFACTS.")
 
 
 def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
@@ -306,16 +345,13 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
     with capsys.disabled():
         print(f"\n  claims-ledger guard: {len(deleted)} `delete` claims; "
               f"{len(yields_phrase)} yield a searchable phrase")
-        if original is None:
-            print("  detection rate: NOT MEASURED (shallow clone)")
-        else:
-            found = set(_detected(rows, original))
-            print(f"  DETECTED in the pre-revision manuscript: {len(found)} of "
-                  f"{len(deleted)} — this is the real coverage")
-            missed = [r["claim_id"] for r in deleted if r["claim_id"] not in found]
-            print("  NOT detectable — these still need human review:")
-            for cid in missed:
-                print(f"      {cid}")
+        found = set(_detected(rows, original))
+        print(f"  DETECTED in the pre-revision manuscript: {len(found)} of "
+              f"{len(deleted)} — this is the real coverage")
+        missed = [r["claim_id"] for r in deleted if r["claim_id"] not in found]
+        print("  NOT detectable — these still need human review:")
+        for cid in missed:
+            print(f"      {cid}")
 
         # THE OTHER DOCUMENTS ARE READ NOW, so their coverage is reported too —
         # a row the widened filter reaches but the prose guard cannot match is
@@ -327,6 +363,9 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
         print("  NOT textually detectable there — equations and code, not prose:")
         print("      HANDOUT-01 — the claim is a formula; normalise_markup "
               "reduces LaTeX maths to nothing searchable")
+        print("      FIG-01, FIG-02 — in-plot labels; no run of MIN_WORDS "
+              "survives the comma and paren split. Covered by "
+              "RETRACTED_IN_FIGURES, not by the phrase guard")
 
     assert len(yields_phrase) >= 25
 
@@ -345,8 +384,18 @@ def test_every_claim_names_a_document_that_exists(rows):
     # and only a resolvable-but-missing path is a fault here.
     unresolved = sorted({r["document"] for r in rows
                          if (lambda q: q is not None and not q.is_file())(
-                             document_path(r["document"]))})
+                             document_path(r["document"]))}
+                        - GENERATED_ARTIFACTS)
     assert not unresolved, f"rows name documents that do not exist: {unresolved}"
+
+    # AND THE DECLARATION MUST STAY TRUE. Listing a document here excuses it
+    # from the check above, so an entry that is no longer a gitignored artifact
+    # — committed since, or renamed — would silently excuse nothing while
+    # looking like it still did.
+    misdeclared = sorted(d for d in GENERATED_ARTIFACTS
+                         if d not in {r["document"] for r in rows})
+    assert not misdeclared, (
+        f"GENERATED_ARTIFACTS names documents no ledger row uses: {misdeclared}")
     assert PREPRINT.exists(), (
         f"the ledger's preprint rows describe {PREPRINT.name}, which is not in "
         "the repository")
@@ -830,3 +879,150 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
     ]
     for phrase in scoped:
         assert not blanket_reassurance_hits(phrase), f"false positive: {phrase}"
+
+
+# ---------------------------------------------------------------------------
+# THE FIGURES. A published artifact nothing could read.
+# ---------------------------------------------------------------------------
+
+# §2.6 of the manuscript: "Radiotrophy is not established for any of the seven
+# species modelled." The word is retracted prose, so it must not survive inside
+# an image either. This floor is coarse on purpose — it covers `fig1`, whose
+# in-plot labels were "radiotrophic niche" and "radiosensitive core", two words
+# each and so under MIN_WORDS: `distinguishing_phrase` cannot search them and
+# the phrase guard never will. Coverage of that figure is this list, not the
+# ledger row.
+RETRACTED_IN_FIGURES = ("radiotroph",)
+
+
+def figure_sidecars() -> list[Path]:
+    return sorted(FIGURES.glob("*.txt"))
+
+
+def retracted_vocabulary_hits(paths) -> list[tuple]:
+    """(figure, term) for every retracted term found. Takes PATHS so the
+    control can drive it with the pre-correction artifacts."""
+    return [(p.name, term) for p in paths
+            for term in RETRACTED_IN_FIGURES
+            if term in normalise_plaintext(p.read_text(encoding="utf-8",
+                                                       errors="replace"))]
+
+
+def test_no_committed_figure_asserts_a_retracted_phenotype():
+    """WHAT THE PROSE AUDIT DID NOT REACH.
+
+    `fig2_melanin_accumulation.pdf` said, inside the image, "C. neoformans,
+    C. sphaerospermum are radiotrophic (melanin-mediated energy gain)" — under a
+    caption disowning "radiation-derived energy production" and against §2.6.
+    `fig1` said "radiotrophic niche".
+
+    Neither was unnoticed. The generator was corrected on 2026-08-14 and the
+    ledger recorded the verdict three times. The artifact went on saying it
+    because no test could open a figure: the claims guard read one `.tex`, and
+    `tests/runtests.jl` splits the monolith above `#  13. Figure export`, so the
+    Julia suite cannot reach `export_figures` at all. Fixing a generator does
+    not fix what was already committed, and nothing said so.
+    """
+    hits = retracted_vocabulary_hits(figure_sidecars())
+    assert not hits, (
+        "committed figures assert a phenotype §2.6 retracts; the generator was "
+        f"fixed but the artifact was not regenerated: {hits}")
+
+
+def test_the_figure_guard_detects_the_pre_correction_artifacts():
+    """THE CONTROL: run the floor against the artifacts known to carry the claim.
+
+    NEITHER FIGURE IS REACHABLE BY THE PHRASE GUARD, and that is why this floor
+    exists rather than duplicating it. `distinguishing_phrase` splits on commas
+    and parentheses and needs MIN_WORDS=5 from one run. Fig 2's annotation —
+    "C. neoformans, C. sphaerospermum are radiotrophic (melanin-mediated energy
+    gain)" — yields runs of 2, 4 and 3 words, and fig 1's labels are two words
+    each. So `_detected` returns nothing for FIG-01 and FIG-02 no matter what,
+    exactly as it does for HANDOUT-01's equation, and the vocabulary floor is
+    the whole of their coverage. Asserting a phrase hit here would have made the
+    control pass on a mechanism that never ran.
+    """
+    prefix = sorted(FIXTURES.glob("fig*_prefix.txt"))
+    assert len(prefix) == 2, f"expected two pre-correction figures, got {prefix}"
+
+    hits = retracted_vocabulary_hits(prefix)
+    assert {p for p, _ in hits} == {f.name for f in prefix}, (
+        "the vocabulary floor missed a figure that contains the retracted "
+        f"phenotype: found {hits}")
+
+    # and it is not matching everything it is handed
+    assert retracted_vocabulary_hits(figure_sidecars()) == []
+
+
+def test_the_figure_rows_are_honest_about_being_vocabulary_only(rows):
+    """A ROW COVERED BY A WORD LIST IS NOT COVERED BY THE PHRASE GUARD.
+
+    `test_no_deleted_claim_survives_in_the_document_it_names` reads the figure
+    sidecars and will find nothing in them for these two rows — not because the
+    figures are clean, but because their claim text has no searchable run. That
+    is a legitimate limit and an illegible one: it looks identical to coverage.
+    So it is asserted, and it fails the day someone rewrites a figure claim into
+    a searchable phrase without noticing the floor is now the weaker check.
+    """
+    vocabulary_only = []
+    for row in deleted_rows(rows):
+        if not row["document"].startswith("preprint/figures/"):
+            continue
+        assert not distinguishing_phrase(row["claim_text"]), (
+            f"{row['claim_id']} now yields a searchable phrase; the phrase "
+            "guard covers it, so update this test and its notes")
+        vocabulary_only.append(row["claim_id"])
+    assert sorted(vocabulary_only) == ["FIG-01", "FIG-02"], vocabulary_only
+
+
+def test_every_committed_figure_matches_its_hash():
+    """THE HALF THAT MAKES THE SIDECAR WORTH ANYTHING.
+
+    Everything above reads `<figure>.txt`, not the PDF a reader opens. Without
+    this, regenerating a figure and forgetting its sidecar leaves the suite
+    green on stale-but-clean text while the PDF still carries the claim — the
+    artifact-versus-source split reproduced inside the guard written to close
+    it. So the PDF's own bytes are pinned, in pure stdlib, and a figure that
+    moves without its sidecar fails here.
+    """
+    import hashlib
+
+    stale = []
+    for pdf in sorted(FIGURES.glob("*.pdf")):
+        recorded = pdf.with_suffix(".sha256")
+        assert recorded.is_file(), f"{pdf.name} has no committed hash"
+        actual = hashlib.sha256(pdf.read_bytes()).hexdigest()
+        if actual != recorded.read_text(encoding="utf-8").strip():
+            stale.append(pdf.name)
+        assert pdf.with_suffix(".txt").is_file(), f"{pdf.name} has no text sidecar"
+    assert not stale, (
+        "these figures changed without their sidecar and hash being "
+        f"regenerated, so every text check above read the OLD figure: {stale}. "
+        "Re-run the export, then `pdftotext -layout` and `sha256sum` for each.")
+
+
+def test_the_sidecars_are_what_pdftotext_actually_produces():
+    """TIER 2: the sidecar is the PDF's text, not merely a file beside it.
+
+    The hash test proves the PDF has not moved since the sidecar was written; it
+    cannot prove the sidecar was ever a faithful extraction. This can, where
+    `pdftotext` exists. It is not a bare skip when absent — the hash test and
+    the vocabulary floor both still run — which is the difference rule 2 asks
+    for between a gap and a hidden one.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("pdftotext") is None:
+        pytest.skip("pdftotext absent: hash + vocabulary tiers still cover this")
+
+    drifted = []
+    for pdf in sorted(FIGURES.glob("*.pdf")):
+        got = subprocess.run(["pdftotext", "-layout", str(pdf), "-"],
+                             capture_output=True, text=True)
+        assert got.returncode == 0, f"pdftotext failed on {pdf.name}"
+        if normalise_plaintext(got.stdout) != normalise_plaintext(
+                pdf.with_suffix(".txt").read_text(encoding="utf-8")):
+            drifted.append(pdf.name)
+    assert not drifted, (
+        f"committed sidecars are not this PDF's text: {drifted}")

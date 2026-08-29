@@ -2069,7 +2069,7 @@ function export_figures(trajectory::Vector{<:Any},
     ax1  = Axis(fig1[1,1],
                 xlabel      = "Monte Carlo Steps",
                 ylabel      = "Mean radial position  r / R",
-                title       = "Radial stratification — cylindrical CPM bioreactor",
+                title       = "Mean radial position — cylindrical CPM bioreactor",
                 titlesize   = 15,
                 xlabelsize  = 13,
                 ylabelsize  = 13,
@@ -2156,7 +2156,7 @@ function export_figures(trajectory::Vector{<:Any},
     ax2  = Axis(fig2[1,1],
                 xlabel    = "Monte Carlo Steps",
                 ylabel    = "Mean melanin field value at occupied sites",
-                title     = "Melanin accumulation — radiation-driven production",
+                title     = "Melanin field at occupied sites — dimensionless model units",
                 titlesize = 15,
                 xlabelsize = 13,
                 ylabelsize = 13)
@@ -2184,11 +2184,11 @@ function export_figures(trajectory::Vector{<:Any},
            labelsize    = 11,
            rowgap       = 4,
            framevisible = false,
-           title        = "Melanin producers\n(★ radiotropic)",
+           title        = "Melanin producers",
            titlesize    = 11)
     # Override first two labels to add star
     text!(ax2, mcs_vec[1], -0.05;
-          text = "★ C. neoformans, C. sphaerospermum drift toward the source (radiotropic)",
+          text = "Ordering follows the hand-specified alpha_M_species scales; not a measured quantity",
           fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
 
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)
@@ -2326,7 +2326,7 @@ function export_figures(trajectory::Vector{<:Any},
           text    = @sprintf("c(R) = %.0f%% c_ext", c_wall_final * 100),
           fontsize = 10, color = colorant"#d62728", align = (:center, :bottom))
     text!(ax4l, Float64(t_vec[end]) * 0.55, c_mean_final + 0.04;
-          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% depleted)",
+          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% non-penetration)",
                              c_mean_final * 100, (1.0 - c_mean_final) * 100),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
 
