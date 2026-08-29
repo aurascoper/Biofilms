@@ -145,6 +145,27 @@ report(tryCatch({ slab_parms(); FALSE },
                                           conditionMessage(e), fixed = TRUE)),
        "slab_parms() refuses a defaulted X_total and names the gate")
 
+# --- 1b. the geometry dispatch refuses what it does not recognise ----------
+# Codex P2 on #19.  The old `if (geom == "slab") k_L else P_eff` read every
+# unrecognised value as cylindrical.  Both halves are asserted: an unknown
+# geom must ERROR, and BOTH supported values must still run -- a dispatch that
+# refuses everything would satisfy the first half alone.
+local({
+  p_bad <- slab_parms(X_total = 1.0); p_bad$geom <- "slabb"
+  y <- c(rep(0, length(p_bad$r_grid)), rep(0, length(p_bad$r_grid)), 1)
+  refused <- tryCatch({ radiodialysis_rhs(0, y, p_bad); FALSE },
+                      error = function(e) grepl("unsupported geom",
+                                                conditionMessage(e), fixed = TRUE))
+  accepts <- vapply(list(slab_parms(X_total = 1.0), default_parms()), function(p) {
+    yy <- c(rep(0, length(p$r_grid)), rep(0, length(p$r_grid)), 1)
+    tryCatch({ radiodialysis_rhs(0, yy, p); TRUE }, error = function(e) FALSE)
+  }, logical(1))
+  report(refused && all(accepts),
+         "geom dispatch refuses an unknown value and still accepts both known ones",
+         sprintf("refused=%s slab=%s cylindrical=%s",
+                 refused, accepts[1], accepts[2]))
+})
+
 # --- 2-3. slab operator and steady profile ---------------------------------
 L_f <- 0.01; D <- 1e-5; N <- 40; kL <- 1e2
 k_eff <- 0.056 * 0.001 / 0.006

@@ -73,7 +73,19 @@ radiodialysis_rhs <- function(t, y, parms) {
     #                 time-invariant.  This is NOT P_eff and must not be named
     #                 or reported as one — commit e4021c0 withdrew P_eff from
     #                 every producer for carrying a fabricated unit.
-    bc_coef <- if (identical(geom, "slab")) k_L else P0 * exp(alpha_P * D_cum)
+    # switch() with an unnamed default, NOT `if slab else cylindrical`: the
+    # else form treats EVERY unrecognised value as cylindrical, so a misspelt
+    # or future geom silently acquires a scientific interpretation instead of
+    # refusing (AGENTS.md rule 3).  face_weights() validates, but the weights
+    # reach this function precomputed in parms, so it never runs here.
+    bc_coef <- switch(
+      geom,
+      slab        = k_L,
+      cylindrical = P0 * exp(alpha_P * D_cum),
+      stop("radiodialysis_rhs(): unsupported geom ", sQuote(geom),
+           ". Supported: 'slab', 'cylindrical'.  An unrecognised geometry ",
+           "must refuse, not fall through to one of them.", call. = FALSE)
+    )
 
     # --------------------------------------------------------
     # (3) Membrane damage ODE

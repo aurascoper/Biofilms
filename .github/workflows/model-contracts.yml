@@ -51,6 +51,32 @@ jobs:
           fi
           python analysis/verify_radiodialysis_stability.py \
             --output artifacts/radiodialysis-stability.json $extra
+      # The numpy re-coding ran nowhere (Codex P2 on #19), so it and its
+      # negative controls could regress without failing any check -- while the
+      # PR claimed cross-implementation agreement on its strength.  It lives
+      # here because this job already installs numpy.  Receipt-asserted for the
+      # same reason as the R one: exit status alone cannot tell a full run from
+      # a run that quietly lost a case.
+      - name: Verify the biofilm depth stencil (numpy re-coding)
+        run: python analysis/verify_biofilm_depth_profile.py --report py-verify.json
+
+      - name: Assert the numpy verifier covered every case
+        run: |
+          python - <<'PY'
+          import json, sys
+          EXPECTED_CASES = 3
+          r = json.load(open("py-verify.json"))
+          names = [c["case"] for c in r["cases"]]
+          print(f"receipt: {len(names)} cases, passed={r['passed']}: {', '.join(names)}")
+          if len(names) != EXPECTED_CASES:
+              sys.exit(f"expected {EXPECTED_CASES} cases, receipt has {len(names)} "
+                       "-- a case was added or silently lost; update EXPECTED_CASES")
+          bad = [c["case"] for c in r["cases"] if not c["passed"]]
+          if bad or not r["passed"]:
+              sys.exit(f"numpy verifier reported failures: {bad}")
+          print("numpy verifier ran complete.")
+          PY
+
       - name: Summarize the time-step diagnostic
         if: always()
         run: |
@@ -109,9 +135,11 @@ jobs:
       - name: Install deSolve
         shell: Rscript {0}
         run: |
-          install.packages("deSolve")
-          stopifnot(requireNamespace("deSolve", quietly = TRUE))
-          cat("deSolve", as.character(packageVersion("deSolve")), "\n")
+          install.packages(c("deSolve", "jsonlite"))
+          for (pkg in c("deSolve", "jsonlite")) {
+            stopifnot(requireNamespace(pkg, quietly = TRUE))
+            cat(pkg, as.character(packageVersion(pkg)), "\n")
+          }
 
       - name: Run the radiodialysis depth-geometry verifier
         run: Rscript analysis/verify_biofilm_depth_profile.R --report r-verify.json
@@ -121,18 +149,33 @@ jobs:
       # a job that exits 0 having skipped is the ALL-PASS-over-skip bug moved
       # from R into YAML.  EXPECTED_CHECKS must be bumped deliberately when
       # checks are added, so silently losing one fails the build.
+      #
+      # Parsed as JSON, and `complete` is REQUIRED (Codex P1 on #19).  The
+      # previous version regex-scraped the three counters and never read the
+      # producer's own completeness declaration, so a receipt reading
+      # {"checks_run":14,...,"complete":false} satisfied every assertion --
+      # a gate accepting a self-declared incomplete run is rule 3 in the one
+      # place whose entire job is to refuse that.
       - name: Assert the verifier actually ran everything
         shell: Rscript {0}
         run: |
-          EXPECTED_CHECKS <- 13L
+          EXPECTED_CHECKS <- 14L
           if (!file.exists("r-verify.json"))
             stop("no receipt: the verifier did not run to completion")
-          j <- readLines("r-verify.json", warn = FALSE)
-          num <- function(k) as.integer(sub(
-            paste0('.*"', k, '": *([0-9]+).*'), "\\1", j))
-          ran <- num("checks_run"); fail <- num("failures"); skip <- num("skipped")
-          cat(sprintf("receipt: %d run, %d failed, %d skipped\n", ran, fail, skip))
-          if (skip > 0L) stop("verifier skipped ", skip, " check(s): ", j)
+          r <- jsonlite::fromJSON("r-verify.json", simplifyVector = TRUE)
+          for (k in c("checks_run", "failures", "skipped", "complete"))
+            if (is.null(r[[k]])) stop("receipt is missing '", k, "'")
+          if (!isTRUE(r$complete))
+            stop("receipt does not declare itself complete: complete=",
+                 format(r$complete))
+          ran <- as.integer(r$checks_run); fail <- as.integer(r$failures)
+          skip <- as.integer(r$skipped)
+          if (anyNA(c(ran, fail, skip))) stop("receipt counters are not integers")
+          cat(sprintf("receipt: %d run, %d failed, %d skipped, complete=%s\n",
+                      ran, fail, skip, r$complete))
+          if (skip > 0L)
+            stop("verifier skipped ", skip, " check(s): ",
+                 paste(unlist(r$skips), collapse = "; "))
           if (fail > 0L) stop("verifier reported ", fail, " failure(s)")
           if (ran != EXPECTED_CHECKS)
             stop("expected ", EXPECTED_CHECKS, " checks, receipt says ", ran,
