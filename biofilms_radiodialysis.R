@@ -7,10 +7,10 @@
 #
 #  (1) Mobile species: cylindrical reaction-diffusion PDE
 #        ∂c/∂t = (1/r) ∂/∂r (r D_eff ∂c/∂r)
-#                - (k_ads X + k_red X_red) c + k_des s
+#                - X (k_ads + k_red f_red) c + k_des s
 #
 #  (2) Immobile phase ODE (biosorption / bioreduction):
-#        ∂s/∂t = (k_ads X + k_red X_red) c - (k_des + k_loss) s
+#        ∂s/∂t = X (k_ads + k_red f_red) c - (k_des + k_loss) s
 #
 #  (3) Membrane damage ODE (radiation-driven permeability):
 #        dm/dt = -k_dam Ḋ(R) m
@@ -95,7 +95,7 @@ radiodialysis_rhs <- function(t, y, parms) {
     # --------------------------------------------------------
     # Source/sink term (identical for mobile and immobile)
     # --------------------------------------------------------
-    uptake_rate <- k_ads * X_total + k_red * X_red  # s⁻¹
+    uptake_rate <- uptake_rate_of(X_total, f_red_active, k_ads, k_red)
 
     # --------------------------------------------------------
     # (1) Mobile species — diffusion + reaction (geometry via w_plus/w_minus)
@@ -156,6 +156,45 @@ radiodialysis_rhs <- function(t, y, parms) {
 # ------------------------------------------------------------
 
 # ------------------------------------------------------------
+#  Uptake rate U (s⁻¹).
+#
+#  f_red_active is a FRACTION of X_total, not a second density:
+#
+#      X_red = f_red_active * X_total,  f_red_active in [0, 1]
+#
+#  which is the contract already written in
+#  docs/research/radiotrophic_calibration_map.md:395 as
+#  X_red = f_red,dry * X_total.  Two consequences, both structural:
+#
+#    * X_red <= X_total holds by construction rather than by an assertion
+#      nobody wrote.  The previous form fixed X_red at 0.3 while X_total was
+#      caller-declared, so a corrected low-biomass basis produced a reducing
+#      mass EXCEEDING total biomass, and U did not scale with the declared
+#      basis at all (Codex P1 on #19).
+#    * U = X_total * (k_ads + k_red * f_red_active) is proportional to
+#      X_total, so the whole uptake term inherits the X_total gate.  There is
+#      no second gated quantity to forget.
+#
+#  WHAT f_red_active IS NOT.  It is an ACTIVE-reducer dry-mass fraction, not a
+#  taxonomic one.  The default 0.3 is inherited, labelled "(Shewanella proxy)"
+#  since 45de4ba, and is a TAXONOMIC proxy standing in an activity slot -- the
+#  very substitution active_from_taxonomic() refuses without a measured
+#  activity fraction ("taxonomic abundance is not functional activity").  It is
+#  not 2/7 of seven species: the coupled path counts one species, S. oneidensis
+#  (biofilms_potts.jl:1377).  Treat 0.3 as an unvalidated placeholder gated by
+#  RADIODIALYSIS: BLOCKED, not as a composition.
+# ------------------------------------------------------------
+uptake_rate_of <- function(X_total, f_red_active, k_ads, k_red) {
+  if (!is.numeric(f_red_active) || length(f_red_active) != 1L ||
+      is.na(f_red_active) || f_red_active < 0 || f_red_active > 1)
+    stop("f_red_active must be a single fraction in [0, 1], got ",
+         paste(format(f_red_active), collapse = ", "),
+         ". It is a fraction OF X_total, not a second biomass density.",
+         call. = FALSE)
+  X_total * (k_ads + k_red * f_red_active)
+}
+
+# ------------------------------------------------------------
 #  Diffusion face weights.  The ONLY thing geometry changes.
 #
 #    cylindrical (1/r) ∂/∂r (r D ∂c/∂r)  ->  w± = (r ± dr/2) / r
@@ -202,7 +241,8 @@ default_parms <- function(Nr = 40, R = 1.0) {
 
     # --- Biomass ---
     X_total = 1.0,     # total biofilm dry mass density (g cm⁻³)
-    X_red   = 0.3,     # metal-reducing fraction (Shewanella proxy)
+    f_red_active = 0.3, # ACTIVE-reducer fraction OF X_total, in [0,1].
+                       # Unvalidated placeholder; see uptake_rate_of() above.
 
     # --- Membrane (Nafion / Donnan) ---
     P0      = 0.01,    # baseline permeability (cm s⁻¹), Fox et al. 2009
@@ -242,13 +282,13 @@ default_parms <- function(Nr = 40, R = 1.0) {
 #  X_total has NO default on purpose.  See the stop() below.
 # ------------------------------------------------------------
 slab_parms <- function(Nr = 40, L_f = 0.01, X_total,
-                       D_eff = 1e-5, k_L = 1e-3) {
+                       D_eff = 1e-5, k_L = 1e-3, f_red_active = 0.3) {
   if (missing(X_total)) {
     stop(
       "slab_parms(): X_total must be stated explicitly, not defaulted.\n",
       "  The biofilm dry-mass basis is exactly what RADIODIALYSIS: BLOCKED\n",
       "  names (README.md:350-353).  It sets the uptake rate\n",
-      "    U = k_ads*X_total + k_red*X_red,\n",
+      "    U = X_total * (k_ads + k_red*f_red_active),\n",
       "  and the penetration depth lambda = sqrt(D_eff/k_eff) scales as\n",
       "  1/sqrt(U), so whether ANY gradient is resolvable across L_f is\n",
       "  downstream of that gate.  Pass a value and label it a test value.",
@@ -276,7 +316,8 @@ slab_parms <- function(Nr = 40, L_f = 0.01, X_total,
 
     # --- Biomass ---
     X_total = X_total, # caller-declared; gated, see stop() above
-    X_red   = 0.3,
+    f_red_active = f_red_active,  # fraction OF X_total; U scales with the
+                       # declared basis, so it inherits that same gate.
 
     # --- Outer face: liquid-film mass transfer, NOT membrane permeability ---
     k_L     = k_L,     # (cm s⁻¹).  P0 / alpha_P are deliberately absent.
@@ -306,7 +347,7 @@ slab_parms <- function(Nr = 40, L_f = 0.01, X_total,
 penetration_depth <- function(parms, phase = c("steady", "transient")) {
   phase <- match.arg(phase)
   with(parms, {
-    U <- k_ads * X_total + k_red * X_red
+    U <- uptake_rate_of(X_total, f_red_active, k_ads, k_red)
     k <- if (phase == "steady") U * k_loss / (k_des + k_loss) else U
     sqrt(D_eff / k)
   })
@@ -359,7 +400,7 @@ ui <- fluidPage(
                   min = 0, max = 0.1, value = 0.02, step = 0.002),
       sliderInput("k_des",   "k_des (s⁻¹)",
                   min = 0, max = 0.05, value = 0.005, step = 0.001),
-      sliderInput("X_red",   "Metal-reducing biomass fraction",
+      sliderInput("f_red_active", "Active metal-reducing fraction of X_total",
                   min = 0, max = 1, value = 0.3, step = 0.05),
 
       h4("Membrane"),
@@ -414,7 +455,7 @@ server <- function(input, output, session) {
     parms$k_ads   <- input$k_ads
     parms$k_red   <- input$k_red
     parms$k_des   <- input$k_des
-    parms$X_red   <- input$X_red
+    parms$f_red_active <- input$f_red_active
     parms$P0      <- input$P0
     parms$alpha_P <- input$alpha_P
     parms$k_dam   <- input$k_dam

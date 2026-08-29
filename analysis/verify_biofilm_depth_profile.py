@@ -16,7 +16,7 @@ THE CONTRACT BEING CHECKED
 --------------------------
 Setting ds/dt = 0 in the immobile-phase equation gives
 
-    s = U c / (k_des + k_loss),      U = k_ads*X_total + k_red*X_red
+    s = U c / (k_des + k_loss),      U = X_total * (k_ads + k_red*f_red_active)
 
 and substituting it back shows the sorption/desorption pair is a *reversible
 buffer* that cancels.  The only true steady sink is precipitation:
@@ -106,13 +106,18 @@ class Kinetics:
     k_red: float = 0.02
     k_des: float = 0.005
     k_loss: float = 0.001
-    X_red: float = 0.3
+    f_red_active: float = 0.3  # ACTIVE-reducer fraction OF X_total, in [0,1]
     X_total: float = 1.0  # TEST VALUE -- gated, see module docstring
 
     def validate(self) -> None:
         for name, value in asdict(self).items():
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative, got {value!r}")
+        if self.f_red_active > 1.0:
+            raise ValueError(
+                "f_red_active is a fraction OF X_total and must lie in [0, 1], "
+                f"got {self.f_red_active!r}. It is not a second biomass density; "
+                "the previous fixed X_red let the reducing mass exceed X_total.")
         if self.k_des + self.k_loss <= 0.0:
             raise ValueError("k_des + k_loss must be positive for a steady state to exist")
 
@@ -120,7 +125,7 @@ class Kinetics:
     def uptake(self) -> float:
         """U, the transient sink (s^-1)."""
         self.validate()
-        return self.k_ads * self.X_total + self.k_red * self.X_red
+        return self.X_total * (self.k_ads + self.k_red * self.f_red_active)
 
     @property
     def k_eff(self) -> float:

@@ -42,7 +42,8 @@ MODEL <- file.path(dirname(dirname(normalizePath(
 if (!file.exists(MODEL)) MODEL <- "biofilms_radiodialysis.R"
 
 WANTED <- c("radiodialysis_rhs", "face_weights", "default_parms",
-            "slab_parms", "penetration_depth", "run_radiodialysis")
+            "slab_parms", "penetration_depth", "run_radiodialysis",
+            "uptake_rate_of")
 for (e in parse(MODEL)) {
   if (is.call(e) && identical(as.character(e[[1]]), "<-") &&
       as.character(e[[2]]) %in% WANTED) eval(e, envir = globalenv())
@@ -118,7 +119,7 @@ operator_of <- function(p) {
 # and every mutant looked "caught" for the wrong reason.
 reference <- function(p, geom) {
   g <- p$r_grid; N <- length(g); dg <- g[2] - g[1]; D <- p$D_eff
-  U <- p$k_ads * p$X_total + p$k_red * p$X_red
+  U <- uptake_rate_of(p$X_total, p$f_red_active, p$k_ads, p$k_red)
   bc <- if (identical(geom, "slab")) p$k_L else p$P0
   wp <- if (identical(geom, "slab")) rep(1, N) else (g + 0.5 * dg) / g
   wm <- if (identical(geom, "slab")) rep(1, N) else (g - 0.5 * dg) / g
@@ -166,11 +167,39 @@ local({
                  refused, accepts[1], accepts[2]))
 })
 
+# --- 1c. the reducing basis is a FRACTION of X_total -----------------------
+# Codex P1 on #19.  X_red was fixed at 0.3 while X_total was caller-declared,
+# so U did not scale with the declared basis and a corrected low X_total put
+# the reducing mass ABOVE total biomass.  Three halves, all required:
+#   (a) U is proportional to X_total, so lambda ~ 1/sqrt(X_total);
+#   (b) the implied X_red = f*X_total never exceeds X_total, structurally;
+#   (c) a fraction outside [0,1] is refused rather than used.
+local({
+  u1  <- uptake_rate_of(1.0, 0.3, 0.05, 0.02)
+  u01 <- uptake_rate_of(0.1, 0.3, 0.05, 0.02)
+  scales <- abs(u01 / u1 - 0.1) < 1e-12
+  lam_ratio <- penetration_depth(slab_parms(X_total = 0.1)) /
+               penetration_depth(slab_parms(X_total = 1.0))
+  lam_ok <- abs(lam_ratio - sqrt(10)) < 1e-9
+  bounded <- all(vapply(c(1e-6, 0.1, 1.0, 10.0), function(xt) {
+    p <- slab_parms(X_total = xt); p$f_red_active * p$X_total <= p$X_total
+  }, logical(1)))
+  refuses <- all(vapply(list(1.5, -0.1, NA_real_, c(0.3, 0.3), "0.3"),
+    function(bad) tryCatch({ uptake_rate_of(1.0, bad, 0.05, 0.02); FALSE },
+                           error = function(e) grepl("fraction in [0, 1]",
+                                                     conditionMessage(e),
+                                                     fixed = TRUE)), logical(1)))
+  report(scales && lam_ok && bounded && refuses,
+         "U scales with X_total, X_red <= X_total by construction, f outside [0,1] refused",
+         sprintf("U(0.1)/U(1)=%.3f lambda ratio=%.6f (sqrt10=%.6f) bounded=%s refuses=%s",
+                 u01/u1, lam_ratio, sqrt(10), bounded, refuses))
+})
+
 # --- 2-3. slab operator and steady profile ---------------------------------
 L_f <- 0.01; D <- 1e-5; N <- 40; kL <- 1e2
 k_eff <- 0.056 * 0.001 / 0.006
 p <- slab_parms(Nr = N, L_f = L_f, X_total = 1.0, D_eff = D, k_L = kL)
-p$k_ads <- k_eff; p$k_red <- 0; p$k_des <- 0; p$k_loss <- 0; p$X_red <- 0
+p$k_ads <- k_eff; p$k_red <- 0; p$k_des <- 0; p$k_loss <- 0; p$f_red_active <- 0
 res <- residual(p, "slab")
 report(res < 1e-13, "slab operator matches independent assembly",
        sprintf("%.2e", res))
@@ -254,7 +283,7 @@ if (!requireNamespace("deSolve", quietly = TRUE)) {
   out <- run_radiodialysis(ps, t_end = 2e5, n_out = 50)
   final <- out$c_mat[nrow(out$c_mat), ]
   # full system: sorption chain on, so the steady sink is k_eff
-  ke <- (ps$k_ads * ps$X_total + ps$k_red * ps$X_red) *
+  ke <- uptake_rate_of(ps$X_total, ps$f_red_active, ps$k_ads, ps$k_red) *
         ps$k_loss / (ps$k_des + ps$k_loss)
   lm2 <- sqrt(ps$D_eff / ke)
   ex <- ps$c_ext * cosh(ps$r_grid / lm2) /

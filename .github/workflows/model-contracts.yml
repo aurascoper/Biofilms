@@ -152,7 +152,7 @@ jobs:
       - name: Assert the verifier actually ran everything
         shell: Rscript {0}
         run: |
-          EXPECTED_CHECKS <- 14L
+          EXPECTED_CHECKS <- 15L
           if (!file.exists("r-verify.json"))
             stop("no receipt: the verifier did not run to completion")
           r <- jsonlite::fromJSON("r-verify.json", simplifyVector = TRUE)
