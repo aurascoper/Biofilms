@@ -40,3 +40,36 @@ first. Check what the control actually contains before trusting what it reports.
 State what was run and what it returned. "Conservation to nine significant
 figures" was true of one check and false about what that check verified; the
 masses it compared differed by 3%. If a suite skipped, say it skipped.
+
+## Work in a worktree, not the shared checkout
+
+Hunter works in these trees at the same time you do. A shared checkout means a
+shared branch pointer, and a branch can change under a running session between
+one command and the next — so a commit lands wherever `HEAD` happens to point,
+not where the work belongs.
+
+This happened **twice in one session** on 2026-08-28, during PR #19:
+
+- `0af4505`, Hunter's claims-ledger work, appeared on `feat/slab-depth-geometry`
+  mid-session. Recovered onto `fix/claims-ledger-delete-verdicts`.
+- `fix/ledger-guard-document-scope` was checked out under the running session,
+  and census commit `5b100d7` landed on it instead of the feature branch.
+  Recovered as `f49fe94`.
+
+Both times the confirming command lied. `git push origin feat/slab-depth-geometry`
+printed **`Everything up-to-date`** while local `HEAD` was a commit ahead — because
+the branch *named* in the push was not the branch *checked out*, and the named one
+genuinely had nothing new. **After committing, treat `Everything up-to-date` as
+evidence the commit went somewhere else**, not as confirmation of anything.
+
+Start in a worktree: `EnterWorktree`, or `git worktree add`. Note that
+`worktree.baseRef` defaults to `fresh`, which branches from `origin/master`;
+stacked work needs `head`. That a worktree already exists is not the rule — one
+did (`Biofilms-v11`, on `fix/figure-artifacts-and-v11`) while both collisions
+happened. The tooling was in use and the practice was not, because the mitigation
+had been written into one plan rather than adopted as standing practice. A
+mitigation scoped to a single piece of work is not in force for the next session.
+
+Read the branch in the same snapshot as the commit — `git status -sb` alongside
+`git log -1`, one command — for the same reason every other check here is taken
+atomically. A push's exit status is not evidence of where a commit landed.
