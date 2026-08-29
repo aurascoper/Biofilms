@@ -26,10 +26,12 @@ was not. It is the paper's own argument happening to the paper, which is an unco
 thing to have to write and the reason I would rather you had the corrected copy.
 
 No number changed. The underlying simulation is the same run, and the values quoted in the
-captions reproduce exactly. What changed is five pieces of text inside two images, plus a
+captions reproduce exactly. What changed is five pieces of text inside the two images — both
+plot titles, the two shaded-band labels in Figure 1, and the annotation quoted above — plus a
 correction note in the Software and Data Availability section recording it.
 
-Two other additions in v1.1, both prompted by the gap you identified:
+A few additions have gone in alongside the correction, most of them prompted by the gap you
+identified:
 
 - **Section 7.3** now discusses biofilms in nuclear facilities — spent fuel pools and cooling
   circuits — alongside the environmental remediation framing. The argument is about regime:
@@ -45,9 +47,22 @@ Two other additions in v1.1, both prompted by the gap you identified:
   the strain and belongs to an institution — but anyone reading the paper should meet the
   name change in the paper rather than in a biosafety committee.
 
-I have also written a short memo for Dr. Hoffman, if it is useful to send alongside: one page
-on what the model computes, one on why a materials scientist rather than a microbiologist,
-and one page that is entirely questions, since he knows what MURR can do and I do not.
+- **Section 6.2** has a new table. It asks, for every accepted move in the simulation, whether
+  removing one term of the model's energy function would have reversed it. The direct radiation
+  term reversed none of 206,042 moves across three seeds — which is a result the section already
+  implied as a ratio, now stated as a count. Two-thirds to three-quarters of moves are reversed
+  by removing no single term at all, so the dynamics are carried by the sum rather than by any
+  one component. It corroborates what was already there rather than claiming anything new.
+
+There is also some tightening of terminology — one coined term is no longer used before the
+paragraph that explains it was coined — but nothing that changes a result.
+
+I have also written a memo for Dr. Hoffman, if it is useful to send alongside. Four short
+landscape pages: what the model computes and what it does not, the published work on biofilms
+in spent fuel pools, why I am writing to a materials scientist at all — his published corrosion
+work qualifies alloys against steam, hydrothermal chemistry and hydrogen permeation, and a
+biofilm is none of those — and a final page that is entirely questions, since he knows what
+MURR can do and I do not.
 
 Thank you again — for the time, and for the assistantship conversation.
 
