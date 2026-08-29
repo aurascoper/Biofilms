@@ -1026,3 +1026,131 @@ def test_the_sidecars_are_what_pdftotext_actually_produces():
             drifted.append(pdf.name)
     assert not drifted, (
         f"committed sidecars are not this PDF's text: {drifted}")
+
+
+# ---------------------------------------------------------------------------
+# A COINED TERM MUST NOT APPEAR BEFORE THE PARAGRAPH THAT DISOWNS IT
+# ---------------------------------------------------------------------------
+
+COINAGE = "radiodialysis"
+DISCLAIMER = "coined for this three-equation system"
+
+# A filename and a cross-reference label are not the coined term being used as
+# though established: `biofilms_radiodialysis.R` is what the file is called, and
+# `\label{}` never reaches a reader at all.
+_EXEMPT = re.compile(r"\\(?:texttt|label|ref|eqref)\{[^}]*\}")
+
+
+def coinage_uses_before_disclaimer(source: str) -> list[tuple[int, str]]:
+    """(line number, line) for every reader-visible use of the coined term
+    above the paragraph that declares it coined.
+
+    Takes SOURCE rather than reading the file, so the control can drive it with
+    a document known to violate the rule.
+    """
+    lines = source.split("\n")
+    cut = next((i for i, l in enumerate(lines) if DISCLAIMER in l), None)
+    if cut is None:
+        return [(0, "the disclaimer paragraph is missing entirely")]
+    return [(i + 1, l) for i, l in enumerate(lines[:cut])
+            if COINAGE in _EXEMPT.sub("", l).lower()]
+
+
+def test_the_coinage_never_precedes_its_disclaimer():
+    """THE FIGURE DEFECT'S SHAPE, IN PROSE.
+
+    §3.11 disowns `radiodialysis` in a full paragraph — "a targeted search finds
+    no scientific usage of it outside this work". The term then appeared ten
+    times, and the abstract called it "a radial radiodialysis solver" with no
+    signal that the word was coined here. Caveat in the body, claim in the part
+    people scan: the same split that left a retracted phenotype inside a figure
+    while the prose around it was clean.
+
+    The rule is positional and so is the check. Anywhere after the disclaimer
+    the term is introduced and qualified; anywhere before it, it reads as
+    established vocabulary.
+    """
+    hits = coinage_uses_before_disclaimer(PREPRINT.read_text(encoding="utf-8"))
+    assert not hits, (
+        f"'{COINAGE}' is used as established vocabulary before the paragraph "
+        f"that declares it coined: {hits}")
+
+
+def test_the_coinage_check_detects_a_use_above_the_disclaimer():
+    """THE CONTROL. Without it this test passes on any document that never says
+    the word, which is every document in the repository but one."""
+    planted = (f"We solve the {COINAGE} system on a radial mesh.\n"
+               f"A term {DISCLAIMER} and is not established.\n"
+               f"The {COINAGE} solver is described in Section 6.\n")
+    hits = coinage_uses_before_disclaimer(planted)
+    assert [h[0] for h in hits] == [1], (
+        "the check must flag the line above the disclaimer and only that one; "
+        f"got {hits}")
+    assert not coinage_uses_before_disclaimer(
+        f"A term {DISCLAIMER}.\nThe {COINAGE} solver runs.\n")
+    assert not coinage_uses_before_disclaimer(
+        f"See \\texttt{{biofilms_{COINAGE}.R}} and \\label{{sec:{COINAGE}}}.\n"
+        f"A term {DISCLAIMER}.\n"), "a filename and a label are not a use"
+
+
+# ---------------------------------------------------------------------------
+# SOME SENTENCES HAVE TO STAY
+# ---------------------------------------------------------------------------
+
+# The guard's other document tests all assert ABSENCE — a `delete` verdict is
+# enforceable precisely because absence is its criterion. That leaves the
+# opposite failure uncovered: a sentence carried deliberately, whose removal
+# nothing notices. These rows name sentences that are load-bearing because of
+# what they PREVENT the document from implying, which is exactly the kind that
+# reads like a hedge on an editing pass and gets trimmed.
+LOAD_BEARING = ("HOFFMAN-10",)
+
+
+def load_bearing_absences(rows, read=None) -> list[tuple[str, str]]:
+    """(claim_id, phrase) for each row whose sentence is no longer in its
+    document. `read` overrides document lookup so the control can supply text."""
+    out = []
+    for row in rows:
+        if row["claim_id"] not in LOAD_BEARING:
+            continue
+        phrase = distinguishing_phrase(row["claim_text"])
+        assert phrase, (
+            f"{row['claim_id']} is declared load-bearing but its claim_text has "
+            f"no run of {MIN_WORDS}+ words to search for. Rephrase the row — "
+            "the word floor is what stops a match being a coincidence.")
+        path = document_path(row["document"])
+        assert path is not None and path.is_file(), (
+            f"{row['claim_id']} names {row['document']}, which does not resolve")
+        text = read(path) if read else _normalised(path)
+        if phrase.lower() not in text:
+            out.append((row["claim_id"], phrase))
+    return out
+
+
+def test_a_load_bearing_sentence_survives_in_its_document(rows):
+    """The Hoffman memo's geometry caveat.
+
+    The implemented domain is a cylinder in water with a Robin boundary — no
+    metal, no planar film, no interface. Without that sentence page 3 offers a
+    dose field beneath a film on steel as something the code does, which is a
+    geometry it does not have. It is also the sentence that reads like a hedge
+    and goes first when someone tightens the page.
+    """
+    missing = load_bearing_absences(rows)
+    assert not missing, (
+        "a sentence the ledger records as load-bearing is no longer in the "
+        f"document that needs it: {missing}")
+
+
+def test_the_load_bearing_check_detects_a_deleted_sentence(rows):
+    """THE CONTROL: strike the phrase from the document and require a report."""
+    def struck(path):
+        text = _normalised(path)
+        for row in rows:
+            if row["claim_id"] in LOAD_BEARING:
+                text = text.replace(distinguishing_phrase(row["claim_text"]).lower(), "")
+        return text
+
+    assert [c for c, _ in load_bearing_absences(rows, read=struck)] == list(LOAD_BEARING), (
+        "removing the phrase must make the check fail; if it does not, the "
+        "check is reading something other than the sentence it names")

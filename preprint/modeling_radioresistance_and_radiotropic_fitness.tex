@@ -116,7 +116,7 @@ from the approximate seeding null at six parcels per species.
 The boundaries are declared rather than discovered late. A proposed partial stochastic
 differential equation organises diffusion, directed motility, nutrient, radiation, melanin,
 interaction and forcing terms; it is a specification, and the four executed
-simulations---two Langevin models, the CPM, and a radial radiodialysis solver---realise only
+simulations---two Langevin models, the CPM, and a radial membrane-transport solver---realise only
 subsets of it. The CPM represents seven named species as computational biomass parcels rather
 than individual organisms, and has neither biomass growth nor a dose-dependent survival process,
 so the implemented phenotype is radiotropism and the model cannot test radiotrophy or
@@ -588,7 +588,7 @@ end-to-end distance.  Viscoelastic creep follows the Kelvin-Voigt model:
 \end{equation}
 with stress relaxation time $\tau = \eta/E$ governing biofilm restructuring dynamics.
 
-\subsection{Radiodialysis Membrane Transport}
+\subsection{Membrane Transport Under Radiation-Driven Permeability Change}
 \label{sec:radiodialysis}
 
 To model contaminant ingress through the bioreactor membrane under radiation-driven
@@ -1187,7 +1187,7 @@ whether plausible biological material changes are large enough to justify any on
 All source code, configuration schemas, tests, provenance ledgers, and figure-generation materials
 are available in the public repository at
 \url{https://github.com/aurascoper/Biofilms}. Version 1.0 was prepared against repository
-revision \texttt{c7539a9}; this revision is prepared against \texttt{afa5e3c}. Each names the
+revision \texttt{c7539a9}; this revision is prepared against \texttt{f72aabb}. Each names the
 parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.
