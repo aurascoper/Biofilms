@@ -2396,13 +2396,29 @@ function export_figures(trajectory::Vector{<:Any},
                 linestyle = :dash,
                 label     = "P_eff / P₀  permeability ratio")
 
-    # Key annotations
-    m_final   = m_vec[end]
+    # Key annotations.
+    #
+    # BOTH WERE PLACED AT x = 0.55*t_end FROM FINAL VALUES, AND COLLIDED. The
+    # two y-positions -- m_final + 0.05 = 0.829 on the left axis and
+    # Peff_final * 0.88 = 2.385 on the right -- are independent numbers on
+    # independently autoscaled axes, and they happened to map to the same 79% of
+    # plot height, so the two labels printed on top of each other and neither
+    # was readable. That is arithmetic, not a rendering fluke: it recurred on
+    # every regeneration.
+    #
+    # The fix separates them HORIZONTALLY, which makes the vertical coincidence
+    # moot however the axes rescale, and anchors each label to its own curve at
+    # its own x so it stays beside the line it describes rather than at a height
+    # derived from a value plotted somewhere else.
+    m_final    = m_vec[end]
     Peff_final = Peff_norm[end]
-    text!(ax3l, Float64(t_vec[end]) * 0.55, m_final + 0.05;
+    i_at(frac) = argmin(abs.(Float64.(t_vec) .- Float64(t_vec[end]) * frac))
+    i_m, i_p   = i_at(0.35), i_at(0.80)
+    Peff_span  = maximum(Peff_norm) - minimum(Peff_norm)
+    text!(ax3l, Float64(t_vec[i_m]), m_vec[i_m] + 0.04;
           text    = @sprintf("m = %.3f", m_final),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
-    text!(ax3r, Float64(t_vec[end]) * 0.55, Peff_final * 0.88;
+    text!(ax3r, Float64(t_vec[i_p]), Peff_norm[i_p] - 0.18 * Peff_span;
           text    = @sprintf("%.1f× baseline", Peff_final),
           fontsize = 10, color = colorant"#d62728", align = (:center, :top))
 

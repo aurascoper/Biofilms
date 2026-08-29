@@ -17,5 +17,6 @@ as uncovered surface. A committed file cannot become unreachable.
 | `wan_meeting_handout_prefix.tex` | `9319d43:preprint/wan_meeting_handout.tex` | `HANDOUT-02` must be detected |
 | `fig1_radial_stratification_prefix.pdf` | `e24dbec:preprint/figures/fig1_radial_stratification.pdf` | `radiotrophic niche` / `radiosensitive core` must be detected |
 | `fig2_melanin_accumulation_prefix.pdf` | `e24dbec:preprint/figures/fig2_melanin_accumulation.pdf` | `... are radiotrophic (melanin-mediated energy gain)` must be detected |
+| `fig3_membrane_transport_prefix.pdf` | `e24dbec:preprint/figures/fig3_membrane_transport.pdf` | `(50 Gy cumulative)` must be detected |
 
 Do not regenerate or "fix" these files. Their value is that they are wrong.

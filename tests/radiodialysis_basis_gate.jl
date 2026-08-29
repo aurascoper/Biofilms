@@ -196,6 +196,10 @@
                                               # holds the claim to account
             "jacc_acceptance_figure.jl",      # fig5; plots the same acceptance
                                               # quantities, same claim
+            "regenerate_fig3.jl",             # fig3 is m(t) and P_eff/P0, which
+                                              # the gated basis does not reach;
+                                              # that script proves it before it
+                                              # copies anything
         ])
         repo = dirname(@__DIR__)
         found = Set{String}()

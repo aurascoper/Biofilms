@@ -363,8 +363,8 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
         print("  NOT textually detectable there — equations and code, not prose:")
         print("      HANDOUT-01 — the claim is a formula; normalise_markup "
               "reduces LaTeX maths to nothing searchable")
-        print("      FIG-01, FIG-02 — in-plot labels; no run of MIN_WORDS "
-              "survives the comma and paren split. Covered by "
+        print("      FIG-01, FIG-02, FIG-05 — in-plot labels; no run of "
+              "MIN_WORDS survives the comma and paren split. Covered by "
               "RETRACTED_IN_FIGURES, not by the phrase guard")
 
     assert len(yields_phrase) >= 25
@@ -892,7 +892,17 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
 # each and so under MIN_WORDS: `distinguishing_phrase` cannot search them and
 # the phrase guard never will. Coverage of that figure is this list, not the
 # ledger row.
-RETRACTED_IN_FIGURES = ("radiotroph",)
+#
+# "gy cumulative" is here for FIG-05, and it is a UNITS claim rather than a
+# phenotype one — the list is "terms that must not survive inside an image", and
+# RM-KR-01's verdict is NEVER PRINT Gy HERE, because D_cum = Ddot_R*t is
+# dimensionless model time and no calibration converts it. fig3 carried
+# "(50 Gy cumulative)" for fifteen days after d53f236 removed it from the
+# generator, because main_coupled() hits RADIODIALYSIS: BLOCKED and nothing
+# could rebuild the artifact. Three words, so the phrase guard could never have
+# reached it either: without this term FIG-05 would have been covered by
+# nothing, while sitting in a list named for rows the vocabulary covers.
+RETRACTED_IN_FIGURES = ("radiotroph", "gy cumulative")
 
 
 def figure_sidecars() -> list[Path]:
@@ -943,7 +953,7 @@ def test_the_figure_guard_detects_the_pre_correction_artifacts():
     control pass on a mechanism that never ran.
     """
     prefix = sorted(FIXTURES.glob("fig*_prefix.txt"))
-    assert len(prefix) == 2, f"expected two pre-correction figures, got {prefix}"
+    assert len(prefix) == 3, f"expected three pre-correction figures, got {prefix}"
 
     hits = retracted_vocabulary_hits(prefix)
     assert {p for p, _ in hits} == {f.name for f in prefix}, (
@@ -958,7 +968,7 @@ def test_the_figure_rows_are_honest_about_being_vocabulary_only(rows):
     """A ROW COVERED BY A WORD LIST IS NOT COVERED BY THE PHRASE GUARD.
 
     `test_no_deleted_claim_survives_in_the_document_it_names` reads the figure
-    sidecars and will find nothing in them for these two rows — not because the
+    sidecars and will find nothing in them for these three rows — not because the
     figures are clean, but because their claim text has no searchable run. That
     is a legitimate limit and an illegible one: it looks identical to coverage.
     So it is asserted, and it fails the day someone rewrites a figure claim into
@@ -972,7 +982,7 @@ def test_the_figure_rows_are_honest_about_being_vocabulary_only(rows):
             f"{row['claim_id']} now yields a searchable phrase; the phrase "
             "guard covers it, so update this test and its notes")
         vocabulary_only.append(row["claim_id"])
-    assert sorted(vocabulary_only) == ["FIG-01", "FIG-02"], vocabulary_only
+    assert sorted(vocabulary_only) == ["FIG-01", "FIG-02", "FIG-05"], vocabulary_only
 
 
 def test_every_committed_figure_matches_its_hash():
