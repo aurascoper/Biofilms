@@ -84,7 +84,7 @@
   }
   {\small
     \textit{Preprint --- not peer reviewed}\\
-    \textit{Version 1.0 --- August 2026}
+    \textit{Version 1.1 --- August 2026}
   }
 \end{center}
 \vspace{4pt}
@@ -283,7 +283,9 @@ biological target, rather than introducing the paradigm itself.
 The practical motivation for modeling these communities lies in nuclear bioremediation.
 \textit{Shewanella oneidensis} MR-1 is a model dissimilatory metal-reducing bacterium capable
 of reducing soluble U(VI) to insoluble U(IV) via extracellular electron transfer through
-c-type cytochromes \cite{heidelberg2002,veeramani2011}. \textit{Ochrobactrum intermedium} AM7,
+c-type cytochromes \cite{heidelberg2002,veeramani2011}. \textit{Ochrobactrum intermedium} AM7
+--- reclassified in 2020 as \textit{Brucella intermedia}, and named under both here for the
+reason given in the Ethics statement ---
 isolated from soil near the Kakrapar Atomic Power Station in India, tolerates high concentrations
 of thorium and produces exopolysaccharides (EPS) that complex with Th(IV), offering a pathway
 toward bioremediation of actinide-contaminated environments \cite{shukla2020}. The combination
@@ -1091,6 +1093,32 @@ mass concentration is required. Fixed-membrane one-way dosimetry is still meanin
 physical system is specified; dose-responsive membrane transport requires a separate constitutive
 and experimental programme.
 
+The regime in which those inputs are obtainable is not the one this paper's motivating sites
+occupy. Section~\ref{sec:planned_feedback} put the gap at about ten orders of magnitude: a
+reactor irradiation delivers of order $\mathrm{Gy}\,\mathrm{min}^{-1}$ and the environmental
+settings cited in Section~1 are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, so a sensitivity
+constant calibrated in one is not transferable to the other. Engineered nuclear facilities lie
+between them, and biofilms are documented there. Sarr\'{o} et al.\ submerged a bioreactor
+carrying stainless steel and titanium coupons in a spent nuclear fuel pool at a Spanish nuclear
+power plant, characterised the biofilm that developed on both materials, and measured its
+radioactivity by gamma-ray spectrometry: the biofilms retained radionuclides from the pool water,
+$^{60}$Co in particular \cite{sarro2007}. Karley et al.\ isolated six bacterial species from
+spent-fuel-pool water with $D_{10}$ values from 248~Gy to 2~kGy and biofilm-forming capability,
+and reported biofilm-mediated Co and Ni removal up to 3.8~$\mu$g per mg of biomass
+\cite{karley2018}; a later study of the same isolates --- among them \textit{B.\ subtilis}, one
+of the seven modelled here --- found that dead biomass also removed both ions, which is what a
+sorption rather than a metabolic mechanism predicts \cite{karley2023}.
+
+We record this as an observation about regime and available inputs, not as a proposed deployment.
+Three quantities the offline counterfactual requires --- a bounded geometry, a characterised
+source, and a measurable metal inventory in the biofilm --- are ordinarily available in such a
+facility and are not available at a contaminated field site. What this framework would compute
+there is the dose a biofilm on a surface receives and whether its presence perturbs the local
+field: the same one-way question posed above, with its inputs supplied rather than assumed.
+Whether the perturbation is large enough to matter is an empirical question, and nothing in this
+paper answers it. The model is unchanged by the observation; only the setting in which its inputs
+could be measured is.
+
 \subsection{Limitations and Future Directions}
 \label{sec:limitations}
 
@@ -1158,10 +1186,9 @@ whether plausible biological material changes are large enough to justify any on
 \section*{Software and Data Availability}
 All source code, configuration schemas, tests, provenance ledgers, and figure-generation materials
 are available in the public repository at
-\url{https://github.com/aurascoper/Biofilms}. The supporting repository revision for this
-manuscript is \texttt{c7539a9}, the parent of the commit that adds this manuscript to the
-repository: a document cannot cite the commit that contains it, so it names the revision it was
-prepared against. No new biological specimens or experimental measurements were generated.
+\url{https://github.com/aurascoper/Biofilms}. Version 1.0 was prepared against repository
+revision \texttt{c7539a9}; this revision is prepared against \texttt{afa5e3c}. Each names the
+parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.
 
@@ -1169,10 +1196,26 @@ Readers should note that the repository has continued past this revision, and th
 numerical results published in it were subsequently corrected by the project's own review: a
 false-positive control that could not fail was replaced, a squared difference reported as a
 variance was relabelled, an unprovenanced sensitivity table was withdrawn and re-measured, and
-one synthetic-gate verdict was withdrawn as not resolution-converged. None of those numbers
-appears in this manuscript, whose transport section reports the execution of a path rather than
-its results. The corrections are recorded in \texttt{data/claims\_ledger.csv} and in
-\texttt{docs/calibration/}.
+one synthetic-gate verdict was withdrawn as not resolution-converged. The corrections are
+recorded in \texttt{data/claims\_ledger.csv} and in \texttt{docs/calibration/}.
+
+\emph{Correction, version 1.1: Figures 1 and 2 have been replaced.} The versions distributed with
+version 1.0 carried claims inside the images that the surrounding text retracts. Figure 2
+annotated two species as ``radiotrophic (melanin-mediated energy gain)'' beneath a caption
+disowning radiation-derived energy production and against
+Section~\ref{sec:radiotrophy_status}; Figure~1 labelled a shaded band a ``radiotrophic niche'',
+and labelled it on the wrong side, since the imposed field is maximal on the axis. Three further
+in-plot strings asserted findings the text does not support: a title reading ``radial
+stratification'' where Section~7 reports a single-seed diagnostic not separated from the seeding
+null, a title attributing melanin accumulation to radiation-driven production, and an annotation
+asserting drift toward the source when the run's own ordering runs the other way. No numerical
+value in either figure changed --- the underlying run is the same, and the mean radial positions
+and melanin values quoted in the captions are reproduced exactly --- and no other figure was
+regenerated. Figures 3 and 4 still carry a ``per cent depleted'' label that should read
+non-penetration; the coupled path that produces them is now gated, so the label is corrected in
+the generator and not yet in the artifact. The defect was that the figure generator had been
+corrected two weeks earlier and the committed images had not, with no check able to detect the
+difference; this is recorded as \texttt{FIG-01} to \texttt{FIG-04} in the claims ledger.
 
 \section*{Ethics, Biosafety, and Regulatory Statement}
 This manuscript reports software development, computational simulation, code audit, and analysis of
@@ -1183,6 +1226,29 @@ for the work reported here. Any future target culture or
 irradiation campaign will begin only after strain-, protocol-, facility- and source-specific
 institutional approvals have been issued; no such campaign or approval is claimed in this
 manuscript.
+
+One organism named here requires a nomenclature note, because the name it is published under is
+no longer the name a laboratory would receive it as. \textit{Ochrobactrum intermedium} was
+reclassified into \textit{Brucella} on genomic grounds \cite{hordt2020}, the combination
+\textit{Brucella intermedia} was validly published the same year \cite{oren2020}, and NCBI
+Taxonomy serves taxon 94625 as \textit{Brucella intermedia} with \textit{Ochrobactrum
+intermedium} retained as a synonym and a lineage reading \texttt{Brucellaceae; Brucella/}
+\texttt{Ochrobactrum group; Brucella}. The consequence is operational rather than taxonomic: CDC's
+laboratory update of 19 December 2022 records that the reclassification is reflected in the rapid
+identification systems clinical laboratories use, and directs that organisms identified as
+\textit{Brucella} be handled in a Class II biosafety cabinet and that presumptive isolates be
+referred to a state public health laboratory \cite{cdc2022}. That same notice designates the
+former \textit{Ochrobactrum} species non-brucellosis-causing.
+
+We state the record and not a determination. Containment level, select-agent status and
+procurement clearance follow the individual strain, are the responsibility of the institution
+that issues them, and are outside what a computational study can establish; this manuscript
+asserts none of them. Two facts are recorded because they bear on anyone reading this as a
+procurement plan: no culture-collection accession for AM7 was located in any repository searched,
+so the strain may be unobtainable; and the repository's own research record carries the
+determination as unresolved, with procurement held pending it. Both names are carried on every
+record here for the same reason the \textit{Wangiella}/\textit{Exophiala} mapping is carried
+--- a search under one name does not return the other.
 
 % ---- References ---------------------------------------------
 \begin{thebibliography}{53}
@@ -1340,6 +1406,47 @@ Shukla, A., Parmar, P., Goswami, D., Patel, B., Saraf, M. (2020).
 Characterization of novel thorium tolerant \textit{Ochrobactrum intermedium} AM7.
 \textit{Journal of Hazardous Materials}, 388, 122047.
 \url{https://doi.org/10.1016/j.jhazmat.2020.122047}
+
+\bibitem{sarro2007}
+Sarr\'{o}, M. I., Garc\'{i}a, A. M., Moreno, D. A., Montero, F. (2007).
+Development and characterization of biofilms on stainless steel and titanium in spent nuclear
+fuel pools.
+\textit{Journal of Industrial Microbiology \& Biotechnology}, 34(6), 433--441.
+\url{https://doi.org/10.1007/s10295-007-0215-7}
+
+\bibitem{karley2018}
+Karley, D., Shukla, S. K., Rao, T. S. (2018).
+Isolation and characterization of culturable bacteria present in the spent nuclear fuel pool
+water.
+\textit{Environmental Science and Pollution Research}, 25(21), 20518--20526.
+\url{https://doi.org/10.1007/s11356-017-0376-5}
+
+\bibitem{karley2023}
+Karley, D., Shukla, S. K., Rao, T. S. (2023).
+Sequestration of cobalt and nickel by biofilm forming bacteria isolated from spent nuclear fuel
+pool water.
+\textit{Environmental Monitoring and Assessment}, 195(6), 731.
+\url{https://doi.org/10.1007/s10661-023-11266-x}
+
+\bibitem{hordt2020}
+H\"{o}rdt, A., Garc\'{i}a L\'{o}pez, M., Meier-Kolthoff, J. P., Schleuning, M., Weinhold, L.-M.,
+Tindall, B. J., Gronow, S., Kyrpides, N. C., Woyke, T., G\"{o}ker, M. (2020).
+Analysis of 1,000+ type-strain genomes substantially improves taxonomic classification of
+\textit{Alphaproteobacteria}.
+\textit{Frontiers in Microbiology}, 11, 468.
+\url{https://doi.org/10.3389/fmicb.2020.00468}
+
+\bibitem{oren2020}
+Oren, A., Garrity, G. M. (2020).
+List of new names and new combinations previously effectively, but not validly, published.
+\textit{International Journal of Systematic and Evolutionary Microbiology}, 70(7), 4043--4049.
+\url{https://doi.org/10.1099/ijsem.0.004244}
+
+\bibitem{cdc2022}
+Centers for Disease Control and Prevention (2022).
+Lab update: reclassification of \textit{Ochrobactrum} species into the \textit{Brucella} genus.
+Laboratory Outreach Communication System, 19 December 2022.
+\url{https://www.cdc.gov/locs/2022/12-19-2022-Lab-Update-Reclassification_Ochrobactrum_species_Brucella_genus.html}
 
 \bibitem{wright1932}
 Wright, S. (1932).

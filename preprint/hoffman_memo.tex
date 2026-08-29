@@ -1,0 +1,187 @@
+\documentclass[landscape,12pt]{article}
+\usepackage[letterpaper,margin=0.6in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=1.3em,itemsep=2pt,topsep=3pt}
+\pagestyle{empty}
+\emergencystretch=3em
+
+\definecolor{model}{HTML}{0D47A1}
+\definecolor{bench}{HTML}{1B5E20}
+\definecolor{phys}{HTML}{B71C1C}
+\definecolor{prior}{HTML}{8D6E00}
+
+\newcommand{\pagehead}[2]{%
+  {\Large\bfseries #1}\\[1pt]
+  {\small\itshape #2}\\[-4pt]
+  \rule{\linewidth}{0.6pt}\\[4pt]}
+
+\begin{document}
+
+% ================================================== PAGE 1
+\pagehead{What the model computes, and what it does not}%
+{Hunter Kinder --- accompanying the preprint Caixia Wan forwarded. One page on the model, one on
+why I am writing to you, one of questions I cannot answer myself.}
+
+\vspace{2mm}
+\begin{minipage}[t]{0.485\linewidth}
+{\large\bfseries\color{model} The object}\\[3pt]
+A biofilm is represented as biomass parcels on a 3-D lattice, with a photon-transport calculation
+(OpenMC) supplying a static dose-rate field and a radial PDE carrying a mobile contaminant into
+the film. The transport runs \emph{once}; it does not read the biology back. That is a declared
+design choice, not a physical law, and the manuscript says where it weakens.
+
+\vspace{2mm}
+{\large\bfseries\color{model} The question it is built to ask}\\[3pt]
+Given a hydrated layer of known composition on a surface in a known field: what dose does the
+layer receive, how much does it hold, and does its presence perturb the field around it?
+
+\vspace{2mm}
+{\large\bfseries\color{phys} What it is not}\\[3pt]
+\begin{itemize}
+  \item \textbf{Not calibrated.} Every parameter in the table is a literature-anchored prior, and
+        a literature prior is not a calibration. The manuscript declares seven of twenty-six
+        parameter rows inadmissible on the basis this model can accept.
+  \item \textbf{Not a radiotrophy result.} Radiotrophy is not established for any of the seven
+        species modelled, and the paper says so in its own words rather than importing the label.
+        One melanin coefficient is retained with its sign declared wrong.
+  \item \textbf{Not a measurement of anything.} The one radial result reported runs opposite to
+        its own coefficient and sits within 1.4 standard errors of the seeding null. It is
+        reported that way.
+\end{itemize}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+{\large\bfseries\color{prior} The gap that matters for you}\\[3pt]
+Dose and dose rate are not interchangeable here, and the gap is not marginal. A reactor
+irradiation delivers of order Gy\,min$^{-1}$. The environmental settings the paper cites as
+motivation --- Chernobyl, Hanford --- are closer to mGy\,yr$^{-1}$. That is roughly ten orders of
+magnitude, and a sensitivity constant calibrated in one regime does not transfer to the other by
+construction.
+
+\vspace{2mm}
+That is the model's worst structural problem, and it is why I am not writing to you about
+environmental remediation.
+
+\vspace{4mm}
+\noindent\rule{\linewidth}{0.4pt}\\[3pt]
+{\small\textbf{One correction, since you may have version 1.0.} Figures 1 and 2 in that version
+carry text inside the images that the surrounding prose retracts --- Figure 2 annotates two
+species as ``radiotrophic (melanin-mediated energy gain)'' beneath a caption disowning exactly
+that. The figure generator had been corrected two weeks earlier; the committed images had not
+been regenerated, and nothing in the test suite could open a figure to notice. Version 1.1
+replaces both. No number changed. I mention it because it is the paper's own argument happening
+to the paper, and you would have found it on page 8.}
+\end{minipage}
+
+\newpage
+% ================================================== PAGE 2
+\pagehead{Why I am writing to a materials scientist}%
+{The overlap is not bioremediation. It is what grows on the alloys, in the water, and what dose it
+takes.}
+
+\vspace{2mm}
+\begin{minipage}[t]{0.485\linewidth}
+{\large\bfseries\color{bench} The empirical fact}\\[3pt]
+Sarr\'{o} and colleagues submerged a bioreactor carrying stainless steel and titanium coupons in
+a spent nuclear fuel pool at a Spanish nuclear power plant. Biofilm developed on both materials.
+They measured its radioactivity by gamma-ray spectrometry and found it had retained radionuclides
+from the pool water, $^{60}$Co in particular.\footnote{\textit{J.\ Ind.\ Microbiol.\ Biotechnol.}
+34(6):433--441, 2007. doi:10.1007/s10295-007-0215-7}
+
+\vspace{2mm}
+Karley and colleagues isolated six bacterial species from spent-fuel-pool water with $D_{10}$
+values from 248~Gy to 2~kGy, all biofilm-formers, and measured Co and Ni removal up to
+3.8~$\mu$g per mg of biomass.\footnote{\textit{Environ.\ Sci.\ Pollut.\ Res.}
+25(21):20518--20526, 2018. doi:10.1007/s11356-017-0376-5} A later study of the same isolates
+found \emph{dead} biomass removed both ions as well --- which is what a sorption mechanism
+predicts and a metabolic one does not.\footnote{\textit{Environ.\ Monit.\ Assess.} 195(6):731,
+2023. doi:10.1007/s10661-023-11266-x} One of those isolates is \textit{B.\ subtilis}, which is
+already one of the seven species in the model.
+
+\vspace{2mm}
+{\large\bfseries\color{phys} What nobody in that literature computes}\\[3pt]
+What dose the biofilm itself receives, and whether a hydrated layer 50--200~$\mu$m thick
+perturbs the local field at the metal surface. The microbiology papers measure what the biofilm
+holds. The transport question next to it is not asked.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+{\large\bfseries\color{model} Why this regime and not the other}\\[3pt]
+A facility is the setting where the model's inputs are obtainable rather than assumed:
+
+\begin{itemize}
+  \item \textbf{Bounded geometry} --- a coupon, not a heterogeneous subsurface.
+  \item \textbf{Characterised source} --- pool water and fuel inventory are known, not inferred.
+  \item \textbf{A measurable metal inventory in the film} --- the papers above already do this.
+  \item \textbf{And a dose rate in the regime the $D_{10}$ priors were actually measured in},
+        which closes the ten-order-of-magnitude gap on the previous page rather than talking
+        around it.
+\end{itemize}
+
+\vspace{3mm}
+{\large\bfseries\color{prior} Being straight about what this is}\\[3pt]
+This is a reframing of application, not of content. The model does not change; what changes is
+who the answer is for. I am not going to tell you that this work was aimed at your field, because
+it was not --- it was aimed at contaminated sites, and the regime argument above is what moved
+it. You work on cladding alloys in reactor water chemistry, and pitting is where
+microbiologically influenced corrosion lives. The overlap is a question about what sits on the
+metal, not a claim about the metal.
+\end{minipage}
+
+\newpage
+% ================================================== PAGE 3
+\pagehead{What the measurement needs}%
+{Questions, not an inventory. You know what is available at MURR and I do not.}
+
+\vspace{2mm}
+\begin{minipage}[t]{0.45\linewidth}
+{\large\bfseries\color{bench} The one thing the model cannot proceed without}\\[3pt]
+A \textbf{closed composition for a hydrated biofilm}, mass fractions summing to unity, because
+that is what a photon-transport code consumes. It needs three separable pieces:
+
+\begin{itemize}
+  \item \textbf{Water fraction} --- hydrated versus dry mass, gravimetric, with the drying
+        protocol fixed and its own variance measured first.
+  \item \textbf{The light elements} --- C, H, N, O, which are most of the mass and which I
+        believe activation methods cannot see.
+  \item \textbf{Trace metals, P, and any actinides} --- the part that binds, and the part the
+        pool-water literature already measures.
+\end{itemize}
+
+\vspace{2mm}
+The third is the piece I would most expect a reactor facility to be good at, and the first two
+are the ones I would expect to go elsewhere --- but that is my reading of the technique, not of
+your facility.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.51\linewidth}
+{\large\bfseries\color{model} What I would actually like to ask you}\\[3pt]
+\begin{itemize}
+  \item Which of those three, if any, is something MURR does routinely --- and which would you
+        send elsewhere?
+  \item Is there a coupon-exposure path at all: a defined field, a known water chemistry, a
+        surface that can be recovered and sectioned?
+  \item Is biofilm on cladding-candidate alloys a question anyone in your area is already
+        asking, or is it treated as a water-chemistry problem upstream of the materials work?
+  \item Would a computed dose field inside a surface film be useful to that work, or is the
+        quantity that matters entirely the corrosion outcome?
+  \item And the blunt one: is there a version of this that is worth a materials scientist's time,
+        or is the honest answer that the interesting part is all microbiology?
+\end{itemize}
+
+\vspace{3mm}
+\rule{\linewidth}{0.4pt}\\[3pt]
+{\small\textbf{One thing I will not do.} There is an organism in the paper, \textit{Ochrobactrum
+intermedium} AM7, reclassified in 2020 as \textit{Brucella intermedia}. It is named under both
+throughout. No culture has been grown, no strain has been procured, and no containment
+determination is asserted anywhere in this work --- containment follows strains, not species, and
+it is not mine to declare. If any of this ever moves toward a bench, that determination is the
+first step and it belongs to an institution, in a document, with an identifier.}
+\end{minipage}
+
+\end{document}
