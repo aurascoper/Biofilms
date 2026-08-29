@@ -603,11 +603,121 @@ end
 #  6. Monte Carlo Step (MCS)
 # ============================================================
 
+# ------------------------------------------------------------------
+#  Which term drove an accepted move
+# ------------------------------------------------------------------
+
+# Order matches `compute_delta_H_terms`' fields and the layer's colour key.
+const DRIVER_LABELS = (:none, :adh, :vol, :rad, :mel, :multiple, :contingent)
+
+const DRIVER_NONE       = 0x01
+const DRIVER_MULTIPLE   = 0x06
+const DRIVER_CONTINGENT = 0x07
+
+"""
+    decisive_label(terms, ΔH, u, T) -> UInt8
+
+Which single term, if any, DECIDED an accepted move — by counterfactual, on the
+uniform that was actually drawn.
+
+A term is decisive when removing it flips the outcome. That is answered here by
+arithmetic on `u` and never by consulting a generator: drawing again would
+advance the stream and break the byte contract, a second generator would make
+the answer stochastic and add a seed to declare, and a probability threshold
+would invent a constant. All three fabricate something.
+
+THE TWO ACCEPTANCE BRANCHES PRODUCE DISJOINT LABEL SETS, which is worth stating
+because it is not obvious and it is what makes `contingent` a category rather
+than a patch:
+
+  * `ΔH <= 0` — accepted outright, `u` is NaN because no draw was taken. Removing
+    a term can raise ΔH above zero, and what would have happened then needs a
+    number nobody drew. No term here can be shown to flip the move to REJECT;
+    it can only remove the certainty. So this branch yields `none` or
+    `contingent`, never a named term.
+  * `ΔH > 0` — a draw exists, so every counterfactual is decidable and nothing
+    is contingent. Only a term that HELPED (ΔH_t < 0) can be decisive: removing
+    a term that hurt lowers ΔH and the move stays accepted. So this branch
+    yields `none`, one of the four, or `multiple`.
+
+`none` is the informative cell in both branches, not the empty one: it says the
+SUM drove the move and no single term owns it. Given §6.2's ~1.5e4 separation
+between the melanin and direct-radiation terms it is expected to be common, and
+it must not be drawn as background.
+"""
+function decisive_label(terms, ΔH::Float64, u::Float64, T::Float64)
+    if ΔH <= 0
+        # Would removing any single term have cost this move its certainty?
+        for v in (terms.adh, terms.vol, terms.rad, terms.mel)
+            ΔH - v > 0 && return DRIVER_CONTINGENT
+        end
+        return DRIVER_NONE
+    end
+    found = 0x00
+    for (i, v) in enumerate((terms.adh, terms.vol, terms.rad, terms.mel))
+        ΔH′ = ΔH - v
+        # The move was accepted, so `u < exp(-ΔH/T)`. Without this term it is
+        # accepted iff ΔH′ <= 0 or `u` still clears the new, smaller threshold.
+        still = ΔH′ <= 0 || u < exp(-ΔH′ / T)
+        if !still
+            found == 0x00 || return DRIVER_MULTIPLE
+            found = UInt8(i + 1)          # 0x02..0x05, past DRIVER_NONE
+        end
+    end
+    return found == 0x00 ? DRIVER_NONE : found
+end
+
+"""
+Per-voxel tally of which term drove each accepted move.
+
+ACCEPTED MOVES ONLY, and deliberately: an attempted-move tally answers "where
+did the sampler look", which is uniform by construction and says nothing about
+the dynamics. `n_accepted` is DERIVED by summing the labels rather than counted
+alongside them, so there is one source for it and not two that can disagree.
+"""
+struct DriverCounts
+    counts::Array{Int32, 4}   # (N, N, N, length(DRIVER_LABELS))
+end
+
+DriverCounts(N::Int) = DriverCounts(zeros(Int32, N, N, N, length(DRIVER_LABELS)))
+
+@inline function record_driver!(d::DriverCounts, x::Int, y::Int, z::Int,
+                                label::UInt8)
+    d.counts[x, y, z, Int(label)] += Int32(1)
+    return nothing
+end
+
+n_accepted(d::DriverCounts) = dropdims(sum(d.counts, dims = 4), dims = 4)
+
+"""
+Modal label per voxel, 0 where no move was ever accepted there.
+
+0 IS NOT `none`. "The sum drove every move here" and "nothing happened here" are
+different statements and must not share a colour; `none` is a result and 0 is an
+absence. Ties go to the lower label index, which is stated rather than left to
+whatever `argmax` happens to do.
+"""
+function modal_driver(d::DriverCounts)
+    N = size(d.counts, 1)
+    out = zeros(UInt8, N, N, N)
+    @inbounds for z in 1:N, y in 1:N, x in 1:N
+        best = 0; best_n = 0
+        for k in 1:length(DRIVER_LABELS)
+            c = d.counts[x, y, z, k]
+            if c > best_n
+                best_n = c; best = k
+            end
+        end
+        out[x, y, z] = UInt8(best)
+    end
+    return out
+end
+
 """
 Perform one Monte Carlo Step = N³ attempted copy operations.
 Standard CPM Metropolis dynamics (Section 3.4 analog → stochastic accept/reject).
 """
-function mcs_step!(state::CPMState, rng::AbstractRNG)
+function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing)
     p = state.params
     N = p.N
     lat = state.lattice
@@ -645,13 +755,23 @@ function mcs_step!(state::CPMState, rng::AbstractRNG)
         end
 
         # 4. Compute ΔH
-        ΔH = compute_delta_H(state, sx, sy, sz, tx, ty, tz)
+        terms = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+        ΔH = terms.adh + terms.vol + terms.rad + terms.mel
 
         # 5. Metropolis acceptance
-        accept = if ΔH <= 0
-            true
-        else
-            rand(rng) < exp(-ΔH / p.T_cpm)
+        #
+        # `u` IS NaN WHEN NO DRAW WAS TAKEN, and that is a fact about the
+        # acceptance rule rather than a missing value: at ΔH <= 0 the move is
+        # accepted outright and the generator is never consulted. The ternary
+        # evaluates only its taken branch, so `rand` is called exactly where it
+        # was before and the stream is untouched. Keeping `u` is what lets a
+        # counterfactual be answered by arithmetic instead of a second draw.
+        u = ΔH <= 0 ? NaN : rand(rng)
+        accept = ΔH <= 0 ? true : u < exp(-ΔH / p.T_cpm)
+
+        if accept && driver !== nothing
+            record_driver!(driver, tx, ty, tz,
+                           decisive_label(terms, ΔH, u, p.T_cpm))
         end
 
         if accept

@@ -1,5 +1,21 @@
 #!/usr/bin/env julia
 # Serial-reference CSV for validating biofilms_potts_jacc.jl.
+#
+# THIS CHECK HAS A DETECTION FLOOR, AND IT IS NOT REDUNDANT WITH THE ONE BESIDE
+# IT. Perturbing the melanin coefficient in compute_delta_H_terms from 0.5 to
+# 0.5000001 leaves every line below byte-identical; 0.5 to 50.0 fails it. A
+# ~2e-7 shift in ΔH moves exp(-ΔH/T_cpm) by ~4e-8, and that has to straddle one
+# of roughly 6.4M uniform draws before a single move flips and the trajectory
+# diverges. So this file guards the TRAJECTORY, at the scale where a trajectory
+# can be said to have changed -- it does not certify bit-exactness of the
+# acceptance arithmetic.
+#
+# That is a third kind of check-that-cannot-fail: not always-green and not
+# always-red, but CONDITIONALLY green with the condition unstated. Stated now.
+# tests/delta_h_decomposition.jl is the exact half of the pair -- it asserts
+# under `===` that the four terms sum to the scalar on every sampled move, with
+# a control showing summation order is observable on 15.7% of them. Green here
+# is necessary and not sufficient; neither file alone covers what both do.
 # Runs the untouched serial script (minus its CairoMakie section) and
 # prints the identical CSV lines:  CSV,seed,species,vol,ncells,mel,survived
 #
