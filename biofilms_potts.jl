@@ -1224,7 +1224,19 @@ mutable struct RadiolysisState
     m::Float64                # membrane integrity  m ∈ [0,1]
     t::Float64                # simulation time
     params::RadiolysisParams
+    # Sticky basis provenance.  NOT inferred from X_total: a coupled state can
+    # legitimately produce mean(X_tot) == 1.0 (every sampled interior site
+    # occupied), which would collide with the standalone default and slip the
+    # gate; and c/s are PATH-dependent, so once a step has run on an occupancy
+    # basis they stay gated even if X_total later returns to 1.0.  Rule 4: the
+    # producer that installs the basis declares it, and the flag never clears.
+    basis_from_occupancy::Bool
 end
+
+# Six-argument form: provenance defaults to false, so a standalone state is
+# unmarked and only the coupled installers set it.
+RadiolysisState(r_grid, c, s, m, t, params) =
+    RadiolysisState(r_grid, c, s, m, t, params, false)
 
 """
 Initialise RadiolysisState: clean interior, intact membrane.
@@ -1259,7 +1271,8 @@ R = 1.0 cm makes dt_rd = 0.5 genuinely unstable, and this guard is what absorbs
 it. `biofilms_potts_jacc.jl` carries the identical wrapper for the same reason.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
-    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack)
+    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack,
+                       rd.basis_from_occupancy)
     dr = rd.r_grid[2] - rd.r_grid[1]
     dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
     n_sub = max(1, ceil(Int, dt / dt_stable))
@@ -1302,8 +1315,9 @@ active-reducer fraction without a measured activity fraction; `D-XRED` in
 `data/calibration/reference_d_requirements.csv` records that as blocked by this
 units error rather than by missing data.
 """
-function _assert_basis_gate(X_total::Float64, ack::Bool = false)
-    X_total == 1.0 && return nothing
+function _assert_basis_gate(X_total::Float64, ack::Bool = false,
+                            from_occupancy::Bool = false)
+    (X_total == 1.0 && !from_occupancy) && return nothing
     # THE ONE EXEMPTION.  validate_serial.jl steps this path only to reproduce a
     # bit-for-bit CPM trajectory, and records no radiodialysis quantity: its CSV
     # carries CPM columns plus rd.m, whose ODE (dm/dt = -k_dam*Ddot_R*m) has no
@@ -1567,6 +1581,10 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                 c_ext   = rp.c_ext,
                 dt_rd   = rp.dt_rd
             )
+            # Declared where the occupancy basis is INSTALLED, and never
+            # cleared: c and s are path-dependent from here on, so provenance
+            # cannot be re-derived from the current X_total (rule 4).
+            rd.basis_from_occupancy = true
         end
         step_radiolysis!(rd, rp.dt_rd)
 
@@ -1927,6 +1945,10 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int)
                 basis_gate_ack = rp.basis_gate_ack,
                 P0 = rp.P0, alpha_P = rp.alpha_P, k_dam = rp.k_dam,
                 Ddot_R = rp.Ddot_R, c_ext = rp.c_ext, dt_rd = rp.dt_rd)
+            # Declared where the occupancy basis is INSTALLED, and never
+            # cleared: c and s are path-dependent from here on, so provenance
+            # cannot be re-derived from the current X_total (rule 4).
+            rd.basis_from_occupancy = true
         end
         step_radiolysis!(rd, rd.params.dt_rd)
         radial_to_3d!(sim.contaminant, rd.c, rd.r_grid, state.interior, N)

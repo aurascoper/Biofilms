@@ -80,10 +80,111 @@
         @test_throws ErrorException SR.step_radiolysis!(rdx, 0.5)
     end
 
+    @testset "provenance is declared and sticky, not inferred from X_total" begin
+        # Codex on 2c93d1e.  Inferring "gated" from X_total != 1.0 fails twice:
+        # a coupled state can hit mean(X_tot) == 1.0 by coincidence, and c/s are
+        # path-dependent so they stay gated after the value moves back.
+        rp1 = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0)
+
+        # (a) THE COLLISION: X_total == 1.0, but the basis came from occupancy.
+        rd = SR.init_radiolysis(rp1; R = 10.0)
+        rd.basis_from_occupancy = true
+        @test rd.params.X_total == 1.0        # indistinguishable by value
+        @test_throws ErrorException SR.step_radiolysis!(rd, 0.5)
+
+        # (b) STICKINESS: gated, stepped, then the value returns to the default.
+        rd2 = SR.init_radiolysis(
+            SR.RadiolysisParams(Nr = 20, X_total = 0.065, Ddot_R = 1.0,
+                                c_ext = 1.0, basis_gate_ack = true); R = 10.0)
+        rd2.basis_from_occupancy = true
+        SR.step_radiolysis!(rd2, 0.5)                    # acked, so it runs
+        rd2.params = SR.RadiolysisParams(Nr = 20, X_total = 1.0, Ddot_R = 1.0,
+                                         c_ext = 1.0)    # ack dropped, value reset
+        @test rd2.params.X_total == 1.0
+        @test rd2.basis_from_occupancy                   # provenance survives
+        @test_throws ErrorException SR.step_radiolysis!(rd2, 0.5)
+
+        # (c) and a genuinely standalone state is still unmarked and allowed.
+        rd3 = SR.init_radiolysis(rp1; R = 10.0)
+        @test rd3.basis_from_occupancy === false
+        SR.step_radiolysis!(rd3, 0.5)
+        @test all(isfinite, rd3.c)
+    end
+
+    @testset "the coupled path actually sets provenance" begin
+        # (a) and (b) above set the flag by hand; this proves the real coupled
+        # loop sets it, so the guard is not protecting a field nobody writes.
+        params = SR.CPMParams(N = 20, n_cells_per_species = 2,
+                              snapshot_interval = 100)
+        rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                                 basis_gate_ack = true)
+        sim = SR.init_coupled_simulation(params, rp; seed = 3)
+        @test sim.rd.basis_from_occupancy === false   # before any step
+        SR.advance_window!(sim, 2)
+        @test sim.rd.basis_from_occupancy === true    # after the installer runs
+    end
+
     @testset "the ack census: exactly these sites, no more" begin
-        # An exemption that can be added silently is not an exemption, it is a
-        # default.  Every site opening the gate is enumerated here, so widening
-        # it is a deliberate edit to this list rather than a line someone adds.
+        # Codex on 2c93d1e: the first version grepped for the literal
+        # "basis_gate_ack = true", so `basis_gate_ack=true`, extra spacing, a
+        # line break, or a field assignment all opened the gate while the census
+        # stayed green -- a check asserting a bound it could not enforce.
+        #
+        # This parses instead.  _opens_gate walks the Julia AST for assignments
+        # to basis_gate_ack in any syntactic form.
+        #
+        # SCOPE, stated rather than implied: this is a STATIC check.  A value
+        # computed at runtime and splatted in (`RadiolysisParams(; kw...)`) is
+        # not statically detectable and this cannot catch it.  What it does
+        # establish is that no site opens the gate by writing the field
+        # directly, in any spelling.  The known-bad fixtures below prove it
+        # catches each form rather than passing because it matches nothing.
+        function _opens_gate(ex)
+            hit = false
+            walk(e) = begin
+                if e isa Expr
+                    if e.head === :kw || e.head === :(=)
+                        lhs, rhs = e.args[1], e.args[2]
+                        names = lhs === :basis_gate_ack ||
+                                (lhs isa Expr && lhs.head === :. &&
+                                 lhs.args[2] == QuoteNode(:basis_gate_ack))
+                        # PROPAGATION is not OPENING.  The reconstruction sites
+                        # write `basis_gate_ack = rp.basis_gate_ack`, forwarding
+                        # a flag someone else already justified; and `= false`
+                        # is the closed default. Anything else -- a literal
+                        # true, or a computed value whose provenance this cannot
+                        # see -- counts as opening the gate and must be listed.
+                        forwards = rhs isa Expr && rhs.head === :. &&
+                                   rhs.args[2] == QuoteNode(:basis_gate_ack)
+                        names && !forwards && rhs !== false && (hit = true)
+                    end
+                    foreach(walk, e.args)
+                end
+            end
+            walk(ex)
+            return hit
+        end
+        opens(src) = _opens_gate(Meta.parseall(src))
+
+        # The control: each of these bypassed the old literal grep.
+        @test opens("RadiolysisParams(basis_gate_ack=true)")
+        @test opens("RadiolysisParams(basis_gate_ack  =  true)")
+        @test opens("RadiolysisParams(Nr = 20,\n  basis_gate_ack =\n  true)")
+        @test opens("rd.params.basis_gate_ack = true")
+        @test opens("x = (basis_gate_ack = true,)")
+        # and it must not fire on the guard's own comparison or on prose,
+        # or the census would name every file that mentions the symbol.
+        @test !opens("ack === :determinism_only")
+        @test !opens("f(basis_gate_ack)")
+        @test !opens("# basis_gate_ack = true, in a comment")
+        @test !opens("s = \"basis_gate_ack = true\"")
+        # propagation forwards a flag already justified elsewhere; the closed
+        # default opens nothing. Neither should name a site.
+        @test !opens("RadiolysisParams(basis_gate_ack = rp.basis_gate_ack)")
+        @test !opens("basis_gate_ack::Bool = false")
+        # but a value this cannot trace IS an opening, and must be listed
+        @test opens("RadiolysisParams(basis_gate_ack = should_ack())")
+
         expected = Set([
             "validate_serial.jl",              # CPM trajectory determinism
             "tests/genealogy_tests.jl",        # legacy vs windowed API equivalence
@@ -98,12 +199,13 @@
             for fname in files
                 endswith(fname, ".jl") || continue
                 path = joinpath(root, fname)
-                # The ASSIGNMENT form only.  The guard itself compares with
-                # `ack === :determinism_only`, and the docstrings name the
-                # symbol in prose; neither opens the gate for anyone.
-                if occursin("basis_gate_ack = true", read(path, String))
-                    push!(found, relpath(path, repo))
+                src = read(path, String)
+                parsed = try
+                    Meta.parseall(src)
+                catch
+                    continue
                 end
+                _opens_gate(parsed) && push!(found, relpath(path, repo))
             end
         end
         @test found == expected

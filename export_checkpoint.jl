@@ -223,11 +223,17 @@ function export_restart_checkpoint(SR, sim, path)
         # fraction nor a reducer fraction.  A consumer cannot tell that by
         # looking at the arrays, so the file says it.  Asserted by
         # tests/checkpoint_io_tests.jl.
-        f["rd/basis_gate_blocked"] = sim.rd.params.X_total != 1.0
-        f["rd/basis_gate_note"] = sim.rd.params.X_total != 1.0 ?
+        # Read from sticky provenance, not from the current X_total: a coupled
+        # state can hit mean(X_tot) == 1.0 by coincidence, and c/s stay gated
+        # once a step has run on an occupancy basis regardless of the value now.
+        gated = sim.rd.basis_from_occupancy || sim.rd.params.X_total != 1.0
+        f["rd/basis_gate_blocked"] = gated
+        f["rd/basis_from_occupancy"] = sim.rd.basis_from_occupancy
+        f["rd/basis_gate_note"] = gated ?
             "RADIODIALYSIS: BLOCKED -- c and s were computed on a gated " *
-            "biomass basis (X_total = $(sim.rd.params.X_total), a site-occupancy " *
-            "mean). No magnitude read from them is a claim about a biofilm." :
+            "biomass basis (X_total = $(sim.rd.params.X_total), " *
+            "basis_from_occupancy = $(sim.rd.basis_from_occupancy)). " *
+            "No magnitude read from them is a claim about a biofilm." :
             "X_total == 1.0, the standalone default; the basis gate does not apply."
         buf = IOBuffer()
         serialize(buf, sim.rng)
@@ -324,9 +330,13 @@ function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = fal
             read(a["membrane_dose_rate_Gy_s"]),
             read(f["fields/melanin_drive"]))
 
+        # Provenance is restored, not recomputed: a restart of a gated run is
+        # still gated, and the flag cannot be re-derived from X_total.
+        rd_prov = haskey(f, "rd/basis_from_occupancy") ?
+                  read(f["rd/basis_from_occupancy"]) : false
         rd = SR.RadiolysisState(read(f["rd/r_grid"]), read(f["rd/c"]),
                                 read(f["rd/s"]), read(a["rd_m"]),
-                                read(a["rd_t"]), rp)
+                                read(a["rd_t"]), rp, rd_prov)
         rng = deserialize(IOBuffer(read(f["rng/serialized"])))
         return SR.CoupledSimulation(state, rd, read(f["contaminant"]), rng,
                                     Int(read(a["sim_mcs"])),

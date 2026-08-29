@@ -282,7 +282,19 @@ mutable struct RadiolysisState
     m::Float64
     t::Float64
     params::RadiolysisParams
+    # Sticky basis provenance.  NOT inferred from X_total: a coupled state can
+    # legitimately produce mean(X_tot) == 1.0 (every sampled interior site
+    # occupied), which would collide with the standalone default and slip the
+    # gate; and c/s are PATH-dependent, so once a step has run on an occupancy
+    # basis they stay gated even if X_total later returns to 1.0.  Rule 4: the
+    # producer that installs the basis declares it, and the flag never clears.
+    basis_from_occupancy::Bool
 end
+
+# Six-argument form: provenance defaults to false, so a standalone state is
+# unmarked and only the coupled installers set it.
+RadiolysisState(r_grid, c, s, m, t, params) =
+    RadiolysisState(r_grid, c, s, m, t, params, false)
 
 function init_radiolysis(rp::RadiolysisParams; R::Float64 = 1.0)
     r_grid = collect(range(0.0, R, length = rp.Nr))
@@ -306,7 +318,8 @@ small. Correct the units to R = 1.0 cm and dt_stable becomes 0.132, n_sub = 4 â€
 at which point a port without this guard diverges.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
-    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack)
+    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack,
+                       rd.basis_from_occupancy)
     dr = rd.r_grid[2] - rd.r_grid[1]
     dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
     n_sub = max(1, ceil(Int, dt / dt_stable))
@@ -349,8 +362,9 @@ active-reducer fraction without a measured activity fraction; `D-XRED` in
 `data/calibration/reference_d_requirements.csv` records that as blocked by this
 units error rather than by missing data.
 """
-function _assert_basis_gate(X_total::Float64, ack::Bool = false)
-    X_total == 1.0 && return nothing
+function _assert_basis_gate(X_total::Float64, ack::Bool = false,
+                            from_occupancy::Bool = false)
+    (X_total == 1.0 && !from_occupancy) && return nothing
     # THE ONE EXEMPTION.  validate_serial.jl steps this path only to reproduce a
     # bit-for-bit CPM trajectory, and records no radiodialysis quantity: its CSV
     # carries CPM columns plus rd.m, whose ODE (dm/dt = -k_dam*Ddot_R*m) has no
@@ -504,6 +518,7 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
                 basis_gate_ack = rp0.basis_gate_ack,
                 P0 = rp0.P0, alpha_P = rp0.alpha_P, k_dam = rp0.k_dam,
                 Ddot_R = rp0.Ddot_R, c_ext = rp0.c_ext, dt_rd = rp0.dt_rd)
+            rd.basis_from_occupancy = true   # see biofilms_potts.jl
         end
         step_radiolysis!(rd, rd.params.dt_rd)
 
