@@ -157,6 +157,16 @@
                         forwards = rhs isa Expr && rhs.head === :. &&
                                    rhs.args[2] == QuoteNode(:basis_gate_ack)
                         names && !forwards && rhs !== false && (hit = true)
+                    elseif e.head === :parameters
+                        # KEYWORD SHORTHAND: `RadiolysisParams(; basis_gate_ack)`
+                        # passes a same-named binding. The field name is
+                        # statically present, so this is NOT the runtime-splat
+                        # residual disclaimed below -- it is a real bypass
+                        # (Codex on 207f292). A bare Symbol under :parameters.
+                        # Errs toward NAMING a site: a keyword parameter
+                        # declared with this name fires too, failing the census
+                        # loudly rather than missing an exemption.
+                        any(a -> a === :basis_gate_ack, e.args) && (hit = true)
                     end
                     foreach(walk, e.args)
                 end
@@ -184,6 +194,12 @@
         @test !opens("basis_gate_ack::Bool = false")
         # but a value this cannot trace IS an opening, and must be listed
         @test opens("RadiolysisParams(basis_gate_ack = should_ack())")
+        # keyword shorthand: same-named binding, field name still statically
+        # present, so the census must see it
+        @test opens("RadiolysisParams(; basis_gate_ack)")
+        @test opens("function build(basis_gate_ack)\n  RadiolysisParams(; basis_gate_ack)\nend")
+        @test opens("(; basis_gate_ack)")
+        @test !opens("RadiolysisParams(; Nr, D_eff)")
 
         expected = Set([
             "validate_serial.jl",              # CPM trajectory determinism
