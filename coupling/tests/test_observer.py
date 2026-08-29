@@ -12,6 +12,7 @@ Only the two PyVista entry points are gated, and they are the thin part.
 from __future__ import annotations
 
 import importlib.util
+import sys
 
 import numpy as np
 import pytest
@@ -1071,3 +1072,36 @@ def test_every_panel_is_drawn_and_labelled(tmp_path):
 def test_plot_panels_refuses_an_empty_panel_list():
     with pytest.raises(ValueError, match="at least one panel"):
         observer.plot_panels([], "melanin")
+
+
+def test_the_empty_panel_contract_is_reachable_without_pyvista():
+    """THE CONTROL THE TEST ABOVE CANNOT BE. It passes wherever pyvista IS
+    installed no matter which line comes first, so it could not detect the
+    defect it was written for: `import pyvista as pv` sat above the check, and
+    in the bare tier -- which is every environment the suite actually runs in
+    without the `viewer` extra -- `plot_panels([], ...)` raised
+    ModuleNotFoundError instead. Rule 2: the skip was the coverage.
+
+    Blocking the module here rather than relying on the runner's environment
+    means this bites on both tiers. The block is asserted to be in force before
+    anything is tested, because a meta-path hook that silently does nothing
+    reproduces as a clean pass -- which is exactly what a `find_module` hook
+    does on a Python that only calls `find_spec`.
+    """
+    class _NoPyVista:
+        def find_spec(self, name, path=None, target=None):
+            if name == "pyvista" or name.startswith("pyvista."):
+                raise ModuleNotFoundError(f"No module named {name!r}")
+            return None
+
+    blocked = [k for k in sys.modules if k == "pyvista" or k.startswith("pyvista.")]
+    saved = {k: sys.modules.pop(k) for k in blocked}
+    sys.meta_path.insert(0, _NoPyVista())
+    try:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("pyvista")      # the block is real
+        with pytest.raises(ValueError, match="at least one panel"):
+            observer.plot_panels([], "melanin")
+    finally:
+        sys.meta_path.pop(0)
+        sys.modules.update(saved)

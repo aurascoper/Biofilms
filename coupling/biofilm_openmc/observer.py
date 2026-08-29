@@ -488,11 +488,16 @@ def plot_panels(panels, layer_name, *, plotter=None, link_views=True):
 
     `panels` is a sequence of `(title, bundle_path)`.
     """
-    import pyvista as pv
-
+    # ARGUMENT CONTRACT BEFORE RENDERER, so the bare tier can reach it. With the
+    # import first, `plot_panels([], ...)` raised ModuleNotFoundError wherever
+    # the `viewer` extra is absent -- which is everywhere the suite actually
+    # runs -- and test_plot_panels_refuses_an_empty_panel_list could not observe
+    # the ValueError it asserts. Rule 2: the skip was the coverage.
     panels = list(panels)
     if not panels:
         raise ValueError("plot_panels needs at least one panel")
+
+    import pyvista as pv
 
     p = plotter or pv.Plotter(shape=(1, len(panels)))
     for i, (title, path) in enumerate(panels):
