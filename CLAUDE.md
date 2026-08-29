@@ -70,6 +70,13 @@ happened. The tooling was in use and the practice was not, because the mitigatio
 had been written into one plan rather than adopted as standing practice. A
 mitigation scoped to a single piece of work is not in force for the next session.
 
-Read the branch in the same snapshot as the commit — `git status -sb` alongside
-`git log -1`, one command — for the same reason every other check here is taken
-atomically. A push's exit status is not evidence of where a commit landed.
+Read the branch and the commit in **one invocation**:
+
+    git status --porcelain=v2 --branch
+
+which reports `branch.oid` and `branch.head` together, from a single read. Two
+git commands on one shell line are not one snapshot — `&&` sequences them, it
+does not make them atomic, so `git status -sb` can report the old branch while
+`git log -1` reports the new commit. That is this section's own failure, and an
+earlier draft of this paragraph prescribed exactly that two-command check.
+A push's exit status is not evidence of where a commit landed either.
