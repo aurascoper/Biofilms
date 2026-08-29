@@ -167,6 +167,34 @@ local({
                  refused, accepts[1], accepts[2]))
 })
 
+# --- 1b2. cached weights must match the declared geometry ------------------
+# Codex on f49fe94.  bc_coef dispatched on geom while the interior rows used
+# whatever weights parms carried, so geom = "slab" over cylindrical weights
+# assembled a hybrid operator instead of refusing.  Both directions, and the
+# well-formed presets must still run or "refuses everything" would pass.
+local({
+  hybrid <- function(base, geom) { p <- base; p$geom <- geom; p }
+  y_of <- function(p) c(rep(0, length(p$r_grid)), rep(0, length(p$r_grid)), 1)
+  caught <- function(p) tryCatch({ radiodialysis_rhs(0, y_of(p), p); FALSE },
+                                 error = function(e)
+                                   grepl("cached face weights do not match geom",
+                                         conditionMessage(e), fixed = TRUE))
+  # cylindrical parms relabelled slab (Codex's example), and the reverse
+  cyl_as_slab <- hybrid(default_parms(), "slab"); cyl_as_slab$k_L <- 1e-3
+  slab_as_cyl <- hybrid(slab_parms(X_total = 1.0), "cylindrical")
+  slab_as_cyl$P0 <- 0.01; slab_as_cyl$alpha_P <- 0.02
+  # and a single corrupted weight, not just a wholesale swap
+  one_bad <- slab_parms(X_total = 1.0); one_bad$w_plus[5] <- 1.001
+  bad_ok <- caught(cyl_as_slab) && caught(slab_as_cyl) && caught(one_bad)
+  good_ok <- all(vapply(list(default_parms(), slab_parms(X_total = 1.0)),
+    function(p) tryCatch({ radiodialysis_rhs(0, y_of(p), p); TRUE },
+                         error = function(e) FALSE), logical(1)))
+  report(bad_ok && good_ok,
+         "cached face weights are validated against the declared geom",
+         sprintf("cyl_as_slab=%s slab_as_cyl=%s one_weight=%s presets_still_run=%s",
+                 caught(cyl_as_slab), caught(slab_as_cyl), caught(one_bad), good_ok))
+})
+
 # --- 1c. the reducing basis is a FRACTION of X_total -----------------------
 # Codex P1 on #19.  X_red was fixed at 0.3 while X_total was caller-declared,
 # so U did not scale with the declared basis and a corrected low X_total put

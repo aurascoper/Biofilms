@@ -249,7 +249,8 @@ Rebuild a `CoupledSimulation` whose continuation is bit-identical to the
 unbroken run. Refuses a Julia-version mismatch unless overridden (the RNG
 byte stream is version-pinned).
 """
-function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = false)
+function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = false,
+                                    declare_basis_from_occupancy::Union{Bool,Nothing} = nothing)
     h5open(path, "r") do f
         a = attributes(f)
         ver = read(a["julia_version"])
@@ -332,8 +333,31 @@ function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = fal
 
         # Provenance is restored, not recomputed: a restart of a gated run is
         # still gated, and the flag cannot be re-derived from X_total.
-        rd_prov = haskey(f, "rd/basis_from_occupancy") ?
-                  read(f["rd/basis_from_occupancy"]) : false
+        #
+        # MISSING IS UNKNOWN, NOT FALSE (Codex on f49fe94). A checkpoint written
+        # before this field existed carries no provenance, and defaulting it to
+        # false is rule 3 inside a gate: if that file's occupancy-derived
+        # X_total happened to land on 1.0, the restored state would read as
+        # standalone and resume integrating gated c/s. So refuse, and make the
+        # caller establish the basis explicitly -- the same shape as
+        # allow_version_mismatch above.
+        rd_prov = if haskey(f, "rd/basis_from_occupancy")
+            read(f["rd/basis_from_occupancy"])
+        elseif declare_basis_from_occupancy !== nothing
+            declare_basis_from_occupancy
+        else
+            error("""
+                restart checkpoint predates rd/basis_from_occupancy, so whether
+                its c and s were computed on a gated biomass basis is UNKNOWN,
+                not false. X_total alone cannot settle it: an occupancy basis
+                can coincide with the standalone default of 1.0.
+
+                Re-run, or resume with declare_basis_from_occupancy=true/false
+                once you have established which it was. Passing `true` is
+                always the safe direction; it gates a state that may not have
+                needed it, rather than releasing one that did.
+                """)
+        end
         rd = SR.RadiolysisState(read(f["rd/r_grid"]), read(f["rd/c"]),
                                 read(f["rd/s"]), read(a["rd_m"]),
                                 read(a["rd_t"]), rp, rd_prov)
