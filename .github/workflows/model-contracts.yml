@@ -60,22 +60,15 @@ jobs:
       - name: Verify the biofilm depth stencil (numpy re-coding)
         run: python analysis/verify_biofilm_depth_profile.py --report py-verify.json
 
+      # The gate proves itself first (Codex P2 on #19): counting three cases
+      # accepted three copies of one, and a case whose checks were deleted has
+      # `all([]) == True` -- the can't-fail shape one level down.  --self-test
+      # runs it against six doctored receipts and requires each rejected.
+      - name: Prove the numpy receipt gate rejects drift
+        run: python scripts/assert_numpy_receipt.py --self-test
+
       - name: Assert the numpy verifier covered every case
-        run: |
-          python - <<'PY'
-          import json, sys
-          EXPECTED_CASES = 3
-          r = json.load(open("py-verify.json"))
-          names = [c["case"] for c in r["cases"]]
-          print(f"receipt: {len(names)} cases, passed={r['passed']}: {', '.join(names)}")
-          if len(names) != EXPECTED_CASES:
-              sys.exit(f"expected {EXPECTED_CASES} cases, receipt has {len(names)} "
-                       "-- a case was added or silently lost; update EXPECTED_CASES")
-          bad = [c["case"] for c in r["cases"] if not c["passed"]]
-          if bad or not r["passed"]:
-              sys.exit(f"numpy verifier reported failures: {bad}")
-          print("numpy verifier ran complete.")
-          PY
+        run: python scripts/assert_numpy_receipt.py py-verify.json
 
       - name: Summarize the time-step diagnostic
         if: always()
@@ -168,9 +161,19 @@ jobs:
           if (!isTRUE(r$complete))
             stop("receipt does not declare itself complete: complete=",
                  format(r$complete))
-          ran <- as.integer(r$checks_run); fail <- as.integer(r$failures)
-          skip <- as.integer(r$skipped)
-          if (anyNA(c(ran, fail, skip))) stop("receipt counters are not integers")
+          # VALIDATE, do not coerce (Codex P2 on #19).  as.integer() is happy
+          # to turn "14" into 14 and FALSE into 0, so a broken producer emitting
+          # {"checks_run":"14","failures":false} certified as complete, and a
+          # negative counter passed every `> 0L` comparison.
+          int1 <- function(k) {
+            v <- r[[k]]
+            if (!is.numeric(v) || length(v) != 1L || is.na(v) ||
+                v < 0 || v != trunc(v))
+              stop("receipt field '", k, "' is not a non-negative integer ",
+                   "scalar: ", paste(format(v), collapse = ", "))
+            as.integer(v)
+          }
+          ran <- int1("checks_run"); fail <- int1("failures"); skip <- int1("skipped")
           cat(sprintf("receipt: %d run, %d failed, %d skipped, complete=%s\n",
                       ran, fail, skip, r$complete))
           if (skip > 0L)
