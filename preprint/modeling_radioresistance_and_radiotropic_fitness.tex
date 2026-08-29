@@ -988,7 +988,13 @@ $\Delta H$ can be decisive, since removing one that raised it leaves the move ac
 \caption{Share of accepted moves reversed by removing a single Hamiltonian term, at $N=40$, six
 parcels per species, seed 42. \emph{None} means no single term reverses the move and the sum
 carries it; \emph{contingent} is the $\Delta H \le 0$ case described above. Percentages are of
-accepted moves, not of attempts.}
+accepted moves, not of attempts. \emph{Added in version 1.2:} the run is the CPM stepped directly
+with \texttt{Random.Xoshiro(seed)} and the melanin field updated each sweep, with no radiodialysis
+coupling --- \emph{not} \texttt{run\_simulation} or \texttt{run\_simulation\_coupled}, which seed
+\texttt{MersenneTwister} and give 14\,281 accepted moves at 100~MCS rather than 16\,037. Version 1.1
+recorded neither the generator nor that distinction, so the table could not be re-executed; it is
+now reproduced by \texttt{julia --project=. decided\_moves.jl}, which compares its own output
+against the values printed here.}
 \label{tab:decided_moves}
 \begin{tabular}{@{}lrr@{}}
 \toprule

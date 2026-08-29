@@ -65,3 +65,7 @@ include("jacc_parity_tests.jl")
 # asserted 5e-5 where the model gives 7.5e-2, and nothing here could read a
 # number out of the prose to say so.
 include("prose_bounds.jl")
+
+# Table 4 was published from a configuration nothing shipped could reproduce.
+# decided_moves.jl is that entry point; this runs it.
+include("decided_moves_tests.jl")
