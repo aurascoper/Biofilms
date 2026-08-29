@@ -88,6 +88,7 @@
             "validate_serial.jl",              # CPM trajectory determinism
             "tests/genealogy_tests.jl",        # legacy vs windowed API equivalence
             "tests/checkpoint_io_tests.jl",    # snapshot/restart round trip
+            "export_checkpoint.jl",            # interchange export; labels the file
             "tests/radiodialysis_basis_gate.jl",  # this file, testing the gate
         ])
         repo = dirname(@__DIR__)

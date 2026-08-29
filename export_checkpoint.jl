@@ -216,6 +216,19 @@ function export_restart_checkpoint(SR, sim, path)
         f["rd/r_grid"] = sim.rd.r_grid
         f["rd/c"] = sim.rd.c
         f["rd/s"] = sim.rd.s
+        # RULE 4: the producer declares the semantics.  c and s here are
+        # computed on a biomass basis that RADIODIALYSIS: BLOCKED gates
+        # whenever X_total != 1.0 -- mean(compute_radial_biomass(...)) is one
+        # species' occupied sites over all interior sites, neither a biomass
+        # fraction nor a reducer fraction.  A consumer cannot tell that by
+        # looking at the arrays, so the file says it.  Asserted by
+        # tests/checkpoint_io_tests.jl.
+        f["rd/basis_gate_blocked"] = sim.rd.params.X_total != 1.0
+        f["rd/basis_gate_note"] = sim.rd.params.X_total != 1.0 ?
+            "RADIODIALYSIS: BLOCKED -- c and s were computed on a gated " *
+            "biomass basis (X_total = $(sim.rd.params.X_total), a site-occupancy " *
+            "mean). No magnitude read from them is a claim about a biofilm." :
+            "X_total == 1.0, the standalone default; the basis gate does not apply."
         buf = IOBuffer()
         serialize(buf, sim.rng)
         f["rng/serialized"] = take!(buf)
@@ -344,7 +357,13 @@ end
 function _cli_export(SR, mode, out, cfg, seed, n_mcs)
     sim = SR.init_coupled_simulation(
         SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100),
-        SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0); seed)
+        # basis_gate_ack: this CLI exports an interchange artifact rather than
+        # asserting anything, and every file it writes carries
+        # rd/basis_gate_blocked so a consumer cannot read c or s without seeing
+        # that the basis was gated. Enumerated in the ack census in
+        # tests/radiodialysis_basis_gate.jl.
+        SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                            basis_gate_ack = true); seed)
     SR.advance_window!(sim, n_mcs)
     if mode == "transport"
         export_transport_snapshot(SR, sim, out; config_toml_path = cfg)

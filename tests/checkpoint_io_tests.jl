@@ -14,6 +14,36 @@ p = SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100)
 rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
                          basis_gate_ack = true)
 
+# ---------- the exported file declares a gated basis (rule 4) ----------
+
+let
+    # A consumer reading rd/c cannot tell the basis was gated by looking at the
+    # array, so the producer says it. Both directions, because a marker that is
+    # always true and one that is always false are equally uninformative.
+    # The `false` case must NOT advance: advance_window! reconstructs the params
+    # with X_total = mean(compute_radial_biomass(...)), so every coupled run
+    # ends up on the gated basis by construction. That is the finding, not a
+    # quirk -- an advanced coupled sim can never export an ungated basis.
+    for (mcs, expected) in ((0, false), (2, true))
+        rpx = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                                  basis_gate_ack = true)
+        sim = SR.init_coupled_simulation(p, rpx; seed = 5)
+        mcs > 0 && SR.advance_window!(sim, mcs)
+        @test (sim.rd.params.X_total != 1.0) == expected
+        # export_restart_checkpoint, not the transport snapshot: only the
+        # restart file carries rd/c and rd/s. The transport snapshot exports
+        # lattice, fields and dose, none of which touch the gated basis.
+        path = joinpath(tmp, "gate_$(mcs).h5")
+        export_restart_checkpoint(SR, sim, path)
+        h5open(path, "r") do f
+            @test read(f["rd/basis_gate_blocked"]) == expected
+            note = read(f["rd/basis_gate_note"])
+            @test occursin(expected ? "RADIODIALYSIS: BLOCKED" :
+                                      "the basis gate does not apply", note)
+        end
+    end
+end
+
 # ---------- transport snapshot: conventions + probe integrity ----------
 
 let
