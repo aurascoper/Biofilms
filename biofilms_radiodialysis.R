@@ -185,12 +185,20 @@ radiodialysis_rhs <- function(t, y, parms) {
 #  RADIODIALYSIS: BLOCKED, not as a composition.
 # ------------------------------------------------------------
 uptake_rate_of <- function(X_total, f_red_active, k_ads, k_red) {
-  if (!is.numeric(f_red_active) || length(f_red_active) != 1L ||
-      is.na(f_red_active) || f_red_active < 0 || f_red_active > 1)
-    stop("f_red_active must be a single fraction in [0, 1], got ",
-         paste(format(f_red_active), collapse = ", "),
-         ". It is a fraction OF X_total, not a second biomass density.",
-         call. = FALSE)
+  # X_total is validated HERE too (Codex on #19): the structural bound
+  # f*X_total <= X_total assumes a finite non-negative scalar, and a hand-built
+  # parms list carrying X_total = -1 reached both callers, returned a negative
+  # uptake, and broke the very bound this helper is cited for.  A guard that
+  # checks one of its two operands proves nothing about their product.
+  finite_scalar <- function(x, nm, hi = Inf) {
+    if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x < 0 || x > hi)
+      stop(nm, " must be a single finite number in [0, ",
+           if (is.finite(hi)) hi else "Inf", "], got ",
+           paste(format(x), collapse = ", "), call. = FALSE)
+  }
+  finite_scalar(X_total, "X_total")
+  finite_scalar(f_red_active,
+                "f_red_active (a fraction OF X_total, not a second density)", 1)
   X_total * (k_ads + k_red * f_red_active)
 }
 

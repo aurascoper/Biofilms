@@ -184,15 +184,19 @@ local({
   bounded <- all(vapply(c(1e-6, 0.1, 1.0, 10.0), function(xt) {
     p <- slab_parms(X_total = xt); p$f_red_active * p$X_total <= p$X_total
   }, logical(1)))
-  refuses <- all(vapply(list(1.5, -0.1, NA_real_, c(0.3, 0.3), "0.3"),
-    function(bad) tryCatch({ uptake_rate_of(1.0, bad, 0.05, 0.02); FALSE },
-                           error = function(e) grepl("fraction in [0, 1]",
-                                                     conditionMessage(e),
-                                                     fixed = TRUE)), logical(1)))
-  report(scales && lam_ok && bounded && refuses,
-         "U scales with X_total, X_red <= X_total by construction, f outside [0,1] refused",
-         sprintf("U(0.1)/U(1)=%.3f lambda ratio=%.6f (sqrt10=%.6f) bounded=%s refuses=%s",
-                 u01/u1, lam_ratio, sqrt(10), bounded, refuses))
+  malformed <- function(f) tryCatch({ f(); FALSE },
+                                    error = function(e) grepl("must be a single finite number",
+                                                              conditionMessage(e), fixed = TRUE))
+  # BOTH operands.  A guard checking only the fraction proves nothing about
+  # the product, and X_total = -1 broke the bound this helper is cited for.
+  refuses_f <- all(vapply(list(1.5, -0.1, NA_real_, Inf, c(0.3, 0.3), "0.3"),
+    function(bad) malformed(function() uptake_rate_of(1.0, bad, 0.05, 0.02)), logical(1)))
+  refuses_x <- all(vapply(list(-1, NA_real_, Inf, -Inf, c(1, 1), "1"),
+    function(bad) malformed(function() uptake_rate_of(bad, 0.3, 0.05, 0.02)), logical(1)))
+  report(scales && lam_ok && bounded && refuses_f && refuses_x,
+         "U scales with X_total, X_red <= X_total by construction, malformed X_total and f refused",
+         sprintf("U(0.1)/U(1)=%.3f lambda ratio=%.6f (sqrt10=%.6f) bounded=%s refuses_f=%s refuses_X=%s",
+                 u01/u1, lam_ratio, sqrt(10), bounded, refuses_f, refuses_x))
 })
 
 # --- 2-3. slab operator and steady profile ---------------------------------

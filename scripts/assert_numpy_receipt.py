@@ -56,14 +56,18 @@ def check(report: dict) -> list[str]:
         if got != EXPECTED[name]:
             bad.append(f"{name}: checks differ -- missing "
                        f"{sorted(EXPECTED[name] - got)}, unexpected {sorted(got - EXPECTED[name])}")
+        # `is not True`, not `not ok`: JSON "false" is a non-empty string and
+        # therefore truthy, so a producer schema regression emitting string
+        # verdicts was certified as passing (Codex on #19).  A verdict must be
+        # an actual boolean true.
         for cname, ok in case.get("checks", {}).items():
-            if not ok:
-                bad.append(f"{name}: check {cname} failed")
-        if not case.get("passed"):
-            bad.append(f"{name}: case reported not passed")
+            if ok is not True:
+                bad.append(f"{name}: check {cname} is {ok!r}, not boolean true")
+        if case.get("passed") is not True:
+            bad.append(f"{name}: case verdict is {case.get('passed')!r}, not boolean true")
 
-    if not report.get("passed"):
-        bad.append("report does not declare overall pass")
+    if report.get("passed") is not True:
+        bad.append(f"overall verdict is {report.get('passed')!r}, not boolean true")
     return bad
 
 
@@ -96,13 +100,24 @@ def self_test() -> int:
     def overall_false(r):
         r["passed"] = False; return r
 
+    def string_verdicts(r):
+        """The truthiness trap: JSON "false" is a non-empty string."""
+        r["cases"][0]["passed"] = "false"
+        r["cases"][0]["checks"] = {c: "false" for c in r["cases"][0]["checks"]}
+        return r
+
+    def overall_string_true(r):
+        r["passed"] = "true"; return r
+
     failures = 0
     for name, mutate in [("a case dropped", drop_case),
                          ("a case duplicated", duplicate_case),
                          ("a case's checks deleted", gut_checks),
                          ("the swap control flipped", flip_control),
                          ("a case renamed", rename_case),
-                         ("overall pass false", overall_false)]:
+                         ("overall pass false", overall_false),
+                         ("string verdicts \"false\"", string_verdicts),
+                         ("overall verdict a string", overall_string_true)]:
         problems = check(mutate(json.loads(json.dumps(good))))
         status = "REJECTED" if problems else "ACCEPTED -- GATE IS BLIND"
         print(f"  {name:<28} {status}")
