@@ -109,14 +109,6 @@ found \emph{dead} biomass removed both ions as well --- which is what a sorption
 predicts and a metabolic one does not.\footnote{\textit{Environ.\ Monit.\ Assess.} 195(6):731,
 2023. doi:10.1007/s10661-023-11266-x} One of those isolates is \textit{B.\ subtilis}, which is
 already one of the seven species in the model.
-\end{minipage}\hfill
-\begin{minipage}[t]{0.485\linewidth}
-{\large\bfseries\color{phys} What that literature does not compute}\\[3pt]
-What dose the biofilm itself receives, and whether a hydrated layer 50--200~$\mu$m thick
-perturbs the local field at the metal surface. Those papers measure what the biofilm holds; the
-transport question next to it is not asked. A facility is also the only setting where the inputs
-to it are obtainable rather than assumed --- a bounded geometry, a characterised source, a
-measurable metal inventory, and a dose rate in the regime the $D_{10}$ priors were measured in.
 
 \vspace{3mm}
 {\large\bfseries\color{bench} The stressor set}\\[3pt]
@@ -127,6 +119,34 @@ chemistry, and hydrogen-isotope permeation.\footnote{\textit{JOM} 74(4), 2022
 (permeation review). Also \textit{Corros.\ Sci.} 209, 2022 and 229, 2024 on Al and Mo in steam.}
 A biofilm is none of the three, and I would not assume from outside your field whether it falls
 inside the envelope anyway.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+{\large\bfseries\color{phys} What that literature does not compute}\\[3pt]
+What dose the biofilm itself receives, and whether a hydrated layer 50--200~$\mu$m thick
+perturbs the local field at the metal surface. Those papers measure what the biofilm holds; the
+transport question next to it is not asked. A facility is also where the inputs to it stop being assumptions --- a bounded geometry, a
+characterised source, a measurable metal inventory, and a dose rate in the regime the $D_{10}$
+priors were measured in.
+
+\vspace{3mm}
+{\large\bfseries\color{prior} The mixed Cr/Al case}\\[3pt]
+Searching \emph{FeCrAl microbiologically influenced corrosion biofilm} on 30 August 2026 returned no
+study of FeCrAl; changing one word to \emph{304L stainless steel} returned four on the first page.
+That is a web search, so it reaches ranked results and not a corpus, and conference proceedings sit
+largely outside it --- which is where such a study would most likely be.
+
+\vspace{2mm}
+Every substrate those searches did return passivates through chromia, or is aluminium, or is carbon
+steel. FeCrAl passivates through a mixed Cr(III)/Al(III) film.\footnote{\textit{J.\ Electrochem.\
+Soc.} 172(12):121501, 2025. Model Fe--Cr10--Al$_x$ alloys in sulphate at pH~1, room temperature;
+Al(III) surface enrichment 46.3\% against 1.1\% Cr for the binary. Commercial grades in borated
+water show an Al--Cr-rich layer at 360\,$^\circ$C; searching on 30 August 2026 I found none measured at pool temperature.}
+Whether that matters to a biofilm is the kind of question I would be asking you. The irradiated case
+is not open --- irradiation makes aqueous corrosion of FeCrAl worse\footnote{\textit{Corros.\ Sci.}
+174:108824, 2020, simulated PWR primary water. The $\alpha'$ that changes the surface is
+characterised to 7.0~dpa at 320--382\,$^\circ$C in APMT and Alkrothal 720.} --- but that was
+established at reactor conditions, and the same day's searching did not return it asked at pool
+temperature, or asked anywhere with a film on the surface.
 \end{minipage}
 
 \newpage
