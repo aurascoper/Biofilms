@@ -196,6 +196,20 @@ end
 # ACCEPTANCE PATH does not consult, which is the claim, and calibration's
 # spatial/time_observable.py records the same fact independently.
 
+"Every column-0 `function NAME(...)` in `path`, as name => body lines."
+function _function_bodies(path::AbstractString)
+    lines = readlines(path)
+    out = Dict{String,Vector{String}}()
+    for (i, l) in enumerate(lines)
+        m = match(r"^function\s+([A-Za-z_][A-Za-z0-9_!]*)\(", l)
+        m === nothing && continue
+        j = findnext(x -> x == "end", lines, i)
+        j === nothing && continue
+        out[m[1]] = lines[i:j]
+    end
+    out
+end
+
 "Body of `function NAME(` in `path`, up to the first column-0 `end`."
 function _function_body(path::AbstractString, name::AbstractString)
     lines = readlines(path)
@@ -219,11 +233,33 @@ let
     @test !occursin(reads, "    # never reads the nutrient field")
 
     serial = joinpath(REPO, "biofilms_potts.jl")
-    for fn in ("compute_delta_H_terms", "mcs_step!")
+
+    # THE SENTENCE SAYS "THE TRAJECTORY", SO THE CHECK COVERS EVERY FUNCTION THAT MOVES
+    # THE LATTICE, not just the two whose bodies were first counted. Enforcing at one
+    # scope while stating at another is the defect the F_s check above exists for.
+    writes_lattice = r"^\s*(lat|lattice)\[[^\]]*\]\s*=[^=]"
+    movers = String[]
+    for (name, body) in _function_bodies(serial)
+        any(l -> occursin(writes_lattice, l), body) && push!(movers, name)
+    end
+
+    # The detector must find a planted write before the set it produces is trusted.
+    @test occursin(writes_lattice, "    lat[tx, ty, tz] = sigma")
+    @test !occursin(writes_lattice, "    sigma = lat[tx, ty, tz]")   # a read is not a write
+
+    # AND THE SET ITSELF IS PINNED. A new lattice mover appearing fails here, which forces
+    # someone to check it rather than letting it inherit a claim made before it existed.
+    # THIS LIST WAS WRONG WHEN WRITTEN BY HAND: it named divide_cell! and missed
+    # place_cell!. divide_cell! mutates the lattice THROUGH place_cell! rather than
+    # directly, so a manual grep for the writers produced a set that was wrong in both
+    # directions, and this assertion is what said so on its first run.
+    @test sort(movers) == sort(["compute_delta_H_terms", "init_state", "mcs_step!",
+                                "place_cell!"])
+
+    for fn in movers
         body = _function_body(serial, fn)
         @test !isempty(body)
-        hits = filter(l -> occursin(reads, l), body)
-        @test isempty(hits)
+        @test isempty(filter(l -> occursin(reads, l), body))
     end
 
     # THE FIELD IS LIVE, WHICH IS WHY THE CLAIM IS ABOUT THE ACCEPTANCE PATH AND NOT ABOUT
