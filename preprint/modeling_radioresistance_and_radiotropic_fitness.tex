@@ -320,6 +320,39 @@ $^{137}$Cs field, an isogenic null in \textit{A.\ niger} across three ionizing m
 insufficient and the media carbon sufficient to account for the observed growth
 \cite{walberg2015}. ``Not demonstrated'' is not ``disproved'', and we state it as the former.
 
+\emph{Added in version 1.2:} a reader may reasonably ask what \emph{does} live in a spent fuel pool,
+given that the mechanism above is withdrawn. The answer is worth stating because it is repeatedly
+confused with the one this section rejects.
+
+Nothing feeds on the metal. Fe(II) released by a corroding surface is an electron donor for iron
+oxidisers, which is an energy source and not a carbon skeleton; neither alloy offers one. Organic carbon arrives from outside: a pool surface sits
+open to a staffed building, ion-exchange resins shed fragments under radiolysis, and refuelling
+introduces lubricants and decontamination chemicals. Demineralisation removes ions and passes
+neutral organics, so even makeup water carries carbon at parts per billion, which is a concentration
+oligotrophs work at. The primary production is done by organisms outside this model: radiolysis
+splits water into oxidants and H$_2$ together, hydrogen-oxidising bacteria fix CO$_2$ with that
+donor --- the indoor pond at Sellafield carries a stable hydrogen-driven microbiome, with
+\textit{Hydrogenophaga} among the taxa \cite{sellafield2020} --- and algal blooms develop in the
+same site's ponds under lighting \cite{sellafield2023}. The radiation field that makes a pool
+hostile is part of what makes it habitable.
+
+\textbf{This model resolves none of that.} \texttt{compute\_delta\_H\_terms} and
+\texttt{mcs\_step!} read the lattice, volumes, species, adhesion couplings,
+$\beta_{s,\mathrm{ion}}$ and melanin, and never the nutrient field; organic carbon is an exogenous
+input the CPM does not represent. Nothing in this paragraph is a claim about the metabolism of the
+seven species modelled, and we make none --- two of them, \textit{S.\ oneidensis} and
+\textit{O.\ intermedium}, have documented or congeneric CO$_2$-fixing capability under conditions a
+pool does not supply, so a blanket statement about their carbon source would be wrong in the
+direction a reader could check.
+
+The distinction this paragraph exists to draw is between two things that sound alike.
+Radiolysis-fed chemolithotrophy is established and mechanistically ordinary, and it runs through
+water chemistry: microbes consume H$_2$ that radiation happened to produce. Radiotrophy as this
+paper uses the term is direct energy capture through melanin, with no such intermediate. Both can be
+described as radiation supplying the energy and only the first is demonstrated. This is a contrast
+and not a defence: it does not address the carbon-budget critique of \cite{walberg2015}, which
+concerns melanised fungi in culture and stands as stated.
+
 Radioresistance, by contrast, is well evidenced for several of the seven, and the
 $D_{10}$ values in Table~\ref{tab:params} are real measurements. Radiotropism has its own
 candidate --- Zhdanova et al.'s 2004 report of directed hyphal growth toward a $^{109}$Cd source,
@@ -1740,6 +1773,17 @@ Aspergillus niger spores are highly resistant to space radiation.
 \textit{Frontiers in Microbiology}, 11, article 560.
 (LD$_{90}$ values for N402 and the pigmentation-deficient $\Delta fwnA$ mutant MA93.1 under
 X-ray, He-ion and Fe-ion exposure; open access, CC BY 4.0.)
+
+\bibitem{sellafield2020}
+Foster, L., Boothman, C., Ruiz-Lopez, S., et al. (2020).
+Identification of a stable hydrogen-driven microbiome in a highly radioactive storage facility on
+the Sellafield site. \textit{Frontiers in Microbiology}, 11, 587556.
+
+\bibitem{sellafield2023}
+Ruiz-Lopez, S., et al. (2023).
+Identification of algal rich microbial blooms in the Sellafield Pile Fuel Storage Pond and the
+application of ultrasonic treatment to control the formation of blooms.
+\textit{Frontiers in Microbiology}, 14, 1261801.
 
 \bibitem{walberg2015}
 Walberg, K. (2015).
