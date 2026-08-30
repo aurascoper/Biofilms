@@ -51,10 +51,19 @@ end
 
 "The bound §6.2 states for the acceptance-favouring reach of ΔH_rad."
 function stated_rad_bound(tex::AbstractString)
-    # Matches the PAIRWISE form. The single-species form the withdrawn version
-    # stated is deliberately not matched: a sentence bounding max_s |β| is not a
-    # bound on ΔH_rad, and reading a number out of it would launder that.
-    m = match(r"\\max_\{s,t\}[^=]*?\\beta_\{t,\\mathrm\{ion\}\}[^=]*?=\s*([^,\$]+)", tex)
+    # THE WHOLE EXPRESSION, NOT A LANDMARK AND A NUMBER. The first version of
+    # this required only that \max_{s,t} be followed somewhere by \beta_{t,...}
+    # and the right literal, so `\max_{s,t}\beta_t = 7.505e-2` and
+    # `\max_{s,t}(\beta_s + \beta_t)I_\gamma = 7.505e-2` both passed every
+    # assertion below. A semantic regression could keep the corrected number and
+    # invalidate the bound it names, which is the failure this file exists to
+    # catch. Raised by Codex on pull request #23.
+    #
+    # So the shape is required in full: both subscripts in their roles, the
+    # subtraction between them in that order, and I_γ. The single-species form
+    # stays unmatched on purpose -- a sentence bounding max_s |β| is one role at
+    # a time and reading a number out of it would launder that.
+    m = match(r"""\\max_\{s,t\}\s*\(\s*\\beta_\{t,\\mathrm\{ion\}\}\s*-\s*\\beta_\{s,\\mathrm\{ion\}\}\s*\)\s*(?:\\,)?\s*I_\\gamma\s*=\s*([^,\$]+)"""x, tex)
     m === nothing && return nothing
     return _latex_number(m[1])
 end
@@ -101,6 +110,23 @@ end
         # whatever number it carries. Both the 1.1 magnitude and the 1.2 one.
         @test stated_rad_bound(raw"$\max_s |\beta_{s,\mathrm{ion}}| = 5\times10^{-5}$") === nothing
         @test stated_rad_bound(raw"$\max_s |\beta_{s,\mathrm{ion}}| = 7.5\times10^{-2}$") === nothing
+    end
+
+    @testset "the control: pairwise-SHAPED formulas that are not the bound" begin
+        # EACH OF THESE CARRIES THE CORRECT LITERAL AND STATES A DIFFERENT
+        # QUANTITY. They are what a semantic regression looks like when the
+        # number survives the edit, and the previous extractor accepted all of
+        # them. Codex named the first two.
+        @test stated_rad_bound(raw"$\max_{s,t}\beta_{t,\mathrm{ion}} = 7.505\times10^{-2}$") === nothing
+        @test stated_rad_bound(raw"$\max_{s,t}(\beta_{t,\mathrm{ion}} + \beta_{s,\mathrm{ion}})\,I_\gamma = 7.505\times10^{-2}$") === nothing
+        # roles swapped: this is the DISfavouring extremum, a different quantity
+        @test stated_rad_bound(raw"$\max_{s,t}(\beta_{s,\mathrm{ion}} - \beta_{t,\mathrm{ion}})\,I_\gamma = 7.505\times10^{-2}$") === nothing
+        # I_gamma dropped: a bound on the coefficients, not on ΔH_rad
+        @test stated_rad_bound(raw"$\max_{s,t}(\beta_{t,\mathrm{ion}} - \beta_{s,\mathrm{ion}}) = 7.505\times10^{-2}$") === nothing
+
+        # AND THE POSITIVE CONTROL, or the four above pass by the extractor
+        # being broken rather than by being strict.
+        @test stated_rad_bound(raw"$\max_{s,t}(\beta_{t,\mathrm{ion}} - \beta_{s,\mathrm{ion}})\,I_\gamma = 7.505\times10^{-2}$") ≈ 7.505e-2
     end
 
     @testset "the control: the version 1.2 bound must fail this" begin

@@ -716,8 +716,20 @@ end
 """
 Perform one Monte Carlo Step = N³ attempted copy operations.
 Standard CPM Metropolis dynamics (Section 3.4 analog → stochastic accept/reject).
+
+`on_proposal`, when given, is called as `on_proposal(terms, ΔH)` for every
+EVALUATED proposal -- after the site pair survives the skip conditions and the
+energy is computed, and before the acceptance draw. It is the producer for the
+per-proposal ΔH_rad statistics quoted in §6.2; without it those numbers came
+from an uncommitted rewrite of this file and nobody could re-run them, which is
+PP-62-11's defect and is why this hook exists rather than a scratch script.
+
+IT MUST NOT CONSULT `rng`. The hook is called before the draw, so a closure that
+touches the generator moves the trajectory; `tests/rad_proposals_tests.jl` pins
+the shipped harness inert against the bare path with a different-seed control.
 """
-function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing)
+function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
+                   on_proposal = nothing)
     p = state.params
     N = p.N
     lat = state.lattice
@@ -757,6 +769,11 @@ function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing)
         # 4. Compute ΔH
         terms = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
         ΔH = terms.adh + terms.vol + terms.rad + terms.mel
+
+        # Evaluated, not attempted: the skip conditions above have already
+        # rejected same-cell and medium-into-medium pairs, and the denominator
+        # the paper reports is this one.
+        on_proposal === nothing || on_proposal(terms, ΔH)
 
         # 5. Metropolis acceptance
         #
