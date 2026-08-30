@@ -939,7 +939,8 @@ constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$. \emph{Corrected, version 1.2:} t
 $\Delta H_{\mathrm{rad}}$ is set by the role a cell plays as well as by $\beta_{s,\mathrm{ion}}$,
 and the third row --- a positively signed species \emph{vacating} a site --- was absent from
 version 1.1. Its omission is what made the largest acceptance-favouring radiation contribution
-look like $5\times10^{-5}$ rather than $7.5\times10^{-2}$.}
+look like $5\times10^{-5}$. The rows are single roles; the reach of the term is the extremum over
+\emph{pairings} of them, $7.505\times10^{-2}$, given beneath the table.}
 \label{tab:term_magnitudes}
 \begin{tabular}{@{}llr@{}}
 \toprule
@@ -1019,14 +1020,23 @@ The direct radiation term was the sole decisive term in one accepted move of 206
 Table~\ref{tab:term_magnitudes}, and the argument that it did was wrong.
 
 $\Delta H_{\mathrm{rad}}$ is signed by the \emph{role} a cell plays, not only by
-$\beta_{s,\mathrm{ion}}$: the source gaining a site contributes $+\beta_{s,\mathrm{ion}} I_\gamma$
-and the target losing one contributes $-\beta_{s,\mathrm{ion}} I_\gamma$. A move is favoured when
+$\beta_{s,\mathrm{ion}}$: a source of species $s$ gaining a site contributes
+$+\beta_{s,\mathrm{ion}} I_\gamma$, and a target of species $t$ losing one contributes
+$-\beta_{t,\mathrm{ion}} I_\gamma$. A move is favoured when
 the total is negative, so a \emph{positively} signed species vacating a site favours acceptance
-exactly as much as a negatively signed one occupying it. The largest such contribution is therefore
-set by $\max_s |\beta_{s,\mathrm{ion}}| = 7.5\times10^{-2}$, not by the smallest magnitude, and it
-is $1.5\times10^{3}$ times the $5\times10^{-5}$ the previous version of this paragraph claimed as a
-bound. Measured over the run, $29.8\%$ of evaluated proposals carry
-$\Delta H_{\mathrm{rad}} < -5\times10^{-5}$ and the extreme reaches $-7.5\times10^{-2}$.
+exactly as much as a negatively signed one occupying it. A copy between two \emph{occupied}
+parcels carries both roles at once and contributes $(\beta_{s,\mathrm{ion}} - \beta_{t,\mathrm{ion}})
+I_\gamma$, so the reach is an extremum over source/target pairings rather than over species:
+$\max_{s,t}(\beta_{t,\mathrm{ion}} - \beta_{s,\mathrm{ion}})\,I_\gamma = 7.505\times10^{-2}$, which is
+$1.5\times10^{3}$ times the $5\times10^{-5}$ that version 1.1 of this paragraph claimed as a bound.
+Measured over the three runs of Table~\ref{tab:decided_moves} --- $3\,968\,838$ evaluated proposals
+across seeds 42, 43 and 44 at 400~MCS --- $26.7\%$ carry
+$\Delta H_{\mathrm{rad}} < -5\times10^{-5}$, and the most acceptance-favouring value reached is
+$-7.5\times10^{-2}$, a vacating \emph{S.\ oneidensis} target with no occupied source. The pairwise
+extremum itself is attained but rare: a \emph{C.\ sphaerospermum} source copying into an
+\emph{S.\ oneidensis} target reaches $-7.505\times10^{-2}$ four times in $1\,298\,668$ proposals at
+$N=20$; the three $N=40$ runs of Table~\ref{tab:decided_moves} do not reach it, which is why the
+single-role figure went unchallenged by the measurement that accompanied it.
 
 Recomputed on that basis, the expected number of accepted moves that removing
 $\Delta H_{\mathrm{rad}}$ alone would reverse is $16.7$ across the three seeds, against $0.26$ under
@@ -1311,7 +1321,17 @@ Section~\ref{sec:cpm_term_magnitudes} previously bounded the acceptance-favourin
 $\Delta H_{\mathrm{rad}}$ at $5\times10^{-5}$ and inferred from that bound that the term deciding
 no accepted move was analytically expected rather than an under-sampling artifact. The bound was
 wrong by a factor of $1.5\times10^{3}$: it enumerated only the source-gains-a-site role, and a
-positively signed species vacating a site favours acceptance by up to $7.5\times10^{-2}$.
+positively signed species vacating a site favours acceptance by up to $7.5\times10^{-2}$. A second
+pass over the same paragraph, also in review, found that the replacement bound was still stated over
+\emph{species} when the quantity is an extremum over source/target \emph{pairings}: a copy between
+two occupied parcels carries both roles, so the reach is $7.505\times10^{-2}$ and
+$\max_s|\beta_{s,\mathrm{ion}}|$ is not a bound on it. The two values differ by $0.067\%$ and the
+larger is attained in a shipped configuration. The fraction of evaluated proposals carrying
+$\Delta H_{\mathrm{rad}} < -5\times10^{-5}$ is likewise restated as $26.7\%$ over the three runs of
+Table~\ref{tab:decided_moves}; the $29.8\%$ first written here came from a run this paper did not
+identify, which is the same defect as \texttt{PP-62-11} and is why the configuration is now named in
+the sentence. \texttt{tests/prose\_bounds.jl} recomputes the bound from the shipped coefficients and
+fails on either withdrawn form.
 Table~\ref{tab:term_magnitudes} gains the missing row and the paragraph beneath
 Table~\ref{tab:decided_moves} is rewritten. \textbf{Two published numbers move.} The count of moves
 for which the direct radiation term was solely decisive is one of 206\,042, not zero --- seed 44

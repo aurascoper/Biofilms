@@ -15,10 +15,23 @@
 # gains a site and -β_ion[target]·I when the target loses one, so a move is
 # favoured whenever the total is negative and BOTH SIGNS OF β_ion CAN DO THAT --
 # a positively signed species vacating a site favours acceptance exactly as much
-# as a negatively signed one occupying it. The bound is therefore
-# max|β_ion| · I₀ over species, which is a property of the shipped coefficients
-# and not of any run. The previous bound took the minimum magnitude among the
-# negatively signed species, which is the same arithmetic with one role missing.
+# as a negatively signed one occupying it.
+#
+# THE BOUND IS OVER PAIRINGS, NOT OVER SPECIES, which is the second thing this
+# gate got wrong. A copy between two occupied parcels contributes
+# (β_source - β_target)·I, so the acceptance-favouring reach is the extremum over
+# the (source, target) pairings the lattice permits, not the largest single
+# coefficient. max|β_ion|·I₀ = 7.5e-2 takes one role at a time and is therefore
+# not a bound at all: a CS source (-5e-5) copying into an SO target (7.5e-2)
+# reaches -7.505e-2, and DOES SO IN A SHIPPED CONFIGURATION -- four times in
+# 1298668 evaluated proposals at N=20, seed 42, 400 MCS. Raised by Codex on pull
+# request #23; the withdrawn version of this file computed max|β_ion| and would
+# have rejected the correct value.
+#
+# max(0, ·) ON EACH ROLE rather than (max β - min β): an absent parcel
+# contributes nothing, so if every coefficient shared one sign the bound would
+# come from one role alone. Writing the difference directly would bake in a
+# property of today's seven coefficients that no test states.
 #
 # SCOPE, STATED RATHER THAN IMPLIED. This gates ONE number: the ΔH_rad bound in
 # §6.2. It is not a general prose-versus-code checker and does not pretend to
@@ -38,7 +51,10 @@ end
 
 "The bound §6.2 states for the acceptance-favouring reach of ΔH_rad."
 function stated_rad_bound(tex::AbstractString)
-    m = match(r"\\max_s\s*\|\\beta_\{s,\\mathrm\{ion\}\}\|\s*=\s*([^,\$]+)", tex)
+    # Matches the PAIRWISE form. The single-species form the withdrawn version
+    # stated is deliberately not matched: a sentence bounding max_s |β| is not a
+    # bound on ΔH_rad, and reading a number out of it would launder that.
+    m = match(r"\\max_\{s,t\}[^=]*?\\beta_\{t,\\mathrm\{ion\}\}[^=]*?=\s*([^,\$]+)", tex)
     m === nothing && return nothing
     return _latex_number(m[1])
 end
@@ -48,13 +64,21 @@ end
     tex = read(TEX, String)
     p = SR.CPMParams()
 
-    # BOTH ROLES, WHICH IS THE WHOLE CORRECTION. Not `minimum(abs, ...)` over the
-    # negatively signed entries, which is what the withdrawn sentence used.
-    true_bound = maximum(abs, p.β_ion) * p.I0
+    # BOTH ROLES AND BOTH ENDS OF THE PAIRING. Not `minimum(abs, ...)` over the
+    # negatively signed entries (version 1.1), and not `maximum(abs, ...)` over
+    # species (version 1.2): see the header.
+    βmax, βmin = maximum(p.β_ion), minimum(p.β_ion)
+    true_bound = (max(0.0, βmax) + max(0.0, -βmin)) * p.I0
     stated = stated_rad_bound(tex)
 
     @test stated !== nothing
     @test isapprox(stated, true_bound; rtol = 1e-6)
+
+    # THE BOUND IS ATTAINED, NOT MERELY ASSERTED. Both ends come from a distinct
+    # species, so two distinct parcels can realize it; if argmax and argmin
+    # coincided the extremum would need one parcel in both roles at once, which
+    # the copy rule forbids, and the bound would be loose without saying so.
+    @test argmax(p.β_ion) != argmin(p.β_ion)
 
     # ...and the same sentence must not still be asserting the withdrawn one.
     @test !occursin("largest radiation contribution that could favour an accepted move is of that order", tex)
@@ -72,17 +96,32 @@ end
         # "no bound stated" and "the right bound stated" would look identical.
         @test stated_rad_bound(withdrawn) === nothing
 
-        # And a sentence that DOES state the withdrawn magnitude must not agree
-        # with the coefficients.
-        wrong = raw"$\max_s |\beta_{s,\mathrm{ion}}| = 5\times10^{-5}$"
-        @test stated_rad_bound(wrong) ≈ 5e-5
-        @test !isapprox(stated_rad_bound(wrong), true_bound; rtol = 1e-6)
+        # A sentence in the withdrawn SHAPE states no bound on ΔH_rad at all --
+        # max_s |β| is one role at a time -- so the extractor must refuse it
+        # whatever number it carries. Both the 1.1 magnitude and the 1.2 one.
+        @test stated_rad_bound(raw"$\max_s |\beta_{s,\mathrm{ion}}| = 5\times10^{-5}$") === nothing
+        @test stated_rad_bound(raw"$\max_s |\beta_{s,\mathrm{ion}}| = 7.5\times10^{-2}$") === nothing
+    end
+
+    @testset "the control: the version 1.2 bound must fail this" begin
+        # 7.505e-2 against 7.5e-2 is 0.067% -- larger than the rtol above, so the
+        # assertion can tell them apart. Stated, because a control that cannot
+        # separate the two values it names proves nothing about either.
+        v12 = maximum(abs, p.β_ion) * p.I0
+        @test v12 ≈ 7.5e-2
+        @test !isapprox(v12, true_bound; rtol = 1e-6)
+        @test true_bound > v12
+
+        wrong12 = raw"$\max_{s,t}(\beta_{t,\mathrm{ion}} - \beta_{s,\mathrm{ion}})\,I_\gamma = 7.5\times10^{-2}$"
+        @test stated_rad_bound(wrong12) ≈ 7.5e-2
+        @test !isapprox(stated_rad_bound(wrong12), true_bound; rtol = 1e-6)
     end
 
     @testset "the parser reads what LaTeX actually writes" begin
         # isapprox, not ==: 7.5 * 10.0^-2 is 0.07500000000000001, and pinning
         # the parser to exact binary equality would fail on arithmetic rather
         # than on parsing.
+        @test _latex_number(raw"7.505\times10^{-2}") ≈ 7.505e-2
         @test _latex_number(raw"7.5\times10^{-2}") ≈ 7.5e-2
         @test _latex_number(raw"5\times10^{-5}")   ≈ 5e-5
         @test _latex_number(raw"1.5\times10^{3}")  ≈ 1.5e3
