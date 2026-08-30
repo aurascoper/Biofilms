@@ -71,13 +71,18 @@ environmental remediation.
 
 \vspace{4mm}
 \noindent\rule{\linewidth}{0.4pt}\\[3pt]
-{\small\textbf{One correction, since you may have version 1.0.} Figures 1 and 2 in that version
+{\small\textbf{Two corrections, since you may have version 1.0.} Figures 1 and 2 in that version
 carry text inside the images that the surrounding prose retracts --- Figure 2 annotates two
 species as ``radiotrophic (melanin-mediated energy gain)'' beneath a caption disowning exactly
 that. The figure generator had been corrected two weeks earlier; the committed images had not
 been regenerated, and nothing in the test suite could open a figure to notice. Version 1.1
-replaces both. No number changed. I mention it because it is the paper's own argument happening
-to the paper, and you would have found it on page 8.}
+replaces both, and no number \emph{in them} changed. Version 1.2 then corrects a number: an
+automated review of the code found the bound I had used to argue one of Section 6.2's results was
+wrong by a factor of $1.5\times10^{3}$, and two published counts moved with it. That section now
+states what the measurement supports rather than what the bad bound predicted, and the code
+carries a test that recomputes the bound and fails if the paper and the coefficients disagree.
+Both are recorded in the paper's Data and Code Availability section. I mention them because they
+are the paper's own argument happening to the paper, and you would have found them on page 8.}
 \end{minipage}
 
 \newpage
