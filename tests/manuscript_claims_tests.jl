@@ -179,3 +179,56 @@ let
     # checked rather than asserted.
     @test !isempty(_scan(SIM_FILES, r"\bk_des\b"i))
 end
+
+# ---------------------------------------------- the acceptance path reads no nutrient
+#
+# §2.6 states that the CPM does not resolve carbon as a driver of the trajectory. That
+# rests on a COUNT taken on one day -- zero nutrient reads inside two function bodies --
+# and a counted zero expires exactly like the F_s grep above: nothing stops a later commit
+# adding a nutrient term to the acceptance rule, at which point the manuscript's claim
+# becomes false and the manuscript is the artifact that cannot notice.
+#
+# SCOPE, AS NARROW AS THE CODE ACTUALLY COUNTED. Not "the CPM ignores nutrients" and not
+# "the field is unused" -- both are broader than what was checked and the second is FALSE.
+# `state.nutrient` is initialised by `init_nutrient!`, integrated every step by
+# `update_nutrient!`, serialised in export_checkpoint.jl, round-tripped in
+# checkpoint_io_tests.jl and parity-checked in the JACC port. It is a live field that the
+# ACCEPTANCE PATH does not consult, which is the claim, and calibration's
+# spatial/time_observable.py records the same fact independently.
+
+"Body of `function NAME(` in `path`, up to the first column-0 `end`."
+function _function_body(path::AbstractString, name::AbstractString)
+    lines = readlines(path)
+    i = findfirst(l -> startswith(l, "function $name("), lines)
+    i === nothing && error("no `function $name(` at column 0 in $path")
+    j = findnext(l -> l == "end", lines, i)
+    j === nothing && error("unterminated `function $name` in $path")
+    return lines[i:j]
+end
+
+let
+    # A READ, not a mention: `state.nutrient` or `nutrient[...]`. A comment naming the
+    # field must not fail this, or the check becomes a trap for the next person who
+    # documents why the field is absent here.
+    reads = r"\.nutrient\b|\bnutrient\s*\["i
+
+    # THE DETECTOR FINDS A PLANTED READ BEFORE IT IS TRUSTED TO FIND NONE.
+    planted = ["function f(x)", "    C = state.nutrient", "    y = nutrient[1, 2, 3]", "end"]
+    @test count(l -> occursin(reads, l), planted) == 2
+    # ...and a mention that is not a read does not trip it.
+    @test !occursin(reads, "    # never reads the nutrient field")
+
+    serial = joinpath(REPO, "biofilms_potts.jl")
+    for fn in ("compute_delta_H_terms", "mcs_step!")
+        body = _function_body(serial, fn)
+        @test !isempty(body)
+        hits = filter(l -> occursin(reads, l), body)
+        @test isempty(hits)
+    end
+
+    # THE FIELD IS LIVE, WHICH IS WHY THE CLAIM IS ABOUT THE ACCEPTANCE PATH AND NOT ABOUT
+    # THE FIELD. If this ever came back empty the §2.6 sentence would be describing dead
+    # state and would need rewriting, not re-passing.
+    integrator = _function_body(serial, "update_nutrient!")
+    @test any(l -> occursin(reads, l), integrator)
+end

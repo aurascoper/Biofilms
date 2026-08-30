@@ -336,10 +336,13 @@ donor --- the indoor pond at Sellafield carries a stable hydrogen-driven microbi
 same site's ponds under lighting \cite{sellafield2023}. The radiation field that makes a pool
 hostile is part of what makes it habitable.
 
-\textbf{This model resolves none of that.} \texttt{compute\_delta\_H\_terms} and
-\texttt{mcs\_step!} read the lattice, volumes, species, adhesion couplings,
-$\beta_{s,\mathrm{ion}}$ and melanin, and never the nutrient field; organic carbon is an exogenous
-input the CPM does not represent. Nothing in this paragraph is a claim about the metabolism of the
+\textbf{This model resolves none of that.} A nutrient field exists on the lattice and is
+integrated by diffusion at every step, and the acceptance rule never consults it:
+\texttt{compute\_delta\_H\_terms} and \texttt{mcs\_step!} read the lattice, volumes, species,
+adhesion couplings, $\beta_{s,\mathrm{ion}}$ and melanin, and no nutrient term appears in either
+(enforced by \texttt{tests/manuscript\_claims\_tests.jl}). The model therefore does not resolve
+carbon as a driver of the trajectory. Neither does it treat carbon as an input arriving from
+outside: the field is there, it is integrated, and nothing in the acceptance path reads it. Nothing in this paragraph is a claim about the metabolism of the
 seven species modelled, and we make none --- two of them, \textit{S.\ oneidensis} and
 \textit{O.\ intermedium}, have documented or congeneric CO$_2$-fixing capability under conditions a
 pool does not supply, so a blanket statement about their carbon source would be wrong in the
