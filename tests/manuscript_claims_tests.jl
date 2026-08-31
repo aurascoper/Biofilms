@@ -180,6 +180,79 @@ let
     @test !isempty(_scan(SIM_FILES, r"\bk_des\b"i))
 end
 
+# ------------------------------------------- the exclusion, ASSERTED not inspected
+#
+# THE CHECK ABOVE IS SCOPED TO A CURATED NAME LIST, AND THAT CUTS BOTH WAYS.
+# SIM_FILE_NAMES is nine hand-maintained entries, not a glob. So "X_max appears in
+# no simulation file" stays green not only when no such file has one, but also when
+# a file that has one simply is not on the list -- and nothing states which of those
+# two is the case. That is the fixed-name-list hazard arriving from the far side: a
+# guard passing for the wrong reason, which is the shape this file already records
+# for the prose-broader-than-the-check defect one level up.
+#
+# It became live when analysis/henry_langmuir_bound.R was added. That producer
+# necessarily contains X_max, q_max and Langmuir -- it exists to compare the forms
+# -- and it is correctly outside SIM_FILE_NAMES because it is not a repo-root
+# simulation source. But "correctly outside" was, until this block, a fact somebody
+# confirmed once by reading, not a property anything enforced.
+#
+# So the enumeration is inverted: every file in the repository carrying any of the
+# three terms must be on a DECLARED list. A new file gets added deliberately or the
+# suite fails. The list is the claim; the scan is what checks it.
+CEILING_VOCAB_ALLOWED = [
+    # the manuscript states the forms and contrasts them -- section 3.12
+    "preprint/modeling_radioresistance_and_radiotropic_fitness.tex",
+    "preprint/wan_meeting_handout.tex",
+    "calibration/tests/fixtures/wan_meeting_handout_prefix.tex",  # its known-bad
+    # the register and the ledger record that the ceiling is absent
+    "data/calibration/suspended_isotherm_proposal.csv",
+    "data/calibration/sop_index.csv",
+    "data/claims_ledger.csv",
+    # the producer for PP-SORP-01, and this file's own assertions
+    "analysis/henry_langmuir_bound.R",
+    "tests/manuscript_claims_tests.jl",
+]
+
+function _ceiling_vocab_files(root)
+    hits = String[]
+    for (dir, _, files) in walkdir(root)
+        occursin(joinpath(root, ".git"), dir) && continue
+        for f in files
+            p = joinpath(dir, f)
+            rel = relpath(p, root)
+            startswith(rel, ".git") && continue
+            text = try
+                read(p, String)
+            catch
+                continue        # binary or unreadable: cannot carry the vocabulary as text
+            end
+            if occursin(r"\bX_max\b"i, text) || occursin(r"\bq_max\b"i, text) ||
+               occursin(r"\bLangmuir\b"i, text)
+                push!(hits, replace(rel, '\\' => '/'))
+            end
+        end
+    end
+    sort(hits)
+end
+
+@testset "every file carrying capacity-ceiling vocabulary is declared" begin
+    found = _ceiling_vocab_files(REPO)
+    @test found == sort(CEILING_VOCAB_ALLOWED)
+
+    # CONTROL: the enumeration must be able to find a file that is not declared.
+    # Without this, an allow-list check passes identically when the walk is broken,
+    # which is the always-passes half of a mutation harness wearing a set equality.
+    planted = joinpath(REPO, "_ceiling_vocab_control.tmp")
+    try
+        write(planted, "q_max <- 1.0\n")
+        @test "_ceiling_vocab_control.tmp" in _ceiling_vocab_files(REPO)
+        @test _ceiling_vocab_files(REPO) != sort(CEILING_VOCAB_ALLOWED)
+    finally
+        rm(planted; force = true)
+    end
+    @test _ceiling_vocab_files(REPO) == sort(CEILING_VOCAB_ALLOWED)  # restored
+end
+
 # ---------------------------------------------- the acceptance path reads no nutrient
 #
 # §2.6 states that the CPM does not resolve carbon as a driver of the trajectory. That

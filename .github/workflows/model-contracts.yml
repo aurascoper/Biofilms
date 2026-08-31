@@ -187,6 +187,54 @@ jobs:
                  " -- a check was added or silently lost; update EXPECTED_CHECKS")
           cat("R verifier ran complete.\n")
 
+      # PP-SORP-01's producer.  The ledger quotes K = 29.72 as the concentration
+      # ratio at which the shipped Henry form and Langmuir diverge by 10%; a
+      # number nobody can re-run is the defect PP-62-11 records and the P1 Codex
+      # raised on #23.  Run here because this job already has R and deSolve.
+      - name: Reproduce the Henry/Langmuir divergence bound
+        run: Rscript analysis/henry_langmuir_bound.R --report hl-verify.json
+
+      # Same receipt discipline as above, and for the same reason: the producer
+      # reports SKIPPED rather than failing when deSolve is missing, so a job
+      # whose setup step was dropped would exit 0 having measured nothing.
+      - name: Assert the divergence-bound producer ran everything
+        shell: Rscript {0}
+        run: |
+          EXPECTED_CHECKS <- 3L
+          if (!file.exists("hl-verify.json"))
+            stop("no receipt: the divergence-bound producer did not complete")
+          r <- jsonlite::fromJSON("hl-verify.json", simplifyVector = TRUE)
+          for (k in c("checks_run", "failures", "skipped", "complete"))
+            if (is.null(r[[k]])) stop("receipt is missing '", k, "'")
+          if (!isTRUE(r$complete))
+            stop("receipt does not declare itself complete: complete=",
+                 format(r$complete))
+          int1 <- function(k) {
+            v <- r[[k]]
+            if (!is.numeric(v) || length(v) != 1L || is.na(v) ||
+                v < 0 || v != trunc(v))
+              stop("receipt field '", k, "' is not a non-negative integer ",
+                   "scalar: ", paste(format(v), collapse = ", "))
+            as.integer(v)
+          }
+          ran <- int1("checks_run"); fail <- int1("failures"); skip <- int1("skipped")
+          if (skip > 0L)
+            stop("producer skipped ", skip, " check(s): ",
+                 paste(unlist(r$skips), collapse = "; "))
+          if (fail > 0L) stop("producer reported ", fail, " failure(s)")
+          if (ran != EXPECTED_CHECKS)
+            stop("expected ", EXPECTED_CHECKS, " checks, receipt says ", ran,
+                 " -- update EXPECTED_CHECKS deliberately")
+          # AND THE QUOTED NUMBER ITSELF, because "3 checks passed" does not say
+          # WHICH bound they passed about.  The ledger cites 29.72; if the
+          # producer starts emitting a different K the row is stale and this is
+          # the only place that would notice.
+          if (!is.numeric(r$K_transient) || abs(r$K_transient - 29.72) > 0.01)
+            stop("K_transient drifted from the value PP-SORP-01 quotes (29.72): ",
+                 format(r$K_transient))
+          cat(sprintf("divergence-bound producer complete; K_transient = %.2f\n",
+                      r$K_transient))
+
   manuscript-build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
