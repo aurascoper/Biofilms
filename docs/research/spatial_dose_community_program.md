@@ -180,6 +180,11 @@ one. That is the direction to err in, and it is recorded rather than assumed. Th
 at 2.35× until the two group means become available, and **it was looked up before D2b so that a
 revision could not be selection dressed as sharpening.**
 
+**The sentence that survives: the comparator is an upper bound, so the threshold is conservative by
+construction.** That is why the fraction stands, and it is recorded rather than left implicit — a
+later reader who finds the adjacent-group bracket published elsewhere would otherwise see a declared
+choice with no reason attached and be tempted to revise it in whichever direction the day required.
+
 **D2a — field steepness. Arithmetic, and it appears to be satisfied.** Water's linear attenuation
 coefficient at Cs-137 and ~1 MeV is of order 0.07–0.09 cm⁻¹, so the bare half-value layer is roughly
 8–10 cm; buildup from scattered photons stretches the effective falloff, plausibly to 15–30 cm per
