@@ -1,33 +1,42 @@
 # The calculus in this code — Section 1: the radial operator
 
-**What this is.** The mathematics the radiodialysis solver actually contains, derived
-rather than named.
+One line of the solver carries the whole geometry:
 
-**What is mechanically checked, and it is not everything.** Each part ends with a *Checks
-against the source* table. Every row there carries a `file:line` and a fragment that line
-must contain, and `calibration/tests/test_guide_citations.py` verifies all of them — a
-citation that has gone stale fails the suite, and the failure says whether the code moved
-or the code changed. **Claims made in the prose but not appearing in a table are not
-mechanically verified.** Two in this section are worth naming as such: the reading of
-`bc_coef` as `P_eff` versus `k_L`, and the sorption rates quoted in Part 5. Both are
-sourced in the text; neither is pinned by a test. Saying so is the point — a guide that
-implied uniform coverage would be making the claim its own tables exist to discipline.
+```
+∂c/∂t = (1/r) ∂/∂r (r D_eff ∂c/∂r)
+```
 
-**Floor.** The chain rule, the product rule, and what a partial derivative is.
+Two `r`s, and neither is a coordinate trick. The one inside is flux times area. The one
+outside is division by volume. Everything in Part 1 follows from a shell between `r` and
+`r + dr` whose two faces have different areas, and you can get there without ever writing
+down a coordinate transformation.
 
-**Ceiling.** Ordinary differential equations as objects an integrator solves. No vector
-calculus, no divergence theorem in general form, no coordinate-transformation machinery.
-Everything here is derivable from a conservation statement on an annulus.
+The other four parts are the places where that operator meets the code: why the axis needs
+no boundary condition, why this solver special-cases it anyway, how a Robin wall becomes
+one line of ghost-node algebra, and why forty coupled ODEs go to LSODA rather than a
+fixed step.
 
-**Relationship to the README.** `README.md` has a `## Mathematical framework` section that
-states the project's *target formalism* — under its own disclaimer that what the programs
-integrate differs. This guide is the other side of that: it describes **what the code
-integrates**, and it cross-references those equations rather than restating them, so the
-two cannot drift into disagreeing.
+**Floor:** the chain rule, the product rule, and what a partial derivative is.
+**Ceiling:** ordinary differential equations as objects an integrator solves.
 
-**Deliberately out of scope:** general curvilinear coordinates, the divergence theorem in
-3D, stability proofs, and the sorption terms beyond noting that they set a second
-timescale. Those belong to later sections.
+Not here: general curvilinear coordinates, the divergence theorem in 3D, stability proofs,
+and the sorption terms beyond noting that they set a second timescale.
+
+Each part ends with a *Checks against the source* table. Every row carries a `file:line`
+and a fragment that line must contain, and `calibration/tests/test_guide_citations.py`
+verifies all of them — a stale citation fails the suite, and the failure says whether the
+code moved or the code changed.
+
+**Claims in the prose but not in a table are not mechanically verified.** Three here: the
+reading of `bc_coef` as `P_eff` versus `k_L`, the sorption rates in Part 5, and the
+stiffness characterisation in Part 5. All three are sourced in the text. None is pinned by
+a test. A guide implying uniform coverage would
+be making exactly the claim its own tables exist to discipline.
+
+`README.md`'s `## Mathematical framework` states the project's *target formalism*, under
+its own disclaimer that what the programs integrate differs. This is the other side: what
+the code integrates. It cross-references those equations rather than restating them, so
+the two cannot drift into disagreeing.
 
 ---
 
@@ -88,7 +97,7 @@ derivative is flux × area — it is there because a face's area grows with radi
 *outside* is ÷ volume — it is there because you asked for a concentration rather than an
 amount. Neither is a coordinate artifact.
 
-**And the physical content is real.** Flux converging on a shrinking face concentrates;
+The physical content is real. Flux converging on a shrinking face concentrates;
 flux spreading onto a growing face dilutes. A slab has neither effect, which is why its
 operator has no such term. If you expand the product for constant `D`:
 
@@ -106,7 +115,7 @@ its curvature. Note that it carries a `1/r`, which is where Part 2 begins.
 
 That `(1/r) ∂c/∂r` term is singular at `r = 0`. The solution is not.
 
-**The resolution is symmetry.** The model is radially symmetric — `c` depends on distance
+The resolution is symmetry. The model is radially symmetric — `c` depends on distance
 from the axis and on nothing else. A smooth function of radius alone must have
 `∂c/∂r → 0` at `r = 0`. If it did not, the profile would have a cusp on the axis, and a
 cusp in a diffusion profile means a source sitting exactly there. There is no such source
@@ -126,7 +135,7 @@ turning out to equal the ordinary term. On the axis, diffusion is twice as effec
 flattening curvature as it is in a slab, because the shell there is closing in from every
 direction at once.
 
-**This is why the manuscript calls it symmetry rather than a wall.** The condition at
+This is why the manuscript calls it symmetry rather than a wall. The condition at
 `r = 0` is a *consequence of the geometry*, not a physical boundary anybody chose. There
 is no membrane on the axis, nothing is sealed, and no flux is being blocked. The zero
 gradient is what radial symmetry forces, and the "zero-flux" phrasing describes the
@@ -184,7 +193,7 @@ c_ghost <- c_vec[Nr - 1] -
   2.0 * dr * bc_coef * (c_vec[Nr] - c_ext) / D_eff
 ```
 
-**So the code is a hybrid, and the contrast is the useful thing.** Flux-form in the
+So the code is a hybrid, and the contrast is what makes it worth explaining. Flux-form in the
 interior, L'Hôpital at the axis, ghost-node elimination at the wall — three treatments and
 three reasons. The interior needs no special case *because* it is flux-form; the two
 boundaries need one *because* the scheme is not carried through to the faces there. The
@@ -206,7 +215,7 @@ inside. The right side is what the membrane will pass, proportional to the conce
 difference across it, with `P_eff` the constant of proportionality — a permeability, in
 units of velocity.
 
-**It interpolates between the two conditions you already know.**
+It interpolates between the two conditions you already know.
 
 - `P_eff → ∞`: the right side can only stay finite if `c(R) → c_ext`. The membrane is
   invisible; this is a Dirichlet condition.
@@ -216,7 +225,7 @@ units of velocity.
 The membrane is the only thing in this model that is neither, and that is exactly why the
 condition has to be Robin rather than one of the two simpler kinds.
 
-**Getting from that statement to the code is one substitution.** Introduce a ghost node
+Getting from that statement to the code is one substitution. Introduce a ghost node
 `c[Nr+1]` just outside the domain and approximate the wall derivative with a centred
 difference, which is second-order:
 
@@ -235,7 +244,7 @@ which is the line in the solver. The ghost is then substituted into the ordinary
 stencil, so it never appears in the state vector — it exists only inside the arithmetic
 for the last node.
 
-**One naming caution the code is emphatic about.** `bc_coef` is `P_eff` in the cylindrical
+One naming caution, and the code is emphatic about it. `bc_coef` is `P_eff` in the cylindrical
 geometry and `k_L`, an external liquid-film mass-transfer coefficient, in the slab. They
 are different physical quantities, and the slab's must not be reported as a permeability.
 The stencil is written to take whichever the producer declares.
@@ -251,7 +260,7 @@ length `2·Nr + 1`. That is the method of lines, and the point of it is that onc
 discretised you are holding an ODE system, and ODE integrators are a solved problem you
 can hand it to.
 
-**Why not just step it forward yourself.** An explicit step is limited by stability, not
+Why not step it forward yourself? An explicit step is limited by stability, not
 by accuracy. The diffusion operator's eigenvalues scale as `D/Δr²`, and an explicit Euler
 step is stable only while `|1 + Δt·λ| ≤ 1` for every eigenvalue `λ` — which caps the step
 at roughly `Δr²/2D`. Halve the grid spacing and the allowed step drops by four.
@@ -263,13 +272,13 @@ exactly it, with a safety factor:
 dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
 ```
 
-**And that is only one of the timescales.** Sorption runs at its own rate — an uptake of
+That is only one of the timescales. Sorption runs at its own rate — an uptake of
 `U = 0.056 s⁻¹` against a relaxation of `1/(k_des + k_loss) = 166.7 s`. When the fastest
 process in a system forces a step far shorter than the slowest process needs for accuracy,
 the system is **stiff**, and that is the whole of the definition. You are then paying tiny
 steps for stability while the interesting behaviour unfolds over minutes.
 
-**That is what LSODA is for.** It monitors the solution and switches between an Adams
+That is what LSODA is for. It monitors the solution and switches between an Adams
 method (cheap, for the non-stiff stretches) and BDF (implicit, stable at large steps, for
 the stiff ones), choosing its own step size to meet the tolerances it is given rather than
 a stability limit you computed by hand.
