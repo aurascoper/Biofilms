@@ -1,0 +1,173 @@
+"""Every `file:line` citation in docs/guides/ resolves to what it claims.
+
+WHY THIS EXISTS. A guide whose premise is that each claim is checkable against a
+line of source is, without this, a tour with footnotes. Nothing in this
+repository verified a file:line citation before it: `manuscript_claims_tests.jl`
+does a regex SEARCH (find every line matching a pattern), and
+`test_claims_ledger.py` resolves a git SHA. Neither takes a pre-named citation
+and asks whether it still points at what it says.
+
+WHAT MAKES A CITATION RESOLVE RATHER THAN MERELY POINT. File-exists and
+line-exists are nearly free to satisfy -- a citation to any line of a file that
+happens to be long enough passes both. The fragment is what carries the claim,
+so every citation states one and the fragment must be on that line.
+
+AND THE FAILURE MESSAGE HAS TO SPLIT TWO CASES, or the repair becomes reflexive.
+When an edit shifts a line the guard fails, and the cheap fix is to bump the
+number. That is right when the code is unchanged and moved, and wrong when the
+fragment moved because the code changed -- those need different responses. So on
+failure the guard searches the file for the fragment and says which case it is.
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parents[2]
+GUIDES = REPO / "docs" / "guides"
+
+# A row of a "Checks against the source" table:
+#   | claim | `path:line` | `fragment` |
+# The fragment is taken verbatim between the last pair of backticks, so it may
+# contain pipes escaped as \| -- which the Robin condition's |_{r=R} needs.
+ROW = re.compile(
+    r"^\|(?P<claim>[^|]*)\|\s*`(?P<path>[^`:]+):(?P<line>\d+)`\s*\|\s*`(?P<frag>.+?)`\s*\|\s*$",
+    re.M)
+
+
+# A LOOSE PATTERN FOR THE SAME THING, USED ONLY TO COUNT. `ROW` is strict on
+# purpose, and a strict parser silently drops what it cannot read -- so the count
+# it produces is a SUBSET while the assertion below it would be about the SET.
+# That is the defect this repository has now had caught three times, and putting
+# it in the guard written to check citations would be the joke completing itself.
+# So anything shaped like a citation row is counted, and the strict parser must
+# account for every one.
+LOOSE_ROW = re.compile(r"^\|.*`[^`]+:\d+`.*\|", re.M)
+
+
+def guide_files() -> list[Path]:
+    return sorted(GUIDES.glob("*.md")) if GUIDES.is_dir() else []
+
+
+def citations(text: str) -> list[dict]:
+    out = []
+    for m in ROW.finditer(text):
+        out.append({
+            "claim": m.group("claim").strip(),
+            "path": m.group("path").strip(),
+            "line": int(m.group("line")),
+            # `\|` is markdown's escape for a pipe inside a table cell; the
+            # source line contains a bare pipe.
+            "frag": m.group("frag").replace(r"\|", "|"),
+        })
+    return out
+
+
+def resolve(cite: dict) -> tuple[bool, str]:
+    """(ok, message). The message names WHICH repair a failure needs."""
+    target = REPO / cite["path"]
+    if not target.is_file():
+        return False, f"no such file: {cite['path']}"
+    lines = target.read_text(encoding="utf-8", errors="replace").split("\n")
+    if cite["line"] > len(lines):
+        return False, (f"{cite['path']} has {len(lines)} lines; cited "
+                       f"{cite['line']}")
+    if cite["frag"] in lines[cite["line"] - 1]:
+        return True, ""
+
+    # THE SPLIT. Where else does the fragment live?
+    elsewhere = [i for i, l in enumerate(lines, 1) if cite["frag"] in l]
+    if elsewhere:
+        return False, (
+            f"THE CODE MOVED, NOT THE CLAIM. {cite['path']}:{cite['line']} no "
+            f"longer contains this fragment, but line(s) {elsewhere} do. "
+            f"Renumber the citation to :{elsewhere[0]}.")
+    return False, (
+        f"THE CODE CHANGED. {cite['path']} no longer contains this fragment "
+        f"anywhere, so the claim it supports may no longer be true. RE-READ the "
+        f"source before renumbering -- bumping the line number here would be "
+        f"the reflexive repair this message exists to prevent. "
+        f"Claim: {cite['claim']!r}")
+
+
+@pytest.mark.skipif(not guide_files(), reason="no guides committed yet")
+@pytest.mark.parametrize("guide", guide_files(), ids=lambda p: p.name)
+def test_every_guide_citation_resolves(guide):
+    text = guide.read_text(encoding="utf-8")
+    cites = citations(text)
+    assert cites, (
+        f"{guide.name} has no parseable citations. A guide in docs/guides/ that "
+        "cites nothing is the shape this check exists to prevent; if it "
+        "genuinely makes no claim about source, say so in the file.")
+
+    # EVERY citation-shaped row, not just the ones the strict parser liked. A
+    # row that fails ROW would otherwise be checked by nothing while this test
+    # reported green over the rows it happened to read.
+    loose = len(LOOSE_ROW.findall(text))
+    assert len(cites) == loose, (
+        f"{guide.name}: {loose} rows look like citations and only {len(cites)} "
+        f"parsed, so {loose - len(cites)} are being checked by nothing. Fix the "
+        "row's format or widen ROW -- do not leave it silently unread.")
+
+    failures = []
+    for c in cites:
+        ok, msg = resolve(c)
+        if not ok:
+            failures.append(msg)
+    assert not failures, "\n\n".join(failures)
+
+
+def test_the_citation_check_detects_a_shifted_line():
+    """CONTROL: shift a real citation and require the guard to catch it.
+
+    SCOPE: one citation drawn from a committed guide, shifted by ONE and by TEN.
+
+    BOTH SHIFTS, AND ONE IS NOT ENOUGH. Off-by-one is exactly the case a fragment
+    match can survive by accident: `w_plus` and `w_minus` sit on consecutive
+    lines of face_weights(), as do `rtol` and `atol` in the ode() call, so a
+    control that only shifted by one could pass while the guard was blind to
+    small drift. Ten crosses out of any such neighbourhood.
+
+    The known-bad is DERIVED FROM THE ARTIFACT -- a real citation from a real
+    guide -- rather than hand-written, because a synthetic citation would test
+    the regex against an idea of the format instead of the format in use.
+    """
+    guides = guide_files()
+    assert guides, "no guide to draw a control from"
+    cites = citations(guides[0].read_text(encoding="utf-8"))
+    assert cites, "no citations to draw a control from"
+
+    real = cites[0]
+    ok, msg = resolve(real)
+    assert ok, f"baseline citation does not resolve, so no control verdict: {msg}"
+
+    for delta in (1, 10):
+        shifted = dict(real, line=real["line"] + delta)
+        ok, msg = resolve(shifted)
+        assert not ok, (
+            f"shifting {real['path']}:{real['line']} by {delta} was NOT caught, "
+            "so this guard cannot detect a stale line number")
+        assert "THE CODE MOVED" in msg, (
+            f"shift by {delta} was caught but misdiagnosed; the fragment still "
+            f"exists in the file, so the message must say the code moved: {msg}")
+
+
+def test_the_two_failure_cases_are_distinguished():
+    """CONTROL: a fragment that exists nowhere must not be reported as moved.
+
+    SCOPE: one synthetic fragment against a real file. This half MUST be
+    synthetic -- the case is 'no line contains this', which cannot be drawn from
+    a citation that resolves.
+    """
+    guides = guide_files()
+    assert guides, "no guide to draw a control from"
+    real = citations(guides[0].read_text(encoding="utf-8"))[0]
+
+    gone = dict(real, frag="Notarealfragment_zzz")
+    ok, msg = resolve(gone)
+    assert not ok
+    assert "THE CODE CHANGED" in msg, (
+        "a fragment absent from the whole file was not diagnosed as a changed "
+        f"claim, so the two repairs are not being distinguished: {msg}")
