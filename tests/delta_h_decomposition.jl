@@ -75,7 +75,9 @@ end
     # O(0.5), so the small ones vanish or survive depending on where they land.
     @test reordered_differs > 0
 
-    # ALL FOUR BRANCHES MUST BE EXERCISED. A decomposition test that never sees
+    # SCOPE: the four branches of compute_delta_H_terms on the fixture below, not
+# every path through the stepper.
+# ALL FOUR BRANCHES MUST BE EXERCISED. A decomposition test that never sees
     # a nonzero melanin term proves nothing about the melanin term, and the
     # first version of this file did exactly that.
     for (i, name) in enumerate(("adh", "vol", "rad", "mel"))

@@ -30,6 +30,8 @@ COVERAGE_FOR = {
     "derived": {"derivation"},
     "evaluated_data": {"source"},
 }
+# SCOPE: the run_by values of MEASURED register rows only. Declared rows are
+# never lab work and derived rows are computed, so neither is reached here.
 # Only hunter is exempt: murr and core_facility are institutions nobody has
 # approached, and unassigned is nobody at all.
 NEEDS_BLOCKED_BY = {"murr", "core_facility", "unassigned"}

@@ -101,7 +101,12 @@ KNOWN_UNHANDLED = [
 # the defect.
 #
 # AND IT DECLARES ITS OWN SCOPE, or it reproduces the defect one level up: it
-# reads the files it is given and claims nothing about any file it was not.
+# reads the files it is given and claims nothing about any file it was not,
+# and it reports TWO TIERS because a proximity window alone has a
+# false-negative mode -- see scan_contracts. As of 2026-08-31 the attached
+# tier is triaged and the module-level tier is a BACKLOG, not a judged set:
+# 17 blocks across six test files remain unscoped and unjudged. Saying so is
+# the difference between a backlog and a silent gap.
 
 UNIVERSAL = re.compile(r"\b(every|all|each|any|no)\b", re.I)
 SCOPE_LINE = re.compile(r"^\s*(#\s*)?SCOPE:\s*\S", re.M)
@@ -137,8 +142,32 @@ DEF_WINDOW = 4
 TEST_DEF = re.compile(r"^\s*(def\s+test_|@testset|function\s+test_)", re.M)
 
 
-def scan_contracts(text: str):
-    """Blocks that describe a check and assert a universal without declaring a scope."""
+# THE WINDOW'S TWO ERROR MODES ARE NOT SYMMETRIC, and the second is the one this
+# tool exists to catch. A false positive costs a judgement call, which is cheap
+# and gets recorded. A false NEGATIVE is a contract the gate silently does not
+# cover -- and enumerating the drops showed the set is NOT empty: a module-level
+# block stating "ALL FOUR BRANCHES MUST BE EXERCISED", and one stating which
+# run_by values are exempt from a check, both sit further than DEF_WINDOW from
+# any test definition. A gate claiming to guard the check-versus-description
+# boundary while missing module-level contracts overstates its own reach, which
+# is the subset defect inside the tool built to detect it.
+#
+# So there are two tiers and the caller is told which is which. Attached
+# contracts are near a test definition. Module-level contracts are further away
+# and are admitted only when they speak NORMATIVELY -- must, never, cannot,
+# only, exempt -- because that is what separates a rule about a check from
+# commentary about the physics.
+NORMATIVE = re.compile(r"\b(must|never|cannot|only|exempt|required)\b", re.I)
+
+
+def scan_contracts(text: str, *, module_level: bool = False):
+    """Blocks that describe a check and assert a universal without declaring a scope.
+
+    SCOPE: the text given. `module_level=False` returns contracts within
+    DEF_WINDOW lines of a test definition; `module_level=True` returns the
+    normatively-worded blocks outside that window. Neither set is the other's
+    superset and both are reported.
+    """
     lines = text.split("\n")
     def_lines = {i for i, l in enumerate(lines, 1) if TEST_DEF.match(l)}
     out = []
@@ -146,7 +175,11 @@ def scan_contracts(text: str):
         if not (UNIVERSAL.search(block) and not SCOPE_LINE.search(block)):
             continue
         span = range(lineno - DEF_WINDOW, lineno + block.count("\n") + DEF_WINDOW + 1)
-        if any(d in span for d in def_lines):
+        attached = any(d in span for d in def_lines)
+        if module_level:
+            if not attached and def_lines and NORMATIVE.search(block):
+                out.append((lineno, block.strip()[:180]))
+        elif attached:
             out.append((lineno, block.strip()[:180]))
     return out
 
@@ -169,12 +202,18 @@ if __name__ == "__main__":
         # SCOPE: the files named on this command line, and nothing else.
         print(f"contract scope: {len(sys.argv) - 2} file(s) named on the command line")
         n = 0
+        m = 0
         for path in sys.argv[2:]:
-            for lineno, block in scan_contracts(open(path).read()):
+            text = open(path).read()
+            for lineno, block in scan_contracts(text):
                 n += 1
-                print(f"\nUNSCOPED CONTRACT  {path}:{lineno}\n     {block}")
-        print(f"\n{n} universal(s) without a declared SCOPE. "
-              "A clean run is not an all-clear: this reads only the files it was given.")
+                print(f"\nUNSCOPED CONTRACT (attached)  {path}:{lineno}\n     {block}")
+            for lineno, block in scan_contracts(text, module_level=True):
+                m += 1
+                print(f"\nUNSCOPED CONTRACT (module-level)  {path}:{lineno}\n     {block}")
+        print(f"\n{n} attached and {m} module-level universal(s) without a declared SCOPE. "
+              "A clean run is not an all-clear: this reads only the files it was given, "
+              "and module-level blocks are admitted only when worded normatively.")
         sys.exit(0)
 
     if len(sys.argv) > 1:
