@@ -316,6 +316,14 @@ def test_the_no_signal_check_detects_an_unblocked_row(index):
     assert not planted["blocked_by"].strip()
 
 
+def dead_terms(index, *, terms=None) -> list:
+    """Registered absences that no index row names. Shared by the check and its
+    control, so the control cannot pass against a regressed guard."""
+    keys = set(ABSENT_TERMS) if terms is None else set(terms)
+    named = {r.get("signal_source", "").strip() for r in index if r.get("signal_source", "").strip()}
+    return sorted(keys - named)
+
+
 def test_no_registry_term_is_dead(index):
     """EVERY term must back an index row, not merely one of them.
 
@@ -329,14 +337,21 @@ def test_no_registry_term_is_dead(index):
     entries were dead while the control passed. That is the same subset-checked
     set-asserted defect as reading only the first regex match. Raised by Codex on
     pull request #23. Compare the complete set."""
-    named = {r.get("signal_source", "").strip() for r in index if r.get("signal_source", "").strip()}
-    dead = sorted(set(ABSENT_TERMS) - named)
+    dead = dead_terms(index)
     assert not dead, (
         f"registered absences no index row is blocked on, so their predicates are "
         f"promotion triggers for nothing: {dead}")
 
 
 def test_the_dead_term_check_detects_an_orphan(index):
-    """CONTROL: a registry key nothing references must be reported."""
-    named = {r.get("signal_source", "").strip() for r in index}
-    assert sorted({"a term no row names"} - named) == ["a term no row names"]
+    """CONTROL, THROUGH THE SHARED LOGIC RATHER THAN BESIDE IT.
+
+    SCOPE: one planted orphan, evaluated by dead_terms() -- the same function the
+    real check calls. The first version recomputed a hard-coded set difference
+    independently, so it would have kept passing if the guard regressed to the
+    old intersection: a control that reimplements what it protects tests its own
+    copy. Raised by Codex on pull request #23.
+    """
+    planted = list(index) + [{"signal_source": ""}]
+    assert "a term no row names" in dead_terms(planted, terms={"a term no row names"})
+    assert not dead_terms(planted, terms=set())

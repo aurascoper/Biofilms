@@ -174,8 +174,15 @@ def scan_contracts(text: str, *, module_level: bool = False):
     for lineno, block in _doc_blocks(text):
         if not (UNIVERSAL.search(block) and not SCOPE_LINE.search(block)):
             continue
-        span = range(lineno - DEF_WINDOW, lineno + block.count("\n") + DEF_WINDOW + 1)
-        attached = any(d in span for d in def_lines)
+        # ASSOCIATE WITH THE ENCLOSING TEST, NOT ONLY A NEARBY DEFINITION. The
+        # proximity window missed the defect that motivated this gate: the
+        # "EVERY LOCATION" contract in prose_bounds.jl sits inside a @testset
+        # whose header is 25 lines above it, so no definition was within four
+        # lines and attached-mode returned nothing for the very file it was
+        # built from. A block belongs to the nearest test definition that
+        # PRECEDES it; blocks above every definition are the module-level tier.
+        preceding = [d for d in def_lines if d <= lineno]
+        attached = bool(preceding)
         if module_level:
             if not attached and def_lines and NORMATIVE.search(block):
                 out.append((lineno, block.strip()[:180]))
@@ -188,13 +195,22 @@ def scan_contracts(text: str, *, module_level: bool = False):
 # triple-quoted blocks -- a bare sentence exercises nothing, which the first
 # version of these controls did and reported as a miss.
 CONTRACT_MUST_FLAG = (
-    "# Every measured requirement has an SOP or a named gap.\n"
-    "# The check compares the index against the register.\n"
-    "def test_coverage():\n")
+    "def test_coverage():\n"
+    "    # Every measured requirement has an SOP or a named gap.\n"
+    "    # The check compares the index against the register.\n")
+# IN-BODY CONTROL: the motivating defect's own shape -- a contract documented
+# beside assertions well inside a test body, far from its header. The proximity
+# window returned nothing for this and reported the file clean.
+CONTRACT_IN_BODY_MUST_FLAG = (
+    "@testset \"ratios\" begin\n"
+    "    x = 1\n    y = 2\n    z = 3\n    w = 4\n    v = 5\n"
+    "    # EVERY LOCATION, NOT THE FIRST MATCH. `match` returns one hit.\n"
+    "    # The docstring claimed every location and covered one.\n"
+    "    @test x == 1\nend\n")
 CONTRACT_MUST_PASS = (
-    "# SCOPE: the 14 measured rows of reference_d_requirements.csv, no other row.\n"
-    "# Every measured requirement has an SOP or a named gap.\n"
-    "def test_coverage():\n")
+    "def test_coverage():\n"
+    "    # SCOPE: the 14 measured rows of reference_d_requirements.csv, no other row.\n"
+    "    # Every measured requirement has an SOP or a named gap.\n")
 
 
 if __name__ == "__main__":
@@ -254,7 +270,9 @@ if __name__ == "__main__":
     c_ok = scan_contracts(CONTRACT_MUST_PASS)
     print(f"  {'ok  ' if c_bad else 'MISS'} universal without SCOPE flags")
     print(f"  {'ok  ' if not c_ok else 'FALSE POSITIVE'} the same universal WITH a SCOPE line passes")
-    ok &= bool(c_bad) and not c_ok
+    c_body = scan_contracts(CONTRACT_IN_BODY_MUST_FLAG)
+    print(f"  {'ok  ' if c_body else 'MISS'} a contract INSIDE a test body, far from its header, flags")
+    ok &= bool(c_bad) and not c_ok and bool(c_body)
 
     print("\nGATE USABLE" if ok else "\nGATE NOT USABLE -- fix before running it on new prose")
     sys.exit(0 if ok else 1)
