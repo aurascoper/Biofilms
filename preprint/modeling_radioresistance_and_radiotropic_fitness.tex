@@ -237,9 +237,10 @@ predict biofilm thickness and spatial species distributions. Deterministic conti
 extended this framework to multiple spatial dimensions: Eberl et al.\ \cite{eberl2001} gave a
 spatio-temporal continuum model for biofilm development, and Alpkvist and Klapper
 \cite{alpkvist2007} a multidimensional multispecies formulation for heterogeneous biofilms.
-Xavier et al.\ \cite{xavier2005} is a different construction --- a hybrid individual-based
-framework for the activity and structure of multispecies biofilms --- and belongs with the
-individual-based work below rather than with the continuum models. Individual-based modeling
+Xavier et al.\ \cite{xavier2005} is a different work --- a framework for multidimensional
+modelling of the activity and structure of multispecies biofilms, as its title states --- and
+the continuum description above was previously attributed to it in error. We do not
+characterise its method here beyond what that title says. Individual-based modeling
 approaches, exemplified
 by the iDynoMiCS platform of Lardon et al.\ \cite{lardon2011}, complement continuum models by
 resolving cell-level stochastic interactions. Cross-diffusion biofilm models have been analyzed
@@ -657,18 +658,22 @@ modalities \cite{audit2026}. Where melanin measurably mattered in an evolution e
 reduced mutation accumulation without altering survival --- an effect on damage that must not be
 generalised into a survival term.
 
-\emph{Two positive results run against that reading and are cited here rather than left out
-of it.} Khajo et al.\ \cite{khajo2011} report that melanin protects
-\textit{Cryptococcus neoformans} from lethal-dose gamma irradiation through sacrificial
-breakdown of the pigment, and Malo et al.\ \cite{malo2018} report a protective effect of
-melanin on \textit{C.\ neoformans} morphology after both sparsely and densely ionizing
-radiation. \textit{C.\ neoformans} is one of the seven species modelled here, so these are
-same-species evidence for the assumption the preceding sentences decline, and this
-repository's own evidence audit already files the second under
-\texttt{melanized\_radioprotective} --- a category defined earlier in this section and, until
-now, never populated in the text. The isogenic null results and these positives are not
-reconciled here, and stating both is the point: a section whose argument rests on naming what
-runs against its position cannot omit the two results that do.
+\emph{Two same-species results are cited here, and stating what they do not measure is the
+point.} Khajo et al.\ \cite{khajo2011} and Malo et al.\ \cite{malo2018} both concern
+melanin and ionizing radiation in \textit{Cryptococcus neoformans}, one of the seven species
+modelled. Neither performs the survival comparison. Khajo's endpoints are electron spin
+resonance, 263~nm absorbance, TBARS and $^{213}$Bi binding, and the protection its title
+names is carried over from prior work rather than measured there \cite{audit2026}. Malo's
+endpoint is cell-wall integrity morphology, and its survival clause likewise refers to the
+group's earlier results \cite{audit2026}.
+
+So they do not contradict the isogenic nulls, and the reason is the one this paper's
+vocabulary predicts: \emph{melanized radioprotective} and \emph{radioresistant} are
+different endpoints, and a damage or morphology result cannot stand against a survival
+result in either direction. That is the same rule as the sentence above --- an effect on
+damage must not be generalised into a survival term --- applied to evidence that appears to
+favour the assumption rather than to undercut it. The rule is not a device for discounting
+inconvenient results, so it is applied here in the direction that costs us the citation.
 
 \subsection{Biofilm Mechanical Properties}
 
@@ -1351,8 +1356,10 @@ absence is downstream of the missing mechanics rather than a separate gap; and a
 no growth generates no growth-induced stress for mechanics to act on, so the mechanical gap
 is in turn downstream of the growth one. The three are better read as one structural absence
 under three names than as three independent items. What that costs is stated rather than
-implied: this model has no route by which morphology could arise, and its spatial output is
-therefore directional redistribution of parcels in an imposed field, not a morphology.
+implied: this model has none of the three routes named above, and its spatial output is
+therefore directional redistribution of parcels in an imposed field rather than a morphology.
+Whether those three exhaust the routes is a question about the literature and not one this
+model answers.
 External review has argued that growth-induced stress is the dominant morphogen in still
 conditions; that claim is literature this work has not verified, is recorded as such in
 \texttt{docs/research/external\_reviews\_2026-08-31\_redteam.md}, and nothing here

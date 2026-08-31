@@ -108,9 +108,14 @@ end
 Every `\\bibitem{key}` not reached by any `\\cite{...}` (comma-separated lists included).
 """
 function _unused_bibitem_keys(tex_text::AbstractString)
+    # STRIP LaTeX COMMENTS FIRST. A `\cite{foo}` inside a `%` comment counted as a
+    # citation, so an orphan could be hidden behind one and never reported. The
+    # Python side's normalise_markup has stripped `%` to end-of-line for exactly
+    # this reason since it was written; this function did not.
+    stripped = replace(tex_text, r"(?m)(?<!\\)%.*" => "")
     defined = [m.captures[1] for m in eachmatch(r"\\bibitem\{([^}]*)\}", tex_text)]
     cited = Set{String}()
-    for m in eachmatch(r"\\cite\{([^}]*)\}", tex_text)
+    for m in eachmatch(r"\\cite\{([^}]*)\}", stripped)
         for key in split(m.captures[1], ',')
             push!(cited, strip(key))
         end
@@ -210,6 +215,29 @@ let
                 join(sort(collect(setdiff(unused, KNOWN_UNUSED))), ", "))
     end
     @test unused == KNOWN_UNUSED
+
+    # THE ASSERTION MUST CONSUME THE FINEST-GRAINED THING THE FUNCTION RETURNS.
+    # The line above compares the UNION, so moving graner1992 from UNUSED_GAP (a
+    # real citation gap) to UNUSED_CONTEXT ("dropping it loses nothing citable")
+    # -- opposite meanings -- leaves the union unchanged and the suite green. The
+    # categories were printed on mismatch and never compared, which made the
+    # classification documentation rather than an assertion, in the guard built
+    # so that a decrement could not hide a category change.
+    #
+    # THIRD INSTANCE OF ONE SHAPE: count-where-a-set-was-meant (this same
+    # assertion, earlier), subset-where-full-coverage-was-meant (the strict row
+    # parser in test_guide_citations.py), and now
+    # categories-printed-where-membership-was-meant. Every time the discriminating
+    # data was already computed and discarded at the assertion line.
+    @test isdisjoint(UNUSED_GAP, UNUSED_RESIDUE)
+    @test isdisjoint(UNUSED_GAP, UNUSED_CONTEXT)
+    @test isdisjoint(UNUSED_RESIDUE, UNUSED_CONTEXT)
+    @test "graner1992" in UNUSED_GAP        # the CPM origin cite is a GAP, not context
+    @test "brim2000" in UNUSED_RESIDUE      # its section was deleted (PP-73-02)
+    @test "battista1997" in UNUSED_CONTEXT  # superseded by slade2011/daly2009/daly2010
+    @test length(UNUSED_GAP) == 3 && length(UNUSED_RESIDUE) == 2 &&
+          length(UNUSED_CONTEXT) == 4
+
     @test_broken isempty(unused)
 end
 

@@ -75,6 +75,15 @@ straight before deleting anything** — dimensional analysis and conservation ar
 tautological and are among the most productive checks here. See *Necessary truths:
 constraining versus restating* below.
 
+**The assertion must consume the finest-grained thing the function returns.** If a
+function computes categories and the test compares their union, the categories are
+documentation. Three guards here have failed this way and each fix was one line:
+a count compared where the function returned a set; a subset counted where full
+coverage was asserted; and category membership printed on mismatch while only the
+union was checked, so a real citation gap could be relabelled "deliberate
+context" with the suite green. **In all three the discriminating data was already
+computed and discarded at the assertion line.**
+
 **Restore a mutation from a scratchpad copy, never with `git checkout`.** A
 mutation check edits a real file; undoing it with `git checkout -- <file>` reverts
 *everything* uncommitted in that file, not the mutation. That destroyed four
@@ -82,6 +91,21 @@ applied reference fixes here in one command. `checkout` reads as an undo and is
 not one when the file carries unstaged work, and the loss is silent — the suite
 goes green because the mutation is gone, and so is the work. Copy to the
 scratchpad before mutating, restore from the copy after.
+
+**A paper's title is not its finding, and the audit already knows the difference.**
+The sharpest version of the summary defect has no external symptom at all: the
+citation is correct, the DOI resolves, nothing drifts, every guard passes — and
+the sentence still misreports the source, because the title was read as the
+result. §2.6 cited Khajo 2011 as reporting protection from lethal-dose gamma; its
+endpoints are EPR, absorbance, TBARS and Bi binding, and
+`docs/research/radiotrophic_compatibility_audit.md:230` says in as many words that
+the survival comparison is not performed there. That row was in this repository,
+unread, when the sentence was written.
+
+**No guard reaches this, and proposing one is the wrong lesson.** The obligation is
+procedural: a paper entering a section on evidence has its ENDPOINT read from the
+audit before the sentence is written. The audit exists because titles and endpoints
+diverge, and it already holds both.
 
 **And draw the known-bad from the artifact path, never from your own hand.** A
 control you construct tests your idea of the failure; one recovered from where
@@ -243,6 +267,17 @@ Any number this repository has published and later found wrong gets **all** of:
    has no reason to touch the document. On 2026-08-31 a red-team line read
    *"RM-G04-01 remains unenforced pending RETRACTED_IN_SOURCES"* for several hours
    after that guard shipped with RM-G04-01's string in its vocabulary.
+
+   **Attribution-with-correction is permitted only while the string is in no
+   retraction vocabulary.** Naming what an earlier report claimed and correcting
+   it in the same breath is ordinary practice, and
+   `coupling/biofilm_openmc/mesh.py:47` does it well. But once a string enters
+   `RETRACTED_IN_SOURCES` or `RETRACTED_CITATIONS`, the artifact carries it in no
+   form and the row holds it alone. Vocabulary membership is the trigger because
+   it tracks the two harms separately: the copy risk is low while the string is
+   visibly marked withdrawn in place, and the guard-collision risk is *created* by
+   adding it. **A comment that was compliant becoming a failure the day its string
+   is guarded is the guard working, not a regression.**
 
    **A superseded record is exempt, and it declares that with a fixed token so
    the scope of this audit is a grep rather than a memory.** The first line of a

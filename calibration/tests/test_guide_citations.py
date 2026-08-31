@@ -33,7 +33,7 @@ GUIDES = REPO / "docs" / "guides"
 # The fragment is taken verbatim between the last pair of backticks, so it may
 # contain pipes escaped as \| -- which the Robin condition's |_{r=R} needs.
 ROW = re.compile(
-    r"^\|(?P<claim>[^|]*)\|\s*`(?P<path>[^`:]+):(?P<line>\d+)`\s*\|\s*`(?P<frag>.+?)`\s*\|\s*$",
+    r"^[ \t]*\|(?P<claim>[^|]*)\|\s*`(?P<path>[^`:]+):(?P<line>\d+)`\s*\|\s*`(?P<frag>.+?)`\s*\|\s*$",
     re.M)
 
 
@@ -44,7 +44,13 @@ ROW = re.compile(
 # it in the guard written to check citations would be the joke completing itself.
 # So anything shaped like a citation row is counted, and the strict parser must
 # account for every one.
-LOOSE_ROW = re.compile(r"^\|.*`[^`]+:\d+`.*\|", re.M)
+# LEADING WHITESPACE IS ALLOWED IN BOTH, and it has to be both. A row indented
+# two spaces -- still a valid Markdown table row -- matched NEITHER pattern, so
+# `cites` and `loose` shrank together and the count-equality check still held.
+# The safety net added so an unparsed row could not hide was itself blind to the
+# one way a row hides. A citation smuggled in indented was never resolved and
+# never reported.
+LOOSE_ROW = re.compile(r"^[ \t]*\|.*`[^`]+:\d+`.*\|", re.M)
 
 
 def guide_files() -> list[Path]:

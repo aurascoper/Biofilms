@@ -363,14 +363,25 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
         # nobody rereads is a number nobody acts on. PP-DEFF-01 sat in this class
         # with a prescribed comment fix unapplied until 2026-08-31, and it was
         # found only because a guard was being built for a different cause.
-        pseudo = [r for r in rows if r["document"] in PSEUDO_DOCUMENTS]
+        # GENERATED_ARTIFACTS ROWS ARE ENFORCED NOWHERE TOO, AND THIS REPORT
+        # MISSED THEM. PILOT-LEV-01 is a `delete` verdict whose document is a
+        # gitignored pilot output: document_path resolves it, the file does not
+        # exist on any clean checkout, the main guard silently continues past it,
+        # and it appeared in NO section of this printout. The report whose stated
+        # job is naming every row nothing enforces was itself incomplete, which is
+        # the defect it exists to prevent.
+        pseudo = [r for r in rows
+                  if r["document"] in PSEUDO_DOCUMENTS
+                  or r["document"] in GENERATED_ARTIFACTS]
         unresolved = [r for r in pseudo
                       if r["status"] in ("delete", "restate", "requalify",
                                          "needs_verification", "needs_calibration")]
         names_source = [r for r in unresolved
                         if re.search(r"\.(jl|R|py)\b", r["code_location"] or "")]
-        print(f"  ENFORCED NOWHERE: {len(pseudo)} rows name a pseudo-document "
-              f"({', '.join(sorted(PSEUDO_DOCUMENTS))}), so no guard reads them")
+        print(f"  ENFORCED NOWHERE: {len(pseudo)} rows are unreachable by any "
+              f"guard -- {', '.join(sorted(PSEUDO_DOCUMENTS))} name no file, and "
+              f"{len(GENERATED_ARTIFACTS)} gitignored artifact path(s) exist on no "
+              "clean checkout")
         print(f"      of those, {len(unresolved)} carry an unresolved verdict "
               f"and {len(names_source)} of those name a source file:")
         for r in names_source:
@@ -1312,6 +1323,49 @@ CITATION_RECORDING_FILES = {
 }
 
 
+def _normalised_for_retraction(text: str) -> str:
+    """Text folded so a withdrawn string cannot hide behind formatting.
+
+    EXACT-SUBSTRING MATCHING WAS DEFEATED BY THREE THINGS THAT CHANGE NOTHING
+    ABOUT WHAT A READER SEES, all verified: an uppercase DOI (DOIs are
+    case-insensitive by the DOI standard, so it resolves to the same withdrawn
+    paper), a newline inside the DOI (which LaTeX renders identically and which
+    ordinary column-wrap produces by accident), and a percent-encoded slash. A
+    withdrawn claim reintroduced into a source comment arrives in a WRAPPED
+    comment, so the newline case is the likely one rather than the exotic one.
+
+    Case-folding is safe here because the vocabulary is DOIs and claim phrases,
+    neither of which carries meaning in case.
+    """
+    # LEADING comment markers are dropped PER LINE, not globally: a claim wrapped
+    # across two comment lines reassembles as `...range# 1e-4...` and the marker
+    # breaks the match. Stripping `#`/`%`/`//` anywhere would over-fold and invent
+    # matches, so only the marker that opens a continuation line is removed.
+    lines = [re.sub(r"^\s*(#+|%+|//)\s*", "", ln) for ln in text.split("\n")]
+    joined = "\n".join(lines)
+    return re.sub(r"\s+", "", joined).replace("%2F", "/").replace("%2f", "/").lower()
+
+
+def _is_derived_from_a_scanned_source(path: Path) -> bool:
+    """True when `path`'s content is a build product of a file this scan reads.
+
+    THE RULE IS "DERIVED FROM A SOURCE ALREADY SCANNED", NEVER "EXEMPT BECAUSE OF
+    WHERE IT LIVES", AND THE REASON LIVES HERE RATHER THAN AT ONE CALL SITE. That
+    split is what failed: the narrowing was made for the citation scanner and its
+    reasoning recorded on that function, and the next scanner written into this
+    same file reached for the rule instead and got the blanket
+    `"__pycache__" in path.parts` skip the narrowing existed to remove. A file
+    inside a directory named `__pycache__` with NO sibling source is scanned --
+    it is a place to hide a string, not a build product.
+
+    Any future walker over this tree wants this predicate, not a location test.
+    """
+    if "__pycache__" not in path.parts:
+        return False
+    stem = path.name.split(".")[0]
+    return (path.parent.parent / f"{stem}.py").is_file()
+
+
 def files_carrying_retracted_citations() -> dict:
     """{repo-relative path: [dois]} for every file containing a withdrawn DOI.
 
@@ -1337,16 +1391,15 @@ def files_carrying_retracted_citations() -> dict:
         # scanned rather than skipped.
         if not path.is_file() or ".git" in path.parts:
             continue
-        if "__pycache__" in path.parts:
-            stem = path.name.split(".")[0]
-            if (path.parent.parent / f"{stem}.py").is_file():
-                continue        # derived from a source this scan already reads
-            # orphaned cache with no source in scope: scan it
+        if _is_derived_from_a_scanned_source(path):
+            continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        hits = [d for d in RETRACTED_CITATIONS if d in text]
+        flat = _normalised_for_retraction(text)
+        hits = [d for d in RETRACTED_CITATIONS
+                if _normalised_for_retraction(d) in flat]
         if hits:
             out[str(path.relative_to(REPO)).replace("\\", "/")] = sorted(hits)
     return out
@@ -1463,13 +1516,15 @@ def sources_carrying_retracted_strings() -> dict:
     for path in REPO.rglob("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
-        if "__pycache__" in path.parts or path.suffix not in SOURCE_SUFFIXES:
+        if _is_derived_from_a_scanned_source(path) or path.suffix not in SOURCE_SUFFIXES:
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        hits = [s for s in RETRACTED_IN_SOURCES if s in text]
+        flat = _normalised_for_retraction(text)
+        hits = [s for s in RETRACTED_IN_SOURCES
+                if _normalised_for_retraction(s) in flat]
         if hits:
             out[str(path.relative_to(REPO)).replace("\\", "/")] = sorted(hits)
     return out

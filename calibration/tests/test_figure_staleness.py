@@ -157,10 +157,37 @@ def unrendered_runs(svg_source: str, txt: str) -> list[str]:
     flat = " ".join(txt.split())
     out = []
     for s in svg_text_runs(svg_source):
+        # THE CLIPPING ALLOWANCE IS EARNED PER RUN, NOT GRANTED TO ALL OF THEM.
+        # The first version dropped the final token of EVERY run, because one run
+        # in 39 has its last word clipped at the column boundary. That left the
+        # last token of all 39 unchecked -- and one of them is a citation year:
+        # `volume bromide did not (Hay et al. 2011,`. Changing 2011 to 2019 left
+        # the guard green, forging a citation inside the figure whose entire
+        # history is withdrawn claims surviving in images.
+        #
+        # So: try the whole run first. Only if that fails may the final token be
+        # dropped, and only then. A run that does not clip is checked in full.
+        if s in flat:
+            continue
         w = s.split()
-        head = " ".join(w[:-1]) if len(w) > 1 else s
-        if head not in flat:
-            out.append(s)
+        if len(w) > 1:
+            head = " ".join(w[:-1])
+            i = flat.find(head)
+            if i >= 0:
+                # THE HEAD MATCHING IS NOT ENOUGH -- that is the hole itself. The
+                # allowance applies only when the extraction TRUNCATES the final
+                # token, so what follows the head must be a proper prefix of it.
+                # A different word there is an edit, not a clip: changing
+                # `2011,` to `2019,` leaves the head intact and must still fail.
+                after = flat[i + len(head):].split()
+                tail = w[-1]
+                # Only the FIRST whitespace-delimited fragment after the head:
+                # the extraction continues into the next run, so a wider window
+                # compares this run's tail against a neighbour's opening words.
+                frag = after[0] if after else ""
+                if len(frag) >= 3 and tail.startswith(frag) and frag != tail:
+                    continue              # genuinely clipped at the boundary
+        out.append(s)
     return out
 
 
@@ -262,6 +289,26 @@ def test_the_source_to_artifact_binding_detects_an_edited_svg():
         assert unrendered_runs(mutated, txt), (
             f"{label} edit was not caught -- text after the opening words can "
             "diverge from the artifact unnoticed")
+
+    # THE CASE THE FOUR CONTROLS BELOW STRUCTURALLY CANNOT REACH: the final token
+    # of a run that does NOT clip. Three of them mutate the one run that clips and
+    # the fourth mutates a first word, so none could see that the clipping
+    # allowance was being granted to all 39 runs rather than to the one that earns
+    # it. That hole let `2011,` become `2019,` in a citation with the suite green.
+    #
+    # 35 of 39 runs are present in the extraction in full. This mutates one of
+    # them, and asserts the mutation applied -- a no-op here would report ESCAPES
+    # for the wrong reason, which happened while writing this: the first candidate
+    # token came from a phrase withdrawn from the figure months ago and no longer
+    # in the source at all.
+    nonclipping = [r for r in runs if r in " ".join(txt.split()) and len(r.split()) > 3]
+    assert nonclipping, "no full-present run to draw the control from"
+    tail = nonclipping[0].split()[-1]
+    mutated, _ = _mutate_inside(source, nonclipping[0], " " + tail, " Notarealword")
+    assert mutated != source, "final-token control: mutation did not apply"
+    assert unrendered_runs(mutated, txt), (
+        "the final token of a NON-clipping run was edited and not caught -- the "
+        "clipping allowance is being granted to runs that do not clip")
 
     # TEST SET, and it is labelled as such the way tools/absence_gate.py labels
     # its own: a DIFFERENT run, whose final token is not clipped. Deriving the
