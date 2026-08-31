@@ -366,6 +366,11 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
         print("      FIG-01, FIG-02, FIG-05 — in-plot labels; no run of "
               "MIN_WORDS survives the comma and paren split. Covered by "
               "RETRACTED_IN_FIGURES, not by the phrase guard")
+        print("      FIG-09, FIG-10 — full sentences that DO yield a phrase, and "
+              "the phrase is still unreachable: pdftotext -layout reads the "
+              "three columns across, so the run is contiguous nowhere. Also "
+              "covered by RETRACTED_IN_FIGURES. Listing them beside the three "
+              "above is the point — 'yields a phrase' is not 'is covered'")
 
     assert len(yields_phrase) >= 25
 
@@ -902,7 +907,27 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
 # could rebuild the artifact. Three words, so the phrase guard could never have
 # reached it either: without this term FIG-05 would have been covered by
 # nothing, while sitting in a list named for rows the vocabulary covers.
-RETRACTED_IN_FIGURES = ("radiotroph", "gy cumulative")
+#
+# "charge-excluded" and "same trap" are FIG-09 and FIG-10, and they are here for
+# a reason the first three do not share: THEIR CLAIM TEXT DOES YIELD A SEARCHABLE
+# PHRASE AND THE PHRASE IS STILL NOT FINDABLE IN THE ARTIFACT. `pdftotext
+# -layout` reads a three-column figure across, so "Bromide is size- and
+# charge-excluded from fine porosity." comes back as "...charge-excluded
+# breakthrough lag gives a lumped run alongside every measurement. from fine
+# porosity." — the phrase interleaved with two other columns and contiguous
+# nowhere. Verified against the real pre-correction sidecar, where `_detected`
+# returns [] for both rows.
+#
+# THAT DISTINCTION IS THE WHOLE DEFECT THIS LIST NOW CLOSES. "Yields a phrase"
+# was read as "is covered", and it is not the same predicate: coverage is a
+# property of the ARTIFACT, not of the claim text. A hand-run control that
+# appends the sentences as clean contiguous lines confirms a guard against an
+# input shape a column layout cannot produce — a control passing on a mechanism
+# that never ran, which is what the fig1/fig2 control below was already written
+# to avoid. Between c2219a2 and this commit, FIG-09 and FIG-10 were covered by
+# nothing at all.
+RETRACTED_IN_FIGURES = ("radiotroph", "gy cumulative",
+                        "charge-excluded", "same trap")
 
 
 def figure_sidecars() -> list[Path]:
@@ -951,9 +976,18 @@ def test_the_figure_guard_detects_the_pre_correction_artifacts():
     exactly as it does for HANDOUT-01's equation, and the vocabulary floor is
     the whole of their coverage. Asserting a phrase hit here would have made the
     control pass on a mechanism that never ran.
+
+    EXTENDED TO THE FOURTH ARTIFACT, and the glob had to widen to reach it.
+    `phase2_diffusion_cell_prefix.txt` does not match `fig*`, so while this
+    control globbed `fig*_prefix.txt` a committed known-bad sat in the fixtures
+    directory covered by nothing — the count assertion pinned three and passed,
+    which is the shape of every other defect on this page: a bound checked
+    against the set it was derived from. FIG-09 and FIG-10 differ from the first
+    three in that their claim text DOES yield a phrase; it is simply unfindable
+    in a column layout. See RETRACTED_IN_FIGURES.
     """
-    prefix = sorted(FIXTURES.glob("fig*_prefix.txt"))
-    assert len(prefix) == 3, f"expected three pre-correction figures, got {prefix}"
+    prefix = sorted(FIXTURES.glob("*_prefix.txt"))
+    assert len(prefix) == 4, f"expected four pre-correction figures, got {prefix}"
 
     hits = retracted_vocabulary_hits(prefix)
     assert {p for p, _ in hits} == {f.name for f in prefix}, (
@@ -964,43 +998,61 @@ def test_the_figure_guard_detects_the_pre_correction_artifacts():
     assert retracted_vocabulary_hits(figure_sidecars()) == []
 
 
-def test_the_figure_rows_are_honest_about_being_vocabulary_only(rows):
-    """A ROW COVERED BY A WORD LIST IS NOT COVERED BY THE PHRASE GUARD.
+def test_no_figure_row_is_reachable_by_the_phrase_guard(rows):
+    """COVERAGE IS A PROPERTY OF THE ARTIFACT, NOT OF THE CLAIM TEXT.
 
-    `test_no_deleted_claim_survives_in_the_document_it_names` reads the figure
-    sidecars and finds nothing in them for the vocabulary-only rows — not because
-    the figures are clean, but because their claim text has no searchable run.
-    That is a legitimate limit and an illegible one: it looks identical to
-    coverage. So the two tiers are named separately and BOTH directions are
-    asserted, because each drift is a different silent loss:
+    The first version of this test split the figure rows into a vocabulary tier
+    and a phrase tier by asking whether `distinguishing_phrase` returned
+    anything, and put FIG-09 and FIG-10 in the phrase tier because their claim
+    text yields a full sentence. THAT PREDICATE IS WRONG AND THE ROWS WERE
+    COVERED BY NOTHING. `pdftotext -layout` reads a three-column figure across,
+    so the sentence comes back interleaved with the other two columns and is
+    contiguous nowhere; `_detected` returns [] for both against the real
+    pre-correction sidecar. A phrase that exists in the ledger and cannot occur
+    in the artifact is not a guard, and it looked exactly like one.
 
-    - a vocabulary-only row that gains a phrase has moved to the STRONGER guard,
-      and leaving it listed here would understate the coverage;
-    - a phrase-covered row that loses its phrase has silently dropped to the
-      weaker word-list floor, which is the failure this test exists to catch.
+    The hand-run that "confirmed" the phrase guard bites appended both sentences
+    as clean lines, which is a shape a column layout cannot produce -- a control
+    passing on a mechanism that never ran, which is the same defect the fig1/fig2
+    control below was written to avoid. Hence this test asks the artifacts.
 
-    FIG-09 and FIG-10 are the phrase tier. They are the withdrawn anion-exclusion
-    claims, both against `phase2_diffusion_cell.pdf`, and their phrases are what
-    the sidecar guard searches for — so if either sentence returns to the figure,
-    the phrase guard bites rather than this one.
-
-    SCOPE: the `delete` rows whose `document` is under `preprint/figures/`, and
-    no other row.
+    SCOPE: the `delete` rows whose `document` is under `preprint/figures/`,
+    evaluated against the four committed `*_prefix.txt` sidecars and nothing
+    else. It says nothing about rows in any other document.
     """
-    vocabulary_only, phrase_covered = [], []
-    for row in deleted_rows(rows):
-        if not row["document"].startswith("preprint/figures/"):
-            continue
+    known_bad = sorted(FIXTURES.glob("*_prefix.txt"))
+    assert len(known_bad) == 4, (
+        f"expected four pre-correction sidecars, got {[p.name for p in known_bad]}")
+    joined = "\n".join(
+        normalise_plaintext(p.read_text(encoding="utf-8", errors="replace"))
+        for p in known_bad)
+
+    figure_rows = [r for r in deleted_rows(rows)
+                   if r["document"].startswith("preprint/figures/")]
+    assert {r["claim_id"] for r in figure_rows} == {
+        "FIG-01", "FIG-02", "FIG-05", "FIG-09", "FIG-10"}, (
+        f"the figure row set moved: {sorted(r['claim_id'] for r in figure_rows)}. "
+        "A new figure `delete` row needs a known-bad sidecar before it can be "
+        "said to be covered by anything.")
+
+    reachable = []
+    for row in figure_rows:
         phrase = distinguishing_phrase(row["claim_text"])
-        (phrase_covered if phrase else vocabulary_only).append(row["claim_id"])
-    assert sorted(vocabulary_only) == ["FIG-01", "FIG-02", "FIG-05"], (
-        f"vocabulary-only tier moved: {sorted(vocabulary_only)}. A row that "
-        "gained a phrase belongs in phrase_covered; a row that lost one has "
-        "dropped to the weaker word-list floor. Update this test and its notes.")
-    assert sorted(phrase_covered) == ["FIG-09", "FIG-10"], (
-        f"phrase-covered tier moved: {sorted(phrase_covered)}. If a row left "
-        "this list its claim text no longer yields a searchable run, so the "
-        "sidecar guard has stopped covering it.")
+        if phrase and phrase.lower() in joined:
+            reachable.append(row["claim_id"])
+    assert not reachable, (
+        f"{reachable} are now findable as contiguous phrases in a known-bad "
+        "figure sidecar, so the phrase guard genuinely covers them and this "
+        "test's premise has changed. That is an improvement -- record which "
+        "rows moved and why the layout now preserves the run.")
+
+    # THE OTHER HALF, OR "COVERED BY NOTHING" AND "COVERED BY THE FLOOR" ARE THE
+    # SAME RESULT HERE. Asserting only that no phrase reaches the artifacts is
+    # satisfied by a word list that fires on none of them.
+    covered = {name for name, _ in retracted_vocabulary_hits(known_bad)}
+    assert covered == {p.name for p in known_bad}, (
+        "the vocabulary floor is the whole of these rows' coverage and it does "
+        f"not fire on every known-bad artifact: {sorted(covered)}")
 
 
 def test_every_committed_figure_matches_its_hash():
