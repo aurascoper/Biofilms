@@ -70,6 +70,11 @@ which was the second defect in the same three lines.
 Neither is visible by reading the assertion. One is an assertion that cannot fail; the
 other is an input that never changed.
 
+**And "cannot fail" is not the same as "tautological", which is a distinction worth keeping
+straight before deleting anything** — dimensional analysis and conservation arguments are
+tautological and are among the most productive checks here. See *Necessary truths:
+constraining versus restating* below.
+
 **And draw the known-bad from the artifact path, never from your own hand.** A
 control you construct tests your idea of the failure; one recovered from where
 the real input comes from tests the pipeline. Where a guard reads a *derived*
@@ -151,6 +156,50 @@ list, which reintroduced exactly that ambiguity.)
   institution says otherwise, in a document, with an identifier.
 
 If a change would move any of these, stop and say so. Do not implement it.
+
+## Necessary truths: constraining versus restating
+
+Rule 1 can be misread as "a tautology is a defect." It is not, and flattening three
+different things under that word has already caused trouble here. **The working distinction
+is not tautological versus not. It is whether a necessary truth CONSTRAINS — forbids
+something — or merely RESTATES.**
+
+**1. The vacuous assertion. A defect, full stop.** An assertion that stays green when
+weakened to something trivially true forbids nothing. It consumed a slot in the suite and
+reported confidence it had not earned. Delete it, or — if it documents an invariant the
+surrounding construction actually provides — say so in the file and stop calling it a
+control. The mechanical test is in rule 1.
+
+**2. Contingent circularity. Not a tautology, and not empty.** A model that recovers its
+own assumption is not true by logical form; it is a correct implementation of a premise.
+The accurate statement is that **the model is not independent evidence for its own
+assumption** — non-informative about the thing it appears to be about, which is different
+from vacuous. This repository has several: `README.md:413` records that the melanin
+ordering among the three producers "is set by the input `α_M`", and
+`docs/preprint_revision_plan.md:107` records a §6.3 scatter that "is a scatter of Table 2's
+own entries." The `β_ion` column has the same shape, spending survival evidence on a
+tropism coefficient. None of these is a bug in the code. Each is a claim that must not be
+reported as a result.
+
+**3. The load-bearing necessary truth. Tautological and indispensable.** Dimensional
+analysis tells you nothing you did not put in — Buckingham π adds no physics — and it is
+how the `D_eff` collision was caught and how the units error behind
+`RADIODIALYSIS: BLOCKED` was found. Conservation arguments are tautological in the same
+sense. So is the shell derivation in `docs/guides/calculus_in_this_code.md`: two face areas
+and a volume, no new physics, and the most useful page in the document. **What makes these
+productive is that the consequences are not obvious from the premises even though they
+follow necessarily.** They forbid things — a film-scale `D_eff` above `D₀`, an occupancy
+fraction in a `g cm⁻³` slot, a slab operator with an `r` in it.
+
+**A check that forbids nothing and a model that predicts only its inputs fail the same
+way**, which is why they belong in one place rather than two.
+
+And the same test applies to the apparatus as a whole. A repository of guards that
+collectively forbid nothing is the first failure at a larger scale. **Naming which claims
+are pinned and which are not is what stops that** — the coverage output that lists
+undetectable ledger rows by name, the guide's paragraph saying which of its prose claims no
+table pins, the SCOPE line on every absence claim. Those exist so the apparatus cannot
+quietly become a restatement of its own inputs.
 
 ## Correcting a published number
 
