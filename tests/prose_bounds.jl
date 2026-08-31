@@ -154,3 +154,83 @@ end
         @test _latex_number("no number here")      === nothing
     end
 end
+
+# ---------------------------------------------- the melanin/radiation RATIO
+#
+# A DIFFERENT DEFECT SIGNATURE FROM THE BOUND ABOVE. §6.2 said the corrected
+# reach is "only fifteen times smaller than the melanin term rather than four
+# orders". Neither ratio the shipped values produce is fifteen: 15.41 is the
+# acceptance-bias ratio computed against a reach of 5e-2, a magnitude appearing
+# nowhere in the paper. The sentence was written mid-correction -- the "four
+# orders" half was already fixed while the ratio still used the pre-pairwise
+# number -- so this is not a place a correction failed to REACH, it is a place
+# two corrections landed at different times and the earlier input survived
+# inside the later one's sentence.
+#
+# You do not find that by asking where a number went. You find it by
+# RECOMPUTING the number from values in the same document, which is what the
+# bound check above already does, which is why this belongs beside it.
+#
+# TWO RATIOS, 6% APART, AND EACH LOCATION USES THE ONE ITS REGISTER DEMANDS.
+# §6.2, §7.1 and the Conclusion compare Hamiltonian terms, so they carry the ΔH
+# ratio. The abstract quotes 15.5%, an acceptance bias, so it carries the bias
+# ratio. An unlabelled number in two places is how the next sweep finds one
+# claim disagreeing with itself.
+
+"The melanin coupling is hard-coded in compute_delta_H_terms, not tabulated."
+function _melanin_coupling(src::AbstractString)
+    m = match(r"ΔH_mel\s*-=\s*([0-9.]+)\s*\*\s*M_local", src)
+    m === nothing && return nothing
+    return parse(Float64, m[1])
+end
+
+@testset "the melanin/radiation ratio in prose is the ratio in the constants" begin
+    tex = read(TEX, String)
+    p = SR.CPMParams()
+    src = read(joinpath(REPO, "biofilms_potts.jl"), String)
+
+    coupling = _melanin_coupling(src)
+    @test coupling !== nothing
+    @test coupling ≈ 0.5
+
+    M_REPORTED = 1.44          # the melanin level Table 3's row is stated at
+    dH_mel = coupling * M_REPORTED
+    @test dH_mel ≈ 0.720
+
+    βmax, βmin = maximum(p.β_ion), minimum(p.β_ion)
+    reach = (max(0.0, βmax) + max(0.0, -βmin)) * p.I0
+
+    ratio_dH   = dH_mel / reach
+    ratio_bias = (exp(dH_mel / p.T_cpm) - 1) / (exp(reach / p.T_cpm) - 1)
+    @test isapprox(ratio_dH,   9.6;  atol = 0.05)
+    @test isapprox(ratio_bias, 10.2; atol = 0.05)
+
+    # ...and the two are NOT interchangeable, which is why each location names
+    # its register. If they ever converge this assertion says so.
+    @test !isapprox(ratio_dH, ratio_bias; rtol = 1e-3)
+
+    "The ΔH ratio §6.2 states."
+    stated_dH = let m = match(r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in", tex)
+        m === nothing ? nothing : parse(Float64, m[1])
+    end
+    @test stated_dH !== nothing
+    @test isapprox(stated_dH, ratio_dH; atol = 0.05)
+
+    @testset "the control generalises past the value it was built from" begin
+        # A synthetic sentence stating FIFTEEN failing would only re-test the
+        # training case. The control is a DIFFERENT wrong ratio, plus the
+        # correct one passing -- that pins an arithmetic relation instead of one
+        # string, and the next half-correction will not land on fifteen either.
+        wrong = raw"smaller than the melanin term by a factor of $12.0$ in $\Delta H$"
+        parsed = match(r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in", wrong)
+        @test parsed !== nothing
+        @test !isapprox(parse(Float64, parsed[1]), ratio_dH; atol = 0.05)
+
+        right = raw"smaller than the melanin term by a factor of $9.6$ in $\Delta H$"
+        ok = match(r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in", right)
+        @test isapprox(parse(Float64, ok[1]), ratio_dH; atol = 0.05)
+
+        # And fifteen, as a special case rather than as the test.
+        @test !isapprox(15.41, ratio_bias; atol = 0.05)
+    end
+end
