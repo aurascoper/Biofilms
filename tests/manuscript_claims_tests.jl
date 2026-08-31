@@ -161,14 +161,51 @@ let
     # conceding the mechanism is undiscovered. A future shrink because somebody
     # deleted a bibitem to clear a red is a DIFFERENT event, and only the named
     # form below can tell the two apart.
-    KNOWN_UNUSED = Set([
-        "alpkvist2007", "battista1997", "blasius1999", "brim2000", "eberl2001",
-        "eisenman2012", "graner1992", "kazy2009", "khajo2011", "lloyd2005",
-        "malo2018", "newsome2014", "robertson2012",
+    # THE SET CARRIES A CLASSIFICATION, NOT A LIST OF KEYS, so that a change in
+    # membership says WHICH KIND of change it was. A bare key list makes "cited a
+    # gap" and "deleted a bibitem to clear a red" the same edit. Resolved against
+    # Crossref with PubMed/Europe PMC as second index on 2026-08-31; every entry
+    # below had its DOI checked, not assumed, because four DOIs in this
+    # bibliography have now resolved to unrelated papers or to nothing.
+    #
+    # (i) SUPPORTS AN UNCITED CLAIM -- a real gap, with the sentence identified.
+    #     Citing these is a manuscript decision, not bibliography tidying, and two
+    #     of them are corrections rather than footnotes. NOT applied here.
+    UNUSED_GAP = Set([
+        "graner1992",     # L973-976 states the GGH construction with no origin cite;
+                          # Graner/Glazier/Hogeweg appear nowhere in the body
+        "alpkvist2007",   # L236-238 is assembled from this title and eberl2001's
+        "eberl2001",      # ...and attributed to xavier2005, a different model class
+        "khajo2011",      # same-species counter-evidence to L647-651
+        "malo2018",       # same
+        "robertson2012",  # primary source for L228-229, which cites only audit2026
+        "blasius1999",    # L258-261 novelty claim; weakest of the six, and becomes
+                          # (ii) if PP-T2-25's delete of the omega_s row lands
     ])
+    # (ii) DRAFT RESIDUE -- the claim they supported is gone from the manuscript.
+    UNUSED_RESIDUE = Set([
+        "brim2000",       # cited in prerevision 7.3, whose claim PP-73-02 deletes
+        "kazy2009",       # Pseudomonas is not among the seven; no surviving sentence
+    ])
+    # (iii) DELIBERATE CONTEXT -- supports no specific sentence; dropping them
+    #       loses nothing citable. Superseded or already-covered background.
+    UNUSED_CONTEXT = Set([
+        "battista1997",   # 1997 review superseded by slade2011/daly2009/daly2010
+        "eisenman2012",   # melanin synthesis; 3.6 models a rate law, not assembly
+        "lloyd2005",      # both bioremediation passages carry species primaries
+        "newsome2014",    # same
+    ])
+    KNOWN_UNUSED = union(UNUSED_GAP, UNUSED_RESIDUE, UNUSED_CONTEXT)
+
     if unused != KNOWN_UNUSED
-        println("  newly unused: ", join(sort(collect(setdiff(unused, KNOWN_UNUSED))), ", "))
-        println("  no longer unused: ", join(sort(collect(setdiff(KNOWN_UNUSED, unused))), ", "))
+        for (name, s) in (("gap", UNUSED_GAP), ("residue", UNUSED_RESIDUE),
+                          ("context", UNUSED_CONTEXT))
+            left = setdiff(s, unused)
+            !isempty(left) && println("  no longer unused, was $name: ",
+                                      join(sort(collect(left)), ", "))
+        end
+        println("  newly unused: ",
+                join(sort(collect(setdiff(unused, KNOWN_UNUSED))), ", "))
     end
     @test unused == KNOWN_UNUSED
     @test_broken isempty(unused)
