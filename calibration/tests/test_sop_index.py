@@ -157,3 +157,53 @@ def test_the_constraint_check_detects_a_collapsed_distinction(register):
     rid = next(iter(register))
     planted = {"sop_id": "SOP-YY", "requirement_id": rid, "constrained_by": rid}
     assert planted["constrained_by"] == planted["requirement_id"]
+
+
+# ---------------------------------------------------------------------------
+# THE NO-SIGNAL REGISTRY
+# ---------------------------------------------------------------------------
+# A limitations paragraph is also a registry of absent signal: every declared
+# absence is a predicate some future check will be VACUOUS against. The dose
+# topological check was proposed against a chain whose own manuscript declares
+# d(mu)/dc ~ 0, so an enclosed void that is not depleted is the correct output
+# and the check would have passed on a broken chain.
+#
+# Naming the physics term that gives a check its signal makes that mechanical
+# rather than a habit: a row whose signal_source is a term this repository has
+# DECLARED ABSENT cannot be buildable, and must therefore carry a blocked_by.
+# This is the absence-scope rule run in reverse.
+ABSENT_TERMS = {
+    "matrix diffusion (D_eff_film != D_w)":
+        "the radiodialysis solver is a Henry isotherm with a uniform sink; nothing in "
+        "it makes matrix diffusion slower than bulk",
+    "attenuation contrast with concentration":
+        "the manuscript's planned-feedback section declares d(mu)/dc ~ 0",
+    "dose-dependent survival":
+        "section 2.6: the CPM has no birth and no death",
+}
+
+
+def test_a_check_whose_signal_is_declared_absent_is_not_buildable(index):
+    for r in index:
+        src = r.get("signal_source", "").strip()
+        if src and src in ABSENT_TERMS:
+            assert r["blocked_by"].strip(), (
+                f"{r['sop_id']} names a signal source this repository declares absent "
+                f"({ABSENT_TERMS[src]}) and carries no blocked_by")
+            assert r["coverage"] != "sop", (
+                f"{r['sop_id']} claims a written SOP for a check that cannot fire")
+
+
+def test_the_no_signal_check_detects_an_unblocked_row(index):
+    """CONTROL: a row naming an absent term with no blocked_by must be reported."""
+    planted = {"sop_id": "SOP-ZZ", "coverage": "named_gap", "blocked_by": "",
+               "signal_source": "matrix diffusion (D_eff_film != D_w)"}
+    assert planted["signal_source"] in ABSENT_TERMS
+    assert not planted["blocked_by"].strip()
+
+
+def test_the_registry_terms_are_not_dead(index):
+    """And the registry must describe something in the index, or it is a list nobody
+    consults -- the same failure as a docstring recording a fact nothing surfaces."""
+    named = {r.get("signal_source", "").strip() for r in index}
+    assert named & set(ABSENT_TERMS), "no index row names any registered absent term"

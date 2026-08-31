@@ -149,13 +149,55 @@ magnitude and no dose-response measured at that magnitude. The curve is therefor
 **assumed** range, and **the range and the end that triggers refusal are both written before
 computing.**
 
-**The horizontal dose contrast is a look-up, and it runs before the curve because it can close the
-gate on its own.** At fixed depth with varying lateral distance, the available contrast is set by
-rack geometry rather than chosen, so it is a number to look up rather than assume. **If horizontal
-contrast across accessible positions is under about 2×, that is below Chengdu's 4.7× with no
-dose-response measured anywhere near pool magnitude, and 0-pre closes on collinearity-adjacent
-grounds before any power calculation runs.** A look-up that can close the gate always precedes a
-calculation that can be tuned.
+### D2 — the horizontal contrast, and the refusal threshold written before anything is looked up
+
+**The threshold and its basis are fixed first, because a look-up whose closing line is chosen
+afterwards is the same instrument as a power analysis with chosen inputs, only faster.** The earlier
+"about 2×" was gestured at by comparison to Chengdu and never derived, so it is replaced by a form
+that can be audited:
+
+> **Refusal threshold.** The design closes if the achievable horizontal dose contrast is below
+> **one half** of the total dose range across which a composition threshold has actually been
+> observed — Chengdu's 4.7× — giving a closing contrast of **2.35×**. The fraction is one half, and
+> it is a declared choice rather than a derived one; what is derived is that the comparator is the
+> only observed gradient, not an achievable one.
+
+Written before the look-up so that the number cannot be moved by what the look-up returns.
+
+**D2a — field steepness. Arithmetic, and it appears to be satisfied.** Water's linear attenuation
+coefficient at Cs-137 and ~1 MeV is of order 0.07–0.09 cm⁻¹, so the bare half-value layer is roughly
+8–10 cm; buildup from scattered photons stretches the effective falloff, plausibly to 15–30 cm per
+halving at several mean free paths. Either way a 2.35× contrast needs **tens of centimetres** of
+lateral separation, not metres.
+
+*Provenance, in the register's own idiom: this is a **derivation** from tabulated attenuation
+coefficients with named inputs. It is not a facility measurement and any real dose map supersedes it.
+Filed as `coverage = derivation` so it cannot later be mistaken for something measured.*
+
+**D2b — samplable positions. Facility access, and unresolved.** If the field is steep enough, the
+binding constraint is not steepness but whether **two or more samplable surfaces exist at adequate
+lateral separation at the same depth**. That is a question about a pool, not about physics.
+
+**Depth tolerance and lateral separation are ONE parameter, and it is a ratio.** Dose varies
+vertically at a comparable rate, so positions differing by ±10 cm in depth while separated by 20 cm
+laterally would carry depth-induced variation comparable to the signal — the confound returning as
+noise rather than as collinearity. **Depth tolerance ≤ 20% of lateral separation**, stated as a
+ratio so that changing one constrains the other automatically.
+
+**The look-up is asymmetric: it can close the gate, and it cannot open it.** Conditions (1) and (3) —
+no detectable residual across plausible effect sizes, and buffering with no monotonic form to test —
+are untouched by any contrast measurement. So the pass branch is **"proceed to D2b"**, never
+"feasible", and a favourable steepness result advances nothing on its own. The gate's failure branch
+is a disjunction of three conditions, so its pass condition is their conjunction.
+
+**If no published horizontal dose map exists for an accessible pool, that is UNRESOLVED, not a
+close.** An operational dose map is not the kind of thing that gets published — it is facility data,
+not a finding — so absence of one is a **search-scope claim and not a physical one**, and reading it
+as "the gradient must be inadequate" would close a gate on the wrong grounds. That branch is written
+now precisely because it is the likely outcome and would otherwise be decided on the day. It
+converts into a question for Hoffman under the rule that already governs the memo: state what the
+design needs, ask whether the sampling exists, assert nothing about his facility from secondhand
+reading.
 
 **"Detectable residual" has no definition without a stated metric and test.** Bray–Curtis
 dissimilarity with PERMANOVA and dose as a continuous covariate is the conventional shape, and its
@@ -258,9 +300,14 @@ unbuilt today.**
 
 ## Three places this fails before anyone spends money
 
-1. **0-pre**: no range of plausible effect sizes leaves a detectable residual, **or** horizontal
-   sampling at fixed depth is unavailable so dose cannot be separated from depth, **or** the
-   cross-protection buffering means composition has no monotonic form to test. Nothing is runnable.
+1. **0-pre**, whose failure branch is a **disjunction** of three conditions — so its pass condition
+   is their **conjunction**, and satisfying one advances nothing:
+   (a) no range of plausible effect sizes leaves a detectable residual;
+   (b) the horizontal contrast is below 2.35× (D2a), **or** no two samplable surfaces exist at
+       adequate lateral separation at the same depth (D2b);
+   (c) cross-protection buffering leaves composition with no monotonic form to test.
+   **A fourth outcome is not a close:** no published dose map for an accessible pool is UNRESOLVED,
+   a search-scope claim rather than a physical one, and becomes a question for Hoffman.
 2. **Phase 0**: the residual is below the floor with the control dissociating. Nothing is sent.
 3. **Phase 1**: composition does not track computed dose. The coupling earns nothing.
 
