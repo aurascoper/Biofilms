@@ -223,13 +223,32 @@ Any number this repository has published and later found wrong gets **all** of:
    the convention has to be a habit rather than something the suite catches,
    because at the moment of writing there is nothing to catch it.
 
-4. **and an audit of everything computed FROM it.** A withdrawn measurement
+4. **and, when what you closed was an ABSENCE, an audit of everything that
+   asserted that absence.** Step 5 audits what was computed *from* a corrected
+   number. This is its sibling pointed backwards: **a document whose job is
+   recording what is unenforced becomes wrong the moment the enforcement ships.**
+   Every "remains unenforced pending X", "not built", "named, not fixed" entry is
+   a claim with an expiry date nobody sets.
+
+   It recurs by construction, not by carelessness — the entry is written when the
+   gap is real, and closing the gap is a separate act in a separate commit that
+   has no reason to touch the document. On 2026-08-31 a red-team line read
+   *"RM-G04-01 remains unenforced pending RETRACTED_IN_SOURCES"* for several hours
+   after that guard shipped with RM-G04-01's string in its vocabulary.
+
+   **A frozen record is exempt and must say so at the top.**
+   `docs/preprint_revision_plan.md` opens "SUPERSEDED — kept as the record of how
+   the revision was planned", and its stale "still open" entries are correct as
+   history. That banner is the discriminator: a live record may not be stale, a
+   declared-frozen one may. Anything without the banner is live.
+
+5. **and an audit of everything computed FROM it.** A withdrawn measurement
    takes its dependents with it. The 3.2 µm ladder row was withdrawn and its
    own headline corrected twice, while the interface-area range published a few
    lines below — `0.41–0.51 across 16×` — kept both of its halves from that row:
    0.41 was its error, and 16× was 3.2 → 0.2. The correction stood next to a
    number that contradicted it. Grep the value, and grep what it was divided by.
-5. If an earlier correction claimed "every other conclusion is unchanged" and
+6. If an earlier correction claimed "every other conclusion is unchanged" and
    this one disproves it, **delete that sentence — do not reword it.** A
    paraphrase is the same claim: "the conclusions themselves are unchanged"
    replaced the original here and sat one line above the paragraph documenting
