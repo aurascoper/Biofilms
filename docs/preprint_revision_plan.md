@@ -1,3 +1,5 @@
+SUPERSEDED: 2026-08-15 — the record of how the v1.1 revision was planned; its "still open" entries are history, not status.
+
 # Preprint revision plan
 
 > **SUPERSEDED — kept as the record of how the revision was planned.** The revision it plans has

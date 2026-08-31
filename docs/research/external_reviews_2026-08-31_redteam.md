@@ -374,6 +374,47 @@ review that was told what to find.
 
 ---
 
+# The thirteen orphaned bibitems — dispositions pinned before the resolution
+
+A classification pass is running over the 13 `\bibitem` entries that no `\cite` reaches.
+**The dispositions below are written before its results arrive**, for the reason 0-pre pins
+its inputs before computing a curve: a rule chosen after seeing the answer is a rule chosen
+by the answer.
+
+**The pass is classification, not citation.** An entry earns a `\cite` by supporting a
+sentence, not by being unreferenced. `turick2011` and `casadevall2017` were cited because
+§2.6 needed what they carry; that reasoning does not extend to the rest. Three classes:
+
+- **(i) supports an uncited claim** — a real gap. Claiming this requires quoting the
+  manuscript sentence and line the entry would support.
+- **(ii) draft residue** — the claim it supported is gone.
+- **(iii) deliberate context** — supports no specific sentence; removing it loses nothing
+  citable.
+
+## Two dispositions decided in advance
+
+**`graner1992`, if no sentence can be located.** This is the founding Cellular Potts paper
+in a manuscript that implements a CPM, so class (i) is the expectation — but the
+requirement is a *specific sentence*, and the sentence that most wants it may be a methods
+statement rather than a claim. "The CPM core is implemented in Julia" does not obviously
+want a citation; the paper belongs wherever the manuscript first says what a Cellular Potts
+Model *is*.
+
+**If the pass returns no locatable sentence, that is a finding about the manuscript, not
+about the bibitem: the model is used without ever being introduced.** It goes to a ledger
+row against the manuscript, not into class (ii) or (iii). Recording that now so the empty
+result cannot be quietly filed as "deliberate context".
+
+**A fourth outcome, which the three classes cannot hold.** An entry whose DOI resolves to an
+unrelated paper is neither gap nor residue nor context. **Given the base rate here — three
+such entries already found in this one bibliography — it is likelier than not among
+thirteen.** It is `PP-REF-01`'s category and takes `PP-REF-01`'s treatment: a ledger row
+with a `delete` verdict naming the correct reference, not a classification. Pinned now
+because discovering it mid-pass invites folding it into (ii), which would lose the
+distinction between *we stopped needing this* and *this was never what it said it was*.
+
+---
+
 ## Summary
 
 | # | Claim | Verdict |

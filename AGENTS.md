@@ -236,11 +236,26 @@ Any number this repository has published and later found wrong gets **all** of:
    *"RM-G04-01 remains unenforced pending RETRACTED_IN_SOURCES"* for several hours
    after that guard shipped with RM-G04-01's string in its vocabulary.
 
-   **A frozen record is exempt and must say so at the top.**
-   `docs/preprint_revision_plan.md` opens "SUPERSEDED — kept as the record of how
-   the revision was planned", and its stale "still open" entries are correct as
-   history. That banner is the discriminator: a live record may not be stale, a
-   declared-frozen one may. Anything without the banner is live.
+   **A superseded record is exempt, and it declares that with a fixed token so
+   the scope of this audit is a grep rather than a memory.** The first line of a
+   superseded document is:
+
+   ```
+   SUPERSEDED: <date> — <what it is the record of>
+   ```
+
+   Step 4's scope is then `grep -L '^SUPERSEDED:' docs/**/*.md`, which is the live
+   set. A live record may not be stale; a superseded one may.
+
+   **The token is deliberately not the English word, because that word is already
+   taken here and means the opposite.** `docs/calibration/reference_d_measurement
+   _protocol.md` opens `**Frozen:** 2026-08-15` — frozen as in *pinned and
+   binding*, a live authoritative document. Matching on "frozen" or "superseded"
+   as prose would exempt it, and would also match
+   `docs/correspondence/wan_v11_note.md`, where "superseded" appears in the body
+   describing the note's own content. Surveyed: 3 of 38 documents carry anything
+   banner-like, and all three mean different things. A natural-language marker
+   would have been actively wrong rather than merely unreliable.
 
 5. **and an audit of everything computed FROM it.** A withdrawn measurement
    takes its dependents with it. The 3.2 µm ladder row was withdrawn and its
