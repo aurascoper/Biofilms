@@ -2,41 +2,43 @@ Phase 2 — two-chamber diffusion cell
 Biofilm grown on a permeable support; transport read as receiver breakthrough
 
 
-                                                      biofilm on permeable support
+                                                            biofilm on permeable support
 
 
 
 
-                                       Donor                                                  Receiver
-                             concentration held constant                                     held near zero
-                                                                                                                                              timed aliquots
-                                 one solute per run                               C(t) gives the breakthrough curve
+                                            Donor                                                    Receiver
+                                 concentration held constant                                        held near zero
+                                                                                                                                                         timed aliquots
+                                     one solute per run                                   C(t) gives the breakthrough curve
 
 
 
-                                                                                                                                              metal to ICP; bromide to IC
-
-
-
-
-                          Both chambers stirred — unstirred boundary layers otherwise read as film resistance.
-
-
-
-Paired blank: bare support                                    Open choice: the tracer                                       What one run yields
-Identical cell and support, no biofilm,                       Bromide is size- and charge-excluded                          Breakthrough lag gives a lumped
-run alongside every measurement.                              from fine porosity. In Hanford sediments                      transport parameter, not a diffusivity
-Gives the support’s own resistance and                        tritiated water resolved intragranular                        alone: sorption retards it. Separating
-its wall sorption. Without it the result                      pore volume where bromide did not; an                         the two needs the partition coefficient
-is film plus support, not film.                               anionic EPS matrix is the same trap.                          from the Phase 1 suspended isotherm.
-
-Edge seal checked separately: a leak                          Tritiated water carries its own approval                      That ordering is why Phase 1 comes
-reads as fast transport.                                      burden. A question for Dr. Deng.                              first.
+                                                                                                                                                         metal to ICP; bromide to IC
 
 
 
 
-What this number is not
-The film-scale effective diffusivity measured here is not the reactor-scale dispersion coefficient that currently carries the same name in radial_parms (1×10⁻³ cm² s⁻¹, about 43× water’s
-It is the quantity slab_parms carries as D_eff (1×10⁻⁵ cm² s⁻¹) — the one default in that file below water self-diffusivity.
+                                Both chambers stirred — unstirred boundary layers otherwise read as film resistance.
+
+
+
+ Paired blank: bare support                                        Open choice: the tracer run                                       What the metal run yields
+ Identical cell and support, no biofilm,                           Bromide is the tracer because R ≈ 1: it is                        Breakthrough lag gives a lumped
+ run alongside every measurement.                                  not retarded, so its breakthrough gives                           transport parameter, not a diffusivity
+ Gives the support’s own resistance and                            D_eff directly — the number the solver takes.                     alone: sorption retards it, so the metal
+ its wall sorption. Without it the result                          If bromide is excluded from part of the pore                      run yields D_app. Separating the two
+ is film plus support, not film.                                   space, that D_eff is not the metal’s. Whether                     needs the partition coefficient from the
+                                                                   an EPS gel does that is untested.                                 Phase 1 suspended isotherm.
+ Edge seal checked separately: a leak                              At Hanford 300A tritiated water resolved pore
+                                                                   volume bromide did not (Hay et al. 2011,                          That ordering is why Phase 1 comes first.
+ reads as fast transport.
+                                                                   doi:10.1029/2010WR010303). Tritiated water’s
+                                                                   approval burden: a question for Dr. Deng.
+
+
+
+ What this number is not
+ The film-scale effective diffusivity measured here is not the reactor-scale dispersion coefficient that currently carries the same name in radial_parms (1×10⁻³ cm² s⁻¹, about 43× water’s self-diffusiv
+ It is the quantity slab_parms carries as D_eff (1×10⁻⁵ cm² s⁻¹) — the one default in that file below water self-diffusivity.
 

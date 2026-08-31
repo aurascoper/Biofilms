@@ -968,21 +968,39 @@ def test_the_figure_rows_are_honest_about_being_vocabulary_only(rows):
     """A ROW COVERED BY A WORD LIST IS NOT COVERED BY THE PHRASE GUARD.
 
     `test_no_deleted_claim_survives_in_the_document_it_names` reads the figure
-    sidecars and will find nothing in them for these three rows — not because the
-    figures are clean, but because their claim text has no searchable run. That
-    is a legitimate limit and an illegible one: it looks identical to coverage.
-    So it is asserted, and it fails the day someone rewrites a figure claim into
-    a searchable phrase without noticing the floor is now the weaker check.
+    sidecars and finds nothing in them for the vocabulary-only rows — not because
+    the figures are clean, but because their claim text has no searchable run.
+    That is a legitimate limit and an illegible one: it looks identical to
+    coverage. So the two tiers are named separately and BOTH directions are
+    asserted, because each drift is a different silent loss:
+
+    - a vocabulary-only row that gains a phrase has moved to the STRONGER guard,
+      and leaving it listed here would understate the coverage;
+    - a phrase-covered row that loses its phrase has silently dropped to the
+      weaker word-list floor, which is the failure this test exists to catch.
+
+    FIG-09 and FIG-10 are the phrase tier. They are the withdrawn anion-exclusion
+    claims, both against `phase2_diffusion_cell.pdf`, and their phrases are what
+    the sidecar guard searches for — so if either sentence returns to the figure,
+    the phrase guard bites rather than this one.
+
+    SCOPE: the `delete` rows whose `document` is under `preprint/figures/`, and
+    no other row.
     """
-    vocabulary_only = []
+    vocabulary_only, phrase_covered = [], []
     for row in deleted_rows(rows):
         if not row["document"].startswith("preprint/figures/"):
             continue
-        assert not distinguishing_phrase(row["claim_text"]), (
-            f"{row['claim_id']} now yields a searchable phrase; the phrase "
-            "guard covers it, so update this test and its notes")
-        vocabulary_only.append(row["claim_id"])
-    assert sorted(vocabulary_only) == ["FIG-01", "FIG-02", "FIG-05"], vocabulary_only
+        phrase = distinguishing_phrase(row["claim_text"])
+        (phrase_covered if phrase else vocabulary_only).append(row["claim_id"])
+    assert sorted(vocabulary_only) == ["FIG-01", "FIG-02", "FIG-05"], (
+        f"vocabulary-only tier moved: {sorted(vocabulary_only)}. A row that "
+        "gained a phrase belongs in phrase_covered; a row that lost one has "
+        "dropped to the weaker word-list floor. Update this test and its notes.")
+    assert sorted(phrase_covered) == ["FIG-09", "FIG-10"], (
+        f"phrase-covered tier moved: {sorted(phrase_covered)}. If a row left "
+        "this list its claim text no longer yields a searchable run, so the "
+        "sidecar guard has stopped covering it.")
 
 
 def test_every_committed_figure_matches_its_hash():

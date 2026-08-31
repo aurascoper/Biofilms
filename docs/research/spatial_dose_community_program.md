@@ -265,6 +265,74 @@ has** — 13 locations and depths, no dose measured, no field computed. The gap 
 sampled a basin did not compute a field, and the missing half is exactly the half this repository
 holds. That is a collaboration framing rather than an absence.
 
+### D3 — the neutron weight on a microbial target, and a gate that refuses without closing
+
+**The four dose figures this program reasons from are all gamma, and a research reactor is a mixed
+field.** They are: Chengdu's ambient rates at the Th-232 site, Shuryak's Cs-137 exposure rates, the
+0.416 Gy/h reported for areas holding irradiated fuel elements, and the 248 Gy–2 kGy D₁₀ range for
+the six spent-fuel-pool isolates cited in the Hoffman memo. That is the whole set — an enumeration
+of what this document cites, not a claim about dosimetry at large. A neutron component does not enter any of those through absorbed
+dose alone; it needs a biological weight, and **no weight for a microbial target has been
+verified here. So the gate refuses: no neutron-bearing exposure is designed, costed or asked for
+until one is sourced.**
+
+**The refusal is typed OPERATIONAL-pending, not STRUCTURAL, and the distinction is the reason for
+writing it down.** STRUCTURAL is the one label in this register that says stop looking, and it
+would be the most consequential verdict in the document resting on the least scoped claim — in a
+document going to a facility whose own people are the ones who would know. Nothing found so far
+earns it. Operationally nothing changes today: the gate refuses either way. What changes is that
+the refusal stays reopenable by someone searching the way the field is actually organised.
+
+**Four web searches, 2026-08-31, term sets verbatim.**
+
+1. `microbial neutron RBE relative biological effectiveness bacteria fungi`
+2. `bacterial spore inactivation D10 fast neutron mixed field gamma comparison reactor sterilization dosimetry`
+3. `neutron RBE bacterial spore inactivation D10 mixed neutron gamma field`
+4. `fungi neutron irradiation relative biological effectiveness spacecraft shielding microbial inactivation`
+
+**The term-set diagnosis is confirmed, and it is only half the barrier.** A microbial neutron RBE
+is largely not indexed under "RBE": it sits in sterilisation dosimetry, BNCT bystander work,
+spacecraft-shielding and planetary-protection validation, and reactor inactivation studies, and it
+is reported there as a D₁₀ under a stated mixed field with a gamma comparison alongside — an RBE in
+substance with no RBE in the title. Searches 1 and 3, which asked for the conjunction
+*microbial + neutron + RBE*, returned nothing usable. Searches 2 and 4, which named those
+literatures instead, returned three on-point documents. **So an empty result under the first term
+set discriminates nothing** — it separates "the term is not how the field names it" from "no value
+exists" not at all. **But the second term set did not clear the gate either, and the reason is now
+retrieval rather than naming:** each of the three is a document whose full text did not open from
+here.
+
+**Three leads, named so that reopening is a task and not a re-search.**
+
+1. **DTIC ADA307995**, *Neutron and γ-Ray Radiation Killing of Bacillus Species Spores: Dosimetry,
+   …* — on point by title, and the closest thing found to the exact quantity. **HTTP 403 from here,
+   unread.** That is *source inaccessible, not value absent* — the same state `HOFFMAN-11` records
+   for NACE-2019-12944, and it changes the day someone with DTIC access opens it.
+2. **NASBEE**, the neutron exposure accelerator for biological-effects experiments at NIRS
+   (*Radiat. Phys. Chem.*, ScienceDirect, paywalled). An **RBE of 3.54 at D₁₀ for 2 MeV average
+   neutrons** appears in the abstract-level material returned. **The target is not established as
+   microbial from what was read**, and NIRS's facility is built for mammalian radiobiology, so this
+   is a lead and explicitly not a number to use. Recorded because it fixes the *form* the answer
+   takes — an RBE quoted at D₁₀ against a stated neutron energy — which is what a search should
+   look for.
+3. **arXiv 2408.10929**, a comparison of spallation, reactor and compact neutron sources for
+   genetic mutation, reporting fast neutrons as an effective mutagen in plants and microorganisms.
+   The PDF returned image streams and no extractable text from here.
+
+SCOPE: the four web searches quoted above, run on 2026-08-31, plus one fetch attempt each at the
+DTIC and arXiv documents, both of which failed to return readable text. No controlled-vocabulary
+database was searched — not PubMed under MeSH, not INIS, not OSTI — no sterilisation-dosimetry
+handbook was opened, no BNCT dosimetry review was read, and no author was contacted. **This is a
+claim about a search, not about a literature**, and the three leads above are evidence that the
+literature is there.
+
+**It converts into a question rather than sitting here**, under the rule that already governs the
+memo: state what the design needs, ask whether the quantity exists, assert nothing about the
+facility from secondhand reading. The question is now in the memo's list — whether a usable neutron
+RBE for bacteria or fungi exists at all, or whether that is simply not how dosimetry is done for
+microbial targets. A radiation-materials person at a reactor either knows or knows who does, and
+that is a cheaper route to the answer than any search run from here.
+
 **0a. Inputs pinned, not chosen.** Rack pitch, array size, burnup spread and cooling times all move
 the residual, so a design failing at one setting can be rescued by widening the spread or shrinking
 the array. Geometry and the burnup/cooling distribution come from a published rack design or a

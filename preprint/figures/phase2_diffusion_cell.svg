@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 618" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 644" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
   <defs>
     <marker id="flux" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#a63a2e"/>
@@ -90,39 +90,42 @@
   <text x="378" y="348" font-size="10.5" text-anchor="middle" fill="#4b5563">Both chambers stirred — unstirred boundary layers otherwise read as film resistance.</text>
 
   <!-- three panels -->
-  <rect x="30" y="370" width="270" height="148" fill="#ffffff" stroke="#8a949e" stroke-width="1.5"/>
+  <rect x="30" y="370" width="270" height="176" fill="#ffffff" stroke="#8a949e" stroke-width="1.5"/>
   <text x="46" y="392" font-size="11.5" font-weight="600" fill="#14202b">Paired blank: bare support</text>
   <text x="46" y="412" font-size="10" fill="#3d4a56">Identical cell and support, no biofilm,</text>
   <text x="46" y="425.5" font-size="10" fill="#3d4a56">run alongside every measurement.</text>
   <text x="46" y="439" font-size="10" fill="#3d4a56">Gives the support&#8217;s own resistance and</text>
   <text x="46" y="452.5" font-size="10" fill="#3d4a56">its wall sorption. Without it the result</text>
   <text x="46" y="466" font-size="10" fill="#3d4a56">is film plus support, not film.</text>
-  <text x="46" y="486" font-size="10" fill="#3d4a56">Edge seal checked separately: a leak</text>
-  <text x="46" y="499.5" font-size="10" fill="#3d4a56">reads as fast transport.</text>
+  <text x="46" y="493" font-size="10" fill="#3d4a56">Edge seal checked separately: a leak</text>
+  <text x="46" y="506.5" font-size="10" fill="#3d4a56">reads as fast transport.</text>
 
-  <rect x="315" y="370" width="270" height="148" fill="#faf3e2" stroke="#8a6420" stroke-width="1.5"/>
-  <text x="331" y="392" font-size="11.5" font-weight="600" fill="#6b4d16">Open choice: the tracer</text>
-  <text x="331" y="412" font-size="10" fill="#6b4d16">Bromide is size- and charge-excluded</text>
-  <text x="331" y="425.5" font-size="10" fill="#6b4d16">from fine porosity. In Hanford sediments</text>
-  <text x="331" y="439" font-size="10" fill="#6b4d16">tritiated water resolved intragranular</text>
-  <text x="331" y="452.5" font-size="10" fill="#6b4d16">pore volume where bromide did not; an</text>
-  <text x="331" y="466" font-size="10" fill="#6b4d16">anionic EPS matrix is the same trap.</text>
-  <text x="331" y="486" font-size="10" fill="#6b4d16">Tritiated water carries its own approval</text>
-  <text x="331" y="499.5" font-size="10" fill="#6b4d16">burden. A question for Dr. Deng.</text>
+  <rect x="315" y="370" width="270" height="176" fill="#faf3e2" stroke="#8a6420" stroke-width="1.5"/>
+  <text x="331" y="392" font-size="11.5" font-weight="600" fill="#6b4d16">Open choice: the tracer run</text>
+  <text x="331" y="410" font-size="10" fill="#6b4d16">Bromide is the tracer because R &#8776; 1: it is</text>
+  <text x="331" y="423.5" font-size="10" fill="#6b4d16">not retarded, so its breakthrough gives</text>
+  <text x="331" y="437" font-size="10" fill="#6b4d16">D_eff directly &#8212; the number the solver takes.</text>
+  <text x="331" y="450.5" font-size="10" fill="#6b4d16">If bromide is excluded from part of the pore</text>
+  <text x="331" y="464" font-size="10" fill="#6b4d16">space, that D_eff is not the metal&#8217;s. Whether</text>
+  <text x="331" y="477.5" font-size="10" fill="#6b4d16">an EPS gel does that is untested.</text>
+  <text x="331" y="491" font-size="10" fill="#6b4d16">At Hanford 300A tritiated water resolved pore</text>
+  <text x="331" y="504.5" font-size="10" fill="#6b4d16">volume bromide did not (Hay et al. 2011,</text>
+  <text x="331" y="518" font-size="10" fill="#6b4d16">doi:10.1029/2010WR010303). Tritiated water&#8217;s</text>
+  <text x="331" y="531.5" font-size="10" fill="#6b4d16">approval burden: a question for Dr. Deng.</text>
 
-  <rect x="600" y="370" width="270" height="148" fill="#ffffff" stroke="#8a949e" stroke-width="1.5"/>
-  <text x="616" y="392" font-size="11.5" font-weight="600" fill="#14202b">What one run yields</text>
+  <rect x="600" y="370" width="270" height="176" fill="#ffffff" stroke="#8a949e" stroke-width="1.5"/>
+  <text x="616" y="392" font-size="11.5" font-weight="600" fill="#14202b">What the metal run yields</text>
   <text x="616" y="412" font-size="10" fill="#3d4a56">Breakthrough lag gives a lumped</text>
   <text x="616" y="425.5" font-size="10" fill="#3d4a56">transport parameter, not a diffusivity</text>
-  <text x="616" y="439" font-size="10" fill="#3d4a56">alone: sorption retards it. Separating</text>
-  <text x="616" y="452.5" font-size="10" fill="#3d4a56">the two needs the partition coefficient</text>
-  <text x="616" y="466" font-size="10" fill="#3d4a56">from the Phase 1 suspended isotherm.</text>
-  <text x="616" y="486" font-size="10" fill="#3d4a56">That ordering is why Phase 1 comes</text>
-  <text x="616" y="499.5" font-size="10" fill="#3d4a56">first.</text>
+  <text x="616" y="439" font-size="10" fill="#3d4a56">alone: sorption retards it, so the metal</text>
+  <text x="616" y="452.5" font-size="10" fill="#3d4a56">run yields D_app. Separating the two</text>
+  <text x="616" y="466" font-size="10" fill="#3d4a56">needs the partition coefficient from the</text>
+  <text x="616" y="479.5" font-size="10" fill="#3d4a56">Phase 1 suspended isotherm.</text>
+  <text x="616" y="500" font-size="10" fill="#3d4a56">That ordering is why Phase 1 comes first.</text>
 
   <!-- naming caution -->
-  <rect x="30" y="534" width="840" height="48" fill="#ffffff" stroke="#a63a2e" stroke-width="1.5"/>
-  <text x="46" y="553" font-size="10.5" font-weight="600" fill="#8c2f24">What this number is not</text>
-  <text x="46" y="571" font-size="10" fill="#3d4a56">The film-scale effective diffusivity measured here is not the reactor-scale dispersion coefficient that currently carries the same name in radial_parms (1&#215;10&#8315;&#179; cm&#178; s&#8315;&#185;, about 43&#215; water&#8217;s self-diffusivity).</text>
-  <text x="46" y="585" font-size="10" fill="#3d4a56">It is the quantity slab_parms carries as D_eff (1&#215;10&#8315;&#8309; cm&#178; s&#8315;&#185;) &#8212; the one default in that file below water self-diffusivity.</text>
+  <rect x="30" y="560" width="840" height="48" fill="#ffffff" stroke="#a63a2e" stroke-width="1.5"/>
+  <text x="46" y="579" font-size="10.5" font-weight="600" fill="#8c2f24">What this number is not</text>
+  <text x="46" y="597" font-size="10" fill="#3d4a56">The film-scale effective diffusivity measured here is not the reactor-scale dispersion coefficient that currently carries the same name in radial_parms (1&#215;10&#8315;&#179; cm&#178; s&#8315;&#185;, about 43&#215; water&#8217;s self-diffusivity).</text>
+  <text x="46" y="611" font-size="10" fill="#3d4a56">It is the quantity slab_parms carries as D_eff (1&#215;10&#8315;&#8309; cm&#178; s&#8315;&#185;) &#8212; the one default in that file below water self-diffusivity.</text>
 </svg>
