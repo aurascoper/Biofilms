@@ -84,6 +84,23 @@ union was checked, so a real citation gap could be relabelled "deliberate
 context" with the suite green. **In all three the discriminating data was already
 computed and discarded at the assertion line.**
 
+**The victim of a mutation is SELECTED FROM THE ARTIFACT, never recalled.** Extract
+the runs, the rows, the citations from the file as it is now; pick one from that
+extraction; mutate it. Do not reach for a string you remember being there.
+
+This has failed twice with different causes and the same outcome — an attack that
+reports ESCAPES having tested nothing, which reads as confirmation of the very
+finding being chased. Once the mutation could not apply because the source stores
+XML entities and the replacement was written against normalised text. Once the
+victim phrase had been withdrawn from that figure months earlier and was no longer
+in the file at all. "Assert the mutation applied" catches both, and did not become
+reflexive; selecting from the artifact removes the opportunity.
+
+**And it is the same root as reading a paper's title as its finding.** Both are
+reaching from memory where the artifact was available: a withdrawn phrase recalled
+into an attack, an implication recalled out of a title. The repair is one habit in
+two places — open the thing before writing the sentence about it.
+
 **Restore a mutation from a scratchpad copy, never with `git checkout`.** A
 mutation check edits a real file; undoing it with `git checkout -- <file>` reverts
 *everything* uncommitted in that file, not the mutation. That destroyed four
