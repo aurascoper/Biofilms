@@ -261,7 +261,7 @@ and implemented with the factor of 2
   & biofilms\us radiodialysis.R:110
   & dc\_dt[1] <- D\_eff * 2.0 * (c\_vec[2] - c\_vec[1]) / dr\^{}2 \\[0.35em]
 the manuscript calls it symmetry, not a wall
-  & preprint/modeling\us radioresistance\us and\us radiotropic\us fitness.tex:660
+  & preprint/modeling\us radioresistance\us and\us radiotropic\us fitness.tex:695
   & Zero-flux symmetry is imposed at \$r = 0\$. \\
 \bottomrule
 \end{longtable}
@@ -348,7 +348,7 @@ the scheme is named finite-volume method of lines
   & biofilms\us radiodialysis.R:32
   & finite-volume method of lines \\[0.35em]
 the manuscript describes both ends as handled in the operator
-  & preprint/modeling\us radioresistance\us and\us radiotropic\us fitness.tex:912
+  & preprint/modeling\us radioresistance\us and\us radiotropic\us fitness.tex:947
   & represented explicitly in the semi-discrete operator \\
 \bottomrule
 \end{longtable}
@@ -487,7 +487,7 @@ LSODA is the integrator
   & biofilms\us radiodialysis.R:380
   & method = "lsoda" \\[0.35em]
 the Julia port substeps against the diffusion bound
-  & biofilms\us potts.jl:1444
+  & biofilms\us potts.jl:1453
   & dt\_stable = 0.4 * dr\^{}2 / (2.0 * rd.params.D\_eff) \\[0.35em]
 the explicit-Euler limit is computed, not asserted
   & analysis/verify\us radiodialysis\us stability.py:153

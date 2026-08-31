@@ -171,3 +171,72 @@ def test_the_two_failure_cases_are_distinguished():
     assert "THE CODE CHANGED" in msg, (
         "a fragment absent from the whole file was not diagnosed as a changed "
         f"claim, so the two repairs are not being distinguished: {msg}")
+
+
+# ------------------------------------------- the rendered artifact, not just the source
+#
+# THE SOURCE-OF-RECORD IS THE .md AND A READER RECEIVES THE .pdf. Everything above
+# reads `docs/guides/*.md`. On 2026-08-31 the committed PDF cited
+# biofilms_potts.jl:1444, biofilms_..._fitness.tex:660 and :912 -- three line
+# numbers the .md had already been corrected away from, because edits elsewhere had
+# shifted them. Every check above passed. That is the figure-staleness defect
+# exactly: prose right, artifact wrong, and the guard reading only the prose.
+#
+# It is also the rendered-versus-source gap this session recorded one commit
+# earlier while writing about it, which is why the binding is asserted here rather
+# than left to the discipline of remembering to re-render.
+#
+# SCOPE, NARROWER THAN "THE PDF IS CURRENT": line numbers only. A prose edit to the
+# .md that never touches a citation leaves the PDF stale and this check green. The
+# .tex is a hand-maintained rendering, not generated, so nothing binds its prose to
+# the .md's -- that is a real and open gap, named here rather than implied away.
+def guide_pdfs() -> list[Path]:
+    return sorted(GUIDES.glob("*.pdf")) if GUIDES.is_dir() else []
+
+
+def pdf_text(pdf: Path) -> str:
+    import subprocess
+    return subprocess.run(["pdftotext", "-layout", str(pdf), "-"],
+                          capture_output=True, text=True).stdout
+
+
+@pytest.mark.skipif(not guide_pdfs(), reason="no rendered guide committed")
+@pytest.mark.parametrize("pdf", guide_pdfs(), ids=lambda p: p.name)
+def test_the_rendered_guide_cites_what_the_source_cites(pdf):
+    import shutil
+    md = pdf.with_suffix(".md")
+    assert md.is_file(), f"{pdf.name} has no .md source of record"
+    if not shutil.which("pdftotext"):
+        pytest.skip("pdftotext unavailable; the rendered-artifact check needs Poppler")
+
+    cites = citations(md.read_text(encoding="utf-8"))
+    assert cites, f"{md.name} yields no citations to compare against"
+    text = " ".join(pdf_text(pdf).split())
+
+    # MATCH WHAT THE EXTRACTION PRODUCES, NOT WHAT THE SOURCE WROTE. The template
+    # breaks long paths at underscores to fit the table column, and `pdftotext
+    # -layout` puts the two halves in DIFFERENT COLUMNS -- `biofilms_` on one side,
+    # `radiodialysis.R:223` on the other -- so no amount of whitespace-joining
+    # rejoins them. Checked against the real text layer rather than assumed: the
+    # segment after the final underscore survives intact for all seven paths, and
+    # full-path matching reported all fourteen citations missing from a PDF that
+    # in fact contained every one. That is the extraction-shape lesson the figure
+    # sidecars taught, arriving in a second artifact.
+    def _tail(path: str) -> str:
+        return Path(path).name.split("_")[-1]
+
+    missing = [f"{c['path']}:{c['line']}" for c in cites
+               if f"{_tail(c['path'])}:{c['line']}" not in text]
+    # ...and no line number the source has moved away from may survive in it. This
+    # half is what catches a stale render: the first is satisfied by a PDF that
+    # merely contains the right numbers somewhere among the wrong ones.
+    current = {str(c["line"]) for c in cites}
+    import re as _re
+    stale = sorted({m for m in _re.findall(r"\.(?:jl|R|py|tex|md):(\d+)", text)
+                    if m not in current})
+
+    assert not missing and not stale, (
+        f"{pdf.name} is not the render of {md.name}. Missing from the artifact: "
+        f"{missing}. Line numbers in the artifact the source no longer cites: "
+        f"{stale}. Re-render the guide -- the .md is the source of record, and "
+        "editing it without re-rendering leaves a reader holding wrong citations.")
