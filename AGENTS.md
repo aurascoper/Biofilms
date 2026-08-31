@@ -75,6 +75,14 @@ straight before deleting anything** — dimensional analysis and conservation ar
 tautological and are among the most productive checks here. See *Necessary truths:
 constraining versus restating* below.
 
+**Restore a mutation from a scratchpad copy, never with `git checkout`.** A
+mutation check edits a real file; undoing it with `git checkout -- <file>` reverts
+*everything* uncommitted in that file, not the mutation. That destroyed four
+applied reference fixes here in one command. `checkout` reads as an undo and is
+not one when the file carries unstaged work, and the loss is silent — the suite
+goes green because the mutation is gone, and so is the work. Copy to the
+scratchpad before mutating, restore from the copy after.
+
 **And draw the known-bad from the artifact path, never from your own hand.** A
 control you construct tests your idea of the failure; one recovered from where
 the real input comes from tests the pipeline. Where a guard reads a *derived*
@@ -257,13 +265,33 @@ Any number this repository has published and later found wrong gets **all** of:
    banner-like, and all three mean different things. A natural-language marker
    would have been actively wrong rather than merely unreliable.
 
-5. **and an audit of everything computed FROM it.** A withdrawn measurement
+5. **and, if the row prescribes a NUMBER, it states the derivation rather than
+   the result.** "The argument must equal the bibitem count" survives drift;
+   "correct the argument to 44" does not. `PP-REF-07` said 44, was right when
+   written, and was wrong when applied months later against 61 bibitems —
+   applying the row's own number would have introduced the defect it exists to
+   remove.
+
+   **This is the third variant of one family and it is not the same as rule 4.**
+   Rule 4 is *closing a gap makes the records of that gap stale*. This is *a
+   prescribed fix carries a derived value, and the derivation's inputs move while
+   the prescription sits unapplied*. The fix was never wrong; its inputs were.
+
+   **Nothing mechanical caught it, and nothing could have.** No guard fired — the
+   number was noticed while applying the row by hand. A prescribed value with a
+   stale derivation is invisible to every tier here, because **the row is
+   internally consistent, the artifact is internally consistent, and only their
+   relation is wrong.** There is no artifact to compare against: the prescription
+   is not yet applied, so nothing has both halves. Hence a convention rather than
+   a check. Any row prescribing a number carries the rule that produced it.
+
+6. **and an audit of everything computed FROM it.** A withdrawn measurement
    takes its dependents with it. The 3.2 µm ladder row was withdrawn and its
    own headline corrected twice, while the interface-area range published a few
    lines below — `0.41–0.51 across 16×` — kept both of its halves from that row:
    0.41 was its error, and 16× was 3.2 → 0.2. The correction stood next to a
    number that contradicted it. Grep the value, and grep what it was divided by.
-6. If an earlier correction claimed "every other conclusion is unchanged" and
+7. If an earlier correction claimed "every other conclusion is unchanged" and
    this one disproves it, **delete that sentence — do not reword it.** A
    paraphrase is the same claim: "the conclusions themselves are unchanged"
    replaced the original here and sat one line above the paragraph documenting

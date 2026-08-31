@@ -233,9 +233,14 @@ non-melanized \textit{pks1} mutant across several ionising-radiation modalities 
 The mathematical modeling of biofilm communities has a rich history beginning with the
 foundational one-dimensional multispecies model of Wanner and Gujer \cite{wanner1986}, which
 coupled reaction-diffusion equations for substrate transport with biomass conservation laws to
-predict biofilm thickness and spatial species distributions. Xavier et al.\ \cite{xavier2005}
-extended this framework to multiple spatial dimensions, providing a deterministic continuum
-approach to heterogeneous biofilm development. Individual-based modeling approaches, exemplified
+predict biofilm thickness and spatial species distributions. Deterministic continuum treatments
+extended this framework to multiple spatial dimensions: Eberl et al.\ \cite{eberl2001} gave a
+spatio-temporal continuum model for biofilm development, and Alpkvist and Klapper
+\cite{alpkvist2007} a multidimensional multispecies formulation for heterogeneous biofilms.
+Xavier et al.\ \cite{xavier2005} is a different construction --- a hybrid individual-based
+framework for the activity and structure of multispecies biofilms --- and belongs with the
+individual-based work below rather than with the continuum models. Individual-based modeling
+approaches, exemplified
 by the iDynoMiCS platform of Lardon et al.\ \cite{lardon2011}, complement continuum models by
 resolving cell-level stochastic interactions. Cross-diffusion biofilm models have been analyzed
 by Sonner et al.\ \cite{sonner2015}, who established mathematical properties of volume-filling
@@ -651,6 +656,19 @@ melanin knockouts show no survival difference under ionizing radiation in \texti
 modalities \cite{audit2026}. Where melanin measurably mattered in an evolution experiment, it
 reduced mutation accumulation without altering survival --- an effect on damage that must not be
 generalised into a survival term.
+
+\emph{Two positive results run against that reading and are cited here rather than left out
+of it.} Khajo et al.\ \cite{khajo2011} report that melanin protects
+\textit{Cryptococcus neoformans} from lethal-dose gamma irradiation through sacrificial
+breakdown of the pigment, and Malo et al.\ \cite{malo2018} report a protective effect of
+melanin on \textit{C.\ neoformans} morphology after both sparsely and densely ionizing
+radiation. \textit{C.\ neoformans} is one of the seven species modelled here, so these are
+same-species evidence for the assumption the preceding sentences decline, and this
+repository's own evidence audit already files the second under
+\texttt{melanized\_radioprotective} --- a category defined earlier in this section and, until
+now, never populated in the text. The isogenic null results and these positives are not
+reconciled here, and stating both is the point: a section whose argument rests on naming what
+runs against its position cannot omit the two results that do.
 
 \subsection{Biofilm Mechanical Properties}
 

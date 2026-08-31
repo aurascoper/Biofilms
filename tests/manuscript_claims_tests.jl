@@ -171,13 +171,15 @@ let
     # (i) SUPPORTS AN UNCITED CLAIM -- a real gap, with the sentence identified.
     #     Citing these is a manuscript decision, not bibliography tidying, and two
     #     of them are corrections rather than footnotes. NOT applied here.
+    # Four entries left this set on 2026-08-31 by being CITED, each for its own
+    # reason and none of them bibliography tidying: alpkvist2007 and eberl2001
+    # because the sentence that misattributed their content to xavier2005 was
+    # corrected, and khajo2011 and malo2018 because section 2.6 cannot rest its
+    # argument on naming what runs against it while omitting the two positives its
+    # own audit files.
     UNUSED_GAP = Set([
         "graner1992",     # L973-976 states the GGH construction with no origin cite;
                           # Graner/Glazier/Hogeweg appear nowhere in the body
-        "alpkvist2007",   # L236-238 is assembled from this title and eberl2001's
-        "eberl2001",      # ...and attributed to xavier2005, a different model class
-        "khajo2011",      # same-species counter-evidence to L647-651
-        "malo2018",       # same
         "robertson2012",  # primary source for L228-229, which cites only audit2026
         "blasius1999",    # L258-261 novelty claim; weakest of the six, and becomes
                           # (ii) if PP-T2-25's delete of the omega_s row lands
