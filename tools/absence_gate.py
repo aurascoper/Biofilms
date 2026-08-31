@@ -81,7 +81,102 @@ KNOWN_UNHANDLED = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# SECOND SURFACE: TEST CONTRACTS THAT OVERSTATE THEIR ASSERTIONS
+# ---------------------------------------------------------------------------
+# Three defects found in one review round shared a signature: the guard bounded
+# its own claim correctly while the DOCSTRING ABOVE IT overstated the reach. A
+# sweep over one file under a ledger note claiming the repository; `match`
+# reading one hit under a docstring claiming every location; a set intersection
+# under a comment claiming the registry. That is not three bugs, it is one seam
+# -- between what a check does and what its description claims -- and it is the
+# seam this project's discipline is organised around, unguarded in the one place
+# that describes the guards.
+#
+# THE CHECK IS NOT "NO UNIVERSAL QUANTIFIER". Universals fire legitimately here:
+# "asserts every registered absence still holds" is accurate. The check is that a
+# universal's SCOPE IS STATED, in a form a reader can compare against the
+# assertion below it. So the gate does not infer scope -- it requires the
+# docstring to declare one, because inferring it is the same guess that produced
+# the defect.
+#
+# AND IT DECLARES ITS OWN SCOPE, or it reproduces the defect one level up: it
+# reads the files it is given and claims nothing about any file it was not.
+
+UNIVERSAL = re.compile(r"\b(every|all|each|any|no)\b", re.I)
+SCOPE_LINE = re.compile(r"^\s*(#\s*)?SCOPE:\s*\S", re.M)
+
+
+def _doc_blocks(text: str):
+    """(line number, block) for each docstring or run of >=2 comment lines."""
+    blocks, buf, start = [], [], None
+    for i, line in enumerate(text.split("\n"), 1):
+        st = line.strip()
+        if st.startswith("#"):
+            if start is None:
+                start = i
+            buf.append(st.lstrip("# ").rstrip())
+        else:
+            if buf and len(buf) >= 2:
+                blocks.append((start, "\n".join(buf)))
+            buf, start = [], None
+    if buf and len(buf) >= 2:
+        blocks.append((start, "\n".join(buf)))
+    for m in re.finditer(r'"""(.*?)"""', text, re.S):
+        blocks.append((text[:m.start()].count("\n") + 1, m.group(1)))
+    return blocks
+
+
+# A CONTRACT IS A BLOCK THAT DESCRIBES A CHECK, not any prose containing "every".
+# The first version flagged 19 blocks across three files, most of them ordinary
+# commentary -- which is the noise failure that gets a gate muted within a week.
+# A block counts only if a test definition sits within DEF_WINDOW lines of it, so
+# what is judged is the boundary between what a check does and what its
+# description claims, which is the seam this exists for.
+DEF_WINDOW = 4
+TEST_DEF = re.compile(r"^\s*(def\s+test_|@testset|function\s+test_)", re.M)
+
+
+def scan_contracts(text: str):
+    """Blocks that describe a check and assert a universal without declaring a scope."""
+    lines = text.split("\n")
+    def_lines = {i for i, l in enumerate(lines, 1) if TEST_DEF.match(l)}
+    out = []
+    for lineno, block in _doc_blocks(text):
+        if not (UNIVERSAL.search(block) and not SCOPE_LINE.search(block)):
+            continue
+        span = range(lineno - DEF_WINDOW, lineno + block.count("\n") + DEF_WINDOW + 1)
+        if any(d in span for d in def_lines):
+            out.append((lineno, block.strip()[:180]))
+    return out
+
+
+# Controls in DOCSTRING FORM, because the scanner reads comment runs and
+# triple-quoted blocks -- a bare sentence exercises nothing, which the first
+# version of these controls did and reported as a miss.
+CONTRACT_MUST_FLAG = (
+    "# Every measured requirement has an SOP or a named gap.\n"
+    "# The check compares the index against the register.\n"
+    "def test_coverage():\n")
+CONTRACT_MUST_PASS = (
+    "# SCOPE: the 14 measured rows of reference_d_requirements.csv, no other row.\n"
+    "# Every measured requirement has an SOP or a named gap.\n"
+    "def test_coverage():\n")
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[1] == "--contracts":
+        # SCOPE: the files named on this command line, and nothing else.
+        print(f"contract scope: {len(sys.argv) - 2} file(s) named on the command line")
+        n = 0
+        for path in sys.argv[2:]:
+            for lineno, block in scan_contracts(open(path).read()):
+                n += 1
+                print(f"\nUNSCOPED CONTRACT  {path}:{lineno}\n     {block}")
+        print(f"\n{n} universal(s) without a declared SCOPE. "
+              "A clean run is not an all-clear: this reads only the files it was given.")
+        sys.exit(0)
+
     if len(sys.argv) > 1:
         for sent, hits in scan(open(sys.argv[1]).read()):
             print(f"FLAG {hits}\n     {sent}\n")
@@ -114,6 +209,13 @@ if __name__ == "__main__":
     if surprises:
         print(f"{surprises} entr{'y' if surprises == 1 else 'ies'} now flag -- "
               "a gap closed; move them out of KNOWN_UNHANDLED.")
+
+    print("\n=== contract mode: a universal must declare a scope ===")
+    c_bad = scan_contracts(CONTRACT_MUST_FLAG)
+    c_ok = scan_contracts(CONTRACT_MUST_PASS)
+    print(f"  {'ok  ' if c_bad else 'MISS'} universal without SCOPE flags")
+    print(f"  {'ok  ' if not c_ok else 'FALSE POSITIVE'} the same universal WITH a SCOPE line passes")
+    ok &= bool(c_bad) and not c_ok
 
     print("\nGATE USABLE" if ok else "\nGATE NOT USABLE -- fix before running it on new prose")
     sys.exit(0 if ok else 1)

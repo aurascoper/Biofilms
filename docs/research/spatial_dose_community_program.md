@@ -156,13 +156,28 @@ afterwards is the same instrument as a power analysis with chosen inputs, only f
 "about 2×" was gestured at by comparison to Chengdu and never derived, so it is replaced by a form
 that can be audited:
 
-> **Refusal threshold — UNPINNABLE AT PRESENT, AND THAT IS THE STATE, NOT A PLACEHOLDER.**
-> No fraction of 4.7× is defensible as a floor. 4.7× bounds the necessary contrast from **above**,
-> and halving an upper bound does not preserve an upper-bound guarantee: if the true necessary
-> contrast is 3×, a 2.35× gate admits an achievable 2.5× that is **below the contrast which actually
-> resolved the effect** — the permissive failure the earlier text claimed could not occur. The
-> threshold is therefore **not set** until the Chengdu Low and Medium group means are obtained, and
-> D2b does not run against an unset threshold.
+> **Refusal threshold — NO AVAILABLE ANCHOR BOUNDS THIS IN THE REQUIRED DIRECTION.** This is a
+> finding with a decision attached, not a to-do.
+>
+> **The arithmetic is not repairable in the direction the original derivation assumed.** A
+> conservative gate needs a **lower** bound on the necessary contrast, and Chengdu supplies only an
+> upper one: a threshold at 480 nGy/h inside a 4.7× span, with Low and Medium given as sampling
+> distances rather than dose rates, so the smallest contrast across which the effect was actually
+> resolved is unpublished. No fraction of an upper bound is a floor — if the necessary contrast is
+> 3×, a 2.35× gate admits an achievable 2.5×, a design that looks like it cleared a pre-registered
+> bar.
+>
+> **Why unset is an improvement and not a regression:** an unset gate refuses everything, while a
+> wrong gate admits exactly the cases it should not. Blocking D2b outright is the safe state.
+>
+> **Three options, and one has to be chosen before D2b runs:**
+> 1. **Obtain the bracket** — author contact for the Low and Medium group means, or another study
+>    reporting a resolved adjacent pair.
+> 2. **Derive the threshold from dispersion rather than from an anchor's span** — the within-group
+>    variance route, which needs no anchor at all and connects to the same 13-site dispersion 0-pre
+>    already uses for the noise floor.
+> 3. **Declare that 0-pre cannot set this threshold, and close on that.** A real outcome, not a
+>    failure to decide.
 
 Written before the look-up so that the number cannot be moved by what the look-up returns.
 

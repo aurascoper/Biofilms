@@ -265,7 +265,13 @@ def test_every_registered_absence_still_holds():
 
 def test_the_absence_predicates_can_fail():
     """CONTROL: each predicate shape must be capable of returning False, or the
-    check above is three lambdas that always pass."""
+    check above is three lambdas that always pass.
+
+    SCOPE: the two predicate SHAPES (_absent_from_sources, _declaration_still_stands)
+    and the non-emptiness of each term's predicate list. It does NOT establish that
+    any predicate is bound to the term its row names -- that is what the per-term
+    mutations establish, and only firing them can.
+    """
     assert not _absent_from_sources(r"compute_delta_H_terms")   # plainly present
     assert not _declaration_still_stands("a phrase no manuscript contains")
     assert not _absent_from("coupling/biofilm_openmc/materials.py", r"MaterialClass")
@@ -294,7 +300,14 @@ def test_a_check_whose_signal_is_declared_absent_is_not_buildable(index):
 
 
 def test_the_no_signal_check_detects_an_unblocked_row(index):
-    """CONTROL: a row naming an absent term with no blocked_by must be reported."""
+    """CONTROL: a row naming an absent term with no blocked_by must be reported.
+
+    SCOPE: one synthetic row. Judged and left unscoped once by the contract gate
+    before this line existed -- the three remaining flags in this file are
+    legitimate: "no row claims an SOP" and "a row with no blocked_by" describe a
+    control's own input, and "printed every run" is temporal. A gate whose false
+    positives are never recorded as judged gets re-litigated every pass.
+    """
     planted = {"sop_id": "SOP-ZZ", "coverage": "named_gap", "blocked_by": "",
                "signal_source": "matrix diffusion (D_eff_film != D_w)"}
     assert planted["signal_source"] in ABSENT_TERMS
@@ -303,6 +316,10 @@ def test_the_no_signal_check_detects_an_unblocked_row(index):
 
 def test_no_registry_term_is_dead(index):
     """EVERY term must back an index row, not merely one of them.
+
+    SCOPE: the keys of ABSENT_TERMS against the signal_source column of the shipped
+    index, and nothing else. It says nothing about whether a row is blocked for the
+    right reason.
 
     The first version intersected the two sets, which proves only that at least
     one key is referenced -- and in the shipped index exactly one was: SOP-T4

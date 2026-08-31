@@ -113,6 +113,8 @@ end
     end
 
     @testset "the control: pairwise-SHAPED formulas that are not the bound" begin
+        # SCOPE: the four synthetic sentences listed in this block, and no
+        # location in the manuscript. Manuscript coverage is the dH_sites loop.
         # EACH OF THESE CARRIES THE CORRECT LITERAL AND STATES A DIFFERENT
         # QUANTITY. They are what a semantic regression looks like when the
         # number survives the edit, and the previous extractor accepted all of
