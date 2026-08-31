@@ -87,10 +87,53 @@ exist makes the gate undecidable: Phase 0 could run in full, with pinned geometr
 control, and return no verdict. The floor needs no pool — but it must be a **sensitivity curve and
 not a number**, because the floor moves with the assumed effect size and the effect size is the
 quantity Phase 1 exists to estimate. Assuming it large makes the design feasible by construction.
-Take replicate count and read depth from a published 16S study of a low-biomass surface community,
-report detectable residual **across a range of plausible effect sizes**, and state which range the
-design survives. The conclusion is then "feasible if the compositional shift is at least X," which
-someone with pool access can evaluate against what they already know.
+
+### 0-pre, first pass — four searches on 2026-08-30, a candidate answer and not a closed one
+
+This is not a systematic read. **It does not close the gate; it moves the failure mode.**
+
+**The plausible effect size spans about eleven orders of magnitude, and the program must pick an
+end.** Two anchors, both verified:
+
+- **Chronic, decade-scale selection.** A Th-232-contaminated site near Chengdu, irradiated over ten
+  years, four sample groups spanning **193 ± 5 to 911 ± 41 nGy/h**. PCA clusters High and Medium
+  fungi away from Low and Blank, putting a threshold near **480 nGy/h**; the effect on fungal
+  diversity exceeds that on bacterial, and bacterial α-diversity does not differ significantly
+  across groups. **Verified 2026-08-30.**
+- **Within-experiment population response.** Shuryak et al., *PLoS One* (2017): effects reported at
+  **36–126 Gy/h**, with 78 of 145 phylogenetically diverse fungal strains growing at 36 Gy/h.
+  **Verified 2026-08-30.**
+
+Those measure different things — selection integrated over generations against population density
+inside an experiment — and a spent fuel pool sits on the first mechanism. **So the program must
+declare which mechanism it predicts, because the expected residual differs by orders of magnitude
+depending on the answer, and a prediction that accommodates both predicts nothing.**
+
+**The pool sits between the two anchors, which is the awkward part.** A dose rate of **0.416 Gy/h**
+is reported for areas holding irradiated fuel elements — roughly 10⁶ above the Chengdu threshold and
+about 10² below Shuryak's tested rates. Neither anchor transfers directly, and no prior effect size
+from the actual system was found — see the scoped absence under the novelty claim below, which names
+the search and its date.
+
+**One finding runs in favour of feasibility.** Chengdu detected a composition threshold across a
+total dose range of about **4.7×**, not orders of magnitude. A detectable effect did not require an
+enormous gradient in that system.
+
+**And one runs against it, as a mechanism rather than a power problem.** Shuryak reports that
+resistance is **cell-concentration dependent** — *D. radiodurans* grew at 67 Gy/h at high density and
+growth was extinguished at a tenfold lower concentration, a roughly threefold shift in critical dose
+rate — and that resistant cells **protect neighbours across phyla**: wild-type *D. radiodurans*
+enhanced *E. coli* survival by more than 200-fold, apparently through catalase-mediated detoxification
+of reactive oxygen species in the shared medium. If composition is buffered by density-dependent
+cross-protection, it is **not decomposable into per-species radiosensitivity**, and "composition
+tracks computed dose" has no monotonic form to test. That belongs here rather than being discovered
+at Phase 1.
+
+**It also happens to be the strongest available argument for a spatial model, and the document should
+not hide that it cuts both ways.** A well-mixed or per-species model cannot represent protection that
+depends on local cell density and a shared extracellular medium. A lattice model with local
+neighbourhoods can. So the mechanism that breaks the simple test is the one that would justify
+Phase 2 — which is a reason to state it plainly rather than a reason to lead with it.
 
 **0a. Inputs pinned, not chosen.** Rack pitch, array size, burnup spread and cooling times all move
 the residual, so a design failing at one setting can be rescued by widening the spread or shrinking
@@ -141,6 +184,21 @@ the coupling would also be load-bearing is not a question this document has surv
 Whether such positions exist at usable magnitude is exactly what Phase 0 asks, and there is reason
 to expect them to be scarce.
 
+**The sharper risk is that dose is not separable from DEPTH, and the sampling geometry decides it.**
+Water is the dominant attenuator — of order half a metre per tenth-value thickness for Co-60 — and
+assemblies sit tens of feet below the surface, so the field spans many orders of magnitude
+vertically. Depth also carries light, settling organic carbon, oxygen from the surface, and operator
+proximity. **A regression of composition on computed dose over a vertical sample is a regression on
+depth wearing a dose label**, and the residual-after-covariates framing in 0c is the right response
+but may be unachievable in that geometry. Not hypothetical for the design: the nearest study found
+in the same dated search sampled "13 different locations and depths."
+
+**So the design that breaks the confound is horizontal.** Sample at **fixed depth** and varying
+lateral distance from the racks, where dose falls off and every depth-linked covariate holds
+approximately constant. **If horizontal sampling at fixed depth is not physically available in the
+pool on offer, 0-pre closes on collinearity even though it does not close on effect size** — and that
+is a sufficient reason to send nothing.
+
 **Temperature is a competing term, not a caveat.** It is a strong driver of community composition
 and plausibly dominates any dose signal. If it can be measured at each position it enters the
 comparison as a rival explanation; otherwise the null this tests against is weaker than the one a
@@ -165,7 +223,9 @@ unbuilt today.**
 
 ## Three places this fails before anyone spends money
 
-1. **0-pre**: no range of plausible effect sizes leaves a detectable residual. Nothing is runnable.
+1. **0-pre**: no range of plausible effect sizes leaves a detectable residual, **or** horizontal
+   sampling at fixed depth is unavailable so dose cannot be separated from depth, **or** the
+   cross-protection buffering means composition has no monotonic form to test. Nothing is runnable.
 2. **Phase 0**: the residual is below the floor with the control dissociating. Nothing is sent.
 3. **Phase 1**: composition does not track computed dose. The coupling earns nothing.
 
