@@ -234,8 +234,18 @@ ABSENT_TERMS = {
          # CODE SIDE: no death, kill or removal function.
          # The trailing !? is load-bearing: Julia mutators end in `!`, and the
          # first version of this pattern could not match `remove_cell!(` at all.
-         # A planted removal function passed it. Caught by the mutation, which is
-         # the only thing that could have caught it.
+         # A planted removal function passed it.
+         #
+         # WHAT CAUGHT IT, PRECISELY, BECAUSE THE CREDIT MATTERS FOR WHETHER THE
+         # STEP IS OPTIONAL. The argument for adding a code-side predicate was
+         # about which indicator a row watches, slow or fast; it gave a reason to
+         # add this one and said nothing about whether the added one worked. What
+         # found the bug was FIRING THE MUTATION in the direction promotion
+         # arrives from and watching the check fail to fail. The pattern was also
+         # correct for a language it was not written against -- `!` is not a word
+         # character, and mutator-bang is a Julia convention -- so it reads as
+         # reasonable to anyone reviewing it. Invisible to inspection, visible
+         # only to execution.
          lambda: _absent_from("biofilms_potts.jl",
                               r"function\s+\w*(death|kill|remove_cell|die)\w*!?\s*\(")],
     ),
@@ -260,6 +270,13 @@ def test_the_absence_predicates_can_fail():
     assert not _declaration_still_stands("a phrase no manuscript contains")
     assert not _absent_from("coupling/biofilm_openmc/materials.py", r"MaterialClass")
     # ...and every term carries at least one predicate, or all() is vacuously True.
+    #
+    # VACUOUS TRUTH OVER AN EMPTY SET IS THE THIRD INSTANCE OF ONE FAMILY IN THIS
+    # REPOSITORY, and they are worth naming together rather than patched apart:
+    # an empty `swift test` suite reporting success, a CI job that was never
+    # dispatched reporting no failures, and now all() over a term with no
+    # predicates. Each reports "nothing wrong" from "nothing checked", and each
+    # was found by asking what the green would look like if the set were empty.
     for term, (_why, preds) in ABSENT_TERMS.items():
         assert preds, term
 
