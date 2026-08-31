@@ -226,7 +226,18 @@ ABSENT_TERMS = {
          # CODE SIDE, the faster indicator: material class is a function of
          # cell_id only. A concentration-dependent mu would have to enter here.
          lambda: _absent_from("coupling/biofilm_openmc/materials.py",
-                              r"concentration|loading|sorbed|c_ext")],
+                              r"concentration|loading|sorbed|c_ext"),
+         # REGIME SIDE. d(mu)/dc ~ 0 is a PHOTON statement: at ~1 MeV over
+         # C/H/N/O, biomass and void are near-indistinguishable. For NEUTRONS it
+         # is false and interestingly so -- biofilm is largely water, so a
+         # biofilm region moderates against a void and hydrogen's scattering
+         # cross-section is large. A source change is exactly the update path
+         # nobody would re-read this entry for, and neither predicate above
+         # fails if the particle changes while the manuscript sentence stays.
+         # Matched on CONTENT, not a line number: a line anchor silently starts
+         # reading a different statement the moment anything above it shifts.
+         lambda: not _absent_from("coupling/biofilm_openmc/model.py",
+                                  r'particle\s*=\s*"photon"')],
     ),
     "dose-dependent survival": (
         "section 2.6 declares neither growth nor survival, and no removal process "
