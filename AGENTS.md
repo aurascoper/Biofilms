@@ -27,10 +27,30 @@ nothing.
 - `authorization_criteria` mapped gate refusals to criteria by substring and
   treated an unmatched refusal as satisfied.
 - `plot_layer` referenced two names it never imported.
+- The figure phrase guard was "confirmed" by appending the two withdrawn
+  sentences to a `.txt` sidecar as clean lines and watching the guard fail.
+  `pdftotext -layout` reads a three-column figure **across**, so the real
+  extraction interleaves the columns and the sentence is contiguous nowhere.
+  `FIG-09` and `FIG-10` were enforced by nothing for a full commit while a
+  control reported otherwise. Fixed by taking the known-bad from the artifact
+  path — `c2219a2:preprint/figures/phase2_diffusion_cell.txt` — instead of
+  writing one.
 
 When you add a guard, add the input that proves it bites. When you review one,
 ask what would have to be true for it to fail, and check that something makes
 it so.
+
+**And draw the known-bad from the artifact path, never from your own hand.** A
+control you construct tests your idea of the failure; one recovered from where
+the real input comes from tests the pipeline. Where a guard reads a *derived*
+artifact — an extraction, a render, a serialisation — **the derivation's shape
+is part of the contract**, and a hand-written input silently opts out of it. The
+sidecar case is the clean example and it is retroactive: `.txt` sidecars exist
+because the FIG-01–07 lesson was that images hide claims, so the extraction is
+what gets read — and nobody had written down that the *shape* of that extraction
+was therefore load-bearing too. This failure mode is not domain-versus-range,
+not a coverage gap, and not a vacuous assertion. It is a control that never met
+the pipeline.
 
 ### 2. A skipped test is uncovered surface, not a neutral fact
 

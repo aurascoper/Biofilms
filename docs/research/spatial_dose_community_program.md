@@ -326,6 +326,32 @@ handbook was opened, no BNCT dosimetry review was read, and no author was contac
 claim about a search, not about a literature**, and the three leads above are evidence that the
 literature is there.
 
+**What would clear this, in the order it should be tried.** OPERATIONAL-pending is only meaningful
+if the pending part names a task, so it does:
+
+1. **DTIC ADA307995, by whatever access exists.** It is the on-point document and the cheapest
+   thing on this list. Public access is 403 from here; a `.mil`/`.edu` affiliation, an
+   interlibrary-loan request, or an NTIS order all reach it. **Clearing condition: the report
+   states a D₁₀ under a characterised neutron field with a gamma comparison, for a named
+   organism.**
+2. **Ask, before buying.** The Hoffman question costs nothing and a radiation-materials person at a
+   reactor either knows the quantity or knows who does. Note this is now a *retrieval* question and
+   not an existence one — "can you get at this" is a much easier thing to answer than "does this
+   exist," and it should be asked in that form.
+3. **NASBEE, through an institutional subscription**, to settle whether the 3.54 figure is
+   microbial or mammalian. **Clearing condition either way: it resolves whether that number may be
+   cited at all**, which is worth the look even though a mammalian answer clears nothing else.
+4. **A controlled-vocabulary search**, which this program has not run: PubMed under MeSH, INIS,
+   OSTI. This
+   sits below the three above because the leads already in hand are more specific than anything a
+   fresh search returns, but it is what would convert the SCOPE line's disclaimer into a bounded
+   enumeration.
+5. **Write to the authors.** Last because it spends an introduction, and the four above are
+   cheaper.
+
+**None of these is scheduled and none is anyone's assignment yet.** Listing them makes the gate a
+task rather than a state; it does not make the task started.
+
 **It converts into a question rather than sitting here**, under the rule that already governs the
 memo: state what the design needs, ask whether the quantity exists, assert nothing about the
 facility from secondhand reading. The question is now in the memo's list — whether a usable neutron
