@@ -240,3 +240,45 @@ def test_the_rendered_guide_cites_what_the_source_cites(pdf):
         f"{missing}. Line numbers in the artifact the source no longer cites: "
         f"{stale}. Re-render the guide -- the .md is the source of record, and "
         "editing it without re-rendering leaves a reader holding wrong citations.")
+
+
+# ------------------------------------------------- the .md moved without a render
+#
+# THE GAP THIS CLOSES, AND THE ONE IT LEAVES OPEN. Everything above binds line
+# NUMBERS. A prose edit to the .md that touches no citation left the .tex and the
+# PDF holding the old wording with every check green -- which happened here on
+# 2026-08-31 and was repaired by hand-syncing three files twice in one session.
+#
+# tools/render_guide.py writes `<name>.md.sha256` ONLY as a side effect of a
+# successful render that verified every citation in the artifact. So the record
+# cannot be satisfied by editing it: a hand-written hash passes this check and
+# leaves the citation check to fail on the next real run. Same inversion as
+# tools/render_figure_svg.py.
+#
+# IT DOES NOT VERIFY THAT THE .tex SAYS WHAT THE .md SAYS. Measured before
+# choosing: the .md's prose paragraphs match the rendered text layer 38 of 48 at a
+# six-word prefix, and the ten failures are MARKUP differences rather than
+# divergence -- backticked `r` renders as math, a literal `##` in prose renders as
+# emphasis. The .tex is a re-authoring, not a render, so the two differ by design
+# and a prose binding would be a fifth false failures. That is the wrong
+# instrument for a hand-authored .tex, not a threshold to tune. A faithful
+# re-sync remains a human obligation and an open gap.
+def guide_records() -> list[Path]:
+    return sorted(GUIDES.glob("*.md.sha256")) if GUIDES.is_dir() else []
+
+
+@pytest.mark.skipif(not guide_records(), reason="no rendered guide recorded")
+@pytest.mark.parametrize("record", guide_records(), ids=lambda p: p.name)
+def test_the_guide_source_matches_its_recorded_render(record):
+    import hashlib
+    md = record.with_suffix("")           # strip .sha256, leaving <name>.md
+    assert md.is_file(), f"{record.name} records a hash for a missing {md.name}"
+    recorded = record.read_text(encoding="utf-8").split()[0]
+    actual = hashlib.sha256(md.read_bytes()).hexdigest()
+    assert recorded == actual, (
+        f"{md.name} has changed since the guide was last rendered, so the "
+        f"committed .tex and .pdf are older than the source of record. Re-sync "
+        f"the .tex by hand, then run `python3 tools/render_guide.py {md}`. Do NOT "
+        "edit the .sha256: that makes this pass and leaves the citation check to "
+        "fail on the next real render. Note this catches only that the source "
+        "MOVED -- nothing verifies the re-sync was faithful.")
