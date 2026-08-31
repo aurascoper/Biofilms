@@ -80,6 +80,12 @@ identified:
 There is also some tightening of terminology — one coined term is no longer used before the
 paragraph that explains it was coined — which changes no result.
 
+**Two separate things, so you do not have to work out which is which.** One is a measurement in
+your own lab: the unirradiated biosorption assay in the handout, ICP readout, no reactor time and no
+scheduling. The other is forwarding the memo below to Dr. Hoffman, which asks him about a material
+and a facility and needs nothing from you but the introduction. They are independent — either can go
+ahead without the other, and neither is a precondition for the other.
+
 I have also written a memo for Dr. Hoffman, if it is useful to send alongside. Four short
 landscape pages: what the model computes and what it does not, the published work on biofilms
 in spent fuel pools, why I am writing to a materials scientist at all — his published corrosion

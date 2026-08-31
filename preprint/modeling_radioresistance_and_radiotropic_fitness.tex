@@ -84,7 +84,7 @@
   }
   {\small
     \textit{Preprint --- not peer reviewed}\\
-    \textit{Version 1.1 --- August 2026}
+    \textit{Version 1.2 --- August 2026}
   }
 \end{center}
 \vspace{4pt}
@@ -107,9 +107,9 @@ transport code and a new biological target rather than introducing the paradigm.
 
 Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
 measured results. The melanin term changes Metropolis acceptance by approximately 15.5\%, whereas
-the direct per-species radiation term changes it by approximately one part in $10^5$ for the two
-negatively signed species; only the product of melanin production and melanin coupling reaches
-the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
+the direct per-species radiation term reaches $7.505\times10^{-2}$, an acceptance bias about ten
+times smaller rather than four orders smaller; only the product of melanin production and melanin
+coupling reaches the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
 opposite to the direction implied by the direct tropism coefficient and is not clearly separated
 from the approximate seeding null at six parcels per species.
 
@@ -994,8 +994,12 @@ For the two negatively signed species \emph{occupying} a site, the direct radiat
 acceptance by about one part in $10^5$, whereas the melanin term changes it by 15.5\%. That
 comparison is between one role of one pair of species and the melanin term, and it does not bound
 $\Delta H_{\mathrm{rad}}$: the third row is the same term at $1.5\times10^{3}$ times the magnitude
-and in the acceptance-favouring direction, only fifteen times smaller than the melanin term rather
-than four orders. Radiation can therefore influence
+and in the acceptance-favouring direction, smaller than the melanin term by a factor of $9.6$ in
+$\Delta H$ rather than by four orders. \emph{Corrected again, version 1.2:} this sentence read
+``fifteen times'' when first written, which is the acceptance-bias ratio computed against a reach of
+$5\times10^{-2}$ --- a value appearing nowhere in this paper. The correction to this paragraph was
+applied twice at different times, and the pre-pairwise ratio survived inside the sentence whose other
+half had already been fixed. Radiation can therefore influence
 the CPM indirectly through the chain
 \[
 I_\gamma \longrightarrow \text{melanin production} \longrightarrow M
@@ -1189,8 +1193,8 @@ membrane state or CPM clock. This validates the implementation path, not the phy
 The implemented programs support a narrower conclusion than the full PSDE specification. The
 Langevin models demonstrate stochastic spatial grouping under chosen drift and interaction rules;
 they do not demonstrate radiation-enhanced growth or survival. The CPM term audit establishes that,
-within its radiation-derived pathway, the melanin term dominates the direct species-specific
-radiation term by several orders of magnitude. The single-seed radial output does not establish a
+within its radiation-derived pathway, the melanin term exceeds the direct species-specific
+radiation term by about an order of magnitude in $\Delta H$ ($9.6$), not by several. The single-seed radial output does not establish a
 radiotropic pattern, because its direction conflicts with the direct coefficient and its magnitude
 is not separated from the seeding null. The radiodialysis solvers establish a reproducible numerical
 solution of the stated semi-discrete equations, but the coupled Julia path does not yet possess a
@@ -1298,8 +1302,9 @@ and finally the scientific offline feedback gate.
 This study separates a broad mathematical proposal from the smaller set of simulations that were
 actually executed. The active CPM represents seven species as computational biomass parcels and
 contains adhesion, volume, radiation and melanin terms. At the shipped constants, the melanin term
-is the dominant radiation-derived contribution to Metropolis acceptance, while the direct
-species-specific radiation term is negligible for the two negatively signed classes. The resulting
+is the dominant radiation-derived contribution to Metropolis acceptance, exceeding the direct
+species-specific radiation term by about an order of magnitude in $\Delta H$ rather than rendering it
+negligible. The resulting
 single-seed radial pattern is diagnostic rather than established: it is opposite to the direct-term
 direction and is not separated from the seeding null at six parcels per species.
 
@@ -1320,7 +1325,7 @@ whether plausible biological material changes are large enough to justify any on
 All source code, configuration schemas, tests, provenance ledgers, and figure-generation materials
 are available in the public repository at
 \url{https://github.com/aurascoper/Biofilms}. Version 1.0 was prepared against repository
-revision \texttt{c7539a9}; this revision is prepared against \texttt{f72aabb}. Each names the
+revision \texttt{c7539a9}; this revision is prepared against \texttt{4d8a5f8}. Each names the
 parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.

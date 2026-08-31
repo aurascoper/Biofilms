@@ -135,6 +135,41 @@ depends on local cell density and a shared extracellular medium. A lattice model
 neighbourhoods can. So the mechanism that breaks the simple test is the one that would justify
 Phase 2 — which is a reason to state it plainly rather than a reason to lead with it.
 
+### 0-pre, pre-registration — the inputs are fixed before the curve is computed
+
+**A power analysis whose inputs the analyst chooses is a device for producing whatever answer is
+wanted:** pick an effect size and get a required *n*; pick an *n* and get a detectable effect. 0-pre's
+entire job is to be able to refuse, so the inputs and the refusal threshold are written down first,
+the same discipline as pinning the observed acceptance band before running.
+
+**The effect-size range comes from the anchors, not from what is achievable.** Chengdu is the low
+anchor and the usable one — a threshold at 480 nGy/h inside a 4.7× total range, so composition
+tracked a modest gradient. The pool's 0.416 Gy/h sits about 10⁶ above it, so there is a gradient
+magnitude and no dose-response measured at that magnitude. The curve is therefore drawn across an
+**assumed** range, and **the range and the end that triggers refusal are both written before
+computing.**
+
+**The horizontal dose contrast is a look-up, and it runs before the curve because it can close the
+gate on its own.** At fixed depth with varying lateral distance, the available contrast is set by
+rack geometry rather than chosen, so it is a number to look up rather than assume. **If horizontal
+contrast across accessible positions is under about 2×, that is below Chengdu's 4.7× with no
+dose-response measured anywhere near pool magnitude, and 0-pre closes on collinearity-adjacent
+grounds before any power calculation runs.** A look-up that can close the gate always precedes a
+calculation that can be tuned.
+
+**"Detectable residual" has no definition without a stated metric and test.** Bray–Curtis
+dissimilarity with PERMANOVA and dose as a continuous covariate is the conventional shape, and its
+power depends on within-group dispersion. That number is available: the amplicon survey verified on
+2026-08-30 sampled 13 locations across a real basin. It carries no dose axis, but **dispersion across
+a real basin's sites is the one number in it that transfers**, and the document says it was taken
+from there.
+
+**And that study is a near-miss rather than a bare absence, which is the better framing and the same
+fact.** It is not evidence that nobody can sample a basin. It is evidence that **someone already
+has** — 13 locations and depths, no dose measured, no field computed. The gap is that the group who
+sampled a basin did not compute a field, and the missing half is exactly the half this repository
+holds. That is a collaboration framing rather than an absence.
+
 **0a. Inputs pinned, not chosen.** Rack pitch, array size, burnup spread and cooling times all move
 the residual, so a design failing at one setting can be rescued by widening the spread or shrinking
 the array. Geometry and the burnup/cooling distribution come from a published rack design or a
