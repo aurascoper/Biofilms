@@ -301,8 +301,23 @@ def test_the_no_signal_check_detects_an_unblocked_row(index):
     assert not planted["blocked_by"].strip()
 
 
-def test_the_registry_terms_are_not_dead(index):
-    """And the registry must describe something in the index, or it is a list nobody
-    consults -- the same failure as a docstring recording a fact nothing surfaces."""
+def test_no_registry_term_is_dead(index):
+    """EVERY term must back an index row, not merely one of them.
+
+    The first version intersected the two sets, which proves only that at least
+    one key is referenced -- and in the shipped index exactly one was: SOP-T4
+    named matrix diffusion while nothing named the other two, so two of three
+    entries were dead while the control passed. That is the same subset-checked
+    set-asserted defect as reading only the first regex match. Raised by Codex on
+    pull request #23. Compare the complete set."""
+    named = {r.get("signal_source", "").strip() for r in index if r.get("signal_source", "").strip()}
+    dead = sorted(set(ABSENT_TERMS) - named)
+    assert not dead, (
+        f"registered absences no index row is blocked on, so their predicates are "
+        f"promotion triggers for nothing: {dead}")
+
+
+def test_the_dead_term_check_detects_an_orphan(index):
+    """CONTROL: a registry key nothing references must be reported."""
     named = {r.get("signal_source", "").strip() for r in index}
-    assert named & set(ABSENT_TERMS), "no index row names any registered absent term"
+    assert sorted({"a term no row names"} - named) == ["a term no row names"]

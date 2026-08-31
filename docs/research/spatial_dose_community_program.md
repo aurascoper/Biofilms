@@ -156,11 +156,13 @@ afterwards is the same instrument as a power analysis with chosen inputs, only f
 "about 2×" was gestured at by comparison to Chengdu and never derived, so it is replaced by a form
 that can be audited:
 
-> **Refusal threshold.** The design closes if the achievable horizontal dose contrast is below
-> **one half** of the total dose range across which a composition threshold has actually been
-> observed — Chengdu's 4.7× — giving a closing contrast of **2.35×**. The fraction is one half, and
-> it is a declared choice rather than a derived one; what is derived is that the comparator is the
-> only observed gradient, not an achievable one.
+> **Refusal threshold — UNPINNABLE AT PRESENT, AND THAT IS THE STATE, NOT A PLACEHOLDER.**
+> No fraction of 4.7× is defensible as a floor. 4.7× bounds the necessary contrast from **above**,
+> and halving an upper bound does not preserve an upper-bound guarantee: if the true necessary
+> contrast is 3×, a 2.35× gate admits an achievable 2.5× that is **below the contrast which actually
+> resolved the effect** — the permissive failure the earlier text claimed could not occur. The
+> threshold is therefore **not set** until the Chengdu Low and Medium group means are obtained, and
+> D2b does not run against an unset threshold.
 
 Written before the look-up so that the number cannot be moved by what the look-up returns.
 
@@ -172,39 +174,33 @@ Blank as 192.906 ± 5.05 and High as 910.964 ± 41.09 nGy/h, and reports Low and
 sampling distances (2 ± 0.5 cm and 7 ± 0.5 cm from source). The threshold sits between Low and
 Medium, so the contrast that actually resolved it is **≤ 4.7× and not otherwise determined**.
 
-**Direction of conservatism, which is now settled even though the magnitude is not:** since the
-resolving bracket is adjacent-group and therefore no wider than the total span, 4.7× is an *upper
-bound* on the necessary contrast, so **2.35× is likely conservative** — it may demand more contrast
-than the effect required, erring toward refusing a workable design rather than accepting a broken
-one. That is the direction to err in, and it is recorded rather than assumed. The threshold stands
-at 2.35× until the two group means become available, and **it was looked up before D2b so that a
-revision could not be selection dressed as sharpening.**
+**What the bracket does and does not give:** it is adjacent-group and therefore no wider than the
+total span, so 4.7× bounds the necessary contrast from **above**. An upper bound alone cannot set a
+floor — see below — so no direction of conservatism follows from it. The comparator was looked up
+before D2b so that a revision could not be selection dressed as sharpening; what that look-up
+established is that the interval is (0, 4.7×] and nothing narrower.
 
-**The conservatism is CONDITIONAL ON A TRANSFER, and the transfer is declared rather than
-established.** The first version of this sentence said the threshold is conservative *by
-construction*, which overstates it. 4.7× is an upper bound on necessary contrast **at Chengdu's
-absolute dose scale**, and the pool sits about 10⁶ above that scale. **Necessary contrast is not
-scale-invariant if the response saturates**, and a saturating response requires *more* contrast at
-high absolute dose, not less — which would flip the direction outright: 2.35× conservative against
-Chengdu and **permissive against the pool.**
+**Two independent defects sat in one sentence, and fixing the second first left the first
+untouched.** The withdrawal of "conservative by construction" weakened the claim along the
+*transfer* axis — 4.7× bounds necessary contrast at Chengdu's absolute scale and the pool sits ~10⁶
+above it, so a saturating response would need *more* contrast, not less. That argument stands. But
+the sentence was **also** wrong arithmetically, for a reason independent of scale: **halving an
+upper bound does not yield a lower bound.** Knowing only that the necessary contrast is at most 4.7×
+tells you nothing about whether 2.35× clears it. Raised by Codex on pull request #23, and the
+threshold is now unset rather than re-justified.
 
-That does not resolve without a dose-response at pool magnitude, which is exactly what this
-document already records as unavailable. So the honest statement is: **the threshold is conservative
-if the Chengdu response transfers, and whether it transfers is assumed here rather than shown.** The
-mechanism declaration in 0-pre — which mechanism the program predicts — is the same assumption
-looked at from the other side, and if that declaration lands on saturation the threshold has to be
-re-derived upward before D2b, not after.
-
-Recorded rather than left implicit, because a later reader who finds the adjacent-group bracket
-published elsewhere would otherwise see a declared fraction with no reason attached and revise it in
-whichever direction the day required — and because a reason that is *stronger than the evidence*
-invites exactly that revision when someone notices the gap.
+**What would pin it:** the adjacent-group bracket around 480 nGy/h. The paper gives Blank as
+192.906 ± 5.05 and High as 910.964 ± 41.09 nGy/h and reports Low and Medium only as sampling
+distances (2 ± 0.5 cm and 7 ± 0.5 cm from source), so the two means needed are unpublished. Until
+they are obtained the necessary contrast is known only to lie in (0, 4.7×], and no gate can be set
+on that interval.
 
 **D2a — field steepness. Arithmetic, and it appears to be satisfied.** Water's linear attenuation
 coefficient at Cs-137 and ~1 MeV is of order 0.07–0.09 cm⁻¹, so the bare half-value layer is roughly
 8–10 cm; buildup from scattered photons stretches the effective falloff, plausibly to 15–30 cm per
-halving at several mean free paths. Either way a 2.35× contrast needs **tens of centimetres** of
-lateral separation, not metres.
+halving at several mean free paths. Either way a contrast of a few-fold needs **tens of centimetres**
+of lateral separation, not metres — which is the shape of the answer regardless of where the
+threshold eventually lands.
 
 *Provenance, in the register's own idiom: this is a **derivation** from tabulated attenuation
 coefficients with named inputs. It is not a facility measurement and any real dose map supersedes it.
@@ -345,8 +341,8 @@ unbuilt today.**
 1. **0-pre**, whose failure branch is a **disjunction** of three conditions — so its pass condition
    is their **conjunction**, and satisfying one advances nothing:
    (a) no range of plausible effect sizes leaves a detectable residual;
-   (b) the horizontal contrast is below 2.35× (D2a), **or** no two samplable surfaces exist at
-       adequate lateral separation at the same depth (D2b);
+   (b) the horizontal contrast is below the threshold — **currently unset, see D2** — **or** no two
+       samplable surfaces exist at adequate lateral separation at the same depth (D2b);
    (c) cross-protection buffering leaves composition with no monotonic form to test.
    **A fourth outcome is not a close:** no published dose map for an accessible pool is UNRESOLVED,
    a search-scope claim rather than a physical one, and becomes a question for Hoffman.

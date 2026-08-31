@@ -209,12 +209,32 @@ end
     # its register. If they ever converge this assertion says so.
     @test !isapprox(ratio_dH, ratio_bias; rtol = 1e-3)
 
-    "The ΔH ratio §6.2 states."
-    stated_dH = let m = match(r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in", tex)
-        m === nothing ? nothing : parse(Float64, m[1])
+    # EVERY LOCATION, NOT THE FIRST MATCH. `match` returns one hit, so the first
+    # version of this read §6.2 alone while the docstring claimed each location
+    # carries the ratio its register demands. Mutating §7.1's 9.6 to 15.0 left
+    # stated_dH at §6.2's value and the whole suite passed; the abstract and the
+    # Conclusion were never inspected at all. A test contract that exceeds its
+    # assertion is the F_s defect living in a comment. Raised by Codex on #23.
+    #
+    # Each location gets its own pattern AND the count is pinned, so a location
+    # losing its phrasing fails rather than silently dropping out of the sweep.
+    dH_sites = [
+        ("6.2", r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in"),
+        ("7.1", r"radiation term by about an order of magnitude in \$\\Delta H\$ \(\$([0-9.]+)\$\)"),
+    ]
+    for (where, pat) in dH_sites
+        hits = collect(eachmatch(pat, tex))
+        @test length(hits) == 1              # the location exists, exactly once
+        for h in hits
+            @test isapprox(parse(Float64, h[1]), ratio_dH; atol = 0.05)
+        end
     end
-    @test stated_dH !== nothing
-    @test isapprox(stated_dH, ratio_dH; atol = 0.05)
+
+    # The Conclusion and the abstract state the ratio in words rather than
+    # digits, so they are pinned by phrase. Naming that difference is the point:
+    # an unlabelled sweep would report them as covered.
+    @test occursin("exceeding the direct\nspecies-specific radiation term by about an order of magnitude in \$\\Delta H\$", tex)
+    @test occursin("an acceptance bias about ten\ntimes smaller rather than four orders smaller", tex)
 
     @testset "the control generalises past the value it was built from" begin
         # A synthetic sentence stating FIFTEEN failing would only re-test the
