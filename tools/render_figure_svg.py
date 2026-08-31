@@ -81,8 +81,24 @@ def main(argv: list[str]) -> int:
     svg = Path(argv[1])
     pdf = render(svg)
     sidecars(pdf)
+    # THE PAIR, NOT THE SOURCE ALONE. The docstring above argues that a record
+    # comparing the SVG to a record of itself can be satisfied by regenerating
+    # the record, leaving the PDF stale -- and then the first version of this
+    # line wrote exactly that record. Codex raised it on pull request #23.
+    #
+    # Recording the digest of the PDF this conversion produced states the pair
+    # the guard actually cares about. BE CLEAR ABOUT WHAT THIS DOES AND DOES NOT
+    # BUY: both lines are still hand-writable, so it does not make forgery
+    # impossible, it makes it require two deliberate falsehoods instead of one.
+    # What actually binds source to artifact is the text check in
+    # calibration/tests/test_figure_staleness.py, which reads the SVG's own text
+    # runs out of the committed .txt and cannot be satisfied by editing a hash.
+    #
+    # `split()[0]` still yields the source digest, so every existing reader of
+    # this file is unaffected.
     digest = sha256(svg)
-    Path(str(svg) + ".sha256").write_text(f"{digest}\n", encoding="utf-8")
+    Path(str(svg) + ".sha256").write_text(
+        f"{digest}\npdf={sha256(pdf)}\n", encoding="utf-8")
     print(f"rendered {pdf} from {svg}\n  source sha256 {digest}\n"
           f"  sidecars: {pdf.with_suffix('.sha256').name}, {pdf.with_suffix('.txt').name}, "
           f"{pdf.with_suffix('.png').name}")

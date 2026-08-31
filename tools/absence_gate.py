@@ -179,12 +179,32 @@ def scan_contracts(text: str, *, module_level: bool = False):
         # "EVERY LOCATION" contract in prose_bounds.jl sits inside a @testset
         # whose header is 25 lines above it, so no definition was within four
         # lines and attached-mode returned nothing for the very file it was
-        # built from. A block belongs to the nearest test definition that
-        # PRECEDES it; blocks above every definition are the module-level tier.
+        # built from.
+        #
+        # BUT "IS THERE A DEFINITION ABOVE ME" IS NOT THE SAME QUESTION AS "AM I
+        # INSIDE ONE", AND USING IT MADE THE MODULE-LEVEL TIER UNREACHABLE. Once
+        # a file's first test definition is passed, every later block satisfied
+        # `preceding` -- so a block that had returned to module scope was
+        # reported as attached, and module-level mode returned nothing for any
+        # file with a test in it. Measured on calibration/tests/test_sop_index.py:
+        # 8 attached, 0 module-level, while the no-signal registry at line 164
+        # and three further module blocks sat there being misfiled.
+        #
+        # THAT IS RULE 3 INSIDE THE TOOL BUILT FOR RULE 3. The header advertises
+        # the module-level count as a standing backlog printed every run so a
+        # clean pass is never an all-clear; it printed 0, and an unreachable
+        # tier and an empty tier print the same 0. Raised by Codex on pull
+        # request #23.
+        #
+        # Membership is now INDENTATION, which is what "inside a body" actually
+        # means in both languages this reads: a block at column 0 is module
+        # scope, an indented block belongs to the definition enclosing it.
+        raw = lines[lineno - 1] if lineno - 1 < len(lines) else ""
+        indent = len(raw) - len(raw.lstrip())
         preceding = [d for d in def_lines if d <= lineno]
-        attached = bool(preceding)
+        attached = indent > 0 and bool(preceding)
         if module_level:
-            if not attached and def_lines and NORMATIVE.search(block):
+            if indent == 0 and def_lines and NORMATIVE.search(block):
                 out.append((lineno, block.strip()[:180]))
         elif attached:
             out.append((lineno, block.strip()[:180]))
@@ -211,6 +231,18 @@ CONTRACT_MUST_PASS = (
     "def test_coverage():\n"
     "    # SCOPE: the 14 measured rows of reference_d_requirements.csv, no other row.\n"
     "    # Every measured requirement has an SOP or a named gap.\n")
+# THE SHAPE THAT WAS INVISIBLE: a module-level contract sitting AFTER a completed
+# test. Under the "is there a def above me" rule this was filed as attached, so
+# the module-level tier reported nothing and its backlog count read as zero. It
+# must appear in module-level mode and must NOT appear in attached mode -- both
+# directions, because classifying it into the wrong tier is the actual defect and
+# a one-sided check cannot see it.
+CONTRACT_MODULE_AFTER_TEST_MUST_FLAG = (
+    "def test_one():\n"
+    "    assert True\n"
+    "\n"
+    "# EVERY registered absence must back an index row.\n"
+    "# Nothing here declares which rows those are.\n")
 
 
 if __name__ == "__main__":
@@ -272,7 +304,16 @@ if __name__ == "__main__":
     print(f"  {'ok  ' if not c_ok else 'FALSE POSITIVE'} the same universal WITH a SCOPE line passes")
     c_body = scan_contracts(CONTRACT_IN_BODY_MUST_FLAG)
     print(f"  {'ok  ' if c_body else 'MISS'} a contract INSIDE a test body, far from its header, flags")
-    ok &= bool(c_bad) and not c_ok and bool(c_body)
+    # BOTH DIRECTIONS: the defect was misclassification, not absence, so a check
+    # that only asserted "module-level finds it" would pass while attached mode
+    # also claimed it and the counts stayed wrong.
+    m_after = scan_contracts(CONTRACT_MODULE_AFTER_TEST_MUST_FLAG, module_level=True)
+    a_after = scan_contracts(CONTRACT_MODULE_AFTER_TEST_MUST_FLAG)
+    print(f"  {'ok  ' if m_after else 'MISS'} a MODULE-LEVEL contract after a completed test "
+          "reaches the module tier")
+    print(f"  {'ok  ' if not a_after else 'MISFILED'} ...and is not also reported as attached")
+    ok &= (bool(c_bad) and not c_ok and bool(c_body)
+           and bool(m_after) and not a_after)
 
     print("\nGATE USABLE" if ok else "\nGATE NOT USABLE -- fix before running it on new prose")
     sys.exit(0 if ok else 1)
