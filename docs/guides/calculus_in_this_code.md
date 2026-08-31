@@ -316,7 +316,7 @@ suite, and the failure message distinguishes "the code moved" from "the code cha
 |---|---|---|
 | the axis limit is named as L'Hôpital | `biofilms_radiodialysis.R:106` | `L'Hôpital limit` |
 | and implemented with the factor of 2 | `biofilms_radiodialysis.R:110` | `dc_dt[1] <- D_eff * 2.0 * (c_vec[2] - c_vec[1]) / dr^2` |
-| the manuscript calls it symmetry, not a wall | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:695` | `Zero-flux symmetry is imposed at $r = 0$.` |
+| the manuscript calls it symmetry, not a wall | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:715` | `Zero-flux symmetry is imposed at $r = 0$.` |
 
 ### Part 3 — three treatments
 
@@ -326,7 +326,7 @@ suite, and the failure message distinguishes "the code moved" from "the code cha
 | its face weights are deliberately unusable | `biofilms_radiodialysis.R:226` | `w_plus[1] <- NA_real_; w_minus[1] <- NA_real_` |
 | the wall uses a ghost node, not a set face flux | `biofilms_radiodialysis.R:132` | `c_ghost <- c_vec[Nr - 1] -` |
 | the scheme is named finite-volume method of lines | `biofilms_radiodialysis.R:32` | `finite-volume method of lines` |
-| the manuscript claims both ends are in the operator | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:947` | `represented explicitly in the semi-discrete operator` |
+| the manuscript claims both ends are in the operator | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:967` | `represented explicitly in the semi-discrete operator` |
 
 ### Part 4 — the Robin condition
 

@@ -209,6 +209,91 @@ should decide its scope at the level of *rendered versus source*, not only of fi
 
 ---
 
+# Third review — melanin radiotrophy
+
+A third commissioned review arrived the same day, on whether melanin converts ionising
+radiation into biologically usable energy. **The pattern holds for a third time:** almost
+everything substantive in it was already in `docs/research/radiotrophic_compatibility_audit.md`
+(2026-08-15) and carried into §2.6 before the review was commissioned.
+
+## Claim 10 — the manuscript should not claim more than "not demonstrated"
+
+**What the repo already holds** (`preprint/…tex:325`):
+
+> "``Not demonstrated'' is not ``disproved'', and we state it as the former."
+
+**Verdict: `keep`.** The manuscript is already more careful than the recommendation, and
+draws a distinction the review does not.
+
+## Claim 11 — no growth means radiotrophy cannot be tested
+
+**Verdict: `keep`.** Stated in four places — abstract `:121`, §2.6 `:315`, Discussion
+`:1244`, Conclusion `:1350` — and independently in `README.md:49-63`.
+
+## Claim 12 — §2.6 draws the radiolytic-H₂ contrast
+
+**Verdict: `keep`**, `:336-361`, and the manuscript already labels its own limits:
+"This is a contrast and not a defence: it does not address the carbon-budget critique."
+
+## Claim 13 — the energy budget, and the antioxidant alternative
+
+**Verdict: `keep` on both.** The energy-budget critique is Walberg 2015, quoted verbatim in
+the audit at `:669-677`. The antioxidant/repair account is §2.1 `:210-227`, with Cortesão's
+NHEJ series.
+
+**One arithmetic check of ours, stated rather than quietly dropped.** The review's budget
+reproduces exactly on two of three figures: 5e-18 J/h deposited into a 1e-13 kg cell at
+0.05 mGy/h, and ~60 ATP-equivalents/cell/h at perfect conversion. Its third — "~500 Gy/h to
+supply 1 % of maintenance" — **recomputes here as ~96 Gy/h**, a factor of about 5. Working:
+1 % of 1 mmol ATP/g/h at 2e-11 g dry mass is 1.2e8 ATP/cell/h, ×8e-20 J = 9.6e-12 J/h, ÷
+1e-13 kg = 96 Gy/h. **Differs by 5×; not repeated.** The conclusion is unaffected — both
+figures sit orders above any survivable chronic dose rate — which is exactly why the
+disagreement is safe to state instead of omitting the number and leaving the next reader to
+rediscover it.
+
+## Claim 14 — "your own reference [36]"
+
+**As stated:** "Your own reference [36] is the closest thing to evidence for this — Turick
+et al. 2011."
+
+**Verdict: `delete`.** `turick2011` is numerically the 36th `\bibitem`, but **it had no
+`\cite` in the body at all.** It was one of fifteen defined-but-uncited entries whose count
+`tests/manuscript_claims_tests.jl` already pinned and printed on every run. The review cites
+it as something the manuscript relies on; the repository had already classified that exact
+entry as unused.
+
+**It is cited now, and for the review's own reason rather than to close the gap.** Turick
+2011 is the one positive measurement in a section otherwise built on nulls, and it runs
+against the mechanism: melanin "is continuously oxidized in the presence of gamma
+radiation." SCOPE: verified from the abstract, cross-indexed on PubMed 21632287, Johns
+Hopkins Pure and Semantic Scholar. The review's account of the apparatus — melanin ghosts,
+carbon paste, no living cells, nanoampere currents — comes from a full text paywalled from
+here and is **not** repeated in §2.6.
+
+`casadevall2017` was cited in the same edit, verified by extracting the ASM PDF and reading
+it rather than trusting the review's quote.
+
+## Claim 15 — no fungus has a CO₂-fixation pathway
+
+**Verdict: `needs_verification`, and it is the review's one real contribution.** Searched
+the manuscript, `README.md`, `data/claims_ledger.csv` and all four
+`docs/research/radiotrophic_*` files: no occurrence of Calvin-Benson-Bassham,
+Wood-Ljungdahl, reductive TCA, or autotrophy. **Genuinely absent from this repository.**
+
+It is also the sharper form of an argument §2.6 already gestures at. The manuscript names
+the carbon-budget critique as unaddressed, but in Walberg's form — the medium supplied
+enough carbon — which is a confounder. "No fungus has a fixation pathway" is structural: it
+does not depend on any energetic estimate, and it would not be closed by a better
+experiment.
+
+**Not adopted, and not written into the manuscript.** It is a claim about fungal genomics,
+outside anything this repository can check, and the review self-flags three of its citations
+plus the hydrated-electron potential as unverified against primary sources. Given that two
+entries in this bibliography have already turned out to be DOIs resolving to unrelated
+papers, nothing from that report enters the manuscript without a primary read.
+
+---
+
 ## Summary
 
 | # | Claim | Verdict |
@@ -222,6 +307,12 @@ should decide its scope at the level of *rendered versus source*, not only of fi
 | 7 | §6.3 needs an SE/direction caveat | `keep` — already the manuscript's position |
 | 8 | Scope the CPM-for-biofilms novelty claim | `delete` — no such claim is made |
 | 9 | "No flow" is undeclared | open — correct, and not fixed in this pass |
+| 10 | Do not claim more than "not demonstrated" | `keep` — the manuscript is already more careful |
+| 11 | No growth ⇒ radiotrophy untestable | `keep` — four places plus README |
+| 12 | §2.6 draws the radiolytic-H₂ contrast | `keep` — and already labels its own limits |
+| 13 | Energy budget; antioxidant alternative | `keep` — both predate the review; one figure recomputes 5× smaller |
+| 14 | "Your own reference [36]" | `delete` — it was an uncited orphan the repo already pinned; now cited, for the review's reason |
+| 15 | No fungus fixes carbon | `needs_verification` — genuinely absent here, and the review's one real contribution |
 
 Kept so that a commissioned review's premises are not mistaken later for its findings, and
 so the two causes behind four unapplied verdicts stay distinguishable.

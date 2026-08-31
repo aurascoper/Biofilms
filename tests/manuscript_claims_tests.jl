@@ -143,8 +143,34 @@ let
     # in both directions; @test_broken stays alongside it so reaching zero still reports an
     # UNEXPECTED PASS and forces someone to delete this whole block rather than let the
     # finding rot.
-    KNOWN_UNUSED = 15
-    @test length(unused) == KNOWN_UNUSED
+    # TWO CHANGES HERE FOR TWO DIFFERENT REASONS, AND THE COMMIT MUST NOT CONFLATE
+    # THEM.
+    #
+    # (1) THE ASSERTION IS ON THE SET, NOT ON A COUNT, AND THAT IS A REPAIR
+    # INDEPENDENT OF ANY NUMBER MOVING. `_unused_bibitem_keys` already RETURNS a
+    # Set and the previous assertion threw it away to compare `length(...)` to a
+    # constant. Cite one entry and orphan another in the same commit and the count
+    # is unchanged and the test passes -- membership changed and nothing could see
+    # it. That is the count-where-a-set-is-meant shape this repository has now had
+    # caught three times, sitting in the guard for the bibliography.
+    #
+    # (2) The membership shrank from 15 to 13 because `turick2011` and
+    # `casadevall2017` are now cited in section 2.6 -- as content, not as
+    # bibliography tidying: the first is the one positive measurement in that
+    # section and it runs against the mechanism, the second is the proponents
+    # conceding the mechanism is undiscovered. A future shrink because somebody
+    # deleted a bibitem to clear a red is a DIFFERENT event, and only the named
+    # form below can tell the two apart.
+    KNOWN_UNUSED = Set([
+        "alpkvist2007", "battista1997", "blasius1999", "brim2000", "eberl2001",
+        "eisenman2012", "graner1992", "kazy2009", "khajo2011", "lloyd2005",
+        "malo2018", "newsome2014", "robertson2012",
+    ])
+    if unused != KNOWN_UNUSED
+        println("  newly unused: ", join(sort(collect(setdiff(unused, KNOWN_UNUSED))), ", "))
+        println("  no longer unused: ", join(sort(collect(setdiff(KNOWN_UNUSED, unused))), ", "))
+    end
+    @test unused == KNOWN_UNUSED
     @test_broken isempty(unused)
 end
 
