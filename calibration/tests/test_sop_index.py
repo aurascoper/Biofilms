@@ -196,22 +196,48 @@ def _declaration_still_stands(phrase: str) -> bool:
     return phrase in TEX.read_text(encoding="utf-8")
 
 
-# term -> (why it is absent, predicate that is True while it REMAINS absent)
+def _absent_from(path: str, pattern: str) -> bool:
+    import re
+    return not re.search(pattern, (REPO / path).read_text(encoding="utf-8"))
+
+
+# TWO PREDICATES PER TERM, WATCHING DIFFERENT CLOCKS. Striking a declaration
+# proves the predicate reads the MANUSCRIPT's claim; landing a symbol proves it
+# reads the CODE's state. Those are opposite directions, and only the code-side
+# one fires in the direction promotion will actually arrive from: nobody deletes
+# "d(mu)/dc ~ 0" from a paper deliberately -- it leaves because someone
+# implemented composition feedback, and the code changes first. A registry
+# watching only the declaration watches the slower indicator.
+#
+# term -> (why, [predicates, ALL true while the term remains absent])
 ABSENT_TERMS = {
     "matrix diffusion (D_eff_film != D_w)": (
         "the radiodialysis solver carries one D_eff and no bulk-water diffusivity, "
         "so nothing in it makes matrix diffusion slower than bulk",
-        lambda: _absent_from_sources(r"\bD_w\b|D_bulk|D_water|D_free"),
+        [lambda: _absent_from_sources(r"\bD_w\b|D_bulk|D_water|D_free")],
     ),
     "attenuation contrast with concentration": (
-        "the planned-feedback section declares d(mu)/dc ~ 0",
-        lambda: _declaration_still_stands(
+        "the planned-feedback section declares d(mu)/dc ~ 0, and the coupling assigns "
+        "voxel material class from occupancy alone",
+        [lambda: _declaration_still_stands(
             r"\partial\mu(\mathbf{r})/\partial c(\mathbf{r},t) \approx 0"),
+         # CODE SIDE, the faster indicator: material class is a function of
+         # cell_id only. A concentration-dependent mu would have to enter here.
+         lambda: _absent_from("coupling/biofilm_openmc/materials.py",
+                              r"concentration|loading|sorbed|c_ext")],
     ),
     "dose-dependent survival": (
-        "the CPM has neither birth nor death",
-        lambda: _declaration_still_stands(
+        "section 2.6 declares neither growth nor survival, and no removal process "
+        "exists in the stepper",
+        [lambda: _declaration_still_stands(
             "has neither biomass growth nor a dose-dependent survival process"),
+         # CODE SIDE: no death, kill or removal function.
+         # The trailing !? is load-bearing: Julia mutators end in `!`, and the
+         # first version of this pattern could not match `remove_cell!(` at all.
+         # A planted removal function passed it. Caught by the mutation, which is
+         # the only thing that could have caught it.
+         lambda: _absent_from("biofilms_potts.jl",
+                              r"function\s+\w*(death|kill|remove_cell|die)\w*!?\s*\(")],
     ),
 }
 
@@ -220,7 +246,8 @@ def test_every_registered_absence_still_holds():
     """THE PROMOTION TRIGGER, AT OPPOSITE POLARITY. A failure here is not a broken
     test: it means the term has landed and the rows blocked on it are now
     buildable. Fix by promoting those rows, never by deleting the entry."""
-    landed = [t for t, (_why, still_absent) in ABSENT_TERMS.items() if not still_absent()]
+    landed = [t for t, (_why, preds) in ABSENT_TERMS.items()
+              if not all(p() for p in preds)]
     assert not landed, (
         f"these registered absences no longer hold, so the rows blocked on them "
         f"should promote: {landed}")
@@ -231,6 +258,10 @@ def test_the_absence_predicates_can_fail():
     check above is three lambdas that always pass."""
     assert not _absent_from_sources(r"compute_delta_H_terms")   # plainly present
     assert not _declaration_still_stands("a phrase no manuscript contains")
+    assert not _absent_from("coupling/biofilm_openmc/materials.py", r"MaterialClass")
+    # ...and every term carries at least one predicate, or all() is vacuously True.
+    for term, (_why, preds) in ABSENT_TERMS.items():
+        assert preds, term
 
 
 def test_a_check_whose_signal_is_declared_absent_is_not_buildable(index):

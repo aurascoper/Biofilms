@@ -180,10 +180,25 @@ one. That is the direction to err in, and it is recorded rather than assumed. Th
 at 2.35× until the two group means become available, and **it was looked up before D2b so that a
 revision could not be selection dressed as sharpening.**
 
-**The sentence that survives: the comparator is an upper bound, so the threshold is conservative by
-construction.** That is why the fraction stands, and it is recorded rather than left implicit — a
-later reader who finds the adjacent-group bracket published elsewhere would otherwise see a declared
-choice with no reason attached and be tempted to revise it in whichever direction the day required.
+**The conservatism is CONDITIONAL ON A TRANSFER, and the transfer is declared rather than
+established.** The first version of this sentence said the threshold is conservative *by
+construction*, which overstates it. 4.7× is an upper bound on necessary contrast **at Chengdu's
+absolute dose scale**, and the pool sits about 10⁶ above that scale. **Necessary contrast is not
+scale-invariant if the response saturates**, and a saturating response requires *more* contrast at
+high absolute dose, not less — which would flip the direction outright: 2.35× conservative against
+Chengdu and **permissive against the pool.**
+
+That does not resolve without a dose-response at pool magnitude, which is exactly what this
+document already records as unavailable. So the honest statement is: **the threshold is conservative
+if the Chengdu response transfers, and whether it transfers is assumed here rather than shown.** The
+mechanism declaration in 0-pre — which mechanism the program predicts — is the same assumption
+looked at from the other side, and if that declaration lands on saturation the threshold has to be
+re-derived upward before D2b, not after.
+
+Recorded rather than left implicit, because a later reader who finds the adjacent-group bracket
+published elsewhere would otherwise see a declared fraction with no reason attached and revise it in
+whichever direction the day required — and because a reason that is *stronger than the evidence*
+invites exactly that revision when someone notices the gap.
 
 **D2a — field steepness. Arithmetic, and it appears to be satisfied.** Water's linear attenuation
 coefficient at Cs-137 and ~1 MeV is of order 0.07–0.09 cm⁻¹, so the bare half-value layer is roughly
