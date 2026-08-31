@@ -205,9 +205,28 @@ a citation splits on commas into runs under `MIN_WORDS = 5`, so `distinguishing_
 returns `''`. **This is a property of the extractor, not of which files are scanned**, and
 no widening of the scanned set reaches it. Closed on 2026-08-31 by `RETRACTED_CITATIONS`.
 
-**`RETRACTED_CITATIONS` reaches `PP-REF-01` and `PP-REF-02` and nothing else. `RM-G04-01`
-remains unenforced pending `RETRACTED_IN_SOURCES`.** Stated in those terms so a later
-reader does not see "the systemic gap has a guard" and stop checking.
+**`RETRACTED_CITATIONS` reaches `PP-REF-01` and `PP-REF-02` and nothing else.**
+`RM-G04-01` was unenforced when this was written; **`RETRACTED_IN_SOURCES` shipped later the
+same day and its vocabulary carries that string**, so both causes are now closed. Stated in
+these terms so a later reader does not see "the systemic gap has a guard" and stop checking
+— and this sentence is itself an instance of why: it said *remains unenforced* for several
+hours after that stopped being true, and nothing would have caught the drift.
+
+**What is still open, after both guards.** The vocabulary tiers reach declared strings.
+Neither reaches the 37 rows whose `document` is a pseudo-document and which are therefore
+enforced nowhere by construction — 13 carrying an unresolved verdict, 6 naming a source.
+That count now prints on every run of the claims-ledger suite rather than living here, for
+the reason the absence gate prints its known gaps: a number in a document nobody rereads is
+a number nobody acts on. Those rows want a human pass, not a guard that happens to sweep
+them.
+
+**And the guide's prose divergence is partly closed with its remaining half stated.**
+`tools/render_guide.py` writes `<name>.md.sha256` only as a side effect of a render that
+verified every citation in the artifact, so the source of record can no longer move without
+one. Nothing verifies the re-sync was *faithful*: measured, the `.md`'s prose matches the
+rendered text layer 38 of 48 at a six-word prefix, and the ten failures are markup
+differences rather than divergence, because the `.tex` is a re-authoring rather than a
+render. That is the wrong instrument for a hand-authored `.tex`, not a threshold to tune.
 
 A third defect surfaced while applying the fixes: §3.4 referred implementing symplectic
 integration to §7.5 as future work, and §7.5 does not list it. The cross-reference was
