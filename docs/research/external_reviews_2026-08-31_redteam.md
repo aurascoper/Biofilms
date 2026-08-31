@@ -168,11 +168,23 @@ Four ledger verdicts were recorded, prescribed, and never applied: `PP-REF-01`,
 `PP-REF-02`, `PP-310-01`, `RM-G04-01`. One cause was assumed; there are **two**, and they
 must not be filed as one.
 
-**Cause 1 — the scope of enforcement.** A verdict is enforced only in the file its
-`document` column names. `RM-G04-01` was restated in README while
-`biofilms_potts.jl:16` went on listing a five-term Hamiltonian, because no guard reads
-source comments. Closing this needs a `RETRACTED_IN_SOURCES` scan over `SIM_FILES`.
-**Not built. Open.**
+**Cause 1 — the scope of enforcement. CLOSED 2026-08-31, and building the guard split the
+cause in two.** (a) The `document` column names *another* file: `RM-G04-01` was restated in
+README while `biofilms_potts.jl:16` went on listing a five-term Hamiltonian. (b) Worse, and
+not seen when this was first written: the column names *no* file. `document = repository` is
+a `PSEUDO_DOCUMENT`, so `document_path` returns `None` and the row is never searched at all.
+Measured: 37 rows sit in that class, 5 carrying an unresolved verdict that names a source.
+`PP-DEFF-01` was one, and its prescribed comment fix sat unapplied at
+`biofilms_radiodialysis.R:242` — **the fifth instance of the unapplied-verdict pattern,
+found by building the guard for the first four.**
+
+`RETRACTED_IN_SOURCES` is a declared vocabulary rather than a phrase sweep, and that was
+measured before it was chosen: `distinguishing_phrase` over every `delete` row against all
+144 source files returns **zero** hits, because claims living in source comments are short —
+a formula, a range, a symbol — and split into runs under `MIN_WORDS`, exactly as figure
+labels and citations do. Third vocabulary tier, same reason as the first two. `restate`
+verdicts are not swept generally: AGENTS.md is explicit that a restate is a judgement about
+meaning and stays with a reviewer; only the specific withdrawn string is mechanical.
 
 **Cause 2 — the phrase extractor.** `PP-REF-01/02` were invisible for an unrelated reason:
 a citation splits on commas into runs under `MIN_WORDS = 5`, so `distinguishing_phrase`

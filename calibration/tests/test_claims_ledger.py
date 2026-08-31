@@ -1372,3 +1372,112 @@ def test_the_retracted_citation_guard_detects_the_pre_fix_manuscript():
     assert not [d for d in RETRACTED_CITATIONS
                 if d in PREPRINT.read_text(encoding="utf-8")], \
         "and the current manuscript must contain neither"
+
+
+# ------------------------------------------------------ retracted in sources
+#
+# CAUSE 1 OF THE UNAPPLIED-VERDICT PATTERN, AND THE LAST OF THE THREE TIERS.
+# A ledger verdict is enforced only in the file its `document` column names. Two
+# ways that leaves a claim unguarded, and they are different:
+#
+#   (a) the column names ANOTHER file. RM-G04-01 was restated in README while
+#       biofilms_potts.jl:16 went on listing a five-term Hamiltonian, because no
+#       guard reads source comments.
+#   (b) the column names NO file. `document = repository` is a PSEUDO_DOCUMENT,
+#       so document_path returns None and the row is never searched at all.
+#       Measured: 37 rows sit in that class, 5 of them carrying an unresolved
+#       verdict that names a source file. PP-DEFF-01 is one, and its prescribed
+#       comment fix sat unapplied at biofilms_radiodialysis.R:242 until
+#       2026-08-31 -- the fifth instance of the pattern found this session.
+#
+# WHY A DECLARED VOCABULARY RATHER THAN A PHRASE SWEEP, MEASURED BEFORE CHOOSING.
+# Running distinguishing_phrase over every `delete` row against all 144 source
+# files returns ZERO hits. The phrase tier cannot reach these claims: the ones
+# that live in source comments are short -- a formula, a range, a symbol -- and
+# split into runs under MIN_WORDS, exactly as figure labels and citations do.
+# So this is the third vocabulary tier, beside RETRACTED_IN_FIGURES and
+# RETRACTED_CITATIONS, for the same reason each of those exists.
+#
+# SEEDED FROM ACTUAL RETRACTIONS, NOT FROM INVENTED VOCABULARY, AND THE SEED IS
+# SMALL ON PURPOSE. Two entries is what the ledger actually supports today. A
+# guard whose value is that the NEXT one is caught does not need a long list, and
+# a long list of invented strings would be the can't-fail shape in a new costume.
+# `restate` verdicts are NOT swept generally -- AGENTS.md is explicit that a
+# restate asks whether the revision says the right thing, which is a judgement
+# and stays with a reviewer. Only the specific withdrawn STRING is mechanical.
+RETRACTED_IN_SOURCES = {
+    "Table 2 range 1e-4..1e-2":
+        "PP-DEFF-01: the range is refuted at its upper end and unresolved at its "
+        "lower, and Table 2 (tab:params) carries no D_eff row at all",
+    "H_radiation + H_pairwise":
+        "RM-G04-01: the Hamiltonian has four terms; total_pairwise_energy is real "
+        "but is called from take_snapshot alone and never enters acceptance",
+}
+
+# The same use-versus-mention resolution as RETRACTED_CITATIONS, and it is needed
+# for the same reason: recording a withdrawal requires naming it. EXPLICIT NAMES,
+# NOT A GLOB -- a glob would auto-admit every future file matching a pattern,
+# which is the property the allow-list exists to prevent.
+SOURCE_RECORDING_FILES = {
+    "data/claims_ledger.csv",
+    "docs/research/external_reviews_2026-08-31_redteam.md",
+    "calibration/tests/test_claims_ledger.py",
+}
+
+SOURCE_SUFFIXES = {".jl", ".R", ".py"}
+
+
+def sources_carrying_retracted_strings() -> dict:
+    """{repo-relative path: [strings]} for every source carrying a withdrawn string.
+
+    SCOPE: files with a SOURCE_SUFFIXES extension anywhere in the repository,
+    excluding `.git` and any file derived from a source already scanned. Shared by
+    the check and its control.
+    """
+    out: dict[str, list[str]] = {}
+    for path in REPO.rglob("*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        if "__pycache__" in path.parts or path.suffix not in SOURCE_SUFFIXES:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        hits = [s for s in RETRACTED_IN_SOURCES if s in text]
+        if hits:
+            out[str(path.relative_to(REPO)).replace("\\", "/")] = sorted(hits)
+    return out
+
+
+def test_no_retracted_string_survives_in_a_source_file():
+    carrying = sources_carrying_retracted_strings()
+    undeclared = {p: s for p, s in carrying.items()
+                  if p not in SOURCE_RECORDING_FILES}
+    assert not undeclared, (
+        "these sources carry a string the ledger withdrew, and are not declared "
+        f"recording files: {undeclared}. The ledger holds the withdrawn wording; "
+        "a correction comment must point at the row rather than repeat the "
+        "string, or the source someone copies from still carries it.")
+
+
+def test_the_source_retraction_guard_detects_the_pre_fix_file():
+    """CONTROL: the R file as it stood before the fix must be caught.
+
+    SCOPE: one file, recovered from git. Drawn from the artifact path rather than
+    written here -- a hand-typed string would test the scanner against my idea of
+    the comment, which is the control-that-never-met-the-pipeline defect.
+    """
+    import subprocess
+    before = subprocess.run(
+        ["git", "show", "59b7d95:biofilms_radiodialysis.R"],
+        cwd=REPO, capture_output=True, text=True)
+    if before.returncode != 0:
+        pytest.skip("pre-fix source not reachable from git")
+    found = [s for s in RETRACTED_IN_SOURCES if s in before.stdout]
+    assert "Table 2 range 1e-4..1e-2" in found, (
+        "the pre-fix R file should carry the withdrawn range; the scanner found "
+        f"{found}. It is matching nothing, not finding nothing.")
+    assert not [s for s in RETRACTED_IN_SOURCES
+                if s in (REPO / "biofilms_radiodialysis.R").read_text(encoding="utf-8")], \
+        "and the current file must carry none"
