@@ -1295,14 +1295,28 @@ def files_carrying_retracted_citations() -> dict:
     """
     out: dict[str, list[str]] = {}
     for path in REPO.rglob("*"):
-        # BUILD ARTIFACTS ARE NOT DOCUMENTS. __pycache__ .pyc files embed this
-        # module's own string constants, so the first run flagged a compiled copy
-        # of this very file. Excluding them by construction is right; adding them
-        # to the allow-list would be declaring a generated file a recording layer.
-        if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts:
+        # THE EXCLUSION IS "DERIVED FROM A SOURCE ALREADY SCANNED", NOT "IS A BUILD
+        # ARTIFACT", AND THE TWO RULES HAVE DIFFERENT FUTURE COVERAGE. The first
+        # version of this skipped `path.suffix in {.pyc, .pdf, .png, .so, .o}`,
+        # which would silently admit any future artifact of those types carrying a
+        # forbidden string -- and `preprint/*.pdf` is the manuscript's own build
+        # output, so the rule excluded the one artifact a reader actually receives.
+        # Measured: with no type exclusion at all, 14 PDFs in the tree produce zero
+        # hits, because PDF text is compressed. The suffix rule bought nothing and
+        # cost coverage.
+        #
+        # A `.pyc` is excludable for a narrower and checkable reason: it is a
+        # compiled copy of a `.py` that is itself in scope, so its content is
+        # already being read at its source. That justification is ASSERTED below
+        # rather than assumed -- if the sibling source is missing, the file is
+        # scanned rather than skipped.
+        if not path.is_file() or ".git" in path.parts:
             continue
-        if path.suffix in {".pyc", ".pdf", ".png", ".so", ".o"}:
-            continue
+        if "__pycache__" in path.parts:
+            stem = path.name.split(".")[0]
+            if (path.parent.parent / f"{stem}.py").is_file():
+                continue        # derived from a source this scan already reads
+            # orphaned cache with no source in scope: scan it
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:

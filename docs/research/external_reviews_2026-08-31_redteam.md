@@ -187,6 +187,26 @@ A third defect surfaced while applying the fixes: §3.4 referred implementing sy
 integration to §7.5 as future work, and §7.5 does not list it. The cross-reference was
 dangling and is now removed.
 
+### A fourth, and it is a new member of the use-versus-mention family rather than a repeat
+
+The first draft of the reference correction named both withdrawn DOIs **inside LaTeX
+comments in the manuscript**. `RETRACTED_CITATIONS` would have caught it. **The design
+would not have**, and that gap is the finding.
+
+Use-versus-mention was resolved at the **file** level — which documents may name a
+withdrawn DOI. A `.tex` comment defeats that resolution without violating it: it sits
+inside a *permitted* file, at a location that is not part of the rendered document. It is
+neither use nor mention in the sense the allow-list encodes. It is **invisible to a reader
+of the PDF and fully visible to a reader of the source — and the source reader is the one
+who copies the string**, which is the whole reason withdrawn identifiers are kept out of
+the manuscript.
+
+So a file-level allow-list is not sufficient for artifacts that have a rendered form and a
+source form. The repair taken here was to remove the strings rather than to teach the guard
+about comments, because the manuscript has no reason to carry a withdrawn DOI in any form;
+the comments now point at the ledger row. **Recorded because the next guard of this shape
+should decide its scope at the level of *rendered versus source*, not only of file.**
+
 ---
 
 ## Summary
