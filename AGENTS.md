@@ -209,6 +209,20 @@ Any number this repository has published and later found wrong gets **all** of:
 2. a row in `data/claims_ledger.csv` with verdict `delete` / `restate` /
    `requalify` / `keep`, stating what was wrong and how it was caught,
 3. a marked correction in the document that carried it — not a silent edit,
+   **which names the ledger row and never repeats the withdrawn content.** The
+   row holds the wording; the artifact must not. Repeating a withdrawn DOI, range
+   or formula inside a correction comment leaves it in the file someone copies
+   from, and every guard written afterwards will fire on the correction itself.
+   This happened three times in one session — a withdrawn DOI in a LaTeX comment,
+   a second in the same file, a withdrawn range in an R comment — each time in a
+   correction whose whole purpose was removing that string.
+
+   **The reason it recurs is structural, not careless: writing a correction and
+   writing a guard against the thing corrected are the same act, and the
+   correction is authored in the window where the guard does not exist yet.** So
+   the convention has to be a habit rather than something the suite catches,
+   because at the moment of writing there is nothing to catch it.
+
 4. **and an audit of everything computed FROM it.** A withdrawn measurement
    takes its dependents with it. The 3.2 µm ladder row was withdrawn and its
    own headline corrected twice, while the interface-area range published a few

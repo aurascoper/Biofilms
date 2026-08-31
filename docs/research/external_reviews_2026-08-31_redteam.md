@@ -153,7 +153,21 @@ paradigm."
 
 ## Claim 9 — "no flow" should be a declared limitation
 
-**Verdict: `needs_verification` → open.** The reviews are right. §7.5 declares that
+**Verdict: `needs_verification` → CLOSED 2026-08-31, and the framing changed on the way.**
+The reviews are right that flow is undeclared, but adding "no flow" beside the existing
+entry would have overstated its independence. Flow reaches morphology through mechanics, and
+a model with no growth generates no growth-induced stress for mechanics to act on — so the
+three are one structural absence under three names. §7.5 now says that, and says what it
+costs: no route by which morphology could arise, so the spatial output is directional
+redistribution in an imposed field rather than a morphology.
+
+**The literature half stays unverified and out of the manuscript.** The reviews argue
+growth-induced stress is the dominant still-condition morphogen (Yan 2019, Asally 2012).
+That is not checked here, §7.5 says so explicitly, and nothing in the added sentence depends
+on it. The claim carrying the weight is internal: this model has no growth, no mechanics and
+no flow.
+
+The original finding, for the record. §7.5 declared that
 "viscoelastic mechanics are absent from the executed simulations", but flow, advection,
 shear and hydrodynamics appear nowhere as model or as declared limitation. SCOPE: searched
 `preprint/…tex`, `README.md` and `data/claims_ledger.csv` on 2026-08-31 for those four terms;
@@ -353,7 +367,7 @@ review that was told what to find.
 | 6 | The CPM is adhesion-and-volume only | `requalify` — four terms; **premise from the brief** |
 | 7 | §6.3 needs an SE/direction caveat | `keep` — already the manuscript's position |
 | 8 | Scope the CPM-for-biofilms novelty claim | `delete` — no such claim is made |
-| 9 | "No flow" is undeclared | open — correct, and not fixed in this pass |
+| 9 | "No flow" is undeclared | **closed 2026-08-31** — declared in §7.5, but as a *relation* rather than a list item: flow is downstream of mechanics, mechanics downstream of growth |
 | 10 | Do not claim more than "not demonstrated" | `keep` — the manuscript is already more careful |
 | 11 | No growth ⇒ radiotrophy untestable | `keep` — four places plus README |
 | 12 | §2.6 draws the radiolytic-H₂ contrast | `keep` — and already labels its own limits |

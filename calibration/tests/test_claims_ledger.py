@@ -353,6 +353,31 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
         for cid in missed:
             print(f"      {cid}")
 
+        # THE ROWS ENFORCED NOWHERE, PRINTED EVERY RUN. `document = repository`
+        # or `correspondence` is a PSEUDO_DOCUMENT: document_path returns None,
+        # so the row is never searched by anything. That is not a scope gap, it
+        # is an ADDRESSABILITY gap -- the verdict has no file to be enforced in.
+        #
+        # This is printed rather than left in a plan for the reason the absence
+        # gate prints its five known gaps: a number that lives in a document
+        # nobody rereads is a number nobody acts on. PP-DEFF-01 sat in this class
+        # with a prescribed comment fix unapplied until 2026-08-31, and it was
+        # found only because a guard was being built for a different cause.
+        pseudo = [r for r in rows if r["document"] in PSEUDO_DOCUMENTS]
+        unresolved = [r for r in pseudo
+                      if r["status"] in ("delete", "restate", "requalify",
+                                         "needs_verification", "needs_calibration")]
+        names_source = [r for r in unresolved
+                        if re.search(r"\.(jl|R|py)\b", r["code_location"] or "")]
+        print(f"  ENFORCED NOWHERE: {len(pseudo)} rows name a pseudo-document "
+              f"({', '.join(sorted(PSEUDO_DOCUMENTS))}), so no guard reads them")
+        print(f"      of those, {len(unresolved)} carry an unresolved verdict "
+              f"and {len(names_source)} of those name a source file:")
+        for r in names_source:
+            print(f"        {r['claim_id']} [{r['status']}]")
+        print("      the rest are unread by construction and want a human pass, "
+              "not a guard that happens to sweep them")
+
         # THE OTHER DOCUMENTS ARE READ NOW, so their coverage is reported too —
         # a row the widened filter reaches but the prose guard cannot match is
         # still uncovered, and saying "34 delete claims" over it would hide that.
