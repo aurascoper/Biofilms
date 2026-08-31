@@ -40,6 +40,36 @@ When you add a guard, add the input that proves it bites. When you review one,
 ask what would have to be true for it to fail, and check that something makes
 it so.
 
+**Two failure modes are invisible from reading the assertion, and they are a pair.**
+Everything above asks whether a check *can* fire. These ask something else.
+
+*The assertion that was never load-bearing.* **Weaken it to something trivially true and
+re-run the controls that are supposed to fail.** If those still fail, something else was
+catching them and the assertion is not what it appears to be; if they now pass, the
+assertion was load-bearing.
+
+State it that way and not as "weaken it and see if the suite stays green" — **a green suite
+stays green under any weakening**, because the assertion was passing anyway. The weakening
+only discriminates against an input the assertion is meant to reject. That correction was
+itself made here after writing the looser form into this file and running it: weakening the
+bibliography set-assertion to `@test true` left 40 passing, which established nothing.
+
+The real instance: a same-run identity assertion in `test_figure_staleness.py` that cannot
+fail while the function it guards is correct, because that function locates the element by
+content and replaces only within the located slice. It is kept, and relabelled as
+documentation of an invariant rather than presented as a control.
+
+*The input that never changed.* A mutation check can be correct in every line and still
+prove nothing, because the mutation did not apply. Reproducing a finding here, a `replace`
+against normalised text missed a source storing XML entities (`&#215;`), changed nothing,
+and the guard's truthful "nothing missing" over an unmodified file read exactly like
+confirmation. **Assert that the mutation applied, and assert WHERE it applied** — a bare
+`mutated != source` passes on a replacement that landed in a different element entirely,
+which was the second defect in the same three lines.
+
+Neither is visible by reading the assertion. One is an assertion that cannot fail; the
+other is an input that never changed.
+
 **And draw the known-bad from the artifact path, never from your own hand.** A
 control you construct tests your idea of the failure; one recovered from where
 the real input comes from tests the pipeline. Where a guard reads a *derived*

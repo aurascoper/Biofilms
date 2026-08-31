@@ -294,6 +294,41 @@ papers, nothing from that report enters the manuscript without a primary read.
 
 ---
 
+# What three reviews establish about commissioning, which is the durable finding
+
+Three commissioned reviews, on three unrelated subjects — symplectic integration and
+rheology, morphology and mechanics, melanin radiotrophy. **All three substantially
+rediscovered work this repository already held**, and in the radiotrophy case rediscovered
+a single document, `radiotrophic_compatibility_audit.md` of 2026-08-15, whose conclusions
+were already carried into §2.6 and the ledger before the review was commissioned.
+
+Across all three, the genuine additions were:
+
+1. the overdamped physical argument (Re, τ_p) — applied to §3.4;
+2. that no fungus has a CO₂-fixation pathway — recorded `needs_verification`, **not
+   adopted**, because it is fungal genomics and nothing here can check it.
+
+**That is the finding, and it is about commissioning rather than about any review.** A
+brief written from a repository that already holds the answer produces a report that
+returns the answer. Two of the false claims in the first two reviews came from premises
+supplied in the briefs and came back reported as findings — a premise returned as a finding
+reads exactly like independent confirmation, which is what makes it worth recording rather
+than quietly correcting.
+
+And the one thing all three added was **in a domain this repository has no purchase on**:
+low-Reynolds hydrodynamics, and fungal carbon metabolism. Neither is checkable from here;
+both are checkable by someone who knows the field.
+
+**So the shape of what external review is good for here is now visible, and so is the shape
+of what to ask for.** Not "audit our claims" — the audits exist, and a brief describing them
+will get them back. Ask instead for the thing the repository structurally cannot do: name
+the domain, state the premise as a premise to be checked rather than as background, and
+expect the answer to arrive as `needs_verification` because verifying it is outside what
+this repository can reach. A review whose findings this repo *could* have produced is a
+review that was told what to find.
+
+---
+
 ## Summary
 
 | # | Claim | Verdict |
