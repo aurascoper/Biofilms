@@ -249,7 +249,7 @@ substrate-limited growth paradigms that dominate existing biofilm models.
 The application of Hamiltonian mechanics to ecological systems remains comparatively
 underexplored, despite the natural conservation laws that govern energy flow in ecosystems.
 Symplectic integration methods, which preserve the geometric structure of Hamiltonian flows,
-have been advocated for ecological modeling by Diele et al.\ \cite{diele2015} to ensure that
+have been advocated for ecological modeling by Diele and Marangi \cite{diele2015} to ensure that
 numerical solutions maintain essential qualitative dynamics. The Kuramoto model of coupled phase
 oscillators \cite{kuramoto1984} provides a well-established framework for synchronization
 phenomena in biological systems, from neural networks to circadian rhythms. Aceb\'r\'on et al.\
@@ -535,8 +535,27 @@ carry the reflection direction across a cylindrical wall boundary --- but it is 
 full from the current position and forces at every step ($\dot{\mathbf{x}} = \mu\mathbf{F} +
 \boldsymbol{\xi}$, the defining property of the overdamped limit), never advanced by its own
 equation of motion, and so is not the persisted inertial degree of freedom a symplectic
-integrator requires; the word survives in a comment where the physics does not. Implementing
-genuine symplectic integration is listed in Section~\ref{sec:limitations}.
+integrator requires; the word survives in a comment where the physics does not.
+
+\emph{This subsection previously referred implementing symplectic integration to
+Section~\ref{sec:limitations} as future work. That cross-reference was dangling ---
+Section~\ref{sec:limitations} does not list it --- and the paragraph below explains why it
+should not be listed there either.}
+
+\emph{And the absence is appropriate, not merely factual --- which is the stronger claim and
+the one this paragraph should make.} At cell scale the regime is overdamped. Taking water
+($\rho = 10^{3}\,\mathrm{kg\,m^{-3}}$, $\eta = 10^{-3}\,\mathrm{Pa\,s}$), a cell of
+length $L = 1$--$10\,\mu$m moving at $U = 20\,\mu\mathrm{m\,s^{-1}}$ gives
+$\mathrm{Re} = \rho U L/\eta \approx 2\times10^{-5}$ to $2\times10^{-4}$, and even a
+$100\,\mu$m biofilm feature at that speed reaches only $2\times10^{-3}$. The inertial
+relaxation time $\tau_p = 2\rho a^{2}/(9\eta)$ is $5.6\times10^{-8}\,$s for
+$a = 0.5\,\mu$m and $2.2\times10^{-7}\,$s for $a = 1\,\mu$m --- roughly ten orders of
+magnitude below the timescales this model addresses, cell division among them. The length and
+speed are stated because $\mathrm{Re}$ is a property of the flow and not of the organism
+alone: a figure quoted without them is not reproducible. A persisted, independently-integrated
+momentum state would therefore inject dynamics the physical system does not have, so its
+absence is a correctness property rather than a gap awaiting work.
+\texttt{analysis/overdamped\_regime.py} reproduces every number in this paragraph.
 
 \subsection{Radiation Field Models}
 
@@ -627,6 +646,22 @@ end-to-end distance.  Viscoelastic creep follows the Kelvin-Voigt model:
 \sigma(t) = E\,\varepsilon(t) + \eta\,\frac{d\varepsilon}{dt}
 \end{equation}
 with stress relaxation time $\tau = \eta/E$ governing biofilm restructuring dynamics.
+
+\paragraph{This subsection is specification, not method.} Nothing described here is
+implemented. No elastic, viscoelastic or mechanical term exists in any source file:
+\texttt{compute\_delta\_H\_terms} returns adhesion, volume, radiation and melanin and
+nothing else, so neither Eq.~\ref{eq:fene} nor Eq.~\ref{eq:kelvinvoigt} enters the
+acceptance rule or any equation of motion. The executed simulations carry no stress, no
+strain and no modulus.
+
+\emph{And a measured modulus could not enter the model as written.} The CPM Hamiltonian
+carries contact energies and a volume-constraint stiffness, not a bulk modulus in Pascals,
+and its clock is Monte Carlo steps rather than seconds, so a relaxation time $\tau$ in
+seconds has no place to land. A bench modulus would inform an immersed-boundary, particle,
+or continuum viscoelastic model --- a different model class from the one this work runs.
+This is recorded so that the specification is not read as a plan the present code could
+absorb by fitting coefficients. Corrects \texttt{claims\_ledger} row \texttt{PP-310-01},
+which recommended labelling this subsection as proposed rather than implemented.
 
 \subsection{Membrane Transport Under Radiation-Driven Permeability Change}
 \label{sec:radiodialysis}
@@ -1532,16 +1567,27 @@ iDynoMiCS: next-generation individual-based modelling of biofilms.
 \url{https://doi.org/10.1111/j.1462-2920.2011.02414.x}
 
 \bibitem{sonner2015}
-Sonner, S., Efendiev, M.A., Eberl, H.J. (2015).
-On the well-posedness of a mathematical model of quorum-sensing in patchy biofilm communities.
-\textit{Mathematical Methods in the Applied Sciences}, 38(3), 3037--3042.
-\url{https://doi.org/10.1002/mma.3237}
+Rahman, K.A., Sudarsan, R., Eberl, H.J. (2015).
+A mixed-culture biofilm model with cross-diffusion.
+\textit{Bulletin of Mathematical Biology}, 77(11), 2086--2124.
+\url{https://doi.org/10.1007/s11538-015-0117-1}
+% CORRECTED 2026-08-31. The entry previously here had wrong bibliographic data,
+% a DOI resolving to an unrelated paper, and was the wrong paper for the
+% cross-diffusion claim it was cited for. The withdrawn fields are recorded in
+% data/claims_ledger.csv, row PP-REF-01 (verdict delete) -- deliberately NOT
+% repeated here, so the withdrawn DOI exists in the recording layer only and
+% cannot be copied out of the manuscript.
 
 \bibitem{diele2015}
-Diele, F., Marangi, C., Ragni, S. (2015).
+Diele, F., Marangi, C. (2020).
 Geometric numerical integration in ecological modelling.
-\textit{Mathematics and Computers in Simulation}, 110, 40--52.
-\url{https://doi.org/10.1016/j.matcom.2014.02.006}
+\textit{Mathematics}, 8(1), 25.
+\url{https://doi.org/10.3390/math8010025}
+% CORRECTED 2026-08-31. EVERY FIELD of the previous entry was wrong -- authors,
+% year, journal, volume, pages -- and its DOI resolved to an unrelated
+% quadratic-programming paper. Two authors, not three; the body citation was
+% updated to match. The withdrawn fields are in data/claims_ledger.csv, row
+% PP-REF-02 (verdict delete), and are deliberately not repeated here.
 
 \bibitem{kuramoto1984}
 Kuramoto, Y. (1984).

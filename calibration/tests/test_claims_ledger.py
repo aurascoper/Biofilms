@@ -1234,3 +1234,127 @@ def test_the_load_bearing_check_detects_a_deleted_sentence(rows):
     assert [c for c, _ in load_bearing_absences(rows, read=struck)] == list(LOAD_BEARING), (
         "removing the phrase must make the check fail; if it does not, the "
         "check is reading something other than the sentence it names")
+
+
+# --------------------------------------------------------- retracted citations
+#
+# THE THIRD TIER, AND IT EXISTS BECAUSE A CITATION CANNOT REACH THE FIRST TWO.
+# `distinguishing_phrase` splits on commas and needs MIN_WORDS from one unbroken
+# run. A bibliographic entry -- "Diele, Marangi, Ragni (2015), Math. Comput.
+# Simul. 110, 40-52, doi ..." -- is all commas, so it yields '' and PP-REF-01 and
+# PP-REF-02 were `delete` verdicts covered by nothing. Both were prescribed in the
+# ledger and sat unapplied in the manuscript until 2026-08-31.
+#
+# NOTE THIS IS A SECOND CAUSE, NOT THE SAME ONE AS THE SOURCE-COMMENT GAP. A
+# verdict is also unenforced when the claim lives in a .jl comment rather than in
+# the file the row's `document` column names -- that is RM-G04-01, and it needs a
+# RETRACTED_IN_SOURCES scan over SIM_FILES. Widening which files are scanned would
+# not reach the two reference rows, because their invisibility is a property of the
+# phrase EXTRACTOR. One symptom, two causes; this closes exactly one of them.
+# THIS GUARD REACHES PP-REF-01 AND PP-REF-02 AND NOTHING ELSE.
+RETRACTED_CITATIONS = {
+    "10.1002/mma.3237": "PP-REF-01: resolves to an unrelated 3D MHD regularity paper",
+    "10.1016/j.matcom.2014.02.006": "PP-REF-02: resolves to an unrelated QP paper",
+}
+
+# USE VERSUS MENTION, AND THE SET IS EXPLICIT NAMES RATHER THAN A GLOB.
+# Recording that a DOI was withdrawn requires naming it, so the ledger and the
+# red-team documents necessarily contain these strings. A whole-tree scan fails on
+# its first run against the very files that record the withdrawal -- the shape of a
+# test whose own control fixture contains the string it forbids.
+#
+# The resolution is an ALLOW-LIST, inverted: scan everything, and require every file
+# carrying a withdrawn DOI to be declared here. A new document quoting one FAILS
+# until it is consciously added, rather than passing because it fell outside a
+# curated scan list. `docs/research/*_redteam.md` was rejected as a glob for exactly
+# that reason: it would auto-admit every future red-team file, which is the property
+# the allow-list was chosen to avoid.
+#
+# BOTH ENTRIES BELOW THE FIRST THREE WERE FOUND BY THIS GUARD ON ITS FIRST RUN, which
+# is the allow-list earning its place: neither was anticipated, and a curated scan
+# list would have silently omitted both instead of demanding a decision.
+CITATION_RECORDING_FILES = {
+    "data/claims_ledger.csv",
+    "docs/research/session_claims_2026-08-24_redteam.md",
+    "docs/research/external_reviews_2026-08-31_redteam.md",
+    "calibration/tests/test_claims_ledger.py",
+    # The pre-revision manuscript, which is ORIGINAL_FIXTURE -- the committed
+    # known-bad this file already uses as its detection floor. It carries both
+    # withdrawn DOIs BECAUSE it is the artifact from before the correction, and
+    # fixtures/README.md says of these files: "Do not regenerate or 'fix' these
+    # files. Their value is that they are wrong."
+    "calibration/tests/fixtures/modeling_radiotrophic_fitness_prerevision.md",
+}
+
+
+def files_carrying_retracted_citations() -> dict:
+    """{repo-relative path: [dois]} for every file containing a withdrawn DOI.
+
+    SCOPE: every readable file in the repository except `.git`. Shared by the check
+    and its control so the control cannot pass against a regressed check.
+    """
+    out: dict[str, list[str]] = {}
+    for path in REPO.rglob("*"):
+        # BUILD ARTIFACTS ARE NOT DOCUMENTS. __pycache__ .pyc files embed this
+        # module's own string constants, so the first run flagged a compiled copy
+        # of this very file. Excluding them by construction is right; adding them
+        # to the allow-list would be declaring a generated file a recording layer.
+        if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts:
+            continue
+        if path.suffix in {".pyc", ".pdf", ".png", ".so", ".o"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        hits = [d for d in RETRACTED_CITATIONS if d in text]
+        if hits:
+            out[str(path.relative_to(REPO)).replace("\\", "/")] = sorted(hits)
+    return out
+
+
+def test_no_withdrawn_citation_survives_outside_the_recording_layer():
+    carrying = files_carrying_retracted_citations()
+    undeclared = {p: d for p, d in carrying.items()
+                  if p not in CITATION_RECORDING_FILES}
+    assert not undeclared, (
+        "these files carry a DOI the ledger withdrew, and are not declared as "
+        f"recording documents: {undeclared}. If this is the manuscript or the "
+        "README, the retraction was never applied. If it is a new document that "
+        "records the withdrawal, add it to CITATION_RECORDING_FILES deliberately.")
+
+
+def test_the_replacements_the_ledger_prescribed_are_present():
+    """The other half: absence of the wrong DOI is not presence of the right one.
+
+    SCOPE: the manuscript only. A guard that checked only for the withdrawn string
+    would pass against a bibliography with the entry simply deleted.
+    """
+    tex = PREPRINT.read_text(encoding="utf-8")
+    for doi, row in (("10.1007/s11538-015-0117-1", "PP-REF-01"),
+                     ("10.3390/math8010025", "PP-REF-02")):
+        assert doi in tex, f"{row}'s prescribed replacement {doi} is not in the manuscript"
+
+
+def test_the_retracted_citation_guard_detects_the_pre_fix_manuscript():
+    """CONTROL: the manuscript as it stood before the fix must be caught.
+
+    SCOPE: one file, recovered from git rather than written here. The known-bad is
+    drawn from the artifact path -- a hand-written string would test the scanner
+    against my idea of the citation, which is the control-that-never-met-the-
+    pipeline defect AGENTS.md rule 1 records from the figure-sidecar case.
+    """
+    import subprocess
+    before = subprocess.run(
+        ["git", "show",
+         "a8ba2b0:preprint/modeling_radioresistance_and_radiotropic_fitness.tex"],
+        cwd=REPO, capture_output=True, text=True)
+    if before.returncode != 0:
+        pytest.skip("pre-fix manuscript not reachable from git")
+    found = [d for d in RETRACTED_CITATIONS if d in before.stdout]
+    assert sorted(found) == sorted(RETRACTED_CITATIONS), (
+        "the pre-fix manuscript should contain both withdrawn DOIs; the scanner "
+        f"found {found}. It is matching nothing, not finding nothing.")
+    assert not [d for d in RETRACTED_CITATIONS
+                if d in PREPRINT.read_text(encoding="utf-8")], \
+        "and the current manuscript must contain neither"

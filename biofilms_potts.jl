@@ -13,7 +13,16 @@
 #  motivates the per-species magnitudes below; it is not what the term computes.
 #
 #  Maps the paper's Hamiltonian (Eq. 2, Section 3.3) to CPM energy:
-#    H_CPM = H_adhesion + H_volume + H_radiation + H_pairwise + H_melanin
+#    H_CPM = H_adhesion + H_volume + H_radiation + H_melanin
+#
+#  FOUR TERMS, NOT FIVE. compute_delta_H_terms returns (adh, vol, rad, mel) and
+#  compute_delta_H sums exactly those. total_pairwise_energy IS real, but it is
+#  called from take_snapshot alone and never enters Metropolis acceptance, so
+#  nothing in the simulation minimises it -- it records mutualistic-pair
+#  proximity under adhesion, not a selected-for outcome. Listing it here as a
+#  term of H_CPM was claims_ledger row RM-G04-01 (verdict restate); that verdict
+#  was applied to README and not to this comment, because the ledger guard
+#  resolves a row's `document` column and nothing reads source comments.
 #
 #  Coupled fields (melanin, nutrient, radiation) updated each MCS
 #  per Eq. 7 (melanin RD) and Eq. 5 (radiation field).
