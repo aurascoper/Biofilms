@@ -160,36 +160,87 @@ def test_the_constraint_check_detects_a_collapsed_distinction(register):
 
 
 # ---------------------------------------------------------------------------
-# THE NO-SIGNAL REGISTRY
+# THE NO-SIGNAL REGISTRY, WHICH ASSERTS ITS ABSENCES RATHER THAN RECORDING THEM
 # ---------------------------------------------------------------------------
 # A limitations paragraph is also a registry of absent signal: every declared
 # absence is a predicate some future check will be VACUOUS against. The dose
 # topological check was proposed against a chain whose own manuscript declares
-# d(mu)/dc ~ 0, so an enclosed void that is not depleted is the correct output
-# and the check would have passed on a broken chain.
+# d(mu)/dc ~ 0, so an enclosed void that is not depleted is the correct output.
 #
-# Naming the physics term that gives a check its signal makes that mechanical
-# rather than a habit: a row whose signal_source is a term this repository has
-# DECLARED ABSENT cannot be buildable, and must therefore carry a blocked_by.
-# This is the absence-scope rule run in reverse.
+# A REGISTRY THAT ONLY RECORDS IS A ONE-TIME GREP, and this repository has the
+# F_s lesson about those: it silently becomes false the day someone implements
+# the thing. If a matrix-diffusion term lands, a recording registry keeps
+# blocking a row whose signal source is now real and nothing fails.
+#
+# So each entry carries a PREDICATE that asserts the absence still holds. The
+# same predicate at opposite polarity is the promotion trigger: the test fails
+# exactly when the term appears, which is exactly when the row should promote.
+# One test doing both jobs, instead of a registry plus a prose trigger somebody
+# has to remember to re-read.
+
+ROOT_SOURCES = sorted(REPO.glob("*.jl")) + sorted(REPO.glob("*.R")) \
+    + sorted((REPO / "analysis").glob("*.R"))
+TEX = REPO / "preprint" / "modeling_radioresistance_and_radiotropic_fitness.tex"
+
+
+def _absent_from_sources(pattern: str) -> bool:
+    """No source names a symbol matching `pattern`."""
+    import re
+    rx = re.compile(pattern)
+    return not any(rx.search(f.read_text(encoding="utf-8", errors="replace"))
+                   for f in ROOT_SOURCES)
+
+
+def _declaration_still_stands(phrase: str) -> bool:
+    """The manuscript still declares the term absent."""
+    return phrase in TEX.read_text(encoding="utf-8")
+
+
+# term -> (why it is absent, predicate that is True while it REMAINS absent)
 ABSENT_TERMS = {
-    "matrix diffusion (D_eff_film != D_w)":
-        "the radiodialysis solver is a Henry isotherm with a uniform sink; nothing in "
-        "it makes matrix diffusion slower than bulk",
-    "attenuation contrast with concentration":
-        "the manuscript's planned-feedback section declares d(mu)/dc ~ 0",
-    "dose-dependent survival":
-        "section 2.6: the CPM has no birth and no death",
+    "matrix diffusion (D_eff_film != D_w)": (
+        "the radiodialysis solver carries one D_eff and no bulk-water diffusivity, "
+        "so nothing in it makes matrix diffusion slower than bulk",
+        lambda: _absent_from_sources(r"\bD_w\b|D_bulk|D_water|D_free"),
+    ),
+    "attenuation contrast with concentration": (
+        "the planned-feedback section declares d(mu)/dc ~ 0",
+        lambda: _declaration_still_stands(
+            r"\partial\mu(\mathbf{r})/\partial c(\mathbf{r},t) \approx 0"),
+    ),
+    "dose-dependent survival": (
+        "the CPM has neither birth nor death",
+        lambda: _declaration_still_stands(
+            "has neither biomass growth nor a dose-dependent survival process"),
+    ),
 }
+
+
+def test_every_registered_absence_still_holds():
+    """THE PROMOTION TRIGGER, AT OPPOSITE POLARITY. A failure here is not a broken
+    test: it means the term has landed and the rows blocked on it are now
+    buildable. Fix by promoting those rows, never by deleting the entry."""
+    landed = [t for t, (_why, still_absent) in ABSENT_TERMS.items() if not still_absent()]
+    assert not landed, (
+        f"these registered absences no longer hold, so the rows blocked on them "
+        f"should promote: {landed}")
+
+
+def test_the_absence_predicates_can_fail():
+    """CONTROL: each predicate shape must be capable of returning False, or the
+    check above is three lambdas that always pass."""
+    assert not _absent_from_sources(r"compute_delta_H_terms")   # plainly present
+    assert not _declaration_still_stands("a phrase no manuscript contains")
 
 
 def test_a_check_whose_signal_is_declared_absent_is_not_buildable(index):
     for r in index:
         src = r.get("signal_source", "").strip()
         if src and src in ABSENT_TERMS:
+            why = ABSENT_TERMS[src][0]
             assert r["blocked_by"].strip(), (
                 f"{r['sop_id']} names a signal source this repository declares absent "
-                f"({ABSENT_TERMS[src]}) and carries no blocked_by")
+                f"({why}) and carries no blocked_by")
             assert r["coverage"] != "sop", (
                 f"{r['sop_id']} claims a written SOP for a check that cannot fire")
 

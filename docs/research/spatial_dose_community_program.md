@@ -164,6 +164,22 @@ that can be audited:
 
 Written before the look-up so that the number cannot be moved by what the look-up returns.
 
+**The comparator is sufficient-not-necessary, and the sharper one is unavailable — checked before
+D2b, deliberately.** 4.7× is the *total span* across four groups with the threshold sitting inside
+it, which establishes the span was **enough**, not that it was **needed**. The tighter comparator is
+the adjacent-group bracket around 480 nGy/h, and that bracket is **not published**: the paper gives
+Blank as 192.906 ± 5.05 and High as 910.964 ± 41.09 nGy/h, and reports Low and Medium only as
+sampling distances (2 ± 0.5 cm and 7 ± 0.5 cm from source). The threshold sits between Low and
+Medium, so the contrast that actually resolved it is **≤ 4.7× and not otherwise determined**.
+
+**Direction of conservatism, which is now settled even though the magnitude is not:** since the
+resolving bracket is adjacent-group and therefore no wider than the total span, 4.7× is an *upper
+bound* on the necessary contrast, so **2.35× is likely conservative** — it may demand more contrast
+than the effect required, erring toward refusing a workable design rather than accepting a broken
+one. That is the direction to err in, and it is recorded rather than assumed. The threshold stands
+at 2.35× until the two group means become available, and **it was looked up before D2b so that a
+revision could not be selection dressed as sharpening.**
+
 **D2a — field steepness. Arithmetic, and it appears to be satisfied.** Water's linear attenuation
 coefficient at Cs-137 and ~1 MeV is of order 0.07–0.09 cm⁻¹, so the bare half-value layer is roughly
 8–10 cm; buildup from scattered photons stretches the effective falloff, plausibly to 15–30 cm per
@@ -173,6 +189,12 @@ lateral separation, not metres.
 *Provenance, in the register's own idiom: this is a **derivation** from tabulated attenuation
 coefficients with named inputs. It is not a facility measurement and any real dose map supersedes it.
 Filed as `coverage = derivation` so it cannot later be mistaken for something measured.*
+
+**Scope: D2a establishes a NEGATIVE, not a dose.** What it shows is that *steepness is not the
+binding constraint*, across a range of roughly 15–30 cm per halving with buildup and depending on
+geometry. **It is not a dose estimate and must not be cited as one** for any other purpose — a
+range that answers "is the gradient steep enough" is not a value that answers "what dose is at this
+position."
 
 **D2b — samplable positions. Facility access, and unresolved.** If the field is steep enough, the
 binding constraint is not steepness but whether **two or more samplable surfaces exist at adequate
