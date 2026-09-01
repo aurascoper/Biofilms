@@ -68,9 +68,23 @@ ACCOUNTED = [
 ]
 
 
+# The paragraph is addressed by line number, so it is ALSO anchored by content: a shift
+# downward would silently drop the tail (which carries no literals, so nothing else would
+# fail), and addressing a render position without checking it is the defect AGENTS.md
+# records for bibliography numbers.
+FIRST_ANCHOR = r"\emph{And the absence is appropriate"
+LAST_ANCHOR = "reproduces every number in this paragraph."
+
+
 def paragraph() -> str:
     lines = TEX.read_text(encoding="utf-8").splitlines()
-    return "\n".join(lines[FIRST_LINE - 1:LAST_LINE])
+    para = "\n".join(lines[FIRST_LINE - 1:LAST_LINE])
+    assert para.lstrip().startswith(FIRST_ANCHOR), (
+        f"lines {FIRST_LINE}-{LAST_LINE} no longer start the overdamped paragraph; "
+        "the section moved and the range must be re-anchored deliberately")
+    assert para.rstrip().endswith(LAST_ANCHOR), (
+        f"lines {FIRST_LINE}-{LAST_LINE} no longer end the overdamped paragraph")
+    return para
 
 
 def _blank_unit_groups(text: str) -> str:
@@ -98,10 +112,13 @@ def _blank_unit_groups(text: str) -> str:
     return "".join(out)
 
 
+# A LEADING MINUS IS PART OF THE QUANTITY. Without it "-5\\times10^{-5}" parsed as +5e-5;
+# set equality still failed, so it was loud rather than silent, but the parse was wrong and
+# this repository publishes negative coefficients.
 TOKEN = re.compile(
-    r"(?P<sci>(?P<mant>\d+(?:\.\d+)?)\\times10\^\{(?P<sexp>-?\d+)\})"
-    r"|(?P<pow>10\^\{(?P<pexp>-?\d+)\})"
-    r"|(?P<bare>\d+(?:\.\d+)?)"
+    r"(?P<sci>(?P<mant>-?\d+(?:\.\d+)?)\\times10\^\{(?P<sexp>-?\d+)\})"
+    r"|(?P<pow>(?P<pneg>-?)10\^\{(?P<pexp>-?\d+)\})"
+    r"|(?P<bare>-?\d+(?:\.\d+)?)"
 )
 
 
@@ -111,7 +128,8 @@ def literals(text: str):
         if m.group("sci"):
             yield float(m.group("mant")) * 10.0 ** int(m.group("sexp")), m.start()
         elif m.group("pow"):
-            yield 10.0 ** int(m.group("pexp")), m.start()
+            sign = -1.0 if m.group("pneg") else 1.0
+            yield sign * 10.0 ** int(m.group("pexp")), m.start()
         else:
             yield float(m.group("bare")), m.start()
 
@@ -203,3 +221,41 @@ def test_the_ten_orders_of_magnitude_claim(receipt):
         assert round(orders) == 10, (
             f"T_bio/tau_p for a = {label} is 10^{orders:.2f}, which does not round "
             "to the ten orders of magnitude section 3.4 claims")
+
+
+# A QUANTITY MUST NOT BE ABLE TO HIDE INSIDE A UNIT GROUP.
+# _blank_unit_groups blanks \mathrm{...} because unit exponents are not quantities:
+# \mathrm{kg\,m^{-3}} carries a -3 meaning "per cubic metre". But a number written INSIDE
+# such a group -- \mathrm{20\,\mu m\,s^{-1}} -- is blanked with it and then accounted for by
+# nothing, and NOTHING FAILS. That is a coverage gap that passes, which is worse than a wrong
+# answer. Rather than parse the inside of a unit group, refuse it: the only digits allowed in
+# there are exponents.
+def test_no_quantity_hides_inside_a_unit_group():
+    text = paragraph()
+    for m in re.finditer(r"\\mathrm\{", text):
+        depth, k = 0, m.end() - 1
+        while k < len(text):
+            if text[k] == "{":
+                depth += 1
+            elif text[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            k += 1
+        group = text[m.end():k]
+        stripped = re.sub(r"\^\{-?\d+\}", "", group)      # exponents are legitimate
+        assert not re.search(r"\d", stripped), (
+            f"a digit sits inside a unit group and would be blanked before accounting: "
+            f"\\mathrm{{{group}}}. Write the quantity outside the group.")
+
+
+def test_the_unit_group_guard_and_the_sign_both_detect_their_defect():
+    # Controls. Without these the two fixes above assert over inputs that never occur.
+    hidden = r"a speed of $\mathrm{20\,\mu m\,s^{-1}}$"
+    assert 20.0 not in [v for v, _ in literals(hidden)], "the miss must be real"
+    group = re.search(r"\\mathrm\{([^}]*)\}", hidden).group(1)
+    assert re.search(r"\d", re.sub(r"\^\{-?\d+\}", "", group)), "the guard must see it"
+
+    assert [v for v, _ in literals(r"$-5\times10^{-5}$")] == [-5e-5]
+    assert [v for v, _ in literals(r"$-10^{-3}$")] == [-1e-3]
+    assert [v for v, _ in literals(r"$2\times10^{-5}$")] == [2e-5]     # unsigned unchanged
