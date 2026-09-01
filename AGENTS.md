@@ -353,6 +353,26 @@ Any number this repository has published and later found wrong gets **all** of:
 A correction that only changes the number teaches nobody why it was wrong, and
 this repository has now corrected its own corrections twice.
 
+**A write to an external system is read back before it is reported as done.**
+This is the identifier rule pointed at a different verb: there, an identifier is
+read back against the registry that issues it; here, a write is read back from
+the system that accepted it. Both exist because the failure is silent.
+
+The instance: `gh pr edit` failed on a deprecated Projects-classic GraphQL call,
+printed that deprecation as a *notice*, **exited zero, and left the body
+unchanged**. Nothing in the output distinguished it from success. The correction
+only landed because the live body was grepped afterwards, and it took a REST
+`PATCH` to actually write. **So the class is not `gh pr edit`** — it is any
+subcommand that can warn, exit zero, and not do the thing, which is why the
+read-back attaches to the write rather than to the command.
+
+A repo-wide grep found **no scripted external writes at all**: every `gh` call
+in `scripts/` and `CLAUDE.md` is a read (`pr view`, `repo view`, eight
+`query(` and zero `mutation`), and CI's one `curl` is already followed by
+`sha256sum -c -`, so a truncated fetch fails loudly. **The exposure is entirely
+in ad-hoc agent practice**, which is precisely why it belongs in this file
+rather than in a lint.
+
 **The audit-dependents step covers artifacts outside the repository, and it
 needs an enumeration rather than a grep.** A withdrawn claim has now survived in
 two dependents that a repository-wide search could not reach: the Wan
@@ -368,6 +388,31 @@ and it is not a file.** So the enumeration is written down when a claim is
 published, not reconstructed when it is withdrawn: PR and issue bodies, review
 comments, correspondence already sent, slide decks, anything quoting a number
 that a later verdict can move.
+
+**Record the sink type, not only the path, because sinks fail in different ways
+— and not the ways you would guess.** The withdrawn `PP-62-04` zero was traced
+into every sink it reached:
+
+| sink | editable | reachable by grep from a work tree | corrected after |
+|---|---|---|---|
+| `docs/correspondence/wan_v11_note.md` | yes | yes | days, on a Codex P1 |
+| PR #23 description | yes | **no** | **three days**, when a human read it |
+| commit `d404438`'s message | **no** | no — needs `--all` and `%b` | **~10 hours**, by `5788db5` |
+| bioRxiv posting | — | — | never posted; `README.md` declares it, dated, as a search result rather than proof |
+
+**The append-only sink was corrected fastest and the editable one slowest**,
+which is the opposite of the intuition that says an editable artifact is easier
+to fix. Editability is not what decides whether a sink gets corrected; **whether
+correcting it is already part of a workflow** is. Writing another commit is the
+normal act, so the commit-message error was answered the same day by the ordinary
+motion of the work. Editing a PR description is out-of-band, triggered by nothing,
+so it sat until someone happened to read it.
+
+Two consequences. **Prefer sinks whose correction rides an existing motion**, and
+where a claim must go into an out-of-band sink, the enumeration is the only thing
+that will bring anyone back to it. And **do not try to rewrite an append-only
+sink**: `d404438` stands, `5788db5` corrects it, and the pair is the record. A
+history rewrite would destroy the evidence that the correction happened.
 
 **An identifier that routes a reader to an external retrieval is read back
 against its source before the paragraph ships.** Accession numbers, DOIs, PMIDs,
