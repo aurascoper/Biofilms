@@ -434,3 +434,43 @@ let
     integrator = _function_body(serial, "update_nutrient!")
     @test any(l -> occursin(reads, l), integrator)
 end
+
+# ------------------------------------------------- H_kNN is described the same way everywhere
+#
+# SCOPE: the H_kNN / Hamiltonian-kNN sentences in the .tex, and nothing else.
+#
+# SECTION 2.5 SAID THE FUNCTIONAL DID THE WORK; SECTIONS 3.2 AND 5 SAID IT WAS NEVER RUN.
+# Related Work closed with "a perspective that our Hamiltonian kNN decision tree
+# operationalizes quantitatively" while §3.2 said "specified and unexercised" and §5 said
+# "remains specified but unexercised". Two statements against one, so the one was the defect
+# -- and it is the same shape as the withdrawn §5 symplectic sentence: a Related Work claim
+# written from what a formalism was FOR rather than from what runs. Nothing caught it,
+# because no guard compares two prose statements about the same object.
+#
+# THE ASSERTION IS AGREEMENT, NOT ABSENCE. Banning one withdrawn verb would be a phrase
+# guard that the next synonym walks past. What must hold is that every place naming H_kNN
+# agrees on its status, so the test requires each such sentence to carry the unexercised
+# vocabulary rather than merely to avoid one word.
+@testset "every H_kNN sentence agrees that it is unexercised" begin
+    tex = read(joinpath(REPO, "preprint",
+                        "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
+
+    # Sentences that NAME the functional, excluding the equation block and bibliography.
+    sentences = [strip(s) for s in split(tex, r"(?<=\.)\s+")
+                 if (occursin("Hamiltonian kNN", s) || occursin(raw"H_{\mathrm{kNN}}", s)) &&
+                    !occursin(raw"\begin{equation}", s) && !occursin(raw"\bibitem", s) &&
+                    !occursin(raw"\subsection", s)]
+
+    @test !isempty(sentences)            # the detector must find something to be trusted
+
+    # Each one must say what the status IS, in the vocabulary §3.2 and §5 already use.
+    unexercised = r"unexercised|specified but not|not exercised"
+    for s in sentences
+        @test occursin(unexercised, s)
+    end
+
+    # THE CONTROL: the withdrawn §2.5 clause must fail this, or the assertion is decorative.
+    withdrawn = "a perspective that our Hamiltonian kNN decision tree operationalizes " *
+                "quantitatively."
+    @test !occursin(unexercised, withdrawn)
+end
