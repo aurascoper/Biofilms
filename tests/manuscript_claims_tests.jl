@@ -199,7 +199,14 @@ let
         # Microbiol Spectr 2023), reached through audit2026. Citing robertson2012 there
         # would have inserted a growth-enhancement paper as a null result: the section 2.6
         # defect, one key over, caught by reading the endpoint before writing the cite.
-        "robertson2012",  # a real gap, but in 2.1/2.6 as a POSITIVE result, not at L228-229
+        # robertson2012 LEFT THIS SET ON 2026-09-01 BY BEING CITED IN 2.1, after the FULL TEXT
+        # was read (PMC3490873) rather than the abstract. The abstract was not enough: it says
+        # "we confirmed that ionizing radiation enhanced cell growth", and whether that was
+        # measured or restated is the Khajo 2011 distinction. The Results heading settles it --
+        # "Low Dose Ionizing Radiation Increases W. dermatitidis Growth Rate and Cell Size" --
+        # and the same section reports the increase in the albino wdpks1 mutant too. So it is a
+        # positive growth result whose melanin attribution fails, which is what 2.1 needed and
+        # is NOT what L228-229 needed. Two readings, two different dispositions.
         "blasius1999",    # 2.3 synchronisation passage; still conditional -- PP-T2-25's
                           # delete of the Table 2 omega_s row is NOT applied (the row is
                           # live, citing kuramoto1984/acebron2005), so citing this now
@@ -243,10 +250,10 @@ let
     @test isdisjoint(UNUSED_GAP, UNUSED_RESIDUE)
     @test isdisjoint(UNUSED_GAP, UNUSED_CONTEXT)
     @test isdisjoint(UNUSED_RESIDUE, UNUSED_CONTEXT)
-    @test "robertson2012" in UNUSED_GAP     # a real gap, and NOT at L228-229; see above
     @test "blasius1999" in UNUSED_GAP       # gated on PP-T2-25, which is unapplied
     @test "graner1992" ∉ UNUSED_GAP        # cited 2026-09-01, so it must have LEFT the set
-    @test length(UNUSED_GAP) == 2 && isempty(UNUSED_RESIDUE) && isempty(UNUSED_CONTEXT)
+    @test "robertson2012" ∉ UNUSED_GAP     # cited 2026-09-01 in §2.1, after the FULL TEXT
+    @test length(UNUSED_GAP) == 1 && isempty(UNUSED_RESIDUE) && isempty(UNUSED_CONTEXT)
 
     @test_broken isempty(unused)
 end
