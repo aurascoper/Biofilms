@@ -404,3 +404,16 @@ cannot tell an addressed finding from an ignored one.
 
 Resolve a thread when it is genuinely addressed. Resolving is the record that
 someone read it.
+
+**So commit freely while a review request is outstanding, and repost the request
+when the committing stops.** The alternative — freezing the branch once a
+request is posted — was considered and rejected, because the freshness check it
+would enforce by hand is already enforced above: `preflight_merge.sh` refuses
+while the newest review covers a commit that is no longer the head. A hand
+convention duplicating a tool that already refuses is a second rule to drift
+from, and drifting between two conventions is worse than either.
+
+**What the request must carry is the head SHA it was posted against.** A review
+scoped to a named commit stays interpretable after the branch moves — it is a
+review of that commit, and the reader can diff forward. An unscoped review of an
+unnamed head is the thing that silently misleads.
