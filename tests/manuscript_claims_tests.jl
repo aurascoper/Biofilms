@@ -558,13 +558,18 @@ end
 #
 # SCOPE: \ref and \label in the manuscript .tex, and literal `Section~<digit>` forms.
 #
-# FIGURE NUMERALS ARE DELIBERATELY NOT CHECKED HERE, AND THE REASON HAS AN OWNER.
-# `Figure~1`, `Figures 1`, `Figure 2`, `Figure~3` and `Figure~4` are still literals in this
-# file. They are claims_ledger row PP-FIG-01, verdict `delete`, required_to_fix "Delete or
-# replace the references" -- UNAPPLIED. Acting on them is that row's decision and not this
-# guard's, so widening this pattern to `Figure~` would silently execute a verdict nobody
-# scheduled. Written here rather than in a commit message because a bare "scoped to Section~"
-# reads as a design choice, and the next person reaching for this rule would widen it. That is
+# FIGURE NUMERALS ARE NOW CHECKED TOO. They were excluded until 2026-09-01 with a reason and
+# an owner -- PP-FIG-01, verdict `delete` -- and that exclusion expired when the row closed.
+# AN EXCLUSION OUTLIVING ITS REASON IS THE STALE-RECORD FAMILY, so the comment is rewritten
+# rather than left standing.
+#
+# PP-FIG-01 DESCRIBED A DEFECT THAT HAD ALREADY BEEN FIXED. Its notes record four PHANTOM
+# figures in sections 6.1-6.4 aliasing onto the four real ones ("Figure 1 in section 6.1
+# RESOLVES TO THE CPM RADIAL-STRATIFICATION PLOT"), and its required_to_fix says "Delete or
+# replace the references; the source files do not exist". Section 6 now contains zero literal
+# figure references: the phantoms were removed in earlier work and the row was never updated.
+# What remained were six literals in the Conclusion, all naming REAL figures, each verified
+# against the caption and filename rather than against its position before conversion. That is
 # how the __pycache__ exclusion went wrong: the reasoning was recorded somewhere the rule was
 # not reached for.
 #
@@ -577,7 +582,10 @@ end
     tex = read(joinpath(REPO, "preprint",
                         "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
 
-    numerals = [m.match for m in eachmatch(r"Section~[0-9]", tex)]
+    # Figures FLOAT, which makes the literal-numeral defect worse for them than for sections:
+    # a section number is one the author controls, but a figure number is wherever LaTeX put
+    # the float, so the prose can become wrong with nothing moving in the source.
+    numerals = [m.match for m in eachmatch(r"Section~[0-9]|Figures?~?\s?[0-9]", tex)]
     @test isempty(numerals)
 
     labels = Set(m.captures[1] for m in eachmatch(r"\\label\{([^}]*)\}", tex))
@@ -589,9 +597,14 @@ end
     @testset "the controls, in both directions" begin
         # Each assertion must fail on the form it was built from, or it is asserting over an
         # empty set and would pass on any manuscript whatsoever.
-        @test !isempty([m.match for m in eachmatch(r"Section~[0-9]", "see Section~3.8, which")])
-        @test isempty([m.match for m in eachmatch(r"Section~[0-9]",
-                                                  raw"see Section~\ref{sec:knn}, which")])
+        pat = r"Section~[0-9]|Figures?~?\s?[0-9]"
+        for pre in ("see Section~3.8, which", "Figure~4 still carries", "Figures 1 and 2",
+                    "retracts. Figure 2")
+            @test !isempty([m.match for m in eachmatch(pat, pre)])
+        end
+        for post in (raw"see Section~\ref{sec:knn}, which", raw"Figure~\ref{fig:contaminant}")
+            @test isempty([m.match for m in eachmatch(pat, post)])
+        end
 
         fake_labels = Set(["sec:intro"])
         fake_refs   = Set(["sec:intro", "sec:nonexistent"])

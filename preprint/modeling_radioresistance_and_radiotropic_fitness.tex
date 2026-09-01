@@ -1476,11 +1476,11 @@ variance was relabelled, an unprovenanced sensitivity table was withdrawn and re
 one synthetic-gate verdict was withdrawn as not resolution-converged. The corrections are
 recorded in \texttt{data/claims\_ledger.csv} and in \texttt{docs/calibration/}.
 
-\emph{Correction, version 1.1: Figures 1 and 2 have been replaced.} The versions distributed with
-version 1.0 carried claims inside the images that the surrounding text retracts. Figure 2
+\emph{Correction, version 1.1: Figures~\ref{fig:radial} and~\ref{fig:melanin} have been replaced.} The versions distributed with
+version 1.0 carried claims inside the images that the surrounding text retracts. Figure~\ref{fig:melanin}
 annotated two species as ``radiotrophic (melanin-mediated energy gain)'' beneath a caption
 disowning radiation-derived energy production and against
-Section~\ref{sec:radiotrophy_status}; Figure~1 labelled a shaded band a ``radiotrophic niche'',
+Section~\ref{sec:radiotrophy_status}; Figure~\ref{fig:radial} labelled a shaded band a ``radiotrophic niche'',
 and labelled it on the wrong side, since the imposed field is maximal on the axis. Three further
 in-plot strings asserted findings the text does not support: a title reading ``radial
 stratification'' where Section~\ref{sec:discussion} reports a single-seed diagnostic not separated from the seeding
@@ -1488,9 +1488,9 @@ null, a title attributing melanin accumulation to radiation-driven production, a
 asserting drift toward the source when the run's own ordering runs the other way. No numerical
 value in either figure changed --- the underlying run is the same, and the mean radial positions
 and melanin values quoted in the captions are reproduced exactly --- and no other figure was
-regenerated. Figure~4 still carries a ``per cent depleted'' label that should read
+regenerated. Figure~\ref{fig:contaminant} still carries a ``per cent depleted'' label that should read
 non-penetration, and is not regenerated here: its quantities are downstream of the gated biomass
-basis. Figure~3 is not --- it plots $m(t)$ and $P_{\mathrm{eff}}/P_0$, neither of which reads that
+basis. Figure~\ref{fig:membrane} is not --- it plots $m(t)$ and $P_{\mathrm{eff}}/P_0$, neither of which reads that
 basis --- and it has now been rebuilt; see the version 1.2 note below. The defect was that the
 figure generator had been corrected two weeks earlier and the committed images had not, with no
 check able to detect the difference; this is recorded as \texttt{FIG-01} to \texttt{FIG-07} in the
@@ -1520,7 +1520,7 @@ sixteen, against $0.26$ predicted under the withdrawn bound and $16.7$ under the
 remaining entries of Table~\ref{tab:decided_moves} were re-measured and reproduce exactly; that is
 a statement about those entries and not about any other result in this paper. Recorded as
 \texttt{PP-62-04} and \texttt{PP-62-09} to \texttt{PP-62-11} in the claims ledger; raised in review
-by Codex on pull request \#23. Figure~3 has separately been rebuilt to remove an in-plot
+by Codex on pull request \#23. Figure~\ref{fig:membrane} has separately been rebuilt to remove an in-plot
 ``50~Gy cumulative'' annotation that the generator dropped on 14 August 2026 and the committed
 artifact kept, and to separate two labels that had been printing on top of one another; no value in
 it changed.
