@@ -138,6 +138,7 @@ radiotropism; radioresistance; OpenMC; uncertainty quantification
 
 % ---- 1. Introduction -----------------------------------------
 \section{Introduction}
+\label{sec:intro}
 
 Microbial communities possess an extraordinary ability to adapt and survive under extreme
 environmental stressors, such as elevated radiation levels. Within such communities, melanized
@@ -175,6 +176,7 @@ here, including as metaphor.
 \section{Related Work}
 
 \subsection{Melanized Fungi, Radioresistance, and the Contested Radiotrophy Claim}
+\label{sec:melanin_radiotrophy}
 
 The observation that melanized fungi colonise high-radiation environments prompted a proposal that
 melanin transduces ionizing radiation into metabolically usable energy. That proposal remains
@@ -326,7 +328,7 @@ The claim rests on a single 2007 paper covering two of the seven, and against it
 same-species report of no substantial melanin protection under gamma, a same-species negative
 melanin-pathway result at 1 and 3~kGy, a same-genus null growth result under a TLD-anchored
 $^{137}$Cs field, an isogenic null in \textit{A.\ niger} across three ionizing modalities
-(Section~2.1), and a formal energy-budget critique holding that the deposited energy is
+(Section~\ref{sec:melanin_radiotrophy}), and a formal energy-budget critique holding that the deposited energy is
 insufficient and the media carbon sufficient to account for the observed growth
 \cite{walberg2015}. ``Not demonstrated'' is not ``disproved'', and we state it as the former.
 
@@ -504,7 +506,7 @@ Four of the nine terms are additionally unrepresentable rather than merely unimp
 deterministic reaction $R_s$ is nutrient-dependent \emph{growth}, and the CPM has none:
 \texttt{state.nutrient} is written each step but never read by \texttt{compute\_delta\_H}, and
 \texttt{divide\_cell!} has no trigger. The phase-locking adjustment $\gamma_s\Delta_s$ depends on
-the $H_{\mathrm{kNN}}$ machinery of Section~3.8, which is specified and unexercised. The
+the $H_{\mathrm{kNN}}$ machinery of Section~\ref{sec:knn}, which is specified and unexercised. The
 non-ionising term $\alpha_{s,\mathrm{nir}}N$ and the external forcing $C_s$ have no counterpart in
 any state variable. Only diffusion, directed motility, noise and the ionising term have anything
 in the implemented models that corresponds to them, and even those correspond by analogy rather
@@ -635,6 +637,7 @@ where $\phi_s(t) = \cos(\omega_s t - \theta_s)$ is the phase-alignment function 
 the adaptive feedback driven by phase-locking and local radiation stress.
 
 \subsection{Hamiltonian kNN Decision Tree}
+\label{sec:knn}
 
 To model species transition probabilities modulated by neighbourhood phase states:
 \begin{equation}
@@ -965,7 +968,7 @@ Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & 
 \label{sec:methods}
 
 The repository contains four executed simulation programs: three in R and one in Julia. The PSDE
-in Section~3 is a proposed organising formalism and is not discretised by any of these programs.
+in Section~\ref{sec:framework} is a proposed organising formalism and is not discretised by any of these programs.
 No optimisation, Sobol analysis, or Morris screening was performed.
 
 \paragraph{Two-dimensional Langevin trajectories (\texttt{biofilms.R}).}
@@ -1269,6 +1272,7 @@ membrane state or CPM clock. This validates the implementation path, not the phy
 
 % ---- 7. Discussion -------------------------------------------
 \section{Discussion}
+\label{sec:discussion}
 
 \subsection{What the Implemented Models Establish}
 
@@ -1315,7 +1319,7 @@ and experimental programme.
 The regime in which those inputs are obtainable is not the one this paper's motivating sites
 occupy. Section~\ref{sec:planned_feedback} put the gap at about ten orders of magnitude: a
 reactor irradiation delivers of order $\mathrm{Gy}\,\mathrm{min}^{-1}$ and the environmental
-settings cited in Section~1 are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, so a sensitivity
+settings cited in Section~\ref{sec:intro} are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, so a sensitivity
 constant calibrated in one is not transferable to the other. Engineered nuclear facilities lie
 between them, and biofilms are documented there. Sarr\'{o} et al.\ submerged a bioreactor
 carrying stainless steel and titanium coupons in a spent nuclear fuel pool at a Spanish nuclear
@@ -1441,7 +1445,7 @@ disowning radiation-derived energy production and against
 Section~\ref{sec:radiotrophy_status}; Figure~1 labelled a shaded band a ``radiotrophic niche'',
 and labelled it on the wrong side, since the imposed field is maximal on the axis. Three further
 in-plot strings asserted findings the text does not support: a title reading ``radial
-stratification'' where Section~7 reports a single-seed diagnostic not separated from the seeding
+stratification'' where Section~\ref{sec:discussion} reports a single-seed diagnostic not separated from the seeding
 null, a title attributing melanin accumulation to radiation-driven production, and an annotation
 asserting drift toward the source when the run's own ordering runs the other way. No numerical
 value in either figure changed --- the underlying run is the same, and the mean radial positions

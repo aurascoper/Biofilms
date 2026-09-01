@@ -484,3 +484,56 @@ end
                 "quantitatively."
     @test !occursin(unexercised, withdrawn)
 end
+
+# ------------------------------------------------- cross-references resolve, and are not numerals
+#
+# SCOPE: \ref and \label in the manuscript .tex, and literal `Section~<digit>` forms.
+#
+# FIGURE NUMERALS ARE DELIBERATELY NOT CHECKED HERE, AND THE REASON HAS AN OWNER.
+# `Figure~1`, `Figures 1`, `Figure 2`, `Figure~3` and `Figure~4` are still literals in this
+# file. They are claims_ledger row PP-FIG-01, verdict `delete`, required_to_fix "Delete or
+# replace the references" -- UNAPPLIED. Acting on them is that row's decision and not this
+# guard's, so widening this pattern to `Figure~` would silently execute a verdict nobody
+# scheduled. Written here rather than in a commit message because a bare "scoped to Section~"
+# reads as a design choice, and the next person reaching for this rule would widen it. That is
+# how the __pycache__ exclusion went wrong: the reasoning was recorded somewhere the rule was
+# not reached for.
+#
+# THE SECOND ASSERTION IS THE LOAD-BEARING ONE, BECAUSE CI CANNOT MAKE IT.
+# manuscript-build runs `latexmk -pdf -interaction=nonstopmode -halt-on-error`. An undefined
+# \ref is a LaTeX *warning*, not an error, so -halt-on-error does not stop, the job goes green,
+# and the PDF ships the words "Section ??" -- a failure that looks like a typo to a reader and
+# like success to the pipeline. Nothing else in the repository catches it. This file does.
+@testset "section cross-references resolve, and none is a literal numeral" begin
+    tex = read(joinpath(REPO, "preprint",
+                        "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
+
+    numerals = [m.match for m in eachmatch(r"Section~[0-9]", tex)]
+    @test isempty(numerals)
+
+    labels = Set(m.captures[1] for m in eachmatch(r"\\label\{([^}]*)\}", tex))
+    refs   = Set(m.captures[1] for m in eachmatch(r"\\ref\{([^}]*)\}", tex))
+    dangling = sort(collect(setdiff(refs, labels)))
+    @test isempty(dangling)          # a dangling \ref renders as "??" and CI stays green
+    @test !isempty(refs)             # non-vacuity: the detector must find references at all
+
+    @testset "the controls, in both directions" begin
+        # Each assertion must fail on the form it was built from, or it is asserting over an
+        # empty set and would pass on any manuscript whatsoever.
+        @test !isempty([m.match for m in eachmatch(r"Section~[0-9]", "see Section~3.8, which")])
+        @test isempty([m.match for m in eachmatch(r"Section~[0-9]",
+                                                  raw"see Section~\ref{sec:knn}, which")])
+
+        fake_labels = Set(["sec:intro"])
+        fake_refs   = Set(["sec:intro", "sec:nonexistent"])
+        @test !isempty(setdiff(fake_refs, fake_labels))       # a dangling ref is detected
+        @test isempty(setdiff(Set(["sec:intro"]), fake_labels))
+    end
+
+    # The five converted references must each resolve, named so that deleting one is loud.
+    for k in ("sec:intro", "sec:melanin_radiotrophy", "sec:knn", "sec:framework",
+              "sec:discussion")
+        @test k in labels
+        @test k in refs
+    end
+end

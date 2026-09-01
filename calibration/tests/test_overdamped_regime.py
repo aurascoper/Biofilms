@@ -39,7 +39,9 @@ REPO = Path(__file__).resolve().parents[2]
 TEX = REPO / "preprint" / "modeling_radioresistance_and_radiotropic_fitness.tex"
 PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 
-FIRST_LINE, LAST_LINE = 571, 584
+# 571-584 until 2026-09-01, when four \label lines were inserted above and the anchor
+# assertion below refused the stale window rather than silently reading two wrong lines.
+FIRST_LINE, LAST_LINE = 573, 586
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the
