@@ -352,6 +352,40 @@ if the pending part names a task, so it does:
 **None of these is scheduled and none is anyone's assignment yet.** Listing them makes the gate a
 task rather than a state; it does not make the task started.
 
+**Why NASBEE in particular is deferred, and what would change that.** The obvious argument is
+ordering — D3 fires ahead of D2's threshold and of D2b's sampling look-up, both unresolved,
+so paying for NASBEE clears the third gate while the first two are open. **That argument is
+contingent and should not be the one on record:** if D2b came back favourable tomorrow it
+evaporates, and the purchase would still be the same purchase.
+
+The argument that holds under any D2b outcome is about the paper. **NASBEE's RBE of 3.54 at
+D₁₀ has no established microbial target** — NIRS builds that facility for mammalian
+radiobiology — so buying it resolves this gate *only if* the target turns out to be
+microbial. SCOPE ON THAT: the figure and its context were read at abstract level only, from
+the search results of 2026-08-31; ScienceDirect returns the full text behind a paywall from
+here. **"Target not established" is a statement about what was readable, not a finding that
+the target is mammalian** — which is precisely why the purchase would resolve something, and
+equally why the cheaper routes should be exhausted before paying to resolve it. If it does not, the purchase returns the gate exactly where it stands, having
+established that one lead does not apply. That is a real outcome and a poor thing to pay for
+when the two routes ahead of it in this list would establish the same thing at no cost.
+
+> **Trigger for revisiting:** DTIC ADA307995 and the Hoffman question both returning nothing,
+> **and** NASBEE's target independently confirmed as microbial *before* purchase rather than
+> after.
+
+The second clause is the load-bearing one. It converts "buy it and see" into a precondition,
+which is the shape the rest of this register uses: a cost paid against a stated outcome
+rather than against a hope.
+
+**What enforces this gate, precisely, because "an unenforced paragraph" understates it.**
+Nothing in the suite reads D3 — it is prose with a declared type. But the *precondition* it
+rests on is guarded: `coupling/biofilm_openmc/model.py:79` sets `particle="photon"` and
+`coupling/tests/test_model_build.py:25` asserts it, so switching the transport to a neutron
+or mixed field fails a test loudly. **The gate cannot be walked past silently, only
+deliberately** — and the deliberate case is a person reading a failing assertion and deciding
+what to do, which lands them here. For a judgement that cannot be mechanised, a guarded
+precondition whose failure routes to the paragraph is the strongest available form.
+
 **It converts into a question rather than sitting here**, under the rule that already governs the
 memo: state what the design needs, ask whether the quantity exists, assert nothing about the
 facility from secondhand reading. The question is now in the memo's list — whether a usable neutron
