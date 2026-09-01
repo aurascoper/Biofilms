@@ -131,11 +131,24 @@ print(f"\n{verdict} ({checks_run} checks run, {failures} failure"
 
 if len(sys.argv) >= 3 and sys.argv[1] == "--report":
     with open(sys.argv[2], "w", encoding="utf-8") as fh:
+        # THE RECEIPT CARRIES EVERY COMPUTED VALUE, NOT A HAND-PICKED SUBSET.
+        # It used to emit three scalars -- Re_cell_1um, tau_p_0p5um, ratio_0p5um --
+        # while section 3.4 states FIVE numbers, so 2e-4, 2e-3 and 2.2e-7 existed in
+        # stdout only. A guard written from that receipt would have covered two of
+        # five and looked complete. That is the same defect as asserting on a union
+        # where categories were computed, moved to the SERIALISATION boundary: the
+        # discriminating data was computed and thrown away on the way out. Serialise
+        # the sets CASES and RADII already define, so a sixth stated number cannot be
+        # missed by a receipt that never mentioned it.
         json.dump({"checks_run": checks_run, "failures": failures, "skipped": 0,
                    "skips": [],
-                   "Re_cell_1um": reynolds(1e-6, 20e-6),
-                   "tau_p_0p5um": tau_p(0.5e-6),
-                   "ratio_0p5um": T_BIO / tau_p(0.5e-6),
+                   "inputs": {"rho": RHO, "eta": ETA, "T_bio": T_BIO},
+                   "reynolds": {label: reynolds(L, U) for label, L, U in CASES},
+                   "lengths": {label: L for label, L, _ in CASES},
+                   "speeds": {label: U for label, _, U in CASES},
+                   "radii": dict(RADII),
+                   "tau_p": {label: tau_p(a) for label, a in RADII},
+                   "ratio": {label: T_BIO / tau_p(a) for label, a in RADII},
                    "complete": failures == 0}, fh)
 
 sys.exit(0 if failures == 0 else 1)
