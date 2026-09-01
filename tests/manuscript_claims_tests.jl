@@ -182,26 +182,37 @@ let
     # corrected, and khajo2011 and malo2018 because section 2.6 cannot rest its
     # argument on naming what runs against it while omitting the two positives its
     # own audit files.
+    # graner1992 LEFT THIS SET ON 2026-09-01 BY BEING CITED, on the Methods sentence
+    # describing the copy-attempt construction. An origin cite for a named formalism is a
+    # PROVENANCE claim -- the paper's title states the construction -- so it needed no
+    # endpoint reading, which is what separated it from the two below.
     UNUSED_GAP = Set([
-        "graner1992",     # L973-976 states the GGH construction with no origin cite;
-                          # Graner/Glazier/Hogeweg appear nowhere in the body
-        "robertson2012",  # primary source for L228-229, which cites only audit2026
-        "blasius1999",    # L258-261 novelty claim; weakest of the six, and becomes
-                          # (ii) if PP-T2-25's delete of the omega_s row lands
+        # robertson2012's ENTRY IN THIS SET USED TO SAY "primary source for L228-229",
+        # AND THAT WAS WRONG. Read from PubMed on 2026-09-01 (PMID 23139812), Robertson
+        # 2012 reports that ionizing radiation "enhanced cell growth by increasing cell
+        # division and cell size" and that low-dose exposure "significantly increased
+        # survivability of BOTH the wild-type and the wdpks1 mutant" -- a positive growth
+        # result, not a null -- with ribosomal biogenesis up in the irradiated wild type
+        # but NOT in the mutant, a melanin-DEPENDENT difference. L228-229 claims comparable
+        # NULL results across several modalities, and its actual primaries are the three
+        # studies in radiotrophic_compatibility_audit.md 9.2 (GSE142318, GSE152116,
+        # Microbiol Spectr 2023), reached through audit2026. Citing robertson2012 there
+        # would have inserted a growth-enhancement paper as a null result: the section 2.6
+        # defect, one key over, caught by reading the endpoint before writing the cite.
+        "robertson2012",  # a real gap, but in 2.1/2.6 as a POSITIVE result, not at L228-229
+        "blasius1999",    # 2.3 synchronisation passage; still conditional -- PP-T2-25's
+                          # delete of the Table 2 omega_s row is NOT applied (the row is
+                          # live, citing kuramoto1984/acebron2005), so citing this now
+                          # could be work in the direction the delete would undo
     ])
-    # (ii) DRAFT RESIDUE -- the claim they supported is gone from the manuscript.
-    UNUSED_RESIDUE = Set([
-        "brim2000",       # cited in prerevision 7.3, whose claim PP-73-02 deletes
-        "kazy2009",       # Pseudomonas is not among the seven; no surviving sentence
-    ])
-    # (iii) DELIBERATE CONTEXT -- supports no specific sentence; dropping them
-    #       loses nothing citable. Superseded or already-covered background.
-    UNUSED_CONTEXT = Set([
-        "battista1997",   # 1997 review superseded by slade2011/daly2009/daly2010
-        "eisenman2012",   # melanin synthesis; 3.6 models a rate law, not assembly
-        "lloyd2005",      # both bioremediation passages carry species primaries
-        "newsome2014",    # same
-    ])
+    # (ii) DRAFT RESIDUE and (iii) DELIBERATE CONTEXT are both EMPTY as of 2026-09-01: the
+    # six entries were DELETED from the bibliography, which is the disposition the
+    # classification already recorded for them. brim2000 and kazy2009 supported claims that
+    # are gone; battista1997, eisenman2012, lloyd2005 and newsome2014 supported no specific
+    # sentence. The sets stay named rather than being removed, so that a future entry
+    # arriving in either category lands somewhere that says what the category means.
+    UNUSED_RESIDUE = Set(String[])
+    UNUSED_CONTEXT = Set(String[])
     KNOWN_UNUSED = union(UNUSED_GAP, UNUSED_RESIDUE, UNUSED_CONTEXT)
 
     if unused != KNOWN_UNUSED
@@ -232,11 +243,10 @@ let
     @test isdisjoint(UNUSED_GAP, UNUSED_RESIDUE)
     @test isdisjoint(UNUSED_GAP, UNUSED_CONTEXT)
     @test isdisjoint(UNUSED_RESIDUE, UNUSED_CONTEXT)
-    @test "graner1992" in UNUSED_GAP        # the CPM origin cite is a GAP, not context
-    @test "brim2000" in UNUSED_RESIDUE      # its section was deleted (PP-73-02)
-    @test "battista1997" in UNUSED_CONTEXT  # superseded by slade2011/daly2009/daly2010
-    @test length(UNUSED_GAP) == 3 && length(UNUSED_RESIDUE) == 2 &&
-          length(UNUSED_CONTEXT) == 4
+    @test "robertson2012" in UNUSED_GAP     # a real gap, and NOT at L228-229; see above
+    @test "blasius1999" in UNUSED_GAP       # gated on PP-T2-25, which is unapplied
+    @test "graner1992" ∉ UNUSED_GAP        # cited 2026-09-01, so it must have LEFT the set
+    @test length(UNUSED_GAP) == 2 && isempty(UNUSED_RESIDUE) && isempty(UNUSED_CONTEXT)
 
     @test_broken isempty(unused)
 end

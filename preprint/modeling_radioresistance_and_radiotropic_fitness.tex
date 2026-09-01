@@ -994,7 +994,7 @@ The CPM core is implemented in Julia using standard-library numerical components
 AMDGPU support checkpoint exchange and the portability port, while CairoMakie is used for figure
 export. The lattice is cubic with a cylindrical biological domain. The reported coupled run uses
 $N=40$, six computational biomass parcels per species, and 100~MCS. One MCS is $N^3$ attempted copy
-operations. The active Metropolis rule contains four terms,
+operations, following the extended-Potts construction of Graner and Glazier \cite{graner1992}. The active Metropolis rule contains four terms,
 $H_{\mathrm{CPM}}=H_{\mathrm{adh}}+H_{\mathrm{vol}}+H_{\mathrm{rad}}+H_{\mathrm{mel}}$, at
 $T_{\mathrm{CPM}}=5.0$. The code has a manually invoked division primitive for lifecycle and
 lineage testing, but no growth law or automatic division trigger; it likewise contains no
@@ -1778,25 +1778,6 @@ melanin.
 \textit{Fungal Biology}, 122(6), 449--456.
 \url{https://doi.org/10.1016/j.funbio.2017.08.010}
 
-\bibitem{newsome2014}
-Newsome, L., Morris, K., Lloyd, J.R. (2014).
-The biogeochemistry and bioremediation of uranium and other priority radionuclides.
-\textit{Chemical Geology}, 363, 164--184.
-\url{https://doi.org/10.1016/j.chemgeo.2013.10.034}
-
-\bibitem{brim2000}
-Brim, H., et al. (2000).
-Engineering \textit{Deinococcus radiodurans} for metal remediation in radioactive mixed
-waste environments.
-\textit{Nature Biotechnology}, 18(1), 85--90.
-\url{https://doi.org/10.1038/71986}
-
-\bibitem{kazy2009}
-Kazy, S.K., D'Souza, S.F., Sar, P. (2009).
-Uranium and thorium sequestration by a \textit{Pseudomonas} sp.
-\textit{Journal of Hazardous Materials}, 163(1), 65--72.
-\url{https://doi.org/10.1016/j.jhazmat.2008.06.076}
-
 \bibitem{blasius1999}
 Blasius, B., Huppert, A., Stone, L. (1999).
 Complex dynamics and phase synchronization in spatially extended ecological systems.
@@ -1822,30 +1803,11 @@ Hairer, E., Lubich, C., Wanner, G. (2006).
 Springer-Verlag.
 \url{https://doi.org/10.1007/3-540-30666-8}
 
-\bibitem{eisenman2012}
-Eisenman, H.C., Casadevall, A. (2012).
-Synthesis and assembly of fungal melanin.
-\textit{Applied Microbiology and Biotechnology}, 93(3), 931--940.
-\url{https://doi.org/10.1007/s00253-011-3777-2}
-
-\bibitem{lloyd2005}
-Lloyd, J.R., Renshaw, J.C. (2005).
-Bioremediation of radioactive waste: radionuclide--microbe interactions in laboratory and
-field-scale studies.
-\textit{Current Opinion in Biotechnology}, 16(3), 254--260.
-\url{https://doi.org/10.1016/j.copbio.2005.04.012}
-
 \bibitem{khajo2011}
 Khajo, A., et al. (2011).
 Protection of melanized \textit{Cryptococcus neoformans} from lethal dose gamma irradiation.
 \textit{PLoS ONE}, 6(9), e25092.
 \url{https://doi.org/10.1371/journal.pone.0025092}
-
-\bibitem{battista1997}
-Battista, J.R. (1997).
-Against all odds: the survival strategies of \textit{Deinococcus radiodurans}.
-\textit{Annual Review of Microbiology}, 51, 203--224.
-\url{https://doi.org/10.1146/annurev.micro.51.1.203}
 
 \bibitem{casadevall2017}
 Casadevall, A., et al. (2017).

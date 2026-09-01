@@ -438,6 +438,30 @@ reproduce on retrieval, and was not adopted. **The rule is cheap enough to run
 on every identifier and it discriminates in both directions**, which is why it
 is worth more than the ordinary caution it looks like.
 
+### Address an entry by its key, never by its printed number
+
+A `\bibitem` key, a ledger `claim_id`, a `\label` — these are stable. The number a renderer
+prints for them is a function of everything above them, so one insertion silently re-points
+every reference below it, and **nothing errors**: the row still reads plausibly and now names a
+different paper.
+
+Measured, not asserted. On 2026-09-01 all six `PP-REF-*` rows located themselves as
+"References [11]", "[12]", "[15]", "[26]", "[4]", "[32]". Resolved against the `.tex` those
+ordinals are `slade2011`, `daly2009`, `xavier2005`, `karley2018`, `meskauskas2004` and
+`kauffman1989` — none of which is the work the row describes. Six for six, and already wrong at
+`HEAD` before any entry was deleted, so the cause was not an edit; it was addressing a render
+artifact. `docs/preprint_revision_plan.md` had the same defect, naming `audit2026` as "[41]"
+when it is entry #61.
+
+This is the identifier read-back rule pointed at an internal target: the `.tex` is the issuing
+registry, the key is the identifier, and the printed number is a rendering of it. Enforced by
+`test_no_ledger_row_locates_itself_by_printed_reference_number` in
+`calibration/tests/test_claims_ledger.py`, with its own control.
+
+**And when a number cannot be recovered, say so rather than guessing.** `PP-REF-06` also cited
+"[20]" and "[35]"; those two keys were not recoverable, and the row now records them as
+unrecovered. Guessing which entries they were would be the failure this rule exists to stop.
+
 ## The suites
 
 Four, and they are separate because they answer different questions.

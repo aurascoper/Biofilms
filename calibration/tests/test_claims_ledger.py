@@ -1561,3 +1561,38 @@ def test_the_source_retraction_guard_detects_the_pre_fix_file():
     assert not [s for s in RETRACTED_IN_SOURCES
                 if s in (REPO / "biofilms_radiodialysis.R").read_text(encoding="utf-8")], \
         "and the current file must carry none"
+
+
+# ---------------------------------------------------------------- addressing by key, not number
+#
+# ALL SIX PP-REF ROWS POINTED AT THE WRONG ENTRY, AND HAD FOR SOME TIME. They located
+# themselves as "References [11]", "[12]", "[15]", "[26]", "[4]", "[32]". Resolved against
+# the .tex those ordinals are slade2011, daly2009, xavier2005, karley2018, meskauskas2004
+# and kauffman1989 -- none of which is the work the row describes. Six for six wrong, and
+# wrong at HEAD before any entry was deleted, so the staleness was not caused by an edit;
+# it was caused by ADDRESSING A RENDER ARTIFACT. A \bibitem key is stable. Its printed
+# number is a function of every entry above it, so one insertion silently re-points every
+# reference below, and nothing errors -- the row still reads plausibly and now names a
+# different paper.
+#
+# This is the identifier rule (read an identifier back against its issuing registry)
+# pointed at an internal target: the .tex is the registry, and the key is the identifier.
+# The number is a rendering of it.
+def test_no_ledger_row_locates_itself_by_printed_reference_number(rows):
+    import re
+    by_number = re.compile(r"References?\s*\[\d+\]")
+    offenders = sorted(r["claim_id"] for r in rows if by_number.search(r["location"]))
+    assert not offenders, (
+        "these rows address the bibliography by printed number, which re-points silently "
+        f"when any entry above is added or removed: {offenders}. "
+        r"Name the \bibitem key instead -- the key is stable, the number is a render artifact.")
+
+
+def test_the_by_number_guard_detects_the_pre_fix_locations(rows):
+    # The control: the form the six rows used must be caught, or the guard above is
+    # asserting over an empty set and would pass on any ledger at all.
+    import re
+    by_number = re.compile(r"References?\s*\[\d+\]")
+    for pre_fix in ("References [15]", "References [32] [20] [35]", "References[4]"):
+        assert by_number.search(pre_fix), pre_fix
+    assert not by_number.search(r"References, \bibitem{campillo2017}")

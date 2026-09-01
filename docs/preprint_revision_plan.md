@@ -172,7 +172,7 @@ versus predicted radioactive decay" — there are no measured decay data in any 
 decay code in the repository. Withdrawn; the constant-background premise, which is what the rest of
 the paper actually uses, is kept.
 
-**Provenance fixes.** The `audit2026` / [41] entry cited the audit at revision `f4e8dbf`, which
+**Provenance fixes.** The `audit2026` entry — written here as "[41]" until 2026-09-01, when it was found to be entry #61 and the number was dropped in favour of the key — cited the audit at revision `f4e8dbf`, which
 predates the audit's own commits; now `904b9a4` / `a03bc32` at repository revision `5d1b777`. §5's
 "six cells per species" now reads "six biomass parcels", with the parcel semantics stated.
 

@@ -231,6 +231,17 @@ description.
 | Malo 2018 | *C. neoformans* | cell-wall integrity retained in melanized cells at mid and max dose; non-melanized cells showed two failure morphologies | **melanized_radioprotective**, **radiation_responsive** | `radioresistant`: the survival clause refers to the group's prior work, not to a curve in this paper |
 | Averesch 2022 | *C. sphaerospermum* ATCC 11289 | 147 vs 151 CPM, n = 1 dish, p = 0.069; flight-versus-ground growth | **none_demonstrated** | see below |
 | Vasileiou 2020 | melanin in solution | Sr-90 beta transmission versus a cellulose control of matched elemental composition | **none_demonstrated** (a measured null) | `radiation_shielding`: the term requires transmitted radiation reduced *by biomass*, and there is no biomass and no melanin-specific reduction |
+| Robertson 2012 | *W. dermatitidis* (= *E. dermatitidis*) wild type and non-melanized *wdpks1* | RNA-seq, >3000 genes differentially expressed; cell division and cell size; survivability after long-term low-dose exposure; ROS; carotenoid | **pending full text** — see note | no label assigned: the abstract's growth clause reads *"we confirmed that ionizing radiation enhanced cell growth"*, and **whether that growth was measured here or restated from prior work is not decidable from the abstract** — the Khajo 2011 distinction exactly |
+
+**Robertson 2012, and why it is not the source for the isogenic nulls.** Read from PubMed on
+2026-09-01 (PMID 23139812, `10.1371/journal.pone.0048674`). It reports that low-dose exposure
+*"significantly increased survivability of both the wild-type and the wdpks1 mutant"* and that
+ribosomal biogenesis genes were up-regulated in the irradiated wild type *"but not in the
+irradiated wdpks1 mutant"* — a melanin-**dependent** difference. That is a positive result, not a
+null, and the manuscript's isogenic-null sentence rests on the three studies in §9.2 instead.
+**SCOPE: the abstract alone, via NCBI eutils, with the full text unretrieved — so the growth
+clause's provenance stays open and this record earns no label.**
+
 
 ### The ISS experiment, in detail
 
