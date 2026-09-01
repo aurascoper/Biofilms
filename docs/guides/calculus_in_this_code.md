@@ -326,7 +326,7 @@ suite, and the failure message distinguishes "the code moved" from "the code cha
 | its face weights are deliberately unusable | `biofilms_radiodialysis.R:226` | `w_plus[1] <- NA_real_; w_minus[1] <- NA_real_` |
 | the wall uses a ghost node, not a set face flux | `biofilms_radiodialysis.R:132` | `c_ghost <- c_vec[Nr - 1] -` |
 | the scheme is named finite-volume method of lines | `biofilms_radiodialysis.R:32` | `finite-volume method of lines` |
-| the manuscript claims both ends are in the operator | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:1031` | `represented explicitly in the semi-discrete operator` |
+| the manuscript claims both ends are in the operator | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:1044` | `represented explicitly in the semi-discrete operator` |
 
 ### Part 4 — the Robin condition
 

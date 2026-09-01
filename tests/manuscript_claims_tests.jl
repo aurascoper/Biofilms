@@ -662,3 +662,52 @@ end
         @test !occursin("radiolysis", "an unrelated paragraph about mesh convergence")
     end
 end
+
+# ------------------------------------------------- 3.12's condition keeps its derivation
+#
+# SCOPE: the "dilute and low-Z" clause in section 3.12 and the mechanism paragraph under it.
+#
+# THE CONDITION SHIPPED WITHOUT ITS DERIVATION FOR THE WHOLE OF v1.1 AND v1.2. §3.12 said the
+# one-way assumption is "a reasonable simplification only while the sorbate is dilute and
+# low-Z" and never said WHY low-Z makes it reasonable -- Compton, photoelectric-as-mechanism,
+# electron density and "indistinguishable" appeared nowhere in the .tex. A reader could not
+# check the condition and a future author could not tell where its boundary lay. That is the
+# repository's own "state the derivation, not the result" rule pointed at the manuscript.
+#
+# IT WAS FOUND BY A PREMISE CHECK, NOT BY A GUARD, and the shape is worth naming because it
+# differs from the other misattributions this repository has caught: those were claims about
+# documents nobody had read. This was a document read CORRECTLY with the reasoning underneath
+# supplied silently -- the conclusion was right and its derivation was imported from outside.
+# Nothing in the text was wrong, which is what makes it hard to catch.
+#
+# THE TWO HALVES HAVE DIFFERENT EVIDENTIARY STATUS AND THE GUARD KEEPS BOTH. The mechanism and
+# the energy boundary are statements about the interaction, checkable with no measurement of
+# this system. The MAGNITUDE of the biomass/medium contrast is not, and §3.12 declines it
+# explicitly, pointing at the water fraction and composition §7.4 lists as missing. A future
+# edit that supplies a number without those measurements is the failure this scopes against.
+@testset "3.12's dilute-and-low-Z condition still carries its mechanism" begin
+    tex = read(joinpath(REPO, "preprint",
+                        "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
+
+    condition = "dilute and low-\$Z\$"
+    @test occursin(condition, tex)
+
+    # The derivation must sit with the condition, not merely somewhere in the document.
+    i = findfirst(condition, tex)
+    @test i !== nothing
+    window = tex[first(i):min(lastindex(tex), first(i) + 1400)]
+    @test occursin("Compton scattering", window)          # the mechanism
+    @test occursin("electron density per unit volume", window)
+    @test occursin("tens of keV", window)                 # the boundary, checkable here
+    @test occursin("left unstated here", window)          # the magnitude, explicitly declined
+
+    @testset "the control" begin
+        # Each string must be absent from text lacking it, or these are occursin calls that
+        # could not fail -- and the condition alone must NOT satisfy the mechanism check,
+        # which is the exact state the manuscript shipped in before this.
+        bare = "is a reasonable simplification only while the sorbate is dilute and low-\$Z\$."
+        @test occursin(condition, bare)
+        @test !occursin("Compton scattering", bare)
+        @test !occursin("tens of keV", bare)
+    end
+end
