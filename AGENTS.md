@@ -353,6 +353,22 @@ Any number this repository has published and later found wrong gets **all** of:
 A correction that only changes the number teaches nobody why it was wrong, and
 this repository has now corrected its own corrections twice.
 
+**The audit-dependents step covers artifacts outside the repository, and it
+needs an enumeration rather than a grep.** A withdrawn claim has now survived in
+two dependents that a repository-wide search could not reach: the Wan
+correspondence draft, and the PR description itself — which carried the retracted
+zero, *and* the bound argument that was wrong by three orders of magnitude, for
+three days after the manuscript was corrected. `PP-62-04` records both.
+
+The step had been run as a grep over tracked files, so its scope was silently
+*what I can grep* rather than *what asserts this claim* — the same substitution
+that makes an absence claim scoped to one file look like a property of the
+repository. **The PR description is the first thing a reader of this work sees
+and it is not a file.** So the enumeration is written down when a claim is
+published, not reconstructed when it is withdrawn: PR and issue bodies, review
+comments, correspondence already sent, slide decks, anything quoting a number
+that a later verdict can move.
+
 **An identifier that routes a reader to an external retrieval is read back
 against its source before the paragraph ships.** Accession numbers, DOIs, PMIDs,
 PDB and NCBI ids — anything whose only job is to send someone somewhere. Read it
