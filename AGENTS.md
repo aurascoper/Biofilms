@@ -358,6 +358,27 @@ This is the identifier rule pointed at a different verb: there, an identifier is
 read back against the registry that issues it; here, a write is read back from
 the system that accepted it. Both exist because the failure is silent.
 
+**The general form, because there are now three instances and one shape: an
+operation's result is confirmed before anything is concluded from it. Writes get
+read back; reads get checked non-empty.**
+
+The read direction's instance: `gh run view --log --job=<id>` returned **0
+lines**, and a grep over it for `undefined` found nothing. That silence was one
+step from being reported as a clean LaTeX build. **An empty file and a clean file
+grep identically**, and nothing in the pipeline flags that nothing was produced.
+The same job's log fetched through `gh api
+repos/<owner>/<repo>/actions/jobs/<id>/logs` returned **121,872 bytes**, and only
+then did the greps mean anything -- the final `latexmk` pass had zero undefined
+references, which the empty log could not have told anyone.
+
+The rule is not "prefer `gh api`"; that is a workaround for one tool on one day.
+It is: **assert the artifact is non-empty before searching it**, whatever
+produced it. A search over nothing returns nothing, and nothing is
+indistinguishable from a clean result at the point where the conclusion gets
+drawn. This is the no-op mutation in a different costume -- the command
+succeeded, produced nothing, and the emptiness was invisible exactly where it
+mattered.
+
 The instance: `gh pr edit` failed on a deprecated Projects-classic GraphQL call,
 printed that deprecation as a *notice*, **exited zero, and left the body
 unchanged**. Nothing in the output distinguished it from success. The correction

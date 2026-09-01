@@ -544,3 +544,46 @@ end
         @test k in refs
     end
 end
+
+# ------------------------------------------------- PP-RECIP-01's two sentences still exist
+#
+# SCOPE: the two manuscript sentences claims_ledger row PP-RECIP-01 connects. Nothing else.
+#
+# THIS GUARD IS NOT WHAT KEEPS THE ROW OFF THE ENFORCED NOWHERE REPORT, and saying so was
+# wrong when it was proposed. That report's predicate is document-based --
+# `r["document"] in PSEUDO_DOCUMENTS or GENERATED_ARTIFACTS`, and PSEUDO_DOCUMENTS is
+# {"repository", "correspondence"} -- so a row whose document is `preprint` is off the report
+# whatever its code_location says. (The corollary matters for the thirty-one rows that ARE on
+# it: they cannot be cleared by adding guards, because they are listed for naming no file.)
+#
+# WHAT IT ACTUALLY BUYS: PP-RECIP-01 records that two separately-stated sentences are one
+# mechanism. That is a claim ABOUT A RELATION, so it goes stale the moment either end is
+# edited away -- and a record of a connection outliving the thing connected is the
+# absence-record-going-stale family, caught here before it happens rather than after.
+@testset "the two sentences PP-RECIP-01 connects are still in the manuscript" begin
+    tex = read(joinpath(REPO, "preprint",
+                        "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
+
+    mechanism = "radiolysis"                     # §3.11, the established descriptor
+    reciprocity = "assumes dose--time reciprocity"   # §3.12, the caveat
+    kinetics = "competing generation and recombination kinetics"
+
+    @test occursin(mechanism, tex)
+    @test occursin(reciprocity, tex)
+    @test occursin(kinetics, tex)
+
+    # The relation, not just the ends: §3.12's caveat must still be ABOUT radiolysis. If the
+    # kinetics clause were rewritten without naming radiolysis products, PP-RECIP-01's claim
+    # that these are one mechanism would be the thing that went stale.
+    i = findfirst(reciprocity, tex)
+    @test i !== nothing
+    window = tex[first(i):min(lastindex(tex), first(i) + 600)]
+    @test occursin("radiolysis", window)
+
+    @testset "the control" begin
+        # Each string must be absent from text that does not contain it, or these are
+        # occursin calls that could not fail.
+        @test !occursin(reciprocity, "an unrelated paragraph about mesh convergence")
+        @test !occursin("radiolysis", "an unrelated paragraph about mesh convergence")
+    end
+end
