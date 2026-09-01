@@ -276,6 +276,11 @@ dose alone; it needs a biological weight, and **no weight for a microbial target
 verified here. So the gate refuses: no neutron-bearing exposure is designed, costed or asked for
 until one is sourced.**
 
+> **SUPERSEDED 2026-09-01 as to existence, not as to the refusal.** A microbial value was
+> verified on that date — see the UPDATE below. The gate still refuses; the reason is now
+> transfer rather than absence. The sentence stands as the record of what was true on
+> 2026-08-31, which is the point of dating it.
+
 **The refusal is typed OPERATIONAL-pending, not STRUCTURAL, and the distinction is the reason for
 writing it down.** STRUCTURAL is the one label in this register that says stop looking, and it
 would be the most consequential verdict in the document resting on the least scoped claim — in a
@@ -301,6 +306,38 @@ set discriminates nothing** — it separates "the term is not how the field name
 exists" not at all. **But the second term set did not clear the gate either, and the reason is now
 retrieval rather than naming:** each of the three is a document whose full text did not open from
 here.
+
+### UPDATE 2026-09-01 — a microbial neutron RBE exists, and the refusal changes grounds
+
+**Verified from a primary index, not from a review's summary.** NCBI eutils `esummary` and
+`efetch` on PMID 3533817 return: Hannan MA, Paul M, Phillips RL, *"Fast neutron r.b.e. for
+lethality and genotoxicity in a wild-type and a repair-deficient strain of yeast"*,
+*Int. J. Radiat. Biol.* **50**(5):811–24, 1986 Nov. Abstract, verbatim: the r.b.e. *"varied
+from 2.7 to 4.1 for lethality, 2.8 to 7.1 for reverse mutation and 3.5 to 7.8 for mitotic
+gene conversion"*, for 11 MeV cyclotron neutrons against ⁶⁰Co gamma in *S. cerevisiae* D7.
+
+**This meets the clearing condition this subsection wrote for itself:** a value with a
+stated endpoint (lethality by colony formation), a stated neutron energy, and a stated
+photon reference. **The existence premise stated above is therefore superseded**, and is
+marked as such where it stands rather than restated here.
+
+**The gate still refuses, on better-scoped grounds.** Yeast is a eukaryote and a fungus;
+three of the seven modelled species are fungi, so this is nearer than a mammalian import,
+and it is not a bacterial value. Nor is 11 MeV cyclotron the fission spectrum a pool or a
+reactor presents. **The open question is now transfer — eukaryote to prokaryote, and one
+neutron energy to another — rather than existence**, which is a materially different and
+much smaller gap.
+
+**And one thing the same review claimed does NOT reproduce.** It reported DTIC ADA307995 as
+Distribution A, freely readable, the earlier 403 being transient bot-detection. **A second
+fetch on 2026-09-01 returned 403 again**, and the AFRRI boilerplate surfaced by search reads
+*"available to qualified users from DTIC, or others may contact the National Technical
+Information Service"* — which is in tension with unlimited public release. The review is
+also internally inconsistent: it states authors and distribution were *"confirmed verbatim
+from the report's SF298 page"* while stating that the year on that same page and the results
+tables were not extractable. **A claim to have read a page that also reports that page's
+contents as unreadable is not adopted here.** The document's status is unchanged: unread,
+with retrieval unresolved.
 
 **Three leads, named so that reopening is a task and not a re-search.**
 

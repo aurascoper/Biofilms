@@ -353,6 +353,30 @@ Any number this repository has published and later found wrong gets **all** of:
 A correction that only changes the number teaches nobody why it was wrong, and
 this repository has now corrected its own corrections twice.
 
+**An identifier that routes a reader to an external retrieval is read back
+against its source before the paragraph ships.** Accession numbers, DOIs, PMIDs,
+PDB and NCBI ids — anything whose only job is to send someone somewhere. Read it
+back from the registry that issues it, not from the document that quoted it to
+you, and not from a search engine's gloss.
+
+The failure mode is specific and it is worse than an ordinary typo: **a wrong
+identifier produces a false negative that is attributed to you.** The reader
+looks, finds nothing, and concludes the document does not exist — the opposite
+of what the paragraph was arguing. This repository shipped `ADA303995` inside
+the paragraph arguing that `ADA307995` should be obtained first, so the
+paragraph's own recommendation, followed literally, would have failed and looked
+like confirmation.
+
+**Both directions of the check have now paid.** A review reported Hannan et al.
+1986 as a microbial neutron RBE source. Reading `PMID 3533817` back through the
+NCBI eutils API returned title, authors, journal, volume, issue, pages and the
+abstract's RBE values — all matching, so the claim was adopted on the index's
+authority rather than the review's. The *same* review reported a DTIC report as
+freely readable; that claim had no identifier-backed check available, did not
+reproduce on retrieval, and was not adopted. **The rule is cheap enough to run
+on every identifier and it discriminates in both directions**, which is why it
+is worth more than the ordinary caution it looks like.
+
 ## The suites
 
 Four, and they are separate because they answer different questions.

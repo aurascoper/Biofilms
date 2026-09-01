@@ -437,3 +437,72 @@ distinction between *we stopped needing this* and *this was never what it said i
 
 Kept so that a commissioned review's premises are not mistaken later for its findings, and
 so the two causes behind four unapplied verdicts stay distinguishable.
+
+---
+
+# Fourth review — microbial neutron RBE (red-teamed 2026-09-01)
+
+Commissioned to answer the question D3's gate left open: is there a neutron RBE for a
+microbial target, with a stated endpoint? **It returned three claims. One is verified and
+useful, one does not reproduce, and one merely confirms what D3 already held.**
+
+## Claim 16 — Hannan et al. 1986 gives a microbial neutron RBE of 2.7–4.1 — **VERIFIED, ADOPTED**
+
+Checked against NCBI eutils rather than against the review's summary, per the identifier
+read-back rule. `esummary` on PMID 3533817 returns Hannan MA, Paul M, Phillips RL, *"Fast
+neutron r.b.e. for lethality and genotoxicity in a wild-type and a repair-deficient strain
+of yeast"*, *Int. J. Radiat. Biol.* 50(5):811–24, 1986 Nov. `efetch` returns the abstract:
+r.b.e. *"varied from 2.7 to 4.1 for lethality, 2.8 to 7.1 for reverse mutation and 3.5 to
+7.8 for mitotic gene conversion"*, 11 MeV cyclotron neutrons against ⁶⁰Co, *S. cerevisiae*
+D7.
+
+**Every field the review gave — title, authors, journal, volume, issue, pages, neutron
+energy, reference radiation and the three RBE ranges — matches the index**, which is an
+enumeration of nine checked fields rather than a claim about the review at large. It moves
+D3's premise: a microbial value exists.
+
+*A superlative was drafted here and withdrawn before it shipped.* The sentence had read that
+this was the first commissioned claim across four reviews to survive verification. **The
+absence gate flagged it as an unscoped universal and it was false** — Claim 3's bibliographic
+conflation verified and produced six corrected entries, and Claim 15 is recorded above as
+"the review's one real contribution." What is defensible, and checkable against the claim
+list above, is narrower: **Claim 16 is the first commissioned claim to supply a usable
+external value, as against correcting or scoping something this repository already held.**
+The same failure as §2.6 — a sentence asserting a range it had not read — caught this time by
+a tool instead of by a reviewer.
+
+**What it does not settle**, and the review did not overclaim this either: yeast is a
+eukaryote, 11 MeV cyclotron is not a fission spectrum. The gate's remaining question is
+transfer, not existence.
+
+## Claim 17 — ADA307995 is Distribution A and freely readable; the earlier 403 was transient — **DOES NOT REPRODUCE**
+
+A second fetch on a different day returned **403 again**. The AFRRI boilerplate surfaced by
+search reads *"available to qualified users from DTIC, or others may contact the National
+Technical Information Service"* — in tension with unlimited public release rather than
+supporting it.
+
+**And the review contradicts itself on this claim specifically.** It states that authors and
+the distribution statement were *"confirmed verbatim from the report's SF298 page"* while
+stating that the year and SR number — printed on that same page — were unverified, and that
+the results tables were *"not extractable."* **A claim to have read a page cannot coexist
+with reporting that page's contents as unreadable**; the bibliographic fields most likely
+came from a catalog record. Not adopted.
+
+## Claim 18 — NASBEE is a mammalian facility; do not purchase — **CONFIRMED, ALREADY HELD**
+
+D3 already recorded this and deferred NASBEE on it. The review returns it as a finding.
+
+## What the fourth review adds to the commissioning finding
+
+The three earlier reviews established that commissioned reviews return their own briefs as
+findings and cite things that do not exist. **This one adds the discriminating case: the same
+review can carry one claim that verifies perfectly and one that collapses**, and the two are
+not distinguishable by tone, confidence, or specificity of citation — Claim 17 reads *more*
+confidently than Claim 16 and cites a page it did not read.
+
+**So the unit of trust here is the individual claim rather than the review.** Claim 16 was
+adopted and Claim 17 refused from the same document on the same day. What separated them was not
+judgement about the source but the availability of an identifier that could be read back
+against an issuing registry. Where that check exists, run it; where it does not, the claim
+does not clear a gate on its own.
