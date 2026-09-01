@@ -259,10 +259,13 @@ approaches, exemplified
 by the iDynoMiCS platform of Lardon et al.\ \cite{lardon2011}, complement continuum models by
 resolving cell-level stochastic interactions. Cross-diffusion biofilm models have been analyzed
 by Sonner et al.\ \cite{sonner2015}, who established mathematical properties of volume-filling
-multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framework extends
-these precedents by incorporating radiation-dependent fitness terms and phase-locking dynamics
-that couple species interactions to external radiation fields, moving beyond the
-substrate-limited growth paradigms that dominate existing biofilm models.
+multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framework is specified to
+extend these precedents with radiation-dependent fitness terms and phase-locking dynamics
+coupling species interactions to external radiation fields, moving beyond the
+substrate-limited growth paradigms that dominate existing biofilm models. Both additions remain
+unexercised: Section~\ref{sec:psde} places the phase-locking adjustment among the four terms it
+classes as unrepresentable, and the fitness field is reported there as absent from this
+repository's simulation sources.
 
 \subsection{Hamiltonian and Stochastic Approaches in Theoretical Ecology}
 
@@ -275,10 +278,13 @@ oscillators \cite{kuramoto1984} provides a well-established framework for synchr
 phenomena in biological systems, from neural networks to circadian rhythms. Aceb\'r\'on et al.\
 \cite{acebron2005} reviewed the model as a paradigm for synchronization, noting its
 generalization to systems with time delays, frequency-weighted coupling, and heterogeneous
-interaction topologies. Our phase-locking kernel $\Gamma_s(t,\mathbf{x})$ draws directly on
-this tradition, extending it to multispecies microbial communities where species-level
-oscillatory dynamics in growth and resource acquisition couple through shared radiation and
-nutrient fields. The use of Langevin stochastic dynamics to describe microbial population
+interaction topologies. Blasius et al.\ \cite{blasius1999} treat phase synchronization in
+spatially extended ecological systems, which is the setting our phase-locking kernel
+$\Gamma_s(t,\mathbf{x})$ is written for: it is specified within this tradition, extended to
+multispecies microbial communities in which species-level oscillatory dynamics in growth and
+resource acquisition would couple through shared radiation and nutrient fields. It remains
+unexercised, and Section~\ref{sec:framework} places the phase-locking adjustment among the four
+terms it classes as unrepresentable. The use of Langevin stochastic dynamics to describe microbial population
 fluctuations follows naturally from the Fokker-Planck formalism and has been applied to
 competing microbial populations in chemostat systems \cite{campillo2017}, where stochastic
 differential equations revealed long-term competitive outcomes differing from deterministic
@@ -463,6 +469,7 @@ $\Delta_s$          & Phase-locking synchronization deviation \\
 \end{table}
 
 \subsection{Partial Stochastic Differential Equation (PSDE) for Species Fitness}
+\label{sec:psde}
 
 The fitness of each species $s$ is governed by the following PSDE:
 \begin{align}
@@ -648,6 +655,14 @@ A_s(t) = \gamma_s\,\phi_s(t) - \beta_{s,\mathrm{ion}}\,I_\gamma(t)
 where $\phi_s(t) = \cos(\omega_s t - \theta_s)$ is the phase-alignment function and $A_s(t)$ is
 the adaptive feedback driven by phase-locking and local radiation stress.
 
+\paragraph{The adaptive-feedback term is specification, not method.}
+A nutrient field is integrated at every step by \texttt{update\_nutrient!}, so this uptake law
+is not wholly unimplemented; the adaptive term $A_s(t)$ is the part that remains unexercised.
+Its phase-alignment factor requires a phase variable, and Section~\ref{sec:psde} places the
+phase-locking adjustment among the four terms it classes as unrepresentable, while the fitness
+field $F_s$ in the saturation factor is reported there as absent from this repository's
+simulation sources.
+
 \subsection{Hamiltonian kNN Decision Tree}
 \label{sec:knn}
 
@@ -656,6 +671,18 @@ To model species transition probabilities modulated by neighbourhood phase state
 \label{eq:knn}
 H_{\mathrm{kNN}} = \frac{1}{\sigma_n}\sum_{j=1}^{n} P_{sj}(t)\,F_j(t,\mathbf{x})\,\Gamma_s(t,\mathbf{x})
 \end{equation}
+
+\paragraph{The name is a coinage, and it is not a description of the form.}
+\emph{kNN} names an operation defined by a distance metric, a ranking and a cutoff $k$.
+Eq.~\ref{eq:knn} has none of the three: it aggregates across the whole index range $j=1,\dots,n$
+under the weight $P_{sj}$, which makes it a phase-weighted neighbour sum rather than a selection
+among neighbours. It is likewise a single product with no split, so \emph{Decision Tree}
+describes nothing in the form either. Section~\ref{sec:intro} holds each word to the endpoint it
+names; that discipline was written for the five phenomenon terms, and it applies to method names
+on the same grounds. The established description of this expression is a phase-weighted
+neighbour sum over a transition matrix. $F_j$ is the fitness field of
+Section~\ref{sec:psde}, reported there as absent from this repository's simulation sources, so
+the quantity aggregated here is itself specified rather than implemented.
 
 \subsection{Radiation Damage and Resilience}
 
@@ -970,7 +997,6 @@ Carrying cap. & $K_s$ & \textit{D.\ radiodurans}   & $10^5$--$10^7$ & cells mm$^
 Carrying cap. & $K_s$ & \textit{B.\ subtilis}      & $10^5$--$10^7$ & cells mm$^{-3}$ & Dense biofilm with EPS matrix & \cite{guttenplan2013} \\
 Carrying cap. & $K_s$ & \textit{S.\ oneidensis}    & $10^5$--$10^7$ & cells mm$^{-3}$ & Planktonic and biofilm modes & \cite{heidelberg2002} \\
 \midrule
-Phase-lock freq. & $\omega_s$ & All species & $0.01$--$1.0$   & rad hr$^{-1}$ & Circadian/ultradian metabolic oscillation & \cite{kuramoto1984,acebron2005} \\
 Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & Thermal and demographic stochasticity & \cite{campillo2017} \\
 \end{longtable}
 \end{landscape}

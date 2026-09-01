@@ -207,10 +207,13 @@ let
         # and the same section reports the increase in the albino wdpks1 mutant too. So it is a
         # positive growth result whose melanin attribution fails, which is what 2.1 needed and
         # is NOT what L228-229 needed. Two readings, two different dispositions.
-        "blasius1999",    # 2.3 synchronisation passage; still conditional -- PP-T2-25's
-                          # delete of the Table 2 omega_s row is NOT applied (the row is
-                          # live, citing kuramoto1984/acebron2005), so citing this now
-                          # could be work in the direction the delete would undo
+        # blasius1999 LEFT THIS SET ON 2026-09-01. Its gate was PP-T2-25's unapplied delete
+        # of the Table 2 omega_s row; that delete is now applied, so the gate is gone and the
+        # entry is cited in §2.3 where the Kuramoto lineage is discussed. Verified against
+        # CROSSREF before citing, not reconstructed from the key: 10.1038/20676 returns
+        # Blasius, Huppert & Stone (1999), Nature 399, 354-359, matching the bibitem on
+        # title, all three authors, container, year, volume and pages. The key could equally
+        # have been the Blasius boundary layer; reading it is what settled that.
     ])
     # (ii) DRAFT RESIDUE and (iii) DELIBERATE CONTEXT are both EMPTY as of 2026-09-01: the
     # six entries were DELETED from the bibliography, which is the disposition the
@@ -250,12 +253,21 @@ let
     @test isdisjoint(UNUSED_GAP, UNUSED_RESIDUE)
     @test isdisjoint(UNUSED_GAP, UNUSED_CONTEXT)
     @test isdisjoint(UNUSED_RESIDUE, UNUSED_CONTEXT)
-    @test "blasius1999" in UNUSED_GAP       # gated on PP-T2-25, which is unapplied
     @test "graner1992" ∉ UNUSED_GAP        # cited 2026-09-01, so it must have LEFT the set
     @test "robertson2012" ∉ UNUSED_GAP     # cited 2026-09-01 in §2.1, after the FULL TEXT
-    @test length(UNUSED_GAP) == 1 && isempty(UNUSED_RESIDUE) && isempty(UNUSED_CONTEXT)
+    @test "blasius1999" ∉ UNUSED_GAP       # cited 2026-09-01, gate removed with PP-T2-25
+    @test isempty(UNUSED_GAP) && isempty(UNUSED_RESIDUE) && isempty(UNUSED_CONTEXT)
 
-    @test_broken isempty(unused)
+    # FLIPPED FROM @test_broken ON 2026-09-01, AND THE TWO ARE NOT THE SAME CLAIM.
+    # @test_broken said "we expect orphans and want to be told when there are none" -- it
+    # tracked a goal. @test says "an uncited bibitem is a failure" -- it enforces a rule.
+    # THE COST OF THE STRICT FORM IS REAL AND IS BEING ACCEPTED DELIBERATELY: the natural
+    # workflow is add-the-bibitem-then-cite-it, and this makes that intermediate state red.
+    # That is the intended trade -- every entry now in the bibliography is cited, and the
+    # classification sets above exist to make a future exception a recorded decision rather
+    # than a silent one. Someone who needs the intermediate state adds the key to the right
+    # category set, which is a one-line edit that says which kind of orphan it is.
+    @test isempty(unused)
 end
 
 # ------------------------------------------------- planned feedback is unimplemented
@@ -452,44 +464,94 @@ let
     @test any(l -> occursin(reads, l), integrator)
 end
 
-# ------------------------------------------------- H_kNN is described the same way everywhere
+# ------------------------------------------------- the phase-locking thread agrees with itself
 #
-# SCOPE: the H_kNN / Hamiltonian-kNN sentences in the .tex, and nothing else.
+# SCOPE: PROSE paragraphs naming the phase-locking machinery -- H_kNN, Gamma_s, phi_s,
+# "phase-lock" -- in the manuscript .tex. NOT the symbol table row, NOT the equations that
+# define these symbols: a definition is not a claim that the model runs it, and widening this
+# into the equation blocks would make every definition require a disclaimer. That exclusion is
+# written here rather than left implicit, because "prose only" alone reads as a preference and
+# the next person would widen it.
 #
-# SECTION 2.5 SAID THE FUNCTIONAL DID THE WORK; SECTIONS 3.2 AND 5 SAID IT WAS NEVER RUN.
-# Related Work closed with "a perspective that our Hamiltonian kNN decision tree
-# operationalizes quantitatively" while §3.2 said "specified and unexercised" and §5 said
-# "remains specified but unexercised". Two statements against one, so the one was the defect
-# -- and it is the same shape as the withdrawn §5 symplectic sentence: a Related Work claim
-# written from what a formalism was FOR rather than from what runs. Nothing caught it,
-# because no guard compares two prose statements about the same object.
+# SECTION 2.5 SAID THE FUNCTIONAL DID THE WORK; SECTIONS 3.2 AND 5 SAID IT WAS NEVER RUN, AND
+# NOTHING COMPARED THEM. That was fixed in 567b135 -- and the guard written there matched
+# `H_kNN` alone, so it did not catch §2.3 saying the Gamma_s kernel "draws directly on this
+# tradition, extending it to multispecies microbial communities". Same defect, different
+# symbol, invisible to a guard scoped to the symbol that prompted it. A GUARD WRITTEN FROM ONE
+# INSTANCE MATCHES ONE INSTANCE; this one is scoped to the class.
 #
-# THE ASSERTION IS AGREEMENT, NOT ABSENCE. Banning one withdrawn verb would be a phrase
-# guard that the next synonym walks past. What must hold is that every place naming H_kNN
-# agrees on its status, so the test requires each such sentence to carry the unexercised
-# vocabulary rather than merely to avoid one word.
-@testset "every H_kNN sentence agrees that it is unexercised" begin
+# THE ASSERTION IS AGREEMENT, NOT ABSENCE OF A PHRASE. Banning a withdrawn verb is a guard the
+# next synonym walks past. What must hold is that any paragraph claiming something about this
+# machinery also says what its status is, in the vocabulary §3.2 and §5 already settled.
+#
+# PARAGRAPH-LEVEL, NOT SENTENCE-LEVEL, and that is load-bearing: §2.3 names Gamma_s in one
+# sentence and carries "It remains unexercised" in the next, so a sentence-split check would
+# fail on correct prose and invite someone to weaken it.
+@testset "every prose paragraph naming the phase-locking machinery states its status" begin
     tex = read(joinpath(REPO, "preprint",
                         "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
 
-    # Sentences that NAME the functional, excluding the equation block and bibliography.
-    sentences = [strip(s) for s in split(tex, r"(?<=\.)\s+")
-                 if (occursin("Hamiltonian kNN", s) || occursin(raw"H_{\mathrm{kNN}}", s)) &&
-                    !occursin(raw"\begin{equation}", s) && !occursin(raw"\bibitem", s) &&
-                    !occursin(raw"\subsection", s)]
+    names = r"Hamiltonian kNN|H_\{\\mathrm\{kNN\}\}|\\Gamma_s|\\phi_s|phase-lock"
 
-    @test !isempty(sentences)            # the detector must find something to be trusted
+    # MASK NON-PROSE FIRST, THEN MAP EACH PROSE HIT TO ITS SUBSECTION.
+    # A definition is not a claim: the symbol-table row "$\Gamma_s$ & Phase-locked kernel" and
+    # the equations that define these symbols must not require a disclaimer, or every
+    # definition in the paper would. Masking preserves offsets so the containing subsection
+    # can still be found.
+    #
+    # SUBSECTION GRANULARITY IS A CORRECTION MADE AFTER MEASURING. A first version checked
+    # PARAGRAPHS and produced two false positives -- §3.4's leapfrog paragraph, whose
+    # subsection carries "specification, not method" in a SIBLING paragraph, and §7.4's
+    # structural-limits paragraph, which disclaims correctly with "absent from the executed
+    # simulations". The manuscript marks status at subsection level, so a paragraph-level
+    # guard cries wolf, and a guard that cries wolf gets weakened rather than obeyed.
+    # The third thing it flagged was REAL and is why the widening happened: §2.2 said "Our
+    # PSDE framework extends these precedents by incorporating ... phase-locking dynamics
+    # that couple species interactions to external radiation fields" -- a fourth instance.
+    masked = replace(tex,
+        r"\\begin\{(equation|align|array|tabular)\}.*?\\end\{\1\}"s => (m -> " "^length(m)))
+    masked = join([occursin(r"&.*\\\\", l) ? " "^length(l) : l
+                   for l in split(masked, "\n")], "\n")
 
-    # Each one must say what the status IS, in the vocabulary §3.2 and §5 already use.
-    unexercised = r"unexercised|specified but not|not exercised"
-    for s in sentences
-        @test occursin(unexercised, s)
+    heads = [m.offset for m in eachmatch(r"\\(sub)?section\{", tex)]
+    owning(i) = maximum(h for h in heads if h <= i)
+    function body(h)
+        nxt = filter(x -> x > h, heads)
+        tex[h:(isempty(nxt) ? lastindex(tex) : prevind(tex, minimum(nxt)))]
     end
 
-    # THE CONTROL: the withdrawn §2.5 clause must fail this, or the assertion is decorative.
-    withdrawn = "a perspective that our Hamiltonian kNN decision tree operationalizes " *
-                "quantitatively."
-    @test !occursin(unexercised, withdrawn)
+    hits = unique(owning(m.offset) for m in eachmatch(names, masked))
+    @test !isempty(hits)           # the detector must find something to be trusted
+    @test length(hits) >= 4        # §2.2, §2.3, §3.2, §3.8, §5 at minimum
+
+    # THE VOCABULARY IS DISCOVERED, NOT INVENTED: every phrase below was read out of a
+    # subsection that already disclaims correctly. Adding one is a claim that the manuscript
+    # uses it as a disclaimer, so it must be quoted from the manuscript.
+    # ONE LITERAL, NOT THREE JOINED BY `*`. Regex `*` in Julia CONCATENATES: r"a|b" * r"c|d"
+    # becomes (?:a|b)(?:c|d), which requires both in sequence. The first version of this line
+    # was three alternation groups multiplied together and therefore matched almost nothing,
+    # reporting four subsections as undisclaimed when only one was. It failed loudly, but it
+    # failed as a FALSE POSITIVE -- the direction that gets a guard weakened.
+    status = r"unexercised|unrepresentable|specified rather than implemented|specified but not|absent from the executed simulations|specification, not method|intended numerical treatment"
+    for h in hits
+        @test occursin(status, body(h))
+    end
+
+    @testset "the controls, one per symbol" begin
+        # Each name must be detected, or a widened matcher that finds nothing passes silently.
+        @test occursin(names, raw"Our phase-locking kernel $\Gamma_s(t,\mathbf{x})$ draws on")
+        @test occursin(names, raw"the $H_{\mathrm{kNN}}$ machinery")
+        @test occursin(names, raw"where $\phi_s(t) = \cos(\omega_s t - \theta_s)$")
+        @test occursin(names, "Hamiltonian kNN Decision Tree")
+        @test !occursin(names, "an unrelated paragraph about mesh convergence")
+
+        # And the two withdrawn clauses must fail the status check, or it is decorative.
+        @test !occursin(status, "a perspective that our Hamiltonian kNN decision tree " *
+                                "operationalizes quantitatively.")
+        @test !occursin(status, raw"Our phase-locking kernel $\Gamma_s(t,\mathbf{x})$ draws " *
+                                "directly on this tradition, extending it to multispecies " *
+                                "microbial communities.")
+    end
 end
 
 # ------------------------------------------------- cross-references resolve, and are not numerals
