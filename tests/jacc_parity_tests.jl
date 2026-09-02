@@ -48,6 +48,23 @@
 # mel and never `nut`, and `melanin_k!` never reads it either, so the gated
 # basis cannot reach an accepted move. Same claim as validate_serial.jl's, and
 # the 10x-uptake testset below is what holds it to account.
+#
+# THAT LAST SENTENCE WAS FALSE UNTIL 2026-09-02 and nothing said so; the
+# correction is ledgered as PP-GUARD-01. The testset perturbed `k_ads`/`k_red`,
+# which reach `rd.c` and `rd.s` and stop there: the
+# only radiolysis quantity reaching `nut` is `rd.m`, through nutrient_k!'s wall
+# term, and `dm_dt = -k_dam*Ddot_R*m` contains neither. So it perturbed a
+# quantity that cannot reach the field it was guarding, while its comment named
+# the one that can. A guard that cannot fire is rule 1; this one also ADVERTISED
+# the coverage it lacked, which is what made it survive reading.
+#
+# DETERMINISM IS A PRECONDITION HERE, NOT AN ASSUMPTION. Every assertion below
+# compares two runs, which tests the perturbation only if the run is
+# reproducible. It is not under multithreading: delta_H reads `vols` at :167
+# while cpm_color! mutates it at :208 -- the documented `ponytail:` staleness --
+# so two SAME-PARAMETER runs differ. Measured 2026-09-02: identical at 1 thread
+# (Julia's default), different at 4. The control below refuses the comparison
+# rather than letting thread noise stand in for a finding.
 
 using Random
 
@@ -109,9 +126,12 @@ mk_rp(; kw...) = P_RP(; Nr = 40, Ddot_R = 1.0, c_ext = 1.0,
 
 # Per-sweep (accepted, evaluated) per spatial class, plus the finiteness guard
 # on the discriminator.
-function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp())
+function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp(),
+                    uptake_scale = 1.0)
         A = zeros(Int, n_mcs, 8); E = zeros(Int, n_mcs, 8); nonfinite = 0
-        cb = (mcs, st, dh) -> begin
+        nut_last = nothing
+        cb = (mcs, st, dh, nut) -> begin
+            nut_last = nut
             nonfinite += count(!isfinite, @view dh[st .!= 0])
             for tz in 1:N, ty in 1:N, tx in 1:N
                 s = st[tx, ty, tz]; s == 0 && continue
@@ -119,9 +139,9 @@ function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp())
                 E[mcs, c] += 1; s == UInt8(2) && (A[mcs, c] += 1)
             end
         end
-    P_RUN(; seed, n_mcs, N, rp, verbose = false,
+    P_RUN(; seed, n_mcs, N, rp, verbose = false, uptake_scale,
           color_order = order, on_sweep = cb)
-    return A, E, nonfinite
+    return A, E, nonfinite, nut_last
 end
 
 pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
@@ -167,7 +187,7 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
     end
 
     @testset "per-sweep reset, discriminator, and all eight classes" begin
-        A, E, nonfinite = run_tables(42, IDENTITY; n_mcs = 3)
+        A, E, nonfinite, _ = run_tables(42, IDENTITY; n_mcs = 3)
         # A per-COLOR-PASS reset would leave only the last color populated and
         # would look perfectly clean; this is what catches it.
         @test all(>(0), sum(E, dims = 1))
@@ -190,7 +210,7 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
     @testset "no decomposition artifact across seeds and orderings" begin
         results = Pair{String,Any}[]
         for seed in (42, 43, 44), (name, ord) in PERMS
-            A, E, _ = run_tables(seed, ord)
+            A, E, _, _ = run_tables(seed, ord)
             s = pooled(A, E, 1:size(A, 1))
             push!(results, "seed $seed $name" => s)
 
@@ -222,13 +242,39 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
     @testset "the exemption's claim is true: acceptance does not see the basis" begin
         # basis_gate_ack above is acknowledged on the grounds that acceptance
         # counts cannot depend on the gated biomass basis. That is a CLAIM. The
-        # basis enters only through `uptake`/`nut`, so 10x the uptake constants
-        # must leave the contingency table byte-identical. The day acceptance
-        # reads the nutrient field, this fails and the exemption is re-argued.
+        # basis enters only through `uptake`/`nut`, so 10x the UPTAKE CONSTANTS
+        # -- not k_ads/k_red, see the header -- must leave the contingency table
+        # byte-identical. The day acceptance reads the nutrient field, this
+        # fails and the exemption is re-argued.
         base = run_tables(42, IDENTITY; n_mcs = 10)
-        pert = run_tables(42, IDENTITY; n_mcs = 10,
-                          rp = mk_rp(k_ads = 0.5, k_red = 0.2))
+
+        # PRECONDITION. Two runs at identical parameters. If this fails the
+        # comparison below is between two draws from a racy process and proves
+        # nothing either way, so it must refuse rather than report. See the
+        # determinism paragraph in the header for the measured thread counts.
+        ctl = run_tables(42, IDENTITY; n_mcs = 10)
+        @test base[1] == ctl[1]
+        @test base[2] == ctl[2]
+
+        pert = run_tables(42, IDENTITY; n_mcs = 10, uptake_scale = 10.0)
         @test base[1] == pert[1]
         @test base[2] == pert[2]
+
+        # THE PERTURBATION IS LIVE, WHICH IS THE HALF THAT MAKES THE TWO
+        # ASSERTIONS ABOVE MEAN ANYTHING. Byte-identical tables are the expected
+        # result, and a perturbation that reached NOTHING would produce them too
+        # -- indistinguishable from the property being asserted. So require the
+        # nutrient FIELD to differ across the same two runs: 10x uptake does
+        # change it, and acceptance is unmoved because it does not read it.
+        #
+        # This observes the field THROUGH run_coupled rather than by driving
+        # nutrient_k! directly. A direct kernel call would prove that scaling a
+        # vector changes a field, which nobody doubts, while staying green if
+        # the `uptake_scale` wiring inside run_coupled were removed -- leaving
+        # `pert` unperturbed and the assertions above vacuous. Caught by
+        # neutering that wiring on 2026-09-02 and watching a direct-call version
+        # of this control pass anyway.
+        @test base[4] !== nothing
+        @test base[4] != pert[4]
     end
 end

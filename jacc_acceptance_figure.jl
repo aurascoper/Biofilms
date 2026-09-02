@@ -42,7 +42,7 @@ const DH_EVERY = 10                  # sweeps sampled for the ΔH pool
 function measure(seed)
     rates = Float64[]
     dhs   = Float32[]
-    cb = (mcs, st, dh) -> begin
+    cb = (mcs, st, dh, _nut) -> begin
         ev = count(!=(0), st)
         push!(rates, ev == 0 ? NaN : count(==(UInt8(2)), st) / ev)
         mcs % DH_EVERY == 1 && append!(dhs, dh[st .!= 0])

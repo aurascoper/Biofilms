@@ -484,7 +484,13 @@ end
 
 # ---- Driver --------------------------------------------------
 
-function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
+# `uptake_scale` exists for one caller: the basis-exemption guard in
+# tests/jacc_parity_tests.jl, which must perturb the uptake constants to hold
+# its own claim to account. `UPTAKE` is a module const with no other knob, so
+# without this seam that guard can only perturb something else -- which is
+# exactly the defect it carried until 2026-09-02. Default 1.0 is a no-op.
+function run_coupled(; uptake_scale::Real = 1.0,
+        N::Int = 40, n_cells_per_species::Int = 6,
         n_mcs::Int = 100, seed::Int = 42, snapshot_interval::Int = 20,
         T_cpm = 5.0f0, λ_V = 10.0f0, V_target = Int32(120),
         I0 = 1.0, κ = 2.0, D_M = 0.1f0, dt_field = 0.5f0,
@@ -505,7 +511,7 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
     J = JACC.array(build_J_matrix())
     βv = JACC.array(BETA_ION)
     αv = JACC.array(ALPHA_M)
-    upt = JACC.array(UPTAKE)
+    upt = JACC.array(Float32.(UPTAKE .* uptake_scale))
     melc = JACC.array(MEL_COEF)
     rad = JACC.array(rad_h)
     mel = JACC.array(mel_h); mel2 = JACC.array(zeros(Float32, N, N, N))
@@ -536,8 +542,15 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
                 gseed, UInt64(mcs * 8 + c), Int32(N), λ_V, V_target, T_cpm,
                 st, dh)
         end
+        # `nut` is handed to the callback so a caller can observe that a
+        # perturbation of the uptake constants actually reached the nutrient
+        # field. The basis-exemption guard needs exactly that: its assertion is
+        # that acceptance is UNMOVED by such a perturbation, and byte-identical
+        # tables mean nothing unless the perturbation demonstrably landed
+        # somewhere. Paid only when a callback exists.
         on_sweep === nothing ||
-            on_sweep(mcs, JACC.to_host(st), JACC.to_host(dh))
+            on_sweep(mcs, JACC.to_host(st), JACC.to_host(dh),
+                     JACC.to_host(nut))
 
         if mcs % 10 == 1
             X_tot, X_red = radial_biomass(JACC.to_host(lat), spec_h, N, rd.params.Nr)
