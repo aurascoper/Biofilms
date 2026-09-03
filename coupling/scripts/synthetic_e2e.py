@@ -87,6 +87,81 @@ def run_transport(model, outdir: Path, name: str):
     return openmc.StatePoint(model.run(cwd=str(cwd), output=False))
 
 
+def _write_viewer_bundle(args, cfg, snapshot, dose, dose_lattice, sd_lattice,
+                         lattice_mass, occupied, n) -> None:
+    """Package what this run already computed as a multi-grid viewer bundle.
+
+    TWO GRIDS, NOT ONE, and the direction of every resampling is declared.
+    The native dose lives on the OpenMC tally grid; the CPM labels live on the
+    lattice. The lattice-resolution dose field this script already builds for
+    attribution is an UPSAMPLING -- `upsample_field` broadcasts one coarse
+    value across every fine voxel in its bin -- so it is written
+    `authoritative_for_quantitation=False` with `derivation="upsampled_coarse_dose"`,
+    and `viewer.bundle_problems` refuses the alternative outright. Displayed on
+    the lattice it looks like per-parcel dose; it is one coarse value repeated.
+
+    The point is not the picture. Putting both grids in one bundle subjects
+    them to `bundle_problems`' coordinate check -- same physical volume, one
+    origin -- which this path never had, because dose and labels were
+    registered only by index arithmetic before now.
+    """
+    from biofilm_openmc.mesh import resolve_mesh_dimension
+    from biofilm_openmc.viewer import Grid, Layer, write_bundle
+
+    pitch = cfg.voxel_pitch_cm
+    origin = tuple(float(v) for v in cfg.origin_cm)
+    extent = biofilm_mesh_extent_cm(cfg, n)
+    dim = resolve_mesh_dimension((n, n, n), cfg.mesh_coarsening_factor,
+                                 getattr(cfg, "mesh_refinement_factor", 1))
+    dose_spacing = tuple(e / d for e, d in zip(extent, dim))
+
+    lattice_grid = Grid("cpm_labels", (n, n, n), origin, (pitch, pitch, pitch))
+    dose_grid = Grid("dose_tally", tuple(int(d) for d in dim), origin,
+                     dose_spacing, material_resolution_grid="cpm_labels",
+                     note="the OpenMC tally mesh; same cube as the lattice, "
+                          "coarsened by mesh_coarsening_factor")
+
+    layers = [
+        Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
+              snapshot.cell_id.astype(np.int32), background=0,
+              note="a computational biomass PARCEL id, never an organism"),
+        Layer("lineage_id", "cpm_labels", "dimensionless", "categorical",
+              snapshot.lineage_id.astype(np.int32), occupancy_from="cell_id"),
+        Layer("generation", "cpm_labels", "dimensionless", "categorical",
+              snapshot.generation.astype(np.int32), occupancy_from="cell_id",
+              note="generation 0 is a founder AND the zero-fill for empty "
+                   "sites; cell_id is what says which voxels hold biomass"),
+        Layer("occupied", "cpm_labels", "dimensionless", "boolean",
+              np.asarray(occupied, dtype=bool), background=0),
+        Layer("mass_kg", "cpm_labels", "kg", "extensive", lattice_mass),
+        Layer("dose_rate_Gy_s", "dose_tally", "Gy/s", "intensive",
+              dose.dose_rate_mean_Gy_s,
+              note="NATIVE here. Gy per second, because a source rate was "
+                   "supplied; the per-source field is a different quantity"),
+        Layer("dose_rate_sd_Gy_s", "dose_tally", "Gy/s", "intensive",
+              dose.dose_rate_sd_Gy_s),
+        Layer("dose_rate_on_lattice", "cpm_labels", "Gy/s", "intensive",
+              dose_lattice, native=False,
+              authoritative_for_quantitation=False,
+              source_grid_id="dose_tally",
+              derivation="upsampled_coarse_dose",
+              note="what attribution actually consumed. One coarse value "
+                   "repeated across each bin -- drawable, never quotable"),
+        Layer("dose_rate_sd_on_lattice", "cpm_labels", "Gy/s", "intensive",
+              sd_lattice, native=False,
+              authoritative_for_quantitation=False,
+              source_grid_id="dose_tally",
+              derivation="upsampled_coarse_dose"),
+    ]
+
+    path = args.outdir / "viewer_bundle.h5"
+    doc = write_bundle(path, [lattice_grid, dose_grid], layers,
+                       provenance={**provenance_attrs(cfg, repo_root=str(REPO)),
+                                   "study": "synthetic_one_way_e2e"})
+    print(f"wrote {path} - {len(doc['grids'])} grids, "
+          f"{len(doc['layers'])} layers")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--snapshot", type=Path, required=True)
@@ -285,6 +360,17 @@ def main(argv=None) -> int:
                            transport_hash=t_hash,
                            label_hash=snapshot.label_state_hash,
                            uncertainty_method="quadrature_independent_bins_approx")
+
+    # THE COUPLING THIS REPOSITORY REPORTS HAD NO BUNDLE, and therefore none of
+    # the co-registration checking `viewer.bundle_problems` applies: grids in
+    # one bundle must describe the same physical volume and share one origin.
+    # `subvoxel_refinement.py` gets that for free and this path did not, so the
+    # dose and the labels were only ever registered by index arithmetic.
+    #
+    # Costs no transport: everything below is already computed above. Pure
+    # numpy + h5py, so the pinned env is untouched by this.
+    _write_viewer_bundle(args, cfg, snapshot, dose, dose_lattice, sd_lattice,
+                         lattice_mass, occupied, n)
 
     import h5py
     with h5py.File(result_path) as f:

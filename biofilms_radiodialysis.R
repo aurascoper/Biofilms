@@ -280,8 +280,12 @@ server <- function(input, output, session) {
       c_centre <- res$c_mat[nrow(res$c_mat), 1]
       c_wall   <- res$c_mat[nrow(res$c_mat), input$Nr]
       sprintf(
-        "t_end=%.0f s  |  m(t_end)=%.4f  |  P_eff(t_end)=%.4f cm/s\nc(0,t_end)=%.4f  |  c(R,t_end)=%.4f  |  Nr=%d",
-        input$t_end, m_final, P_final, c_centre, c_wall, input$Nr
+        # P_eff/P0, dimensionless. The absolute value was printed with
+        # `cm/s` attached, which is a fabricated unit on an uncalibrated
+        # placeholder: P0 is a literature-anchored default, not a measurement
+        # of this system, so P0 * exp(...) is not a permeability in cm/s.
+        "t_end=%.0f s  |  m(t_end)=%.4f  |  P_eff(t_end)/P0=%.4f (dimensionless)\nc(0,t_end)=%.4f  |  c(R,t_end)=%.4f  |  Nr=%d",
+        input$t_end, m_final, P_final / parms$P0, c_centre, c_wall, input$Nr
       )
     })
   })

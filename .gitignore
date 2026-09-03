@@ -390,6 +390,11 @@ calibration/*.egg-info/
 *.tif
 *.tiff
 
+# Built preprint. The .tex is the source; the PDF is a build artifact and
+# was swept into a commit once by `git add -A` after being explicitly left
+# out of the one before it.
+preprint/*.pdf
+
 # geolocator market bar cache (regenerable via python3 -m geolocator.market backfill)
 geolocator/data/market_bars.sqlite
 

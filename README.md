@@ -22,16 +22,19 @@ currently refuses to emit a single physical unit.
 julia --project=. biofilms_potts.jl    # coupled CPM + radiodialysis, N = 40, 100 MCS, seed 42
 ```
 
-(That command has one open defect — see [Dependencies](#dependencies).)
+(That command's previous open defect — an undeclared `CairoMakie` dependency — is fixed; see
+[Dependencies](#dependencies).)
 
 The framework is **uncalibrated**. Its parameters are literature priors and declared model inputs.
 No lattice pitch, no seconds-per-Monte-Carlo-step and no material density has been selected, and no
 output has been compared to a measurement of a target system. Every simulation number below is
 reported in the dimensionless model units it was computed in.
 
-On the manuscript's status: two web searches on 2026-08-15 found **no record of a bioRxiv posting**,
-and no DOI appears anywhere in the repository. Its own final section is titled "Notation Fixes
-Required Before Submission". Treat it as unposted — that is a search result, not proof.
+On the manuscript's status: web searches on both 2026-08-15 and 2026-08-24 found **no record of a
+bioRxiv posting**, and no DOI appears anywhere in the repository. Treat it as unposted — that is a
+search result, not proof. (Its predecessor, the superseded `modeling_radiotrophic_fitness.md`, had
+a closing "Notation Fixes Required Before Submission" section; the current, revised
+`.tex` — the source of record — has no such section and no unresolved notation issues.)
 
 ---
 
@@ -157,7 +160,8 @@ Biofilms/
 ├── validate_serial.jl             # Serial-vs-JACC statistical comparison
 ├── export_checkpoint.jl           # HDF5 checkpoint / transport-snapshot export
 ├── scoby_3d.jl                    # empty (0 bytes)
-├── Project.toml, Manifest.toml, LocalPreferences.toml
+├── Project.toml                   # Manifest.toml and LocalPreferences.toml exist locally
+│                                  # but are gitignored — a clone resolves its own
 │
 ├── calibration/                   # biofilm-calibration (Python, numpy-only)
 │   ├── biofilm_calibration/
@@ -229,7 +233,8 @@ Biofilms/
 │
 ├── tests/                         # runtests.jl, contract_csv.jl, deterministic_radiation.jl,
 │                                  #   genealogy_tests.jl, checkpoint_io_tests.jl, fixtures/
-├── preprint/                      # .tex (source of record), .md (revised derivative),
+├── preprint/                      # .tex (source of record; no .md derivative exists in the
+│                                  #   tree — the superseded .md is git history only),
 │                                  #   figures/ (4 × PDF + PNG). The built .pdf was REMOVED:
 │                                  #   it was a pre-revision build carrying withdrawn claims
 ├── assets/                        # preview_bioreactor_3d.png, preview_radiodialysis.png
@@ -383,12 +388,14 @@ Run provenance, both branches: the coupled default is `N = 40`, 6 parcels per sp
 seed 42. `--no-radiolysis` runs `main()`, which is `N = 60`, **8** parcels per species, **200** MCS,
 seed 42. All reported numbers below come from the coupled `N = 40` run.
 
-**Two stale stdout banners are an open defect.** `biofilms_potts.jl:1088` and `:1529` both print
-`H = H_adh + H_vol + H_rad + H_pair + H_mel` — five terms, where the acceptance path has four and
-`H_pair` is a diagnostic. `:1541` prints `Ḋ(R)=%.1f Gy/s` for a quantity that is a dimensionless
-placeholder and for which `seconds_per_mcs` is `NaN`. Nothing enforces agreement between the banners
-and the code, which is why they drifted; a reader who trusts the terminal is told two things this
-README refuses.
+**Fixed:** the two stale stdout banners (`main()` at `biofilms_potts.jl:1088`,
+`main_coupled()` at `:1540`) used to print `H = H_adh + H_vol + H_rad + H_pair + H_mel` — five
+terms, where the acceptance path has four and `H_pair` is a diagnostic — and `:1552` used to print
+`Ḋ(R)=%.1f Gy/s` for a quantity that is a dimensionless placeholder and for which
+`seconds_per_mcs` is `NaN`. Both now state the true four-term acceptance path and label the
+`Ḋ(R)` value as a placeholder rather than a physical rate. Nothing enforces agreement between the
+banners and the code beyond the fix itself, so re-check them if the Hamiltonian terms or the
+dose-rate handling change again.
 
 **Fig 1 — radial mean position by species over 100 MCS** (N = 40, 6 parcels/species, seed 42). The
 plotted observable is the mean parcel distance from the cylinder axis, in lattice units normalised by
@@ -766,25 +773,30 @@ Provenance ledger distribution (`data/parameter_provenance.csv`, 49 rows × 21 c
 ## Tests
 
 ```bash
-julia --project=. tests/runtests.jl              # 135 passed, 0 failed (re-run 2026-08-15 at HEAD)
+julia --project=. tests/runtests.jl              # 146 passed, 0 failed (re-run 2026-08-24 at HEAD)
 julia --project=. biofilms_potts_jacc.jl --selftest
 
-pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 86 collected
-pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 173 collected
+pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 279 collected
+pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 343 collected
 ```
 
-The Julia figure is 2 + 34 + 57 + 42 across the four suites, re-run on this tree rather than quoted
+The Julia figure is 2 + 34 + 68 + 42 across the four suites, re-run on this tree rather than quoted
 from `docs/branch_report.md`, which records the older 2026-08-13 branch-end figures and is stale on
 the Python counts.
 
-Run together in the coupling venv, the two Python suites give **259 passed, 4 skipped**
-(re-run 2026-08-15 at HEAD). All four skips are coupling modules that skip on `import openmc` in a
-bare venv — the three in `coupling/tests/integration/` plus `coupling/tests/test_model_build.py`.
+Run together in the coupling venv, the two Python suites give **616 passed, 6 skipped**
+(re-run 2026-08-24 at HEAD). All six skips are coupling modules that skip on `import openmc` in a
+bare venv — the five in `coupling/tests/integration/` plus `coupling/tests/test_model_build.py`.
 No calibration test skips: the pilot ND2 file is present on this machine, so `test_pilot.py` runs.
 The OpenMC integration tier is manual opt-in: activate the `openmc-biofilms`
 environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
 `.github/workflows/coupling-tests.yml` — `julia-tests`, `python-unit`, `calibration-unit`, and
-`openmc-integration` behind a `workflow_dispatch` input.
+`openmc-integration` behind a `workflow_dispatch` input (API tier only; no nuclear data, so
+the five `tests/integration/` modules still skip there). Real-data-backed verification of the
+golden-tally fixture (`coupling/tests/fixtures/golden_tally_water_phantom.json`) is a separate
+workflow, `.github/workflows/golden-tally-verification.yml`, triggered by `workflow_dispatch`
+or a push touching the files that could invalidate the pin (the OpenMC/nuclear-data version)
+— not on a schedule, since the fixture's values only change when those do.
 
 What the tests pin:
 
@@ -907,16 +919,22 @@ implementation, and neither they nor it bear on the biofilm work.
 
 **Julia 1.12** — the tested version; the CSV golden fixture pins the RNG stream to it.
 
-`Project.toml [deps]` is exactly `AMDGPU`, `HDF5`, `JACC`. `HDF5` is required by
-`export_checkpoint.jl`; `JACC` (with `AMDGPU`) by `biofilms_potts_jacc.jl`.
+`Project.toml [deps]` is `AMDGPU`, `CairoMakie`, `HDF5`, `JACC`. `HDF5` is required by
+`export_checkpoint.jl`; `JACC` (with `AMDGPU`) by `biofilms_potts_jacc.jl`; `CairoMakie` by the
+figure-export path in `biofilms_potts.jl` (below the `#  13. Figure export` split marker — the
+sandbox module the splitters build has hard-coded imports that never consult `Project.toml`, so
+this declaration only fixes `Pkg.instantiate()`, not what the split marker's own sandbox imports).
 
-**Open defect: `CairoMakie` is undeclared.** `biofilms_potts.jl:1874` does `using CairoMakie` at top
-level, below the `#  13. Figure export` split marker, so
-`julia --project=. biofilms_potts.jl` **fails at that line** unless CairoMakie happens to be present
-in the default environment. That is a missing dependency declaration, not a design choice: the
-split-marker rule constrains only what appears *above* the marker, and the sandbox module the
-splitters build has hard-coded imports that never consult `Project.toml`. Until it is declared, run
-the simulation from an environment that also has CairoMakie.
+**Fixed:** `CairoMakie` was previously undeclared, so `julia --project=. biofilms_potts.jl` failed
+at the `using CairoMakie` line (now `:1885`) unless CairoMakie happened to already be present in
+the default environment. It is now declared in `Project.toml`.
+
+That is a **declaration, not a lock.** `Manifest.toml` is gitignored (`.gitignore:377`), so a
+clean checkout has no resolved dependency graph and `Pkg.instantiate()` resolves versions afresh
+against whatever the registry offers that day. An earlier version of this line said CairoMakie
+was "resolved in `Manifest.toml`" — true of the working tree it was written in, and false of
+every clone, which is the same shape of error as an absence claim that names only the one place
+someone looked.
 
 **R** — `deSolve`, `shiny`, `plotly`, `ggplot2`, `dplyr`, `MASS`, `class` (the last two for
 `reactor_decision_tree.R`).

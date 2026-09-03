@@ -450,6 +450,51 @@ caught by reading what produced them.
   noise, and α would become a second tunable with none of δ's discipline. A test
   asserts neither gate module references it.
 
+## The gate and the significance test can disagree, and a run that does cannot publish
+
+They are computed independently — `decide()` reads quantile bounds,
+`distinguishable_from_zero` runs a t-test — and nothing reconciled them. Two draws
+of 0.05 with se = 0.01 return `PASS_SYNTHETIC_GATE` **and**
+`distinguishable_from_zero = false`: the run asserts the effect cleared the
+threshold and, one field later, that it is not separable from no effect.
+
+`publication_block()` refuses that combination at publication time.
+**Refusing is the point: it does not pick a winner.** Downgrading the PASS would
+settle the disagreement for the t-test; keeping it settles it for the bounds.
+Neither is the pipeline's call. The row is kept in
+`openmc_nested_pilot_verdict.json` with the contradiction **named** in a
+`publication_block` field — flagged, not retired — and the canonical tables are
+refused. It fires in one direction only: a non-PASS verdict that is *not*
+distinguishable is coherent, and `noise_floor` (t = 0.369) and
+`lever_density_x1.35` (t = 1.840) are exactly that. A symmetric check would
+refuse most of the table above. Checked against all 11 scenarios of the run
+above: it blocks none of them.
+
+**The minimum outer-draw count was raised from 2 to 4, and the old number was
+derived from the wrong property.** It came from asking where `t_critical_999`
+stops returning `None` — the function's *domain*. A floor needs its usable
+*range*: at df = 1 it returns 318.3, a value and not an attainable one, so two
+draws can PASS and can essentially never be significant. The replacement reads
+the shape of the curve instead:
+
+| draws | df | t_crit(0.999) | ratio to next |
+|---|---|---|---|
+| 2 | 1 | 318.3 | 14.3× |
+| 3 | 2 | 22.33 | 2.19× |
+| 4 | 3 | 10.21 | 1.42× |
+| 5 | 4 | 7.173 | |
+
+m = 4 is the first count at which one more draw no longer more than halves the
+bar. This is a knee-of-the-curve heuristic about design stability, **not a power
+calculation**, and it deliberately does not ask which of the findings above
+survive — a floor chosen to protect existing results is chosen after seeing them,
+and its margin here would have been 1.2%.
+
+**α = 0.999 one-tailed is half of why the floor is needed.** At 0.95,
+t_crit(df = 1) is 6.31 rather than 318.3. Raising the floor and lowering α would
+address the same symptom; α is a declared decision policy and is recorded here
+unchanged rather than moved as a side effect.
+
 ## What this does not establish
 
 No target parameter was inferred. Reference D's verdict is `NOT_EVALUATED`, the

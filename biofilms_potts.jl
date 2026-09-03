@@ -1085,7 +1085,7 @@ function main()
     println("="^72)
     println("  Cellular Potts Model — Radiotropic Biofilm System")
     println("  Based on Kinder & Faulkner (2026)")
-    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("="^72)
     println()
 
@@ -1466,8 +1466,11 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                            rd.c[end])
     push!(trajectory, cs0)
     print_snapshot(snap0)
-    @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
-            rd.t, rd.m, rp.P0 * exp(rp.alpha_P * rd.t * rp.Ddot_R),
+    # RATIO, NOT AN ABSOLUTE. P0 is an uncalibrated placeholder, so
+    # `P0 * exp(...)` carries its arbitrariness into a number that looks
+    # measured. P_eff/P0 is dimensionless and is what the manuscript reports.
+    @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
+            rd.t, rd.m, exp(rp.alpha_P * rd.t * rp.Ddot_R),
             rd.c[end], mean(rd.c))
 
     for mcs in 1:n_mcs
@@ -1517,8 +1520,8 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                                   mean(rd.c), mean(rd.s), rd.c[end])
             push!(trajectory, cs)
             print_snapshot(snap)
-            @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
-                    rd.t, rd.m, P_eff_now, rd.c[end], mean(rd.c), mean(rd.s))
+            @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
+                    rd.t, rd.m, P_eff_now / rp.P0, rd.c[end], mean(rd.c), mean(rd.s))
         end
     end
 
@@ -1526,6 +1529,23 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
 end
 
 # ---- Radiodialysis-coupled main -----------------------------
+
+"""
+    print_membrane_report(rp, rd, n_mcs)
+
+Print the membrane-integrity/permeability/dose summary. Split out of
+`main_coupled()` so it's testable without a full simulation run, and so a
+negative control can capture exactly what it prints: no fabricated physical
+units (Gy, cm/s) attached to a quantity this repository cannot calibrate —
+see docs/research/session_claims_2026-08-24_redteam.md and PR #12.
+"""
+function print_membrane_report(rp::RadiolysisParams, rd::RadiolysisState, n_mcs::Int)
+    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
+    @printf("  Final P_eff / P0 = %.4f  (dimensionless ratio, exact by construction from alpha_P·Ddot_R·dt_rd·n_MCS — not a measurement)\n",
+            exp(rp.alpha_P * rp.Ddot_R * rd.t))
+    @printf("  Final P_eff, absolute: not computed in this work (P0 = %.3g cm/s is a Nafion-117 literature prior, not a calibration)\n", rp.P0)
+    @printf("  D_cum (dimensionless placeholder) after %d MCS: %.1f  (no seconds_per_mcs conversion exists — not Gy)\n", n_mcs, rp.Ddot_R * rd.t)
+end
 
 """
     main_coupled()
@@ -1537,7 +1557,7 @@ function main_coupled()
     println("="^72)
     println("  CPM + Radiodialysis Membrane Transport (Coupled)")
     println("  Kinder & Faulkner (2026) — Equations (1)–(3)")
-    println("  H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("  PDE: ∂c/∂t = ∇·(D ∇c) - uptake·c + k_des·s (cylindrical)")
     println("="^72)
     println()
@@ -1549,7 +1569,7 @@ function main_coupled()
             params.N, N_SPECIES, params.n_cells_per_species)
     @printf("  Radiolysis:   Nr=%d  D_eff=%.3g  P₀=%.3g  α=%.3g\n",
             rp.Nr, rp.D_eff, rp.P0, rp.alpha_P)
-    @printf("  Membrane:     Ḋ(R)=%.1f Gy/s  c_ext=%.2f  k_dam=%.3g\n\n",
+    @printf("  Membrane:     Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)  c_ext=%.2f  k_dam=%.3g\n\n",
             rp.Ddot_R, rp.c_ext, rp.k_dam)
 
     n_mcs = 100
@@ -1561,11 +1581,7 @@ function main_coupled()
 
     @printf("\n  Simulation completed in %.1f seconds.\n", elapsed)
     @printf("  Surviving cells: %d\n", length(state.cells))
-    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
-    @printf("  Final P_eff = %.5f cm/s  (×%.1f baseline)\n",
-            rp.P0 * exp(rp.alpha_P * rp.Ddot_R * rd.t),
-            exp(rp.alpha_P * rp.Ddot_R * rd.t))
-    @printf("  Cumulative dose at membrane: %.1f Gy\n", rp.Ddot_R * rd.t)
+    print_membrane_report(rp, rd, n_mcs)
 
     # Contaminant uptake summary
     println("\n  CONTAMINANT UPTAKE SUMMARY")

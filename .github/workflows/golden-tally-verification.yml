@@ -1,0 +1,180 @@
+name: golden-tally-verification
+
+# ENABLING, not extending -- this tier of coupling-tests.yml's old
+# openmc-integration job never actually dispatched (0 runs across 91 logged
+# CI runs) and never set up nuclear data, so a first run would have skipped
+# every data-gated test and still reported green: the empty-suite pattern.
+# This job sets up real ENDF/B-VIII.0 data and asserts the data-gated tests
+# actually ran (a non-skipped count, not just exit code 0), so its first
+# green means something.
+#
+# TRIGGER: workflow_dispatch plus `paths:`, not a `schedule:` -- a nightly
+# job that is green 364 days a year is a check nobody reads. The filter has
+# to cover everything that can change what real OpenMC produces.
+#
+# THE FIRST VERSION OF THIS FILTER WAS WRONG, and its comment said why in a
+# sentence that was false: "the fixture's values only change when OpenMC or
+# the data library change." They also change when any module that PRODUCES
+# the tally changes. `regenerate_golden_tally.py:_run_one()` imports
+# biofilm_openmc's config, model, mesh, materials and dose, and
+# `_nuclear_data_id` comes from openmc_nested_pilot.py; edit any of them and
+# real transport output moves while test_gate_composition.py keeps replaying
+# the old JSON and every check stays green against a stale pin. That is the
+# gate-that-cannot-fail shape, one level up from the seam the fixture exists
+# to close.
+#
+# The list below is enumerated rather than a blanket `coupling/**` so this
+# 45-minute job does not fire on every unrelated coupling edit --  which
+# makes it a copy that can drift, so
+# `test_gate_composition.py::test_every_fixture_producing_module_triggers_
+# verification` walks the script's real imports and fails if one is not
+# listed here, in BOTH triggers.
+#
+# AND `pull_request` IS NOT OPTIONAL, which the first version of this file got
+# wrong. `push` here is branch-filtered to master/feat/ci/research, so a PR
+# from `fix/**` -- or from a fork, which cannot match any branch filter --
+# never fired this job at all, while coupling-tests.yml went green replaying
+# the committed tally. A change to a fixture-producing module could merge
+# without real OpenMC ever regenerating the result it invalidated: green
+# against a pin nothing revalidated. `model-contracts.yml` already mirrors its
+# push paths into a filtered `pull_request` for exactly this reason.
+
+on:
+  push:
+    branches: [master, "feat/**", "ci/**", "research/**"]
+    paths: &fixture_inputs
+      - ".github/workflows/golden-tally-verification.yml"
+      - "docs/openmc_stack.md"
+      # THE ENTRY MOVES WITH THE SPEC. `docs/openmc_stack.md` is listed above
+      # because it USED to carry the package list; collapsing the three copies
+      # into environment.yml moved that list out from under this trigger and
+      # left the filter watching the file that no longer holds it. The job
+      # builds its transport env from environment.yml directly, so an env-only
+      # change -- bumping the OpenMC pin, say -- would have matched neither
+      # trigger, and coupling-tests.yml's env-backed job is workflow_dispatch
+      # only. The fixture would stay pinned to a transport stack nothing reran.
+      # The doc stays listed: it still carries the nuclear-data identity.
+      - "environment.yml"
+      - "coupling/scripts/regenerate_golden_tally.py"
+      - "coupling/tests/fixtures/golden_tally_water_phantom.json"
+      # The fixture-producing modules, per the control test named above.
+      - "coupling/scripts/openmc_nested_pilot.py"
+      - "coupling/biofilm_openmc/config.py"
+      - "coupling/biofilm_openmc/dose.py"
+      - "coupling/biofilm_openmc/materials.py"
+      - "coupling/biofilm_openmc/mesh.py"
+      - "coupling/biofilm_openmc/model.py"
+  # ANCHORED, not copied. Two hand-maintained path lists drift, and the one
+  # that drifts is the one nobody watches -- here that would be the PR trigger,
+  # the only one that fires before a merge.
+  pull_request:
+    paths: *fixture_inputs
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: golden-tally-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Real nuclear-data download (3.3 GB archive) + 12 small transport runs.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v1
+        with:
+          # ONE SPEC. This was inline create-args, a second hand-maintained
+          # copy of environment.yml's contents; see that file for why three
+          # copies of one spec is the drift that produced this workflow's
+          # first two bugs.
+          environment-file: environment.yml
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - name: Instantiate Julia dependencies for interop tests
+        run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
+
+      - name: Install package
+        shell: micromamba-shell {0}
+        run: pip install -e contract && pip install -e "coupling[dev]"
+
+      - name: Download and verify nuclear data
+        # The archive SHA-256 is the identity pin (docs/openmc_stack.md:
+        # "the archive digest is the stronger identity... it pins every data
+        # file, not just the index"). Refuse to proceed on a mismatch rather
+        # than silently run against different data than the fixture was
+        # generated with.
+        #
+        # AND THE PATH IS EXPORTED FROM HERE, not written again by hand. The
+        # first version of this file hardcoded `/root/openmc-data/...` in the
+        # two steps below while this one wrote to `$HOME` (= /home/runner), so
+        # openmc's import died on EACCES traversing /root -- 6 collection
+        # errors on the job's first real run. Two copies of one path, in the
+        # same file that had just grown a YAML anchor to stop exactly that.
+        # `$GITHUB_ENV` makes the consumers read where the data actually
+        # landed.
+        run: |
+          mkdir -p "$HOME/openmc-data"
+          cd "$HOME/openmc-data"
+          curl -L -o endfb-viii.0-hdf5.tar.xz \
+            https://anl.box.com/shared/static/uhbxlrx7hvxqw27psymfbhi7bx7s6u6a.xz
+          echo "200cc6b97aa8cacc3f70ebc169bb91cf39381875fc80fb91ec5d84292da9b970  endfb-viii.0-hdf5.tar.xz" \
+            | sha256sum -c -
+          echo "200cc6b97aa8cacc3f70ebc169bb91cf39381875fc80fb91ec5d84292da9b970" \
+            > endfb-viii.0-hdf5.tar.xz.sha256
+          tar -xJf endfb-viii.0-hdf5.tar.xz
+          xs="$HOME/openmc-data/endfb-viii.0-hdf5/cross_sections.xml"
+          test -r "$xs" || { echo "extracted, but $xs is not readable"; exit 1; }
+          echo "OPENMC_CROSS_SECTIONS=$xs" >> "$GITHUB_ENV"
+
+      - name: Run API + integration tier, with a JUnit record
+        shell: micromamba-shell {0}
+        run: |
+          cd coupling
+          xvfb-run -a pytest -rs tests --junitxml=results.xml
+
+      - name: Assert the data-gated tests actually ran
+        # THE ENABLING CHECK. Exit code 0 is what a fully-skipped run also
+        # reports. Parse the JUnit record and require every test under
+        # tests/integration/ to be non-skipped -- if OPENMC_CROSS_SECTIONS
+        # setup silently broke, this fails loudly instead of reporting the
+        # same green a do-nothing run would.
+        run: |
+          python3 - <<'PYEOF'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          tree = ET.parse("coupling/results.xml")
+          integration = [tc for tc in tree.iter("testcase")
+                         if "tests.integration." in tc.get("classname", "")
+                         or "tests/integration/" in tc.get("file", "")]
+          if not integration:
+              print("FAIL: no tests/integration/ testcases found in the JUnit "
+                    "record at all -- the tier did not run, not just skip")
+              sys.exit(1)
+          skipped = [tc for tc in integration if tc.find("skipped") is not None]
+          if skipped:
+              names = [tc.get("name") for tc in skipped]
+              print(f"FAIL: {len(skipped)}/{len(integration)} integration "
+                    f"tests were SKIPPED, not run: {names}. Nuclear-data "
+                    "setup did not take effect -- this run means nothing.")
+              sys.exit(1)
+          print(f"OK: {len(integration)} integration tests ran, none skipped.")
+          PYEOF
+
+      - name: Regenerate the golden tally and diff against the committed fixture
+        shell: micromamba-shell {0}
+        run: python3 coupling/scripts/regenerate_golden_tally.py
+
+      - name: Fail if the fixture drifted
+        # COMPARE-ONLY, matching tests/contract_csv.jl for the serial
+        # fixture -- this job never commits a regenerated fixture, it only
+        # detects that the committed one no longer matches what today's
+        # OpenMC + nuclear data actually produce.
+        run: git diff --exit-code -- coupling/tests/fixtures/golden_tally_water_phantom.json
