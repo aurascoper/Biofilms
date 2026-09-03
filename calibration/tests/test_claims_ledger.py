@@ -1347,7 +1347,7 @@ def _normalised_for_retraction(text: str) -> str:
 
 
 def _is_derived_from_a_scanned_source(path: Path) -> bool:
-    """True when `path`'s content is a build product of a file this scan reads.
+    """True only for current Python bytecode derived from a source this scan reads.
 
     THE RULE IS "DERIVED FROM A SOURCE ALREADY SCANNED", NEVER "EXEMPT BECAUSE OF
     WHERE IT LIVES", AND THE REASON LIVES HERE RATHER THAN AT ONE CALL SITE. That
@@ -1356,24 +1356,78 @@ def _is_derived_from_a_scanned_source(path: Path) -> bool:
     same file reached for the rule instead and got the blanket
     `"__pycache__" in path.parts` skip the narrowing existed to remove. A file
     inside a directory named `__pycache__` with NO sibling source is scanned --
-    it is a place to hide a string, not a build product.
+    it is a place to hide a string, not a build product. The sibling check alone
+    was still a surface marker: `__pycache__/foo.py` beside `foo.py` passed it.
+
+    The exemption therefore verifies the relation Python itself records. The
+    path must be a PEP 3147 cache path, the interpreter magic and marshalled body
+    must be valid, and the header must match the current source bytes (hash mode)
+    or the source timestamp and size (timestamp mode). A name selects a candidate;
+    only the derivation contract earns the skip.
 
     Any future walker over this tree wants this predicate, not a location test.
     """
-    if "__pycache__" not in path.parts:
+    import importlib.util
+    import marshal
+    import struct
+    import sys
+    import types
+
+    if path.parent.name != "__pycache__" or path.suffix != ".pyc":
         return False
-    stem = path.name.split(".")[0]
-    return (path.parent.parent / f"{stem}.py").is_file()
+    try:
+        source = Path(importlib.util.source_from_cache(str(path)))
+    except ValueError:
+        # Pytest assertion rewriting is real bytecode with a deliberately
+        # extended cache tag that source_from_cache refuses. Admit that one
+        # producer by its exact current-interpreter form, then subject it to the
+        # same header, source and code-object checks below.
+        pytest_cache = re.fullmatch(
+            rf"(?P<stem>.+)\.{re.escape(sys.implementation.cache_tag)}"
+            r"-pytest-[0-9A-Za-z_.-]+\.pyc",
+            path.name)
+        if not pytest_cache:
+            return False
+        source = path.parent.parent / f"{pytest_cache.group('stem')}.py"
+    try:
+        payload = path.read_bytes()
+        source_bytes = source.read_bytes()
+    except OSError:
+        return False
+    if len(payload) < 16 or payload[:4] != importlib.util.MAGIC_NUMBER:
+        return False
+    flags = struct.unpack("<I", payload[4:8])[0]
+    if flags & ~0b11:
+        return False
+    if flags & 0b1:
+        if payload[8:16] != importlib.util.source_hash(source_bytes):
+            return False
+    else:
+        mtime, size = struct.unpack("<II", payload[8:16])
+        if mtime != int(source.stat().st_mtime) & 0xFFFFFFFF:
+            return False
+        if size != len(source_bytes) & 0xFFFFFFFF:
+            return False
+    try:
+        code = marshal.loads(payload[16:])
+    except (EOFError, ValueError, TypeError):
+        return False
+    if not isinstance(code, types.CodeType):
+        return False
+    code_source = Path(code.co_filename)
+    if not code_source.is_absolute():
+        code_source = Path.cwd() / code_source
+    return code_source.resolve() == source.resolve()
 
 
-def files_carrying_retracted_citations() -> dict:
+def files_carrying_retracted_citations(root: Path = REPO) -> dict:
     """{repo-relative path: [dois]} for every file containing a withdrawn DOI.
 
     SCOPE: every readable file in the repository except `.git`. Shared by the check
     and its control so the control cannot pass against a regressed check.
     """
     out: dict[str, list[str]] = {}
-    for path in REPO.rglob("*"):
+    for path in root.rglob("*"):
         # THE EXCLUSION IS "DERIVED FROM A SOURCE ALREADY SCANNED", NOT "IS A BUILD
         # ARTIFACT", AND THE TWO RULES HAVE DIFFERENT FUTURE COVERAGE. The first
         # version of this skipped `path.suffix in {.pyc, .pdf, .png, .so, .o}`,
@@ -1401,7 +1455,7 @@ def files_carrying_retracted_citations() -> dict:
         hits = [d for d in RETRACTED_CITATIONS
                 if _normalised_for_retraction(d) in flat]
         if hits:
-            out[str(path.relative_to(REPO)).replace("\\", "/")] = sorted(hits)
+            out[str(path.relative_to(root)).replace("\\", "/")] = sorted(hits)
     return out
 
 
@@ -1428,7 +1482,9 @@ def test_the_replacements_the_ledger_prescribed_are_present():
         assert doi in tex, f"{row}'s prescribed replacement {doi} is not in the manuscript"
 
 
-def test_the_retracted_citation_guard_detects_the_pre_fix_manuscript():
+@pytest.mark.parametrize("representation", ("exact", "uppercase", "wrapped", "encoded"))
+def test_citation_normalisation_enters_through_the_production_scanner(
+        tmp_path, representation):
     """CONTROL: the manuscript as it stood before the fix must be caught.
 
     SCOPE: one file, recovered from git rather than written here. The known-bad is
@@ -1443,13 +1499,53 @@ def test_the_retracted_citation_guard_detects_the_pre_fix_manuscript():
         cwd=REPO, capture_output=True, text=True)
     if before.returncode != 0:
         pytest.skip("pre-fix manuscript not reachable from git")
-    found = [d for d in RETRACTED_CITATIONS if d in before.stdout]
-    assert sorted(found) == sorted(RETRACTED_CITATIONS), (
-        "the pre-fix manuscript should contain both withdrawn DOIs; the scanner "
-        f"found {found}. It is matching nothing, not finding nothing.")
+    victim = next((d for d in RETRACTED_CITATIONS if d in before.stdout), None)
+    assert victim, "the pre-fix artifact contains no vocabulary victim"
+    rendered = {
+        "exact": victim,
+        "uppercase": victim.upper(),
+        "wrapped": victim.replace("mma.", "mma.\n% "),
+        "encoded": victim.replace("/", "%2F"),
+    }[representation]
+    candidate = tmp_path / "candidate.tex"
+    candidate.write_text(rendered, encoding="utf-8")
+    found = files_carrying_retracted_citations(tmp_path)
+    assert found == {"candidate.tex": [victim]}, (
+        f"the {representation} artifact-derived DOI did not traverse the same "
+        f"root walk, file read and normalisation as production: {found}")
     assert not [d for d in RETRACTED_CITATIONS
                 if d in PREPRINT.read_text(encoding="utf-8")], \
         "and the current manuscript must contain neither"
+
+
+def test_only_current_bytecode_is_exempt_from_the_production_scanners(tmp_path):
+    """CONTROL: a cache-looking sibling is input; current bytecode is derived.
+
+    Both assertions call the complete production scanners. Testing the predicate
+    alone would leave either walker free to reinstate a location-based bypass.
+    """
+    import importlib.util
+    import py_compile
+
+    doi = next(iter(RETRACTED_CITATIONS))
+    source_claim = next(iter(RETRACTED_IN_SOURCES))
+    source = tmp_path / "foo.py"
+    source.write_text(
+        f"WITHDRAWN_DOI = {doi!r}\nWITHDRAWN_CLAIM = {source_claim!r}\n",
+        encoding="utf-8")
+    cache = Path(importlib.util.cache_from_source(str(source)))
+    py_compile.compile(str(source), cfile=str(cache), doraise=True)
+    assert doi.encode() in cache.read_bytes(), "bytecode control lost its DOI payload"
+    assert _is_derived_from_a_scanned_source(cache), (
+        "py_compile output did not satisfy the production derivation contract")
+    masquerade = cache.parent / "foo.py"
+    masquerade.write_text(f"# {doi}\n# {source_claim}\n", encoding="utf-8")
+
+    citations = files_carrying_retracted_citations(tmp_path)
+    sources = sources_carrying_retracted_strings(tmp_path)
+    assert set(citations) == {"foo.py", "__pycache__/foo.py"}, citations
+    assert set(sources) == {"foo.py", "__pycache__/foo.py"}, sources
+    assert str(cache.relative_to(tmp_path)).replace("\\", "/") not in citations
 
 
 # ------------------------------------------------------ retracted in sources
@@ -1505,7 +1601,7 @@ SOURCE_RECORDING_FILES = {
 SOURCE_SUFFIXES = {".jl", ".R", ".py"}
 
 
-def sources_carrying_retracted_strings() -> dict:
+def sources_carrying_retracted_strings(root: Path = REPO) -> dict:
     """{repo-relative path: [strings]} for every source carrying a withdrawn string.
 
     SCOPE: files with a SOURCE_SUFFIXES extension anywhere in the repository,
@@ -1513,7 +1609,7 @@ def sources_carrying_retracted_strings() -> dict:
     the check and its control.
     """
     out: dict[str, list[str]] = {}
-    for path in REPO.rglob("*"):
+    for path in root.rglob("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
         if _is_derived_from_a_scanned_source(path) or path.suffix not in SOURCE_SUFFIXES:
@@ -1526,7 +1622,7 @@ def sources_carrying_retracted_strings() -> dict:
         hits = [s for s in RETRACTED_IN_SOURCES
                 if _normalised_for_retraction(s) in flat]
         if hits:
-            out[str(path.relative_to(REPO)).replace("\\", "/")] = sorted(hits)
+            out[str(path.relative_to(root)).replace("\\", "/")] = sorted(hits)
     return out
 
 
@@ -1541,7 +1637,9 @@ def test_no_retracted_string_survives_in_a_source_file():
         "string, or the source someone copies from still carries it.")
 
 
-def test_the_source_retraction_guard_detects_the_pre_fix_file():
+@pytest.mark.parametrize("representation", ("exact", "uppercase", "wrapped"))
+def test_source_normalisation_enters_through_the_production_scanner(
+        tmp_path, representation):
     """CONTROL: the R file as it stood before the fix must be caught.
 
     SCOPE: one file, recovered from git. Drawn from the artifact path rather than
@@ -1554,10 +1652,19 @@ def test_the_source_retraction_guard_detects_the_pre_fix_file():
         cwd=REPO, capture_output=True, text=True)
     if before.returncode != 0:
         pytest.skip("pre-fix source not reachable from git")
-    found = [s for s in RETRACTED_IN_SOURCES if s in before.stdout]
-    assert "Table 2 range 1e-4..1e-2" in found, (
-        "the pre-fix R file should carry the withdrawn range; the scanner found "
-        f"{found}. It is matching nothing, not finding nothing.")
+    victim = "Table 2 range 1e-4..1e-2"
+    assert victim in before.stdout, "the pre-fix artifact contains no vocabulary victim"
+    rendered = {
+        "exact": victim,
+        "uppercase": victim.upper(),
+        "wrapped": victim.replace("range ", "range\n# "),
+    }[representation]
+    candidate = tmp_path / "candidate.R"
+    candidate.write_text(rendered, encoding="utf-8")
+    found = sources_carrying_retracted_strings(tmp_path)
+    assert found == {"candidate.R": [victim]}, (
+        f"the {representation} artifact-derived source claim did not traverse "
+        f"the same root walk, suffix gate, file read and normalisation as production: {found}")
     assert not [s for s in RETRACTED_IN_SOURCES
                 if s in (REPO / "biofilms_radiodialysis.R").read_text(encoding="utf-8")], \
         "and the current file must carry none"

@@ -136,6 +136,22 @@ was therefore load-bearing too. This failure mode is not domain-versus-range,
 not a coverage gap, and not a vacuous assertion. It is a control that never met
 the pipeline.
 
+**A control enters by the production door.** If production discovers files by
+walking a root, normalises them in a scanner, and classifies the scanner's
+result, the control must place its known-bad under a root and call that scanner.
+Calling the normaliser directly, or comparing the vocabulary to a string in the
+test, proves a helper and leaves the production path free to bypass it. This is
+not satisfied by sharing an assertion: the control must traverse the same input
+boundary and return the same finest-grained result production consumes.
+
+**An exemption is keyed on the property that earns it, at the location where it
+is true.** A directory name, suffix, token value or other surface marker can
+select a candidate; it cannot justify skipping one. Verify the relation itself:
+a cache file is current bytecode derived from the sibling source, a clipped token
+is the one measured run at the one figure location, and a recording document is
+the exact declared path. Broad markers turn a local exception into an input
+channel production never reads, which is the exclusion outliving its reason.
+
 ### 2. A skipped test is uncovered surface, not a neutral fact
 
 `plot_layer` shipped a `NameError` on its first rendering line behind eight

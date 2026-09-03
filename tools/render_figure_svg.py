@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render an SVG figure to PDF and write the source hash THE CONVERSION SAW.
+"""Render an SVG figure to PDF and record THE SOURCE/OUTPUT PAIR IT SAW.
 
 WHY THE HASH IS WRITTEN HERE AND NOWHERE ELSE. An SVG source-of-truth plus a
 committed derived PDF is the generator-and-artifact pair that already failed in
@@ -12,11 +12,12 @@ obvious repair is to regenerate the hash. That is green again with the PDF still
 stale, so the check meant to catch staleness has been satisfied without catching
 it.
 
-So the hash file is written ONLY by this script, as a side effect of actually
-converting. The only way to make the guard green is to run the conversion, which
-produces the PDF. This is contract_csv.jl's compare-never-regenerate reasoning
-inverted: there the fixture must never be rewritten by the thing it checks; here
-the record must be writable only by the generator.
+The record therefore contains source, output, and a framed joint digest. The
+component hashes diagnose which file moved; the joint digest makes their exact
+combination the unit the guard accepts. The file remains writable, so this turns
+an accidental "update the source hash" repair into an explicit forged pair rather
+than pretending hashes prove provenance. The PDF text is independently checked
+through its own extraction paths.
 
     python3 tools/render_figure_svg.py preprint/figures/phase2_diffusion_cell.svg
 """
@@ -35,6 +36,16 @@ CAIRO_PY = Path("/home/aurascoper/.local/share/mamba/envs/openmc-biofilms/bin/py
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def pair_sha256(svg: Path, pdf: Path) -> str:
+    """Digest the ordered source/output pair with explicit framing."""
+    digest = hashlib.sha256(b"biofilms-svg-pdf-pair-v1\0")
+    for path in (svg, pdf):
+        body = path.read_bytes()
+        digest.update(len(body).to_bytes(8, "big"))
+        digest.update(body)
+    return digest.hexdigest()
 
 
 def render(svg: Path) -> Path:
@@ -81,25 +92,25 @@ def main(argv: list[str]) -> int:
     svg = Path(argv[1])
     pdf = render(svg)
     sidecars(pdf)
-    # THE PAIR, NOT THE SOURCE ALONE. The docstring above argues that a record
-    # comparing the SVG to a record of itself can be satisfied by regenerating
-    # the record, leaving the PDF stale -- and then the first version of this
-    # line wrote exactly that record. Codex raised it on pull request #23.
+    # THE PAIR, NOT TWO INDEPENDENT FACTS. The docstring above argues that a
+    # record comparing the SVG to itself can be satisfied by regenerating the
+    # record, leaving the PDF stale. The second version put independent source
+    # and PDF hashes in the same file: editing the source hash still left a valid
+    # old PDF hash, so the stale combination remained admissible. Codex raised
+    # both versions on pull request #23.
     #
-    # Recording the digest of the PDF this conversion produced states the pair
-    # the guard actually cares about. BE CLEAR ABOUT WHAT THIS DOES AND DOES NOT
-    # BUY: both lines are still hand-writable, so it does not make forgery
-    # impossible, it makes it require two deliberate falsehoods instead of one.
-    # What actually binds source to artifact is the text check in
-    # calibration/tests/test_figure_staleness.py, which reads the SVG's own text
-    # runs out of the committed .txt and cannot be satisfied by editing a hash.
-    #
-    # `split()[0]` still yields the source digest, so every existing reader of
-    # this file is unaffected.
-    digest = sha256(svg)
+    # A framed joint digest makes the exact combination the renderer saw a
+    # first-class value. Component hashes remain for diagnosis, but neither can
+    # substitute for the pair. This does not make a text file unforgeable; it
+    # turns the ordinary "update the source hash" repair into an explicit false
+    # claim about the source/output pair. Exact text binding is checked through
+    # the PDF itself in test_figure_staleness.py.
+    source_digest = sha256(svg)
+    pdf_digest = sha256(pdf)
     Path(str(svg) + ".sha256").write_text(
-        f"{digest}\npdf={sha256(pdf)}\n", encoding="utf-8")
-    print(f"rendered {pdf} from {svg}\n  source sha256 {digest}\n"
+        f"source={source_digest}\npdf={pdf_digest}\npair={pair_sha256(svg, pdf)}\n",
+        encoding="utf-8")
+    print(f"rendered {pdf} from {svg}\n  source sha256 {source_digest}\n"
           f"  sidecars: {pdf.with_suffix('.sha256').name}, {pdf.with_suffix('.txt').name}, "
           f"{pdf.with_suffix('.png').name}")
     return 0

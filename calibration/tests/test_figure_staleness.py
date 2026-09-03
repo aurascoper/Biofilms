@@ -1,4 +1,4 @@
-"""A rendered figure must be derived from the SVG currently in the tree.
+"""A rendered figure must be paired with the SVG currently in the tree.
 
 SCOPE: the SVG/PDF/sha256 triples under preprint/figures/, and nothing else.
 
@@ -6,11 +6,10 @@ This exists because the generator-and-artifact pair has already failed here once
 a figure generator was corrected two weeks before its committed images were, and
 no check could open a figure to notice. FIG-01 through FIG-07 record it.
 
-THE HASH IS WRITTEN ONLY BY tools/render_figure_svg.py. A sidecar a human can
-rewrite binds the SVG to a record of itself, so the repair for a mismatch would be
-to regenerate the record -- green, with the PDF still stale. Because only the
-renderer writes it, the sole way to make this green is to run the renderer, which
-emits the PDF as a side effect.
+THE RECORD IS WRITTEN BY tools/render_figure_svg.py and names source, output and
+their framed joint digest. Independent hashes describe two files; the pair digest
+describes the one combination the renderer saw. Exact text binding then enters
+through the PDF itself, including the one token the layout extraction clips.
 """
 from __future__ import annotations
 
@@ -29,27 +28,75 @@ def svg_triples():
     return sorted(FIGDIR.glob("*.svg"))
 
 
+def pair_sha256(svg: Path, pdf: Path) -> str:
+    """Digest the ordered source/output pair with explicit framing."""
+    digest = hashlib.sha256(b"biofilms-svg-pdf-pair-v1\0")
+    for path in (svg, pdf):
+        body = path.read_bytes()
+        digest.update(len(body).to_bytes(8, "big"))
+        digest.update(body)
+    return digest.hexdigest()
+
+
+def render_record_mismatches(svg: Path, pdf: Path, record_text: str) -> dict:
+    """Return every field where a render record differs from its exact pair."""
+    lines = record_text.splitlines()
+    if len(lines) != 3:
+        return {"format": f"expected three fields, got {len(lines)}"}
+    try:
+        fields = dict(line.split("=", 1) for line in lines)
+    except ValueError:
+        return {"format": "every line must be key=value"}
+    if set(fields) != {"source", "pdf", "pair"}:
+        return {"format": f"expected source/pdf/pair, got {sorted(fields)}"}
+    expected = {
+        "source": hashlib.sha256(svg.read_bytes()).hexdigest(),
+        "pdf": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+        "pair": pair_sha256(svg, pdf),
+    }
+    return {key: (fields[key], value) for key, value in expected.items()
+            if fields[key] != value}
+
+
 @pytest.mark.parametrize("svg", svg_triples(), ids=lambda p: p.name)
 def test_the_rendered_pdf_matches_the_svg_in_the_tree(svg):
     record = Path(str(svg) + ".sha256")
     pdf = svg.with_suffix(".pdf")
     assert record.is_file(), f"{svg.name} has no render record; run tools/render_figure_svg.py"
     assert pdf.is_file(), f"{svg.name} has no rendered PDF"
-    recorded = record.read_text(encoding="utf-8").split()[0]
-    actual = hashlib.sha256(svg.read_bytes()).hexdigest()
-    assert recorded == actual, (
-        f"{svg.name} changed since it was rendered. Re-run "
+    mismatches = render_record_mismatches(
+        svg, pdf, record.read_text(encoding="utf-8"))
+    assert not mismatches, (
+        f"{svg.name} and {pdf.name} are not the pair the renderer recorded "
+        f"({mismatches}). Re-run "
         f"tools/render_figure_svg.py {svg.relative_to(REPO)} -- do NOT edit the "
-        f".sha256 file, which would make this pass with a stale PDF.")
+        ".sha256 file: independent component hashes do not establish a pair.")
 
 
-def test_the_staleness_check_can_fail():
-    """CONTROL: a record that does not match its source must be reported.
+def test_the_render_record_rejects_a_stale_source_output_combination(tmp_path):
+    """CONTROL: independently valid component hashes are not a valid pair.
 
-    SCOPE: one synthetic pair, exercising the comparison this file performs.
+    The source and PDF come from the production artifact. The source is mutated,
+    its component hash is updated as the reported escape did, and the unchanged
+    PDF retains its valid component hash. This calls the production comparison;
+    a helper-only digest assertion would not prove that path consumes the pair.
     """
-    body = b"<svg/>"
-    assert hashlib.sha256(body).hexdigest() != hashlib.sha256(b"<svg />").hexdigest()
+    original_svg = FIGDIR / "phase2_diffusion_cell.svg"
+    original_pdf = original_svg.with_suffix(".pdf")
+    svg = tmp_path / original_svg.name
+    pdf = tmp_path / original_pdf.name
+    source = original_svg.read_bytes()
+    victim = b"self-diffusivity"
+    assert victim in source, "artifact-derived mutation victim is absent"
+    svg.write_bytes(source.replace(victim, b"self-diffusivNOTRENDERED", 1))
+    pdf.write_bytes(original_pdf.read_bytes())
+    stale_pair = pair_sha256(original_svg, original_pdf)
+    forged_components = (
+        f"source={hashlib.sha256(svg.read_bytes()).hexdigest()}\n"
+        f"pdf={hashlib.sha256(pdf.read_bytes()).hexdigest()}\n"
+        f"pair={stale_pair}\n")
+    mismatches = render_record_mismatches(svg, pdf, forged_components)
+    assert set(mismatches) == {"pair"}, mismatches
 
 
 def test_the_phase2_figure_carries_the_corrected_multiple():
@@ -83,22 +130,20 @@ def test_the_phase2_figure_carries_the_corrected_multiple():
 
 # ---------------------------------------------------------------- source -> artifact
 #
-# WHAT THE HASH CHECK ABOVE CANNOT DO, AND THE FILE IT GUARDS SAID SO FIRST.
-# `test_the_rendered_pdf_matches_the_svg_in_the_tree` compares the committed
-# `.svg.sha256` against the SVG. Both are files in the tree. Edit the SVG,
-# rewrite the record by hand, do not re-render: the record and the source agree,
-# the PDF's own hash still matches its own record, and every check here passes
-# over a stale PDF. tools/render_figure_svg.py's docstring argues exactly this
-# and then wrote exactly that record. Raised by Codex on pull request #23.
+# WHAT THE COMPONENT HASHES CANNOT DO, AND THE FILE THEY GUARD SAID SO FIRST.
+# Edit the SVG, update its component hash, and leave the old PDF with its still
+# valid component hash: two independently true statements admit a stale pair.
+# The framed pair field above makes that exact combination fail unless somebody
+# deliberately rewrites the relation too. Raised by Codex on pull request #23.
 #
-# A HASH CANNOT FIX A HASH. Recording the PDF digest beside the source digest
-# (now done) makes the forgery need two lies instead of one; it does not make it
-# impossible, because both lines are still text in a file anyone can write.
+# A HASH IS NOT PROVENANCE. The record is writable and a deliberate forgery is
+# possible; its job is to prevent independent component updates from posing as a
+# render receipt, not to authenticate an author.
 #
 # So the binding is content, not digest: every text run in the SVG must appear in
 # the committed `.txt`, which the sidecar test independently pins to the PDF's
-# actual bytes. SVG text -> committed text -> committed PDF, each link checked by
-# something that cannot be satisfied by editing a record.
+# actual bytes. The one layout-clipped suffix is verified through pdftohtml's
+# hidden-text extraction from the PDF itself.
 #
 # SCOPE, STATED BECAUSE IT IS NARROWER THAN "THE PDF IS FRESH": this catches
 # TEXT drift only. An SVG edit that moves a rectangle and touches no string
@@ -148,12 +193,28 @@ def svg_text_runs(svg_source: str) -> list[str]:
     return runs
 
 
-def unrendered_runs(svg_source: str, txt: str) -> list[str]:
-    """Runs whose text is absent from the extraction, final token allowed clipped.
+CLIPPED_FINAL_TOKENS = {
+    # LOCATION-SCOPED, NOT VALUE-KEYED OR GLOBALLY INFERRED. Exactly one run in
+    # the measured figure crosses the right column boundary. The layout sidecar
+    # ends at this prefix, while `pdftohtml -hidden` reads the complete token
+    # from the PDF and is checked below. A changed suffix creates a different run
+    # identity and does not inherit this exception.
+    "phase2_diffusion_cell.svg": {
+        "The film-scale effective diffusivity measured here is not the reactor-scale "
+        "dispersion coefficient that currently carries the same name in radial_parms "
+        "(1×10⁻³ cm² s⁻¹, about 43× water’s self-diffusivity).": "self-diffusiv",
+    },
+}
+
+
+def unrendered_runs(svg_source: str, txt: str,
+                    allowed_clips: dict[str, str] | None = None) -> list[str]:
+    """Runs absent from the extraction, with exact location-earned clips only.
 
     Shared by the check and its controls, so a control cannot pass against a
     regressed check.
     """
+    allowed_clips = allowed_clips or {}
     flat = " ".join(txt.split())
     out = []
     for s in svg_text_runs(svg_source):
@@ -170,23 +231,19 @@ def unrendered_runs(svg_source: str, txt: str) -> list[str]:
         if s in flat:
             continue
         w = s.split()
-        if len(w) > 1:
+        allowed_prefix = allowed_clips.get(s)
+        if allowed_prefix and len(w) > 1:
             head = " ".join(w[:-1])
             i = flat.find(head)
             if i >= 0:
-                # THE HEAD MATCHING IS NOT ENOUGH -- that is the hole itself. The
-                # allowance applies only when the extraction TRUNCATES the final
-                # token, so what follows the head must be a proper prefix of it.
-                # A different word there is an edit, not a clip: changing
-                # `2011,` to `2019,` leaves the head intact and must still fail.
+                # The allowance belongs to this exact run at this exact figure,
+                # and the observed fragment must still equal its recorded prefix.
                 after = flat[i + len(head):].split()
                 tail = w[-1]
-                # Only the FIRST whitespace-delimited fragment after the head:
-                # the extraction continues into the next run, so a wider window
-                # compares this run's tail against a neighbour's opening words.
                 frag = after[0] if after else ""
-                if len(frag) >= 3 and tail.startswith(frag) and frag != tail:
-                    continue              # genuinely clipped at the boundary
+                if (frag == allowed_prefix and tail.startswith(allowed_prefix)
+                        and allowed_prefix != tail):
+                    continue
         out.append(s)
     return out
 
@@ -208,8 +265,10 @@ def _run_extent(svg_source: str, run: str):
 def test_the_svg_text_reaches_the_committed_pdf_text(svg):
     txt_path = svg.with_suffix(".txt")
     assert txt_path.is_file(), f"{svg.name} has no .txt sidecar; run tools/render_figure_svg.py"
-    missing = unrendered_runs(svg.read_text(encoding="utf-8"),
-                              txt_path.read_text(encoding="utf-8"))
+    missing = unrendered_runs(
+        svg.read_text(encoding="utf-8"),
+        txt_path.read_text(encoding="utf-8"),
+        CLIPPED_FINAL_TOKENS.get(svg.name))
     assert not missing, (
         f"{svg.name} carries text that is not in the rendered artifact, so the "
         f"committed PDF is older than the SVG: {missing[:3]}. Re-run "
@@ -217,6 +276,33 @@ def test_the_svg_text_reaches_the_committed_pdf_text(svg):
         "hash checks pass and will not make this one. If the missing word is "
         "MID-run rather than at the end, suspect layout drift before staleness -- "
         "see the note on the clipped final token above.")
+
+
+@pytest.mark.parametrize("svg", svg_triples(), ids=lambda p: p.name)
+def test_every_declared_clip_is_complete_in_the_pdf(svg):
+    """The layout exception is checked through a second, complete PDF path.
+
+    `pdftotext -layout` clips at the visible column boundary. Poppler's hidden
+    XML extraction retains the complete text object, so this verifies the suffix
+    the layout sidecar cannot observe instead of granting it globally.
+    """
+    clips = CLIPPED_FINAL_TOKENS.get(svg.name, {})
+    if not clips:
+        return
+    import shutil
+    import subprocess
+    if not shutil.which("pdftohtml"):
+        pytest.skip("pdftohtml unavailable; the clipped suffix needs its PDF path")
+    got = subprocess.run(
+        ["pdftohtml", "-xml", "-hidden", "-stdout", str(svg.with_suffix(".pdf"))],
+        capture_output=True, text=True)
+    assert got.returncode == 0, f"pdftohtml failed for {svg.name}: {got.stderr}"
+    hidden = html.unescape(re.sub(r"<[^>]+>", " ", got.stdout))
+    for run in clips:
+        suffix = " ".join(run.split()[-3:])
+        assert suffix in hidden, (
+            f"{svg.name}'s declared clipped suffix {suffix!r} is not complete in "
+            "the PDF; the location-scoped layout exception is unsupported")
 
 
 def _mutate_inside(source: str, run: str, old: str, new: str):
@@ -259,8 +345,12 @@ def test_the_source_to_artifact_binding_detects_an_edited_svg():
     svg = FIGDIR / "phase2_diffusion_cell.svg"
     source = svg.read_text(encoding="utf-8")
     txt = svg.with_suffix(".txt").read_text(encoding="utf-8")
+    allowed_clips = CLIPPED_FINAL_TOKENS[svg.name]
 
-    assert not unrendered_runs(source, txt), "baseline is not clean; no control verdict"
+    def missing(candidate):
+        return unrendered_runs(candidate, txt, allowed_clips)
+
+    assert not missing(source), "baseline is not clean; no control verdict"
     runs = svg_text_runs(source)
     assert runs, "no text runs found -- the extractor is broken, not the figure"
 
@@ -286,9 +376,20 @@ def test_the_source_to_artifact_binding_detects_an_edited_svg():
             f"{label}: mutation landed in a different element than the one "
             "selected -- _mutate_inside no longer bounds the replace to the "
             "located run")
-        assert unrendered_runs(mutated, txt), (
+        assert missing(mutated), (
             f"{label} edit was not caught -- text after the opening words can "
             "diverge from the artifact unnoticed")
+
+    # THE REPORTED ESCAPE: preserve the fragment visible in pdftotext's clipped
+    # layout output and alter only the unobservable suffix. The exception is
+    # attached to the original run identity, so the changed run cannot inherit
+    # it. This is the control that distinguishes location scope from prefix
+    # inference.
+    mutated, _ = _mutate_inside(
+        source, victim, "self-diffusivity).", "self-diffusivNOTRENDERED")
+    assert mutated != source, "clipped-suffix control: mutation did not apply"
+    assert missing(mutated), (
+        "an edit beyond the visible clipped prefix inherited the exception")
 
     # THE CASE THE FOUR CONTROLS BELOW STRUCTURALLY CANNOT REACH: the final token
     # of a run that does NOT clip. Three of them mutate the one run that clips and
@@ -306,7 +407,7 @@ def test_the_source_to_artifact_binding_detects_an_edited_svg():
     tail = nonclipping[0].split()[-1]
     mutated, _ = _mutate_inside(source, nonclipping[0], " " + tail, " Notarealword")
     assert mutated != source, "final-token control: mutation did not apply"
-    assert unrendered_runs(mutated, txt), (
+    assert missing(mutated), (
         "the final token of a NON-clipping run was edited and not caught -- the "
         "clipping allowance is being granted to runs that do not clip")
 
@@ -320,6 +421,6 @@ def test_the_source_to_artifact_binding_detects_an_edited_svg():
     first_word = other.split()[0]
     mutated, _ = _mutate_inside(source, other, first_word, "Notarealword")
     assert mutated != source, "test-set mutation did not apply"
-    assert unrendered_runs(mutated, txt), (
+    assert missing(mutated), (
         "a mutation in a run OTHER than the one the rule was derived from was "
         "not caught, so the rule is overfit to that run")
