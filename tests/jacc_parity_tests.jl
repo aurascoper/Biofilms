@@ -87,6 +87,7 @@ const P_HOST  = Base.eval(ParityPort, :(JACC.to_host))
 const P_PFOR  = Base.eval(ParityPort, :(JACC.parallel_for))
 const P_BETA  = Base.eval(ParityPort, :BETA_ION)
 const P_MELC  = Base.eval(ParityPort, :MEL_COEF)
+const P_UPTAKE = Base.eval(ParityPort, :UPTAKE)
 
 const IDENTITY = collect(0:7)
 const PERMS = ["identity" => IDENTITY,
@@ -109,7 +110,8 @@ mk_rp(; kw...) = P_RP(; Nr = 40, Ddot_R = 1.0, c_ext = 1.0,
 
 # Per-sweep (accepted, evaluated) per spatial class, plus the finiteness guard
 # on the discriminator.
-function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp())
+function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp(),
+        uptake = P_UPTAKE, on_nutrient = nothing)
         A = zeros(Int, n_mcs, 8); E = zeros(Int, n_mcs, 8); nonfinite = 0
         cb = (mcs, st, dh) -> begin
             nonfinite += count(!isfinite, @view dh[st .!= 0])
@@ -119,8 +121,8 @@ function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp())
                 E[mcs, c] += 1; s == UInt8(2) && (A[mcs, c] += 1)
             end
         end
-    P_RUN(; seed, n_mcs, N, rp, verbose = false,
-          color_order = order, on_sweep = cb)
+    P_RUN(; seed, n_mcs, N, rp, uptake, verbose = false,
+          color_order = order, on_sweep = cb, on_nutrient)
     return A, E, nonfinite
 end
 
@@ -225,9 +227,14 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
         # basis enters only through `uptake`/`nut`, so 10x the uptake constants
         # must leave the contingency table byte-identical. The day acceptance
         # reads the nutrient field, this fails and the exemption is re-argued.
-        base = run_tables(42, IDENTITY; n_mcs = 10)
+        base_nut = Ref{Any}(); pert_nut = Ref{Any}()
+        base = run_tables(42, IDENTITY; n_mcs = 10,
+                          uptake = P_UPTAKE,
+                          on_nutrient = (_, nut) -> (base_nut[] = copy(nut)))
         pert = run_tables(42, IDENTITY; n_mcs = 10,
-                          rp = mk_rp(k_ads = 0.5, k_red = 0.2))
+                          uptake = 10.0f0 .* P_UPTAKE,
+                          on_nutrient = (_, nut) -> (pert_nut[] = copy(nut)))
+        @test base_nut[] != pert_nut[]
         @test base[1] == pert[1]
         @test base[2] == pert[2]
     end

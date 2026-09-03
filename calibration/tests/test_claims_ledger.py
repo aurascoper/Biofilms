@@ -1346,8 +1346,9 @@ def _normalised_for_retraction(text: str) -> str:
     return re.sub(r"\s+", "", joined).replace("%2F", "/").replace("%2f", "/").lower()
 
 
-def _is_derived_from_a_scanned_source(path: Path) -> bool:
-    """True only for current Python bytecode derived from a source this scan reads.
+def _is_derived_from_a_scanned_source(
+        path: Path, protected_strings=()) -> bool:
+    """True only when a bytecode cache adds no protected content beyond source.
 
     THE RULE IS "DERIVED FROM A SOURCE ALREADY SCANNED", NEVER "EXEMPT BECAUSE OF
     WHERE IT LIVES", AND THE REASON LIVES HERE RATHER THAN AT ONE CALL SITE. That
@@ -1361,9 +1362,13 @@ def _is_derived_from_a_scanned_source(path: Path) -> bool:
 
     The exemption therefore verifies the relation Python itself records. The
     path must be a PEP 3147 cache path, the interpreter magic and marshalled body
-    must be valid, and the header must match the current source bytes (hash mode)
-    or the source timestamp and size (timestamp mode). A name selects a candidate;
-    only the derivation contract earns the skip.
+    must be valid, and its code object must name the sibling source. Hash-mode
+    caches must match the current source hash. A timestamp header alone cannot
+    prove identity: a same-length rewrite inside one timestamp second preserves
+    it. Timestamp caches are exempt only when every protected string appears in
+    the compiled payload iff it appears in the source the scanner also reads.
+    That is the exact property this scanner needs; stale unrelated bytecode is
+    not allowed to hide a withdrawn string.
 
     Any future walker over this tree wants this predicate, not a location test.
     """
@@ -1399,14 +1404,9 @@ def _is_derived_from_a_scanned_source(path: Path) -> bool:
     flags = struct.unpack("<I", payload[4:8])[0]
     if flags & ~0b11:
         return False
-    if flags & 0b1:
+    hash_mode = bool(flags & 0b1)
+    if hash_mode:
         if payload[8:16] != importlib.util.source_hash(source_bytes):
-            return False
-    else:
-        mtime, size = struct.unpack("<II", payload[8:16])
-        if mtime != int(source.stat().st_mtime) & 0xFFFFFFFF:
-            return False
-        if size != len(source_bytes) & 0xFFFFFFFF:
             return False
     try:
         code = marshal.loads(payload[16:])
@@ -1417,7 +1417,20 @@ def _is_derived_from_a_scanned_source(path: Path) -> bool:
     code_source = Path(code.co_filename)
     if not code_source.is_absolute():
         code_source = Path.cwd() / code_source
-    return code_source.resolve() == source.resolve()
+    if code_source.resolve() != source.resolve():
+        return False
+    if hash_mode:
+        return True
+    if not protected_strings:
+        return False
+    source_flat = _normalised_for_retraction(
+        source_bytes.decode("utf-8", errors="replace"))
+    payload_flat = _normalised_for_retraction(
+        payload.decode("utf-8", errors="replace"))
+    return all(
+        (_normalised_for_retraction(item) in payload_flat)
+        == (_normalised_for_retraction(item) in source_flat)
+        for item in protected_strings)
 
 
 def files_carrying_retracted_citations(root: Path = REPO) -> dict:
@@ -1445,7 +1458,7 @@ def files_carrying_retracted_citations(root: Path = REPO) -> dict:
         # scanned rather than skipped.
         if not path.is_file() or ".git" in path.parts:
             continue
-        if _is_derived_from_a_scanned_source(path):
+        if _is_derived_from_a_scanned_source(path, RETRACTED_CITATIONS):
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -1536,7 +1549,7 @@ def test_only_current_bytecode_is_exempt_from_the_production_scanners(tmp_path):
     cache = Path(importlib.util.cache_from_source(str(source)))
     py_compile.compile(str(source), cfile=str(cache), doraise=True)
     assert doi.encode() in cache.read_bytes(), "bytecode control lost its DOI payload"
-    assert _is_derived_from_a_scanned_source(cache), (
+    assert _is_derived_from_a_scanned_source(cache, RETRACTED_CITATIONS), (
         "py_compile output did not satisfy the production derivation contract")
     masquerade = cache.parent / "foo.py"
     masquerade.write_text(f"# {doi}\n# {source_claim}\n", encoding="utf-8")
@@ -1546,6 +1559,34 @@ def test_only_current_bytecode_is_exempt_from_the_production_scanners(tmp_path):
     assert set(citations) == {"foo.py", "__pycache__/foo.py"}, citations
     assert set(sources) == {"foo.py", "__pycache__/foo.py"}, sources
     assert str(cache.relative_to(tmp_path)).replace("\\", "/") not in citations
+
+
+def test_timestamp_cache_cannot_hide_a_same_length_source_rewrite(tmp_path):
+    """CONTROL: timestamp and size equality are not source identity."""
+    import importlib.util
+    import os
+    import py_compile
+    import struct
+
+    doi = next(iter(RETRACTED_CITATIONS))
+    source = tmp_path / "stale.py"
+    before = f"VALUE = {doi!r}\n"
+    source.write_text(before, encoding="utf-8")
+    cache = Path(importlib.util.cache_from_source(str(source)))
+    py_compile.compile(str(source), cfile=str(cache), doraise=True)
+    stamp = source.stat()
+    after = before.replace(doi, "x" * len(doi))
+    assert len(after.encode()) == len(before.encode())
+    source.write_text(after, encoding="utf-8")
+    os.utime(source, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    cached_mtime, cached_size = struct.unpack("<II", cache.read_bytes()[8:16])
+    assert cached_mtime == int(source.stat().st_mtime) & 0xFFFFFFFF
+    assert cached_size == len(source.read_bytes()) & 0xFFFFFFFF
+
+    assert not _is_derived_from_a_scanned_source(cache, RETRACTED_CITATIONS)
+    found = files_carrying_retracted_citations(tmp_path)
+    cache_key = str(cache.relative_to(tmp_path)).replace("\\", "/")
+    assert found == {cache_key: [doi]}, found
 
 
 # ------------------------------------------------------ retracted in sources
@@ -1612,7 +1653,7 @@ def sources_carrying_retracted_strings(root: Path = REPO) -> dict:
     for path in root.rglob("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
-        if _is_derived_from_a_scanned_source(path) or path.suffix not in SOURCE_SUFFIXES:
+        if path.suffix not in SOURCE_SUFFIXES:
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")

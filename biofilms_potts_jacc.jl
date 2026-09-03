@@ -489,7 +489,8 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
         T_cpm = 5.0f0, λ_V = 10.0f0, V_target = Int32(120),
         I0 = 1.0, κ = 2.0, D_M = 0.1f0, dt_field = 0.5f0,
         D_C = 0.2f0, C_wall = 1.0f0, rp = RadiolysisParams(), verbose = true,
-        color_order = 0:7, on_sweep = nothing)
+        uptake = UPTAKE, color_order = 0:7, on_sweep = nothing,
+        on_nutrient = nothing)
     @assert iseven(N) "checkerboard requires even N"
     # A non-permutation here double-updates one class and never updates
     # another, producing a silently wrong simulation that no downstream test
@@ -505,7 +506,9 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
     J = JACC.array(build_J_matrix())
     βv = JACC.array(BETA_ION)
     αv = JACC.array(ALPHA_M)
-    upt = JACC.array(UPTAKE)
+    @assert length(uptake) == N_SPECIES "uptake must name all seven species"
+    @assert all(isfinite, uptake) && all(>=(0), uptake) "uptake must be finite and non-negative"
+    upt = JACC.array(Float32.(uptake))
     melc = JACC.array(MEL_COEF)
     rad = JACC.array(rad_h)
     mel = JACC.array(mel_h); mel2 = JACC.array(zeros(Float32, N, N, N))
@@ -562,6 +565,7 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
             nut, nut2, lat, spec, upt, Int32(N), dt_field, D_C,
             Float32(rd.m) * C_wall)
         nut, nut2 = nut2, nut
+        on_nutrient === nothing || on_nutrient(mcs, JACC.to_host(nut))
 
         if verbose && (mcs % snapshot_interval == 0 || mcs == n_mcs)
             vol, ncells, mean_mel = species_stats(

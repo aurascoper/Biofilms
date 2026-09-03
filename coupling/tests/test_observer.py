@@ -1064,9 +1064,20 @@ def test_every_panel_is_drawn_and_labelled(tmp_path):
     run-versus-null figure is the null going missing."""
     a = _melanin_bundle(tmp_path / "a.h5", np.linspace(0.0, 1.0, 64))
     b = _melanin_bundle(tmp_path / "b.h5", np.linspace(0.0, 9.0, 64))
-    p = observer.plot_panels([("run", a), ("null", b)], "melanin")
+    panels = [("run", a), ("null", b)]
+    p = observer.plot_panels(panels, "melanin")
     assert len(p.renderers) == 2
     assert all(_clims_of(r) for r in p.renderers), "a panel drew no data"
+    for renderer, (title, _) in zip(p.renderers, panels, strict=True):
+        rendered_text = {
+            actor.GetText(i)
+            for actor in renderer.actors.values()
+            if hasattr(actor, "GetText")
+            for i in range(8)
+            if actor.GetText(i) is not None
+        }
+        assert title in rendered_text, (
+            f"panel {title!r} drew data but not its title: {rendered_text}")
 
 
 def test_plot_panels_refuses_an_empty_panel_list():
