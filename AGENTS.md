@@ -532,6 +532,25 @@ cause fails `test_julia_interop.py`, which spawns julia against the repo root.
 Either way the honest reading is "not instantiated in this worktree", never "not
 installed on this machine". That conflation is the defect recorded under rule 2.
 
+**AND RUN PYTEST AS `python -m pytest`, NEVER THE CONSOLE SCRIPT.** `biofilm_openmc`
+is installed editable, and the finder records ONE absolute path — whichever checkout
+it was installed from. It is appended to `sys.meta_path`, so a `sys.path` entry beats
+it; `python -m pytest` prepends the current directory and wins, while the console
+`pytest` inserts only `coupling/tests` and loses. From a worktree the console script
+therefore tests ANOTHER CHECKOUT'S CODE, silently, on whatever branch that checkout
+happens to be on:
+
+```sh
+cd coupling && <checkout>/coupling/.venv/bin/python -m pytest -q tests
+```
+
+This cost five `test_observer.py` failures that were reported as a defect in this
+branch. They were `plot_panels` missing from `feat/slab-depth-geometry`, which is
+where the main checkout was parked. Under `-m` the same suite is 314 passed, and the
+only red is the HDF5 pair above. **The confirming check had the same defect as the
+claim**: the "is it pre-existing?" run was made in the main checkout, so both runs
+imported the same file and the comparison could not have come out any other way.
+
 ## Before merging
 
 ```sh
