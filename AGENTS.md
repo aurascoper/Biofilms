@@ -148,6 +148,22 @@ whatever does not need it — name resolution, schema shape, argument contracts.
 
 Read a skip count as a question, never as a pass.
 
+**And read the skip's REASON as a claim, not as context.** `42e915a` reported the
+three Python suites as not run — "no venv and no pytest on this machine" — and
+hand-checked `test_claims_ledger.py`'s invariants against the new row instead.
+The venv exists, at the path `## The suites` names below; `--collect-only`
+refutes the claim in five seconds. Every other entry under these rules is a
+*check* that was wrong. This is a claim that the check was UNAVAILABLE, made
+without testing availability, and it is worse than a bare skip because it
+justifies itself — the justification is what made hand-checking read as
+diligence rather than as the substitution it was.
+
+So: **confirm a capability is absent before reporting it as a blocker.** An
+unavailability claim is an absence claim, and absence claims state their scope.
+What happened here is the scope failure in its ordinary form — a relative
+`.venv/bin/pytest` was missing from one directory, and that was written down as a
+property of the machine.
+
 ### 3. Never default to pass
 
 A lookup, a substring map, or a dispatch table must **refuse** the case it does
@@ -497,6 +513,24 @@ julia --project=. tests/runtests.jl                 # the CPM kernels
 `openmc-integration` is `workflow_dispatch`-gated: the hosted runner has no
 photon library, and tests needing nuclear data must report SKIPPED rather than
 be represented as passed.
+
+**IN A GIT WORKTREE, NEITHER INVOCATION ABOVE RESOLVES, AND BOTH FAIL IN A WAY
+THAT READS AS ABSENCE.** `coupling/.venv` and `Manifest.toml` are both
+gitignored, so a fresh worktree has neither, and the two may live in different
+checkouts. Point at an instantiated one instead of concluding the tooling is
+absent:
+
+```sh
+<checkout>/coupling/.venv/bin/pytest -q tests    # from any suite directory
+julia --project=<checkout> tests/runtests.jl     # from the worktree root
+```
+
+`--project=.` in a worktree errors in `checkpoint_io_tests.jl` on a missing HDF5
+and STOPS THERE, so every testset after `runtests.jl:40` — `jacc_parity_tests.jl`
+among them — never runs, and the report says nothing about them. The same root
+cause fails `test_julia_interop.py`, which spawns julia against the repo root.
+Either way the honest reading is "not instantiated in this worktree", never "not
+installed on this machine". That conflation is the defect recorded under rule 2.
 
 ## Before merging
 

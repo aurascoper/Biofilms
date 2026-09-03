@@ -252,6 +252,13 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
         # comparison below is between two draws from a racy process and proves
         # nothing either way, so it must refuse rather than report. See the
         # determinism paragraph in the header for the measured thread counts.
+        #
+        # THE DIRECTION THAT MATTERS IS NOT VISIBLE FROM THE ASSERTION. Without
+        # this, a threading change would MASK THIS GUARD FIRING: the day
+        # acceptance does read the nutrient field the tables differ, and under
+        # threads a real difference is indistinguishable from thread noise, so
+        # the finding this testset exists to produce would be read as flake.
+        # The precondition refuses that case instead of reporting it.
         ctl = run_tables(42, IDENTITY; n_mcs = 10)
         @test base[1] == ctl[1]
         @test base[2] == ctl[2]
