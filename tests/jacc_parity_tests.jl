@@ -111,7 +111,7 @@ mk_rp(; kw...) = P_RP(; Nr = 40, Ddot_R = 1.0, c_ext = 1.0,
 # Per-sweep (accepted, evaluated) per spatial class, plus the finiteness guard
 # on the discriminator.
 function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp(),
-        uptake = P_UPTAKE, on_nutrient = nothing)
+        uptake_scale = 1.0f0, on_nutrient = nothing)
         A = zeros(Int, n_mcs, 8); E = zeros(Int, n_mcs, 8); nonfinite = 0
         cb = (mcs, st, dh) -> begin
             nonfinite += count(!isfinite, @view dh[st .!= 0])
@@ -121,7 +121,8 @@ function run_tables(seed, order; N = 20, n_mcs = 50, rp = mk_rp(),
                 E[mcs, c] += 1; s == UInt8(2) && (A[mcs, c] += 1)
             end
         end
-    P_RUN(; seed, n_mcs, N, rp, uptake, verbose = false,
+    P_RUN(; seed, n_mcs, N, rp, uptake = uptake_scale .* P_UPTAKE,
+          verbose = false,
           color_order = order, on_sweep = cb, on_nutrient)
     return A, E, nonfinite
 end
@@ -227,13 +228,24 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
         # basis enters only through `uptake`/`nut`, so 10x the uptake constants
         # must leave the contingency table byte-identical. The day acceptance
         # reads the nutrient field, this fails and the exemption is re-argued.
+        # The byte-identical table comparison below is interpretable only on the
+        # single-thread configuration it was measured on. With four threads,
+        # scheduling changes the tables even when acceptance does not read the
+        # nutrient field; that false-red signature nearly passed for liveness.
+        @test Threads.nthreads() == 1
+
         base_nut = Ref{Any}(); pert_nut = Ref{Any}()
         base = run_tables(42, IDENTITY; n_mcs = 10,
-                          uptake = P_UPTAKE,
+                          uptake_scale = 1.0f0,
                           on_nutrient = (_, nut) -> (base_nut[] = copy(nut)))
         pert = run_tables(42, IDENTITY; n_mcs = 10,
-                          uptake = 10.0f0 .* P_UPTAKE,
+                          uptake_scale = 10.0f0,
                           on_nutrient = (_, nut) -> (pert_nut[] = copy(nut)))
+        # Callback execution is part of the control, not an assumption about the
+        # production entry point. Without these checks an unwired callback and a
+        # field that happened to compare equal would be indistinguishable.
+        @test isassigned(base_nut)
+        @test isassigned(pert_nut)
         @test base_nut[] != pert_nut[]
         @test base[1] == pert[1]
         @test base[2] == pert[2]

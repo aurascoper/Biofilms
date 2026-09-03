@@ -1061,7 +1061,12 @@ def test_panels_share_one_camera(tmp_path):
 @_needs_pyvista
 def test_every_panel_is_drawn_and_labelled(tmp_path):
     """Two panels asked for, two panels rendered. A silently dropped panel in a
-    run-versus-null figure is the null going missing."""
+    run-versus-null figure is the null going missing.
+
+    MUTATION CONTROL: removing `p.add_text(title, ...)` from the production
+    renderer leaves both data assertions green and fails the per-renderer title
+    assertion below for both supplied labels.
+    """
     a = _melanin_bundle(tmp_path / "a.h5", np.linspace(0.0, 1.0, 64))
     b = _melanin_bundle(tmp_path / "b.h5", np.linspace(0.0, 9.0, 64))
     panels = [("run", a), ("null", b)]

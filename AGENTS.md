@@ -510,6 +510,15 @@ cd contract     && ../coupling/.venv/bin/pytest -q tests   # the shared vocabula
 julia --project=. tests/runtests.jl                 # the CPM kernels
 ```
 
+A Julia control that deliberately fails one top-level testset must be run
+through a narrow driver that includes that test file alone. A failure in an
+earlier top-level testset aborts every later `include`, so silence about the
+target testset in the full-suite log cannot distinguish "passed" from "never
+reached." Establish the narrow baseline first, apply the mutation, restore it,
+and establish the same narrow baseline again. Verify both `git diff --quiet`
+and an empty `git status --porcelain` between controls; reading a partial diff
+is not evidence that the scratch tree was restored.
+
 `openmc-integration` is `workflow_dispatch`-gated: the hosted runner has no
 photon library, and tests needing nuclear data must report SKIPPED rather than
 be represented as passed.
