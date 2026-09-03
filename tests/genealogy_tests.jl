@@ -143,7 +143,12 @@ end
 
 let
     p = SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100)
-    rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0)
+    # basis_gate_ack: this compares blocked output against blocked output (two code
+    # paths, or a round trip) and asserts no magnitude, so it needs the gated basis
+    # to step but makes no claim about it. Enumerated in the ack census in
+    # tests/radiodialysis_basis_gate.jl -- adding a fourth site fails that test.
+    rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                             basis_gate_ack = true)
     n = 21   # crosses the mcs % 10 == 1 biomass-rebuild boundary twice
 
     st_legacy, rd_legacy, _, _ = redirect_stdout(devnull) do

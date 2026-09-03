@@ -216,6 +216,25 @@ function export_restart_checkpoint(SR, sim, path)
         f["rd/r_grid"] = sim.rd.r_grid
         f["rd/c"] = sim.rd.c
         f["rd/s"] = sim.rd.s
+        # RULE 4: the producer declares the semantics.  c and s here are
+        # computed on a biomass basis that RADIODIALYSIS: BLOCKED gates
+        # whenever X_total != 1.0 -- mean(compute_radial_biomass(...)) is one
+        # species' occupied sites over all interior sites, neither a biomass
+        # fraction nor a reducer fraction.  A consumer cannot tell that by
+        # looking at the arrays, so the file says it.  Asserted by
+        # tests/checkpoint_io_tests.jl.
+        # Read from sticky provenance, not from the current X_total: a coupled
+        # state can hit mean(X_tot) == 1.0 by coincidence, and c/s stay gated
+        # once a step has run on an occupancy basis regardless of the value now.
+        gated = sim.rd.basis_from_occupancy || sim.rd.params.X_total != 1.0
+        f["rd/basis_gate_blocked"] = gated
+        f["rd/basis_from_occupancy"] = sim.rd.basis_from_occupancy
+        f["rd/basis_gate_note"] = gated ?
+            "RADIODIALYSIS: BLOCKED -- c and s were computed on a gated " *
+            "biomass basis (X_total = $(sim.rd.params.X_total), " *
+            "basis_from_occupancy = $(sim.rd.basis_from_occupancy)). " *
+            "No magnitude read from them is a claim about a biofilm." :
+            "X_total == 1.0, the standalone default; the basis gate does not apply."
         buf = IOBuffer()
         serialize(buf, sim.rng)
         f["rng/serialized"] = take!(buf)
@@ -230,7 +249,8 @@ Rebuild a `CoupledSimulation` whose continuation is bit-identical to the
 unbroken run. Refuses a Julia-version mismatch unless overridden (the RNG
 byte stream is version-pinned).
 """
-function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = false)
+function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = false,
+                                    declare_basis_from_occupancy::Union{Bool,Nothing} = nothing)
     h5open(path, "r") do f
         a = attributes(f)
         ver = read(a["julia_version"])
@@ -311,9 +331,36 @@ function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = fal
             read(a["membrane_dose_rate_Gy_s"]),
             read(f["fields/melanin_drive"]))
 
+        # Provenance is restored, not recomputed: a restart of a gated run is
+        # still gated, and the flag cannot be re-derived from X_total.
+        #
+        # MISSING IS UNKNOWN, NOT FALSE (Codex on f49fe94). A checkpoint written
+        # before this field existed carries no provenance, and defaulting it to
+        # false is rule 3 inside a gate: if that file's occupancy-derived
+        # X_total happened to land on 1.0, the restored state would read as
+        # standalone and resume integrating gated c/s. So refuse, and make the
+        # caller establish the basis explicitly -- the same shape as
+        # allow_version_mismatch above.
+        rd_prov = if haskey(f, "rd/basis_from_occupancy")
+            read(f["rd/basis_from_occupancy"])
+        elseif declare_basis_from_occupancy !== nothing
+            declare_basis_from_occupancy
+        else
+            error("""
+                restart checkpoint predates rd/basis_from_occupancy, so whether
+                its c and s were computed on a gated biomass basis is UNKNOWN,
+                not false. X_total alone cannot settle it: an occupancy basis
+                can coincide with the standalone default of 1.0.
+
+                Re-run, or resume with declare_basis_from_occupancy=true/false
+                once you have established which it was. Passing `true` is
+                always the safe direction; it gates a state that may not have
+                needed it, rather than releasing one that did.
+                """)
+        end
         rd = SR.RadiolysisState(read(f["rd/r_grid"]), read(f["rd/c"]),
                                 read(f["rd/s"]), read(a["rd_m"]),
-                                read(a["rd_t"]), rp)
+                                read(a["rd_t"]), rp, rd_prov)
         rng = deserialize(IOBuffer(read(f["rng/serialized"])))
         return SR.CoupledSimulation(state, rd, read(f["contaminant"]), rng,
                                     Int(read(a["sim_mcs"])),
@@ -344,7 +391,13 @@ end
 function _cli_export(SR, mode, out, cfg, seed, n_mcs)
     sim = SR.init_coupled_simulation(
         SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100),
-        SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0); seed)
+        # basis_gate_ack: this CLI exports an interchange artifact rather than
+        # asserting anything, and every file it writes carries
+        # rd/basis_gate_blocked so a consumer cannot read c or s without seeing
+        # that the basis was gated. Enumerated in the ack census in
+        # tests/radiodialysis_basis_gate.jl.
+        SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                            basis_gate_ack = true); seed)
     SR.advance_window!(sim, n_mcs)
     if mode == "transport"
         export_transport_snapshot(SR, sim, out; config_toml_path = cfg)

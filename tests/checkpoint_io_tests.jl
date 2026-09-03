@@ -7,7 +7,80 @@ include(joinpath(REPO, "export_checkpoint.jl"))   # CLI-guarded; functions only
 
 tmp = mktempdir()
 p = SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100)
-rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0)
+# basis_gate_ack: this compares blocked output against blocked output (two code
+# paths, or a round trip) and asserts no magnitude, so it needs the gated basis
+# to step but makes no claim about it. Enumerated in the ack census in
+# tests/radiodialysis_basis_gate.jl -- adding a fourth site fails that test.
+rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                         basis_gate_ack = true)
+
+# ---------- a checkpoint with no provenance is UNKNOWN, not ungated ----------
+
+let
+    # Codex on f49fe94: defaulting missing provenance to false is rule 3 inside
+    # a gate. Simulate a pre-provenance file by deleting the dataset.
+    rpx = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                              basis_gate_ack = true)
+    sim = SR.init_coupled_simulation(p, rpx; seed = 11)
+    SR.advance_window!(sim, 2)
+    legacy = joinpath(tmp, "legacy_no_provenance.h5")
+    export_restart_checkpoint(SR, sim, legacy)
+    h5open(legacy, "r+") do f
+        delete_object(f, "rd/basis_from_occupancy")
+    end
+    @test !h5open(g -> haskey(g, "rd/basis_from_occupancy"), legacy, "r")
+
+    # refuses rather than assuming
+    err = try
+        restore_restart_checkpoint(SR, legacy); nothing
+    catch e
+        sprint(showerror, e)
+    end
+    @test err !== nothing
+    @test occursin("UNKNOWN", err)
+
+    # and both explicit declarations are honoured
+    simT = restore_restart_checkpoint(SR, legacy; declare_basis_from_occupancy = true)
+    @test simT.rd.basis_from_occupancy === true
+    simF = restore_restart_checkpoint(SR, legacy; declare_basis_from_occupancy = false)
+    @test simF.rd.basis_from_occupancy === false
+
+    # a CURRENT checkpoint still restores with no declaration needed, or the
+    # refusal above would just be blocking everything.
+    current = joinpath(tmp, "current_provenance.h5")
+    export_restart_checkpoint(SR, sim, current)
+    @test restore_restart_checkpoint(SR, current).rd.basis_from_occupancy === true
+end
+
+# ---------- the exported file declares a gated basis (rule 4) ----------
+
+let
+    # A consumer reading rd/c cannot tell the basis was gated by looking at the
+    # array, so the producer says it. Both directions, because a marker that is
+    # always true and one that is always false are equally uninformative.
+    # The `false` case must NOT advance: advance_window! reconstructs the params
+    # with X_total = mean(compute_radial_biomass(...)), so every coupled run
+    # ends up on the gated basis by construction. That is the finding, not a
+    # quirk -- an advanced coupled sim can never export an ungated basis.
+    for (mcs, expected) in ((0, false), (2, true))
+        rpx = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                                  basis_gate_ack = true)
+        sim = SR.init_coupled_simulation(p, rpx; seed = 5)
+        mcs > 0 && SR.advance_window!(sim, mcs)
+        @test (sim.rd.params.X_total != 1.0) == expected
+        # export_restart_checkpoint, not the transport snapshot: only the
+        # restart file carries rd/c and rd/s. The transport snapshot exports
+        # lattice, fields and dose, none of which touch the gated basis.
+        path = joinpath(tmp, "gate_$(mcs).h5")
+        export_restart_checkpoint(SR, sim, path)
+        h5open(path, "r") do f
+            @test read(f["rd/basis_gate_blocked"]) == expected
+            note = read(f["rd/basis_gate_note"])
+            @test occursin(expected ? "RADIODIALYSIS: BLOCKED" :
+                                      "the basis gate does not apply", note)
+        end
+    end
+end
 
 # ---------- transport snapshot: conventions + probe integrity ----------
 
