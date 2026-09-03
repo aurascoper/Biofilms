@@ -316,10 +316,15 @@ lethality and genotoxicity in a wild-type and a repair-deficient strain of yeast
 from 2.7 to 4.1 for lethality, 2.8 to 7.1 for reverse mutation and 3.5 to 7.8 for mitotic
 gene conversion"*, for 11 MeV cyclotron neutrons against ⁶⁰Co gamma in *S. cerevisiae* D7.
 
-**This meets the clearing condition this subsection wrote for itself:** a value with a
-stated endpoint (lethality by colony formation), a stated neutron energy, and a stated
-photon reference. **The existence premise stated above is therefore superseded**, and is
-marked as such where it stands rather than restated here.
+**This meets the existence screen this subsection first wrote for itself, not the gate's
+clearing condition:** it supplies a value with a stated endpoint (lethality by colony
+formation), a stated neutron energy, and a stated photon reference. **The existence premise
+stated above is therefore superseded**, and is marked as such where it stands rather than
+restated here. The gate requires two further links that this result does not supply: the
+organism must either be relevant to the modelled target or carry an explicit organism-transfer
+argument, and the neutron field must either match the intended reactor spectrum or carry an
+explicit spectrum-transfer argument. A value that clears neither transfer is a lead, not a
+design weight.
 
 **The gate still refuses, on better-scoped grounds.** Yeast is a eukaryote and a fungus;
 three of the seven modelled species are fungi, so this is nearer than a mammalian import,
@@ -368,23 +373,30 @@ if the pending part names a task, so it does:
 
 1. **DTIC ADA307995, by whatever access exists.** It is the on-point document and the cheapest
    thing on this list. Public access is 403 from here; a `.mil`/`.edu` affiliation, an
-   interlibrary-loan request, or an NTIS order all reach it. **Clearing condition: the report
+   interlibrary-loan request, or an NTIS order all reach it. **Evidence condition:** the report
    states a D₁₀ under a characterised neutron field with a gamma comparison, for a named
-   organism.**
+   microbial organism. **Gate-clearing condition:** that organism is relevant to the modelled
+   target, or an explicit organism-transfer argument connects it to the target; and that field
+   matches the intended reactor spectrum, or an explicit spectrum-transfer argument connects
+   it to the intended field. Both transfers must be resolved before the value can weight a
+   neutron-bearing design.
 2. **Ask, before buying.** The Hoffman question costs nothing and a radiation-materials person at a
-   reactor either knows the quantity or knows who does. Note this is now a *retrieval* question and
-   not an existence one — "can you get at this" is a much easier thing to answer than "does this
-   exist," and it should be asked in that form.
+   reactor either knows the quantity or knows who does. Ask for both missing links, not only the
+   document: whether the organism is transferable to the modelled target, and whether the reported
+   neutron energy or spectrum is transferable to the intended reactor field. Retrieval alone can
+   reopen the evidence; it cannot clear either transfer.
 3. **NASBEE, through an institutional subscription**, to settle whether the 3.54 figure is
-   microbial or mammalian. **Clearing condition either way: it resolves whether that number may be
-   cited at all**, which is worth the look even though a mammalian answer clears nothing else.
+   microbial or mammalian. A mammalian target clears neither transfer. A relevant microbial target
+   could clear the organism half, but the 2 MeV-average NASBEE field still needs an explicit
+   transfer to the intended reactor spectrum before the number can enter a design.
 4. **A controlled-vocabulary search**, which this program has not run: PubMed under MeSH, INIS,
-   OSTI. This
-   sits below the three above because the leads already in hand are more specific than anything a
-   fresh search returns, but it is what would convert the SCOPE line's disclaimer into a bounded
-   enumeration.
-5. **Write to the authors.** Last because it spends an introduction, and the four above are
-   cheaper.
+   OSTI. Search the two transfer axes explicitly — target organism or taxon, and neutron source,
+   energy or spectrum. This sits below the three above because the leads already in hand are more
+   specific than anything a fresh search returns, but it is what would convert the SCOPE line's
+   disclaimer into a bounded enumeration.
+5. **Write to the authors.** Ask which organism and endpoint produced the value, and for the
+   neutron energy distribution or source needed to judge spectrum transfer. Last because it spends
+   an introduction, and the four above are cheaper.
 
 **None of these is scheduled and none is anyone's assignment yet.** Listing them makes the gate a
 task rather than a state; it does not make the task started.
@@ -397,22 +409,28 @@ evaporates, and the purchase would still be the same purchase.
 
 The argument that holds under any D2b outcome is about the paper. **NASBEE's RBE of 3.54 at
 D₁₀ has no established microbial target** — NIRS builds that facility for mammalian
-radiobiology — so buying it resolves this gate *only if* the target turns out to be
-microbial. SCOPE ON THAT: the figure and its context were read at abstract level only, from
-the search results of 2026-08-31; ScienceDirect returns the full text behind a paywall from
-here. **"Target not established" is a statement about what was readable, not a finding that
-the target is mammalian** — which is precisely why the purchase would resolve something, and
-equally why the cheaper routes should be exhausted before paying to resolve it. If it does not, the purchase returns the gate exactly where it stands, having
-established that one lead does not apply. That is a real outcome and a poor thing to pay for
-when the two routes ahead of it in this list would establish the same thing at no cost.
+radiobiology — so buying it can resolve the organism-transfer half *only if* the target turns
+out to be microbial and relevant to the modelled community. It cannot by itself resolve the
+spectrum-transfer half: the reported 2 MeV-average field still has to be connected to the
+intended reactor spectrum. SCOPE ON THAT: the figure and its context were read at abstract
+level only, from the search results of 2026-08-31; ScienceDirect returns the full text behind
+a paywall from here. **"Target not established" is a statement about what was readable, not a
+finding that the target is mammalian** — which is precisely why the purchase would resolve
+something, and equally why the cheaper routes should be exhausted before paying to resolve
+it. If the target is not relevant, the purchase establishes that one lead does not apply. If
+it is relevant but supplies no defensible spectrum transfer, it advances one half of the gate
+and leaves the other refusing. Both are real outcomes and poor things to pay for when the two
+routes ahead of it in this list might establish the same facts at no cost.
 
 > **Trigger for revisiting:** DTIC ADA307995 and the Hoffman question both returning nothing,
-> **and** NASBEE's target independently confirmed as microbial *before* purchase rather than
-> after.
+> **and** NASBEE's target independently confirmed as relevant to the modelled community
+> *before* purchase rather than after, **and** a defensible route from its 2 MeV-average field
+> to the intended reactor spectrum identified before treating its value as usable.
 
-The second clause is the load-bearing one. It converts "buy it and see" into a precondition,
-which is the shape the rest of this register uses: a cost paid against a stated outcome
-rather than against a hope.
+The second and third clauses are load-bearing. They convert "buy it and see" into two
+preconditions, which is the shape the rest of this register uses: a cost paid against stated
+outcomes rather than against a hope. Target relevance without spectrum transfer can advance
+the evidence register; it cannot clear the design gate.
 
 **What enforces this gate, precisely, because "an unenforced paragraph" understates it.**
 Nothing in the suite reads D3 — it is prose with a declared type. But the *precondition* it
