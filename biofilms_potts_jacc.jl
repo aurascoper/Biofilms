@@ -185,7 +185,7 @@ end
 # non-adjacent under Moore-26, so lattice reads are race-free.
 function cpm_color!(i, j, k, lat, vols, spec, J, βv, melc, rad, mel,
         ox, oy, oz, seed::UInt64, step::UInt64, N, λV::Float32,
-        Vt::Int32, T::Float32)
+        Vt::Int32, T::Float32, st, dh)
     tx = 2 * (Int(i) - 1) + Int(ox) + 1
     ty = 2 * (Int(j) - 1) + Int(oy) + 1
     tz = 2 * (Int(k) - 1) + Int(oz) + 1
@@ -204,10 +204,22 @@ function cpm_color!(i, j, k, lat, vols, spec, J, βv, melc, rad, mel,
 
     ΔH = delta_H(lat, vols, spec, J, βv, melc, rad, mel,
         tx, ty, tz, σs, σt, N, λV, Vt)
+    # Instrumentation. Write-only, per-site, no atomic: the same non-adjacency
+    # that makes the lattice reads race-free makes these writes race-free. `st`
+    # is the discriminator -- 0 never proposed, 1 evaluated-rejected, 2
+    # evaluated-accepted -- because a sentinel inside `dh` would collapse
+    # "never proposed" into "ΔH was NaN" and silently shrink the denominator of
+    # every acceptance rate downstream. The spatial class is NOT stored: it is
+    # derived from (tx,ty,tz) so it stays spatial when `color_order` permutes
+    # the pass sequence.
+    dh[tx, ty, tz] = ΔH
     if ΔH <= 0.0f0 || u01(r2) < exp(-ΔH / T)
         σt > Int32(0) && (JACC.@atomic vols[σt] -= Int32(1))
         σs > Int32(0) && (JACC.@atomic vols[σs] += Int32(1))
         lat[tx, ty, tz] = σs
+        st[tx, ty, tz] = UInt8(2)
+    else
+        st[tx, ty, tz] = UInt8(1)
     end
     return nothing
 end
@@ -476,8 +488,14 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
         n_mcs::Int = 100, seed::Int = 42, snapshot_interval::Int = 20,
         T_cpm = 5.0f0, λ_V = 10.0f0, V_target = Int32(120),
         I0 = 1.0, κ = 2.0, D_M = 0.1f0, dt_field = 0.5f0,
-        D_C = 0.2f0, C_wall = 1.0f0, rp = RadiolysisParams(), verbose = true)
+        D_C = 0.2f0, C_wall = 1.0f0, rp = RadiolysisParams(), verbose = true,
+        uptake = UPTAKE, color_order = 0:7, on_sweep = nothing,
+        on_nutrient = nothing)
     @assert iseven(N) "checkerboard requires even N"
+    # A non-permutation here double-updates one class and never updates
+    # another, producing a silently wrong simulation that no downstream test
+    # would catch. The default 0:7 passes trivially.
+    @assert sort(collect(color_order)) == collect(0:7) "color_order must be a permutation of 0:7"
 
     lat_h, spec_h, vols_h, rad_h, mel_h, nut_h =
         init_host(N, n_cells_per_species, seed, I0, κ, Float64(C_wall))
@@ -488,23 +506,41 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
     J = JACC.array(build_J_matrix())
     βv = JACC.array(BETA_ION)
     αv = JACC.array(ALPHA_M)
-    upt = JACC.array(UPTAKE)
+    @assert length(uptake) == N_SPECIES "uptake must name all seven species"
+    @assert all(isfinite, uptake) && all(>=(0), uptake) "uptake must be finite and non-negative"
+    upt = JACC.array(Float32.(uptake))
     melc = JACC.array(MEL_COEF)
     rad = JACC.array(rad_h)
     mel = JACC.array(mel_h); mel2 = JACC.array(zeros(Float32, N, N, N))
     nut = JACC.array(nut_h); nut2 = JACC.array(zeros(Float32, N, N, N))
+
+    # Acceptance instrumentation, reduced and never drawn (see d404438).
+    st = JACC.array(zeros(UInt8, N, N, N))
+    dh = JACC.array(zeros(Float32, N, N, N))
 
     rd = init_radiolysis(rp; R = N / 2.0)
     Nh = N ÷ 2
     gseed = splitmix64(UInt64(seed))
 
     for mcs in 1:n_mcs
-        for c in 0:7
+        # Reset ONCE per sweep, not per color pass. A per-pass reset would
+        # leave only the last color populated and look perfectly clean.
+        fill!(st, UInt8(0))
+        fill!(dh, 0.0f0)
+        for c in color_order
+            # The RNG step key stays `mcs*8 + c`, keyed to the COLOR and not to
+            # its position in `color_order`. So permuting the order gives the
+            # same sites the same draws and changes only how much `vols` has
+            # accumulated when each pass reads it -- which is exactly the
+            # confound being separated out.
             JACC.parallel_for((Nh, Nh, Nh), cpm_color!,
                 lat, vols, spec, J, βv, melc, rad, mel,
                 Int32(c & 1), Int32((c >> 1) & 1), Int32((c >> 2) & 1),
-                gseed, UInt64(mcs * 8 + c), Int32(N), λ_V, V_target, T_cpm)
+                gseed, UInt64(mcs * 8 + c), Int32(N), λ_V, V_target, T_cpm,
+                st, dh)
         end
+        on_sweep === nothing ||
+            on_sweep(mcs, JACC.to_host(st), JACC.to_host(dh))
 
         if mcs % 10 == 1
             X_tot, X_red = radial_biomass(JACC.to_host(lat), spec_h, N, rd.params.Nr)
@@ -529,6 +565,7 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
             nut, nut2, lat, spec, upt, Int32(N), dt_field, D_C,
             Float32(rd.m) * C_wall)
         nut, nut2 = nut2, nut
+        on_nutrient === nothing || on_nutrient(mcs, JACC.to_host(nut))
 
         if verbose && (mcs % snapshot_interval == 0 || mcs == n_mcs)
             vol, ncells, mean_mel = species_stats(

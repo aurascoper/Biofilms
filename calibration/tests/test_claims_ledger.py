@@ -80,6 +80,24 @@ def normalise_markup(source: str) -> str:
     return " ".join(s.split()).lower()
 
 
+def normalise_plaintext(source: str) -> str:
+    """Extracted figure text, whitespace-collapsed and lowercased.
+
+    NOT `normalise_markup`. That function strips `%` to end of line as a LaTeX
+    comment, and figure text carries real percent signs — `c_mean = 1.2% c_ext`
+    — so running it here would silently delete the rest of any line holding one.
+    A normaliser aimed at the wrong language is a guard reading a document it
+    cannot see.
+    """
+    return " ".join(source.split()).lower()
+
+
+def _normalised(path: Path) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return (normalise_plaintext if path.suffix == ".txt"
+            else normalise_markup)(text)
+
+
 def _preprint_text() -> str:
     return normalise_markup(PREPRINT.read_text(encoding="utf-8"))
 
@@ -101,36 +119,74 @@ DOCUMENT_ALIASES = {
 # print the same nothing.
 PSEUDO_DOCUMENTS = {"repository", "correspondence"}
 
+# NOT SOURCE, AND NOT IN THE REPOSITORY. `artifacts/` is gitignored
+# (`.gitignore:76`) and nothing under it is tracked, so a row naming a pilot
+# artifact resolves to a file only on a machine where that pilot has been run.
+# Both document-resolution tests below were therefore passing on local state and
+# would have failed on CI or any clean checkout — a check whose outcome depends
+# on untracked files is rule 1 wearing rule 2's clothes. They are DECLARED here
+# rather than removed from the ledger: the rows are real verdicts on real
+# numbers, they are simply unenforceable from a clean tree, and saying that is
+# the point. When the artifact happens to be present it is still read.
+GENERATED_ARTIFACTS = {
+    "artifacts/pilot/openmc_nested_pilot_budget.json",
+    "artifacts/pilot/openmc_nested_pilot_verdict.json",
+}
+
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+# The figures are the only PUBLISHED artifacts that are not source. A committed
+# PDF carries claim text that no suite could read: `tests/runtests.jl` splits the
+# monolith at `#  13. Figure export` and loads only what is above the cut, so
+# `export_figures` is unreachable from Julia by construction. The generator was
+# corrected on 2026-08-14 and the ledger recorded the verdict three times
+# (RM-G08-01, RM-G10-01, PP-65-08, the last saying in as many words that "the
+# committed PNGs still carry the old reversed zone labels"); the artifact went on
+# saying the retracted thing for two weeks because nothing could fail.
+FIGURES = REPO / "preprint" / "figures"
+
 
 def document_path(document: str) -> Path | None:
     if document in PSEUDO_DOCUMENTS:
         return None
-    return DOCUMENT_ALIASES.get(document, REPO / document)
+    path = DOCUMENT_ALIASES.get(document, REPO / document)
+    # A row may name the artifact a reader actually opens. PDF text is
+    # compressed, so searching the bytes finds nothing; the committed `.txt`
+    # sidecar is what gets read, and the hash test below is what stops a stale
+    # sidecar from standing in for a fresh PDF.
+    if path.suffix == ".pdf":
+        return path.with_suffix(".txt")
+    return path
 
 
 def deleted_rows(rows):
     return [r for r in rows if r["status"] == "delete"]
 
 
-# The manuscript as first committed, before any revision removed anything. It is
-# the only document known to CONTAIN the deleted claims, which makes it the only
-# valid control for whether this guard detects them.
-ORIGINAL_COMMIT = "5980dc5"
-ORIGINAL_PATH = "preprint/modeling_radiotrophic_fitness.md"
+# THE CONTROLS ARE COMMITTED FILES, NOT GIT OBJECTS. Each of these was once
+# recovered with `git show <sha>:<path>` — 5980dc5, 9319d43, and a third that
+# would have been e24dbec — and each time the same exposure was written down and
+# left in place: a squash-merge makes the pinned commit unreachable, `git show`
+# fails, and the control degrades into a skip. Rule 2 says to read a skip as
+# uncovered surface, and a control that can quietly stop controlling is rule 1
+# again one level up. A committed file cannot become unreachable. Provenance is
+# in `fixtures/README.md`.
+ORIGINAL_FIXTURE = "modeling_radiotrophic_fitness_prerevision.md"   # was 5980dc5
 
 
-def _original_manuscript() -> str | None:
-    import subprocess
+def _fixture(name: str) -> str:
+    """A known-bad document, read from disk. Never skips: if a control file is
+    missing that is a failure, not an environment quirk."""
+    path = FIXTURES / name
+    assert path.is_file(), (
+        f"negative-control fixture {name} is missing. The guard it feeds cannot "
+        "fail without it, which makes it not a guard. See fixtures/README.md.")
+    return normalise_markup(path.read_text(encoding="utf-8", errors="replace"))
 
-    shallow = subprocess.run(
-        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
-        capture_output=True, text=True)
-    if shallow.stdout.strip() == "true":
-        return None
-    got = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{ORIGINAL_COMMIT}:{ORIGINAL_PATH}"],
-        capture_output=True, text=True)
-    return normalise_markup(got.stdout) if got.returncode == 0 else None
+
+def _original_manuscript() -> str:
+    return _fixture(ORIGINAL_FIXTURE)
 
 
 def _detected(rows, text, documents=("preprint", "preprint_tex")) -> list[str]:
@@ -192,8 +248,7 @@ def test_no_deleted_claim_survives_in_the_document_it_names(rows):
         if path is None or not path.is_file():
             continue                                    # named by the test below
         if path not in cache:
-            cache[path] = normalise_markup(path.read_text(encoding="utf-8",
-                                                          errors="replace"))
+            cache[path] = _normalised(path)
         phrase = distinguishing_phrase(row["claim_text"])
         if phrase and phrase.lower() in cache[path]:
             survivors.append(f"{row['claim_id']} in {row['document']}: {phrase[:90]}")
@@ -220,10 +275,7 @@ def test_the_guard_actually_detects_deleted_claims(rows):
     matching achieves — so dropping the markup normalisation fails here rather
     than silently halving the guard.
     """
-    original = _original_manuscript()
-    if original is None:
-        pytest.skip("shallow clone: the original manuscript is not reachable")
-    found = _detected(rows, original)
+    found = _detected(rows, _original_manuscript())
     assert len(found) >= 18, (
         f"the guard detected only {len(found)} deleted claims in the "
         "pre-revision manuscript, which contains them. It has stopped "
@@ -231,9 +283,9 @@ def test_the_guard_actually_detects_deleted_claims(rows):
 
 
 # The handout as first committed, before the azide line and the sorption box
-# were corrected. Same role as ORIGINAL_COMMIT, for the other document the
+# were corrected. Same role as ORIGINAL_FIXTURE, for the other document the
 # ledger carries `delete` verdicts on.
-HANDOUT_COMMIT = "9319d43"
+HANDOUT_FIXTURE = "wan_meeting_handout_prefix.tex"          # was 9319d43
 HANDOUT_PATH = "preprint/wan_meeting_handout.tex"
 
 
@@ -249,20 +301,7 @@ def test_the_guard_detects_the_handout_claims(rows):
     (`X_{\max}` becomes a bare `x`). A prose-phrase guard cannot check a
     formula, so that row stays with a human — see the coverage report.
     """
-    import subprocess
-
-    shallow = subprocess.run(
-        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
-        capture_output=True, text=True)
-    if shallow.stdout.strip() == "true":
-        pytest.skip("shallow clone: the pre-correction handout is not reachable")
-    got = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{HANDOUT_COMMIT}:{HANDOUT_PATH}"],
-        capture_output=True, text=True)
-    if got.returncode != 0:
-        pytest.skip(f"{HANDOUT_COMMIT}:{HANDOUT_PATH} is not reachable")
-
-    found = _detected(rows, normalise_markup(got.stdout), documents=(HANDOUT_PATH,))
+    found = _detected(rows, _fixture(HANDOUT_FIXTURE), documents=(HANDOUT_PATH,))
     assert "HANDOUT-02" in found, (
         "the guard found no deleted handout claim in the pre-correction "
         f"handout, which contains them (found: {found}). It is not guarding "
@@ -280,11 +319,11 @@ def test_every_deleted_claim_names_a_document_the_guard_can_read(rows):
     unreadable = sorted({r["document"] for r in deleted_rows(rows)
                          if (lambda q: q is None or not q.is_file())(
                              document_path(r["document"]))}
-                        - PSEUDO_DOCUMENTS)
+                        - PSEUDO_DOCUMENTS - GENERATED_ARTIFACTS)
     assert not unreadable, (
         "`delete` rows name documents that cannot be read, so those verdicts "
         f"are unguarded: {unreadable}. Add a path alias, fix the row, or "
-        "declare it in PSEUDO_DOCUMENTS.")
+        "declare it in PSEUDO_DOCUMENTS / GENERATED_ARTIFACTS.")
 
 
 def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
@@ -306,16 +345,49 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
     with capsys.disabled():
         print(f"\n  claims-ledger guard: {len(deleted)} `delete` claims; "
               f"{len(yields_phrase)} yield a searchable phrase")
-        if original is None:
-            print("  detection rate: NOT MEASURED (shallow clone)")
-        else:
-            found = set(_detected(rows, original))
-            print(f"  DETECTED in the pre-revision manuscript: {len(found)} of "
-                  f"{len(deleted)} — this is the real coverage")
-            missed = [r["claim_id"] for r in deleted if r["claim_id"] not in found]
-            print("  NOT detectable — these still need human review:")
-            for cid in missed:
-                print(f"      {cid}")
+        found = set(_detected(rows, original))
+        print(f"  DETECTED in the pre-revision manuscript: {len(found)} of "
+              f"{len(deleted)} — this is the real coverage")
+        missed = [r["claim_id"] for r in deleted if r["claim_id"] not in found]
+        print("  NOT detectable — these still need human review:")
+        for cid in missed:
+            print(f"      {cid}")
+
+        # THE ROWS ENFORCED NOWHERE, PRINTED EVERY RUN. `document = repository`
+        # or `correspondence` is a PSEUDO_DOCUMENT: document_path returns None,
+        # so the row is never searched by anything. That is not a scope gap, it
+        # is an ADDRESSABILITY gap -- the verdict has no file to be enforced in.
+        #
+        # This is printed rather than left in a plan for the reason the absence
+        # gate prints its five known gaps: a number that lives in a document
+        # nobody rereads is a number nobody acts on. PP-DEFF-01 sat in this class
+        # with a prescribed comment fix unapplied until 2026-08-31, and it was
+        # found only because a guard was being built for a different cause.
+        # GENERATED_ARTIFACTS ROWS ARE ENFORCED NOWHERE TOO, AND THIS REPORT
+        # MISSED THEM. PILOT-LEV-01 is a `delete` verdict whose document is a
+        # gitignored pilot output: document_path resolves it, the file does not
+        # exist on any clean checkout, the main guard silently continues past it,
+        # and it appeared in NO section of this printout. The report whose stated
+        # job is naming every row nothing enforces was itself incomplete, which is
+        # the defect it exists to prevent.
+        pseudo = [r for r in rows
+                  if r["document"] in PSEUDO_DOCUMENTS
+                  or r["document"] in GENERATED_ARTIFACTS]
+        unresolved = [r for r in pseudo
+                      if r["status"] in ("delete", "restate", "requalify",
+                                         "needs_verification", "needs_calibration")]
+        names_source = [r for r in unresolved
+                        if re.search(r"\.(jl|R|py)\b", r["code_location"] or "")]
+        print(f"  ENFORCED NOWHERE: {len(pseudo)} rows are unreachable by any "
+              f"guard -- {', '.join(sorted(PSEUDO_DOCUMENTS))} name no file, and "
+              f"{len(GENERATED_ARTIFACTS)} gitignored artifact path(s) exist on no "
+              "clean checkout")
+        print(f"      of those, {len(unresolved)} carry an unresolved verdict "
+              f"and {len(names_source)} of those name a source file:")
+        for r in names_source:
+            print(f"        {r['claim_id']} [{r['status']}]")
+        print("      the rest are unread by construction and want a human pass, "
+              "not a guard that happens to sweep them")
 
         # THE OTHER DOCUMENTS ARE READ NOW, so their coverage is reported too —
         # a row the widened filter reaches but the prose guard cannot match is
@@ -327,6 +399,14 @@ def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
         print("  NOT textually detectable there — equations and code, not prose:")
         print("      HANDOUT-01 — the claim is a formula; normalise_markup "
               "reduces LaTeX maths to nothing searchable")
+        print("      FIG-01, FIG-02, FIG-05 — in-plot labels; no run of "
+              "MIN_WORDS survives the comma and paren split. Covered by "
+              "RETRACTED_IN_FIGURES, not by the phrase guard")
+        print("      FIG-09, FIG-10 — full sentences that DO yield a phrase, and "
+              "the phrase is still unreachable: pdftotext -layout reads the "
+              "three columns across, so the run is contiguous nowhere. Also "
+              "covered by RETRACTED_IN_FIGURES. Listing them beside the three "
+              "above is the point — 'yields a phrase' is not 'is covered'")
 
     assert len(yields_phrase) >= 25
 
@@ -345,8 +425,18 @@ def test_every_claim_names_a_document_that_exists(rows):
     # and only a resolvable-but-missing path is a fault here.
     unresolved = sorted({r["document"] for r in rows
                          if (lambda q: q is not None and not q.is_file())(
-                             document_path(r["document"]))})
+                             document_path(r["document"]))}
+                        - GENERATED_ARTIFACTS)
     assert not unresolved, f"rows name documents that do not exist: {unresolved}"
+
+    # AND THE DECLARATION MUST STAY TRUE. Listing a document here excuses it
+    # from the check above, so an entry that is no longer a gitignored artifact
+    # — committed since, or renamed — would silently excuse nothing while
+    # looking like it still did.
+    misdeclared = sorted(d for d in GENERATED_ARTIFACTS
+                         if d not in {r["document"] for r in rows})
+    assert not misdeclared, (
+        f"GENERATED_ARTIFACTS names documents no ledger row uses: {misdeclared}")
     assert PREPRINT.exists(), (
         f"the ledger's preprint rows describe {PREPRINT.name}, which is not in "
         "the repository")
@@ -830,3 +920,827 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
     ]
     for phrase in scoped:
         assert not blanket_reassurance_hits(phrase), f"false positive: {phrase}"
+
+
+# ---------------------------------------------------------------------------
+# THE FIGURES. A published artifact nothing could read.
+# ---------------------------------------------------------------------------
+
+# §2.6 of the manuscript: "Radiotrophy is not established for any of the seven
+# species modelled." The word is retracted prose, so it must not survive inside
+# an image either. This floor is coarse on purpose — it covers `fig1`, whose
+# in-plot labels were "radiotrophic niche" and "radiosensitive core", two words
+# each and so under MIN_WORDS: `distinguishing_phrase` cannot search them and
+# the phrase guard never will. Coverage of that figure is this list, not the
+# ledger row.
+#
+# "gy cumulative" is here for FIG-05, and it is a UNITS claim rather than a
+# phenotype one — the list is "terms that must not survive inside an image", and
+# RM-KR-01's verdict is NEVER PRINT Gy HERE, because D_cum = Ddot_R*t is
+# dimensionless model time and no calibration converts it. fig3 carried
+# "(50 Gy cumulative)" for fifteen days after d53f236 removed it from the
+# generator, because main_coupled() hits RADIODIALYSIS: BLOCKED and nothing
+# could rebuild the artifact. Three words, so the phrase guard could never have
+# reached it either: without this term FIG-05 would have been covered by
+# nothing, while sitting in a list named for rows the vocabulary covers.
+#
+# "charge-excluded" and "same trap" are FIG-09 and FIG-10, and they are here for
+# a reason the first three do not share: THEIR CLAIM TEXT DOES YIELD A SEARCHABLE
+# PHRASE AND THE PHRASE IS STILL NOT FINDABLE IN THE ARTIFACT. `pdftotext
+# -layout` reads a three-column figure across, so "Bromide is size- and
+# charge-excluded from fine porosity." comes back as "...charge-excluded
+# breakthrough lag gives a lumped run alongside every measurement. from fine
+# porosity." — the phrase interleaved with two other columns and contiguous
+# nowhere. Verified against the real pre-correction sidecar, where `_detected`
+# returns [] for both rows.
+#
+# THAT DISTINCTION IS THE WHOLE DEFECT THIS LIST NOW CLOSES. "Yields a phrase"
+# was read as "is covered", and it is not the same predicate: coverage is a
+# property of the ARTIFACT, not of the claim text. A hand-run control that
+# appends the sentences as clean contiguous lines confirms a guard against an
+# input shape a column layout cannot produce — a control passing on a mechanism
+# that never ran, which is what the fig1/fig2 control below was already written
+# to avoid. Between c2219a2 and this commit, FIG-09 and FIG-10 were covered by
+# nothing at all.
+RETRACTED_IN_FIGURES = ("radiotroph", "gy cumulative",
+                        "charge-excluded", "same trap")
+
+
+def figure_sidecars() -> list[Path]:
+    return sorted(FIGURES.glob("*.txt"))
+
+
+def retracted_vocabulary_hits(paths) -> list[tuple]:
+    """(figure, term) for every retracted term found. Takes PATHS so the
+    control can drive it with the pre-correction artifacts."""
+    return [(p.name, term) for p in paths
+            for term in RETRACTED_IN_FIGURES
+            if term in normalise_plaintext(p.read_text(encoding="utf-8",
+                                                       errors="replace"))]
+
+
+def test_no_committed_figure_asserts_a_retracted_phenotype():
+    """WHAT THE PROSE AUDIT DID NOT REACH.
+
+    `fig2_melanin_accumulation.pdf` said, inside the image, "C. neoformans,
+    C. sphaerospermum are radiotrophic (melanin-mediated energy gain)" — under a
+    caption disowning "radiation-derived energy production" and against §2.6.
+    `fig1` said "radiotrophic niche".
+
+    Neither was unnoticed. The generator was corrected on 2026-08-14 and the
+    ledger recorded the verdict three times. The artifact went on saying it
+    because no test could open a figure: the claims guard read one `.tex`, and
+    `tests/runtests.jl` splits the monolith above `#  13. Figure export`, so the
+    Julia suite cannot reach `export_figures` at all. Fixing a generator does
+    not fix what was already committed, and nothing said so.
+    """
+    hits = retracted_vocabulary_hits(figure_sidecars())
+    assert not hits, (
+        "committed figures assert a phenotype §2.6 retracts; the generator was "
+        f"fixed but the artifact was not regenerated: {hits}")
+
+
+def test_the_figure_guard_detects_the_pre_correction_artifacts():
+    """THE CONTROL: run the floor against the artifacts known to carry the claim.
+
+    NEITHER FIGURE IS REACHABLE BY THE PHRASE GUARD, and that is why this floor
+    exists rather than duplicating it. `distinguishing_phrase` splits on commas
+    and parentheses and needs MIN_WORDS=5 from one run. Fig 2's annotation —
+    "C. neoformans, C. sphaerospermum are radiotrophic (melanin-mediated energy
+    gain)" — yields runs of 2, 4 and 3 words, and fig 1's labels are two words
+    each. So `_detected` returns nothing for FIG-01 and FIG-02 no matter what,
+    exactly as it does for HANDOUT-01's equation, and the vocabulary floor is
+    the whole of their coverage. Asserting a phrase hit here would have made the
+    control pass on a mechanism that never ran.
+
+    EXTENDED TO THE FOURTH ARTIFACT, and the glob had to widen to reach it.
+    `phase2_diffusion_cell_prefix.txt` does not match `fig*`, so while this
+    control globbed `fig*_prefix.txt` a committed known-bad sat in the fixtures
+    directory covered by nothing — the count assertion pinned three and passed,
+    which is the shape of every other defect on this page: a bound checked
+    against the set it was derived from. FIG-09 and FIG-10 differ from the first
+    three in that their claim text DOES yield a phrase; it is simply unfindable
+    in a column layout. See RETRACTED_IN_FIGURES.
+    """
+    prefix = sorted(FIXTURES.glob("*_prefix.txt"))
+    assert len(prefix) == 4, f"expected four pre-correction figures, got {prefix}"
+
+    hits = retracted_vocabulary_hits(prefix)
+    assert {p for p, _ in hits} == {f.name for f in prefix}, (
+        "the vocabulary floor missed a figure that contains the retracted "
+        f"phenotype: found {hits}")
+
+    # and it is not matching everything it is handed
+    assert retracted_vocabulary_hits(figure_sidecars()) == []
+
+
+def test_no_figure_row_is_reachable_by_the_phrase_guard(rows):
+    """COVERAGE IS A PROPERTY OF THE ARTIFACT, NOT OF THE CLAIM TEXT.
+
+    The first version of this test split the figure rows into a vocabulary tier
+    and a phrase tier by asking whether `distinguishing_phrase` returned
+    anything, and put FIG-09 and FIG-10 in the phrase tier because their claim
+    text yields a full sentence. THAT PREDICATE IS WRONG AND THE ROWS WERE
+    COVERED BY NOTHING. `pdftotext -layout` reads a three-column figure across,
+    so the sentence comes back interleaved with the other two columns and is
+    contiguous nowhere; `_detected` returns [] for both against the real
+    pre-correction sidecar. A phrase that exists in the ledger and cannot occur
+    in the artifact is not a guard, and it looked exactly like one.
+
+    The hand-run that "confirmed" the phrase guard bites appended both sentences
+    as clean lines, which is a shape a column layout cannot produce -- a control
+    passing on a mechanism that never ran, which is the same defect the fig1/fig2
+    control below was written to avoid. Hence this test asks the artifacts.
+
+    SCOPE: the `delete` rows whose `document` is under `preprint/figures/`,
+    evaluated against the four committed `*_prefix.txt` sidecars and nothing
+    else. It says nothing about rows in any other document.
+    """
+    known_bad = sorted(FIXTURES.glob("*_prefix.txt"))
+    assert len(known_bad) == 4, (
+        f"expected four pre-correction sidecars, got {[p.name for p in known_bad]}")
+    joined = "\n".join(
+        normalise_plaintext(p.read_text(encoding="utf-8", errors="replace"))
+        for p in known_bad)
+
+    figure_rows = [r for r in deleted_rows(rows)
+                   if r["document"].startswith("preprint/figures/")]
+    assert {r["claim_id"] for r in figure_rows} == {
+        "FIG-01", "FIG-02", "FIG-05", "FIG-09", "FIG-10"}, (
+        f"the figure row set moved: {sorted(r['claim_id'] for r in figure_rows)}. "
+        "A new figure `delete` row needs a known-bad sidecar before it can be "
+        "said to be covered by anything.")
+
+    reachable = []
+    for row in figure_rows:
+        phrase = distinguishing_phrase(row["claim_text"])
+        if phrase and phrase.lower() in joined:
+            reachable.append(row["claim_id"])
+    assert not reachable, (
+        f"{reachable} are now findable as contiguous phrases in a known-bad "
+        "figure sidecar, so the phrase guard genuinely covers them and this "
+        "test's premise has changed. That is an improvement -- record which "
+        "rows moved and why the layout now preserves the run.")
+
+    # THE OTHER HALF, OR "COVERED BY NOTHING" AND "COVERED BY THE FLOOR" ARE THE
+    # SAME RESULT HERE. Asserting only that no phrase reaches the artifacts is
+    # satisfied by a word list that fires on none of them.
+    covered = {name for name, _ in retracted_vocabulary_hits(known_bad)}
+    assert covered == {p.name for p in known_bad}, (
+        "the vocabulary floor is the whole of these rows' coverage and it does "
+        f"not fire on every known-bad artifact: {sorted(covered)}")
+
+
+def test_every_committed_figure_matches_its_hash():
+    """THE HALF THAT MAKES THE SIDECAR WORTH ANYTHING.
+
+    Everything above reads `<figure>.txt`, not the PDF a reader opens. Without
+    this, regenerating a figure and forgetting its sidecar leaves the suite
+    green on stale-but-clean text while the PDF still carries the claim — the
+    artifact-versus-source split reproduced inside the guard written to close
+    it. So the PDF's own bytes are pinned, in pure stdlib, and a figure that
+    moves without its sidecar fails here.
+    """
+    import hashlib
+
+    stale = []
+    for pdf in sorted(FIGURES.glob("*.pdf")):
+        recorded = pdf.with_suffix(".sha256")
+        assert recorded.is_file(), f"{pdf.name} has no committed hash"
+        actual = hashlib.sha256(pdf.read_bytes()).hexdigest()
+        if actual != recorded.read_text(encoding="utf-8").strip():
+            stale.append(pdf.name)
+        assert pdf.with_suffix(".txt").is_file(), f"{pdf.name} has no text sidecar"
+    assert not stale, (
+        "these figures changed without their sidecar and hash being "
+        f"regenerated, so every text check above read the OLD figure: {stale}. "
+        "Re-run the export, then `pdftotext -layout` and `sha256sum` for each.")
+
+
+def test_the_sidecars_are_what_pdftotext_actually_produces():
+    """TIER 2: the sidecar is the PDF's text, not merely a file beside it.
+
+    The hash test proves the PDF has not moved since the sidecar was written; it
+    cannot prove the sidecar was ever a faithful extraction. This can, where
+    `pdftotext` exists. It is not a bare skip when absent — the hash test and
+    the vocabulary floor both still run — which is the difference rule 2 asks
+    for between a gap and a hidden one.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("pdftotext") is None:
+        pytest.skip("pdftotext absent: hash + vocabulary tiers still cover this")
+
+    drifted = []
+    for pdf in sorted(FIGURES.glob("*.pdf")):
+        got = subprocess.run(["pdftotext", "-layout", str(pdf), "-"],
+                             capture_output=True, text=True)
+        assert got.returncode == 0, f"pdftotext failed on {pdf.name}"
+        if normalise_plaintext(got.stdout) != normalise_plaintext(
+                pdf.with_suffix(".txt").read_text(encoding="utf-8")):
+            drifted.append(pdf.name)
+    assert not drifted, (
+        f"committed sidecars are not this PDF's text: {drifted}")
+
+
+# ---------------------------------------------------------------------------
+# A COINED TERM MUST NOT APPEAR BEFORE THE PARAGRAPH THAT DISOWNS IT
+# ---------------------------------------------------------------------------
+
+COINAGE = "radiodialysis"
+DISCLAIMER = "coined for this three-equation system"
+
+# A filename and a cross-reference label are not the coined term being used as
+# though established: `biofilms_radiodialysis.R` is what the file is called, and
+# `\label{}` never reaches a reader at all.
+_EXEMPT = re.compile(r"\\(?:texttt|label|ref|eqref)\{[^}]*\}")
+
+
+def coinage_uses_before_disclaimer(source: str) -> list[tuple[int, str]]:
+    """(line number, line) for every reader-visible use of the coined term
+    above the paragraph that declares it coined.
+
+    Takes SOURCE rather than reading the file, so the control can drive it with
+    a document known to violate the rule.
+    """
+    lines = source.split("\n")
+    cut = next((i for i, l in enumerate(lines) if DISCLAIMER in l), None)
+    if cut is None:
+        return [(0, "the disclaimer paragraph is missing entirely")]
+    return [(i + 1, l) for i, l in enumerate(lines[:cut])
+            if COINAGE in _EXEMPT.sub("", l).lower()]
+
+
+def test_the_coinage_never_precedes_its_disclaimer():
+    """THE FIGURE DEFECT'S SHAPE, IN PROSE.
+
+    §3.11 disowns `radiodialysis` in a full paragraph — "a targeted search finds
+    no scientific usage of it outside this work". The term then appeared ten
+    times, and the abstract called it "a radial radiodialysis solver" with no
+    signal that the word was coined here. Caveat in the body, claim in the part
+    people scan: the same split that left a retracted phenotype inside a figure
+    while the prose around it was clean.
+
+    The rule is positional and so is the check. Anywhere after the disclaimer
+    the term is introduced and qualified; anywhere before it, it reads as
+    established vocabulary.
+    """
+    hits = coinage_uses_before_disclaimer(PREPRINT.read_text(encoding="utf-8"))
+    assert not hits, (
+        f"'{COINAGE}' is used as established vocabulary before the paragraph "
+        f"that declares it coined: {hits}")
+
+
+def test_the_coinage_check_detects_a_use_above_the_disclaimer():
+    """THE CONTROL. Without it this test passes on any document that never says
+    the word, which is every document in the repository but one."""
+    planted = (f"We solve the {COINAGE} system on a radial mesh.\n"
+               f"A term {DISCLAIMER} and is not established.\n"
+               f"The {COINAGE} solver is described in Section 6.\n")
+    hits = coinage_uses_before_disclaimer(planted)
+    assert [h[0] for h in hits] == [1], (
+        "the check must flag the line above the disclaimer and only that one; "
+        f"got {hits}")
+    assert not coinage_uses_before_disclaimer(
+        f"A term {DISCLAIMER}.\nThe {COINAGE} solver runs.\n")
+    assert not coinage_uses_before_disclaimer(
+        f"See \\texttt{{biofilms_{COINAGE}.R}} and \\label{{sec:{COINAGE}}}.\n"
+        f"A term {DISCLAIMER}.\n"), "a filename and a label are not a use"
+
+
+# ---------------------------------------------------------------------------
+# SOME SENTENCES HAVE TO STAY
+# ---------------------------------------------------------------------------
+
+# The guard's other document tests all assert ABSENCE — a `delete` verdict is
+# enforceable precisely because absence is its criterion. That leaves the
+# opposite failure uncovered: a sentence carried deliberately, whose removal
+# nothing notices. These rows name sentences that are load-bearing because of
+# what they PREVENT the document from implying, which is exactly the kind that
+# reads like a hedge on an editing pass and gets trimmed.
+LOAD_BEARING = ("HOFFMAN-10",)
+
+
+def load_bearing_absences(rows, read=None) -> list[tuple[str, str]]:
+    """(claim_id, phrase) for each row whose sentence is no longer in its
+    document. `read` overrides document lookup so the control can supply text."""
+    out = []
+    for row in rows:
+        if row["claim_id"] not in LOAD_BEARING:
+            continue
+        phrase = distinguishing_phrase(row["claim_text"])
+        assert phrase, (
+            f"{row['claim_id']} is declared load-bearing but its claim_text has "
+            f"no run of {MIN_WORDS}+ words to search for. Rephrase the row — "
+            "the word floor is what stops a match being a coincidence.")
+        path = document_path(row["document"])
+        assert path is not None and path.is_file(), (
+            f"{row['claim_id']} names {row['document']}, which does not resolve")
+        text = read(path) if read else _normalised(path)
+        if phrase.lower() not in text:
+            out.append((row["claim_id"], phrase))
+    return out
+
+
+def test_a_load_bearing_sentence_survives_in_its_document(rows):
+    """The Hoffman memo's geometry caveat.
+
+    The implemented domain is a cylinder in water with a Robin boundary — no
+    metal, no planar film, no interface. Without that sentence page 3 offers a
+    dose field beneath a film on steel as something the code does, which is a
+    geometry it does not have. It is also the sentence that reads like a hedge
+    and goes first when someone tightens the page.
+    """
+    missing = load_bearing_absences(rows)
+    assert not missing, (
+        "a sentence the ledger records as load-bearing is no longer in the "
+        f"document that needs it: {missing}")
+
+
+def test_the_load_bearing_check_detects_a_deleted_sentence(rows):
+    """THE CONTROL: strike the phrase from the document and require a report."""
+    def struck(path):
+        text = _normalised(path)
+        for row in rows:
+            if row["claim_id"] in LOAD_BEARING:
+                text = text.replace(distinguishing_phrase(row["claim_text"]).lower(), "")
+        return text
+
+    assert [c for c, _ in load_bearing_absences(rows, read=struck)] == list(LOAD_BEARING), (
+        "removing the phrase must make the check fail; if it does not, the "
+        "check is reading something other than the sentence it names")
+
+
+# --------------------------------------------------------- retracted citations
+#
+# THE THIRD TIER, AND IT EXISTS BECAUSE A CITATION CANNOT REACH THE FIRST TWO.
+# `distinguishing_phrase` splits on commas and needs MIN_WORDS from one unbroken
+# run. A bibliographic entry -- "Diele, Marangi, Ragni (2015), Math. Comput.
+# Simul. 110, 40-52, doi ..." -- is all commas, so it yields '' and PP-REF-01 and
+# PP-REF-02 were `delete` verdicts covered by nothing. Both were prescribed in the
+# ledger and sat unapplied in the manuscript until 2026-08-31.
+#
+# NOTE THIS IS A SECOND CAUSE, NOT THE SAME ONE AS THE SOURCE-COMMENT GAP. A
+# verdict is also unenforced when the claim lives in a .jl comment rather than in
+# the file the row's `document` column names -- that is RM-G04-01, and it needs a
+# RETRACTED_IN_SOURCES scan over SIM_FILES. Widening which files are scanned would
+# not reach the two reference rows, because their invisibility is a property of the
+# phrase EXTRACTOR. One symptom, two causes; this closes exactly one of them.
+# THIS GUARD REACHES PP-REF-01 AND PP-REF-02 AND NOTHING ELSE.
+RETRACTED_CITATIONS = {
+    "10.1002/mma.3237": "PP-REF-01: resolves to an unrelated 3D MHD regularity paper",
+    "10.1016/j.matcom.2014.02.006": "PP-REF-02: resolves to an unrelated QP paper",
+}
+
+# USE VERSUS MENTION, AND THE SET IS EXPLICIT NAMES RATHER THAN A GLOB.
+# Recording that a DOI was withdrawn requires naming it, so the ledger and the
+# red-team documents necessarily contain these strings. A whole-tree scan fails on
+# its first run against the very files that record the withdrawal -- the shape of a
+# test whose own control fixture contains the string it forbids.
+#
+# The resolution is an ALLOW-LIST, inverted: scan everything, and require every file
+# carrying a withdrawn DOI to be declared here. A new document quoting one FAILS
+# until it is consciously added, rather than passing because it fell outside a
+# curated scan list. `docs/research/*_redteam.md` was rejected as a glob for exactly
+# that reason: it would auto-admit every future red-team file, which is the property
+# the allow-list was chosen to avoid.
+#
+# BOTH ENTRIES BELOW THE FIRST THREE WERE FOUND BY THIS GUARD ON ITS FIRST RUN, which
+# is the allow-list earning its place: neither was anticipated, and a curated scan
+# list would have silently omitted both instead of demanding a decision.
+CITATION_RECORDING_FILES = {
+    "data/claims_ledger.csv",
+    "docs/research/session_claims_2026-08-24_redteam.md",
+    "docs/research/external_reviews_2026-08-31_redteam.md",
+    "calibration/tests/test_claims_ledger.py",
+    # The pre-revision manuscript, which is ORIGINAL_FIXTURE -- the committed
+    # known-bad this file already uses as its detection floor. It carries both
+    # withdrawn DOIs BECAUSE it is the artifact from before the correction, and
+    # fixtures/README.md says of these files: "Do not regenerate or 'fix' these
+    # files. Their value is that they are wrong."
+    "calibration/tests/fixtures/modeling_radiotrophic_fitness_prerevision.md",
+}
+
+
+def _normalised_for_retraction(text: str) -> str:
+    """Text folded so a withdrawn string cannot hide behind formatting.
+
+    EXACT-SUBSTRING MATCHING WAS DEFEATED BY THREE THINGS THAT CHANGE NOTHING
+    ABOUT WHAT A READER SEES, all verified: an uppercase DOI (DOIs are
+    case-insensitive by the DOI standard, so it resolves to the same withdrawn
+    paper), a newline inside the DOI (which LaTeX renders identically and which
+    ordinary column-wrap produces by accident), and a percent-encoded slash. A
+    withdrawn claim reintroduced into a source comment arrives in a WRAPPED
+    comment, so the newline case is the likely one rather than the exotic one.
+
+    Case-folding is safe here because the vocabulary is DOIs and claim phrases,
+    neither of which carries meaning in case.
+    """
+    # LEADING comment markers are dropped PER LINE, not globally: a claim wrapped
+    # across two comment lines reassembles as `...range# 1e-4...` and the marker
+    # breaks the match. Stripping `#`/`%`/`//` anywhere would over-fold and invent
+    # matches, so only the marker that opens a continuation line is removed.
+    lines = [re.sub(r"^\s*(#+|%+|//)\s*", "", ln) for ln in text.split("\n")]
+    joined = "\n".join(lines)
+    return re.sub(r"\s+", "", joined).replace("%2F", "/").replace("%2f", "/").lower()
+
+
+def _is_derived_from_a_scanned_source(
+        path: Path, protected_strings=()) -> bool:
+    """True only when a bytecode cache adds no protected content beyond source.
+
+    THE RULE IS "DERIVED FROM A SOURCE ALREADY SCANNED", NEVER "EXEMPT BECAUSE OF
+    WHERE IT LIVES", AND THE REASON LIVES HERE RATHER THAN AT ONE CALL SITE. That
+    split is what failed: the narrowing was made for the citation scanner and its
+    reasoning recorded on that function, and the next scanner written into this
+    same file reached for the rule instead and got the blanket
+    `"__pycache__" in path.parts` skip the narrowing existed to remove. A file
+    inside a directory named `__pycache__` with NO sibling source is scanned --
+    it is a place to hide a string, not a build product. The sibling check alone
+    was still a surface marker: `__pycache__/foo.py` beside `foo.py` passed it.
+
+    The exemption therefore verifies the relation Python itself records. The
+    path must be a PEP 3147 cache path, the interpreter magic and marshalled body
+    must be valid, and its code object must name the sibling source. Hash-mode
+    caches must match the current source hash. A timestamp header alone cannot
+    prove identity: a same-length rewrite inside one timestamp second preserves
+    it. Timestamp caches are exempt only when every protected string appears in
+    the compiled payload iff it appears in the source the scanner also reads.
+    That is the exact property this scanner needs; stale unrelated bytecode is
+    not allowed to hide a withdrawn string.
+
+    Any future walker over this tree wants this predicate, not a location test.
+    """
+    import importlib.util
+    import marshal
+    import struct
+    import sys
+    import types
+
+    if path.parent.name != "__pycache__" or path.suffix != ".pyc":
+        return False
+    try:
+        source = Path(importlib.util.source_from_cache(str(path)))
+    except ValueError:
+        # Pytest assertion rewriting is real bytecode with a deliberately
+        # extended cache tag that source_from_cache refuses. Admit that one
+        # producer by its exact current-interpreter form, then subject it to the
+        # same header, source and code-object checks below.
+        pytest_cache = re.fullmatch(
+            rf"(?P<stem>.+)\.{re.escape(sys.implementation.cache_tag)}"
+            r"-pytest-[0-9A-Za-z_.-]+\.pyc",
+            path.name)
+        if not pytest_cache:
+            return False
+        source = path.parent.parent / f"{pytest_cache.group('stem')}.py"
+    try:
+        payload = path.read_bytes()
+        source_bytes = source.read_bytes()
+    except OSError:
+        return False
+    if len(payload) < 16 or payload[:4] != importlib.util.MAGIC_NUMBER:
+        return False
+    flags = struct.unpack("<I", payload[4:8])[0]
+    if flags & ~0b11:
+        return False
+    hash_mode = bool(flags & 0b1)
+    if hash_mode:
+        if payload[8:16] != importlib.util.source_hash(source_bytes):
+            return False
+    try:
+        code = marshal.loads(payload[16:])
+    except (EOFError, ValueError, TypeError):
+        return False
+    if not isinstance(code, types.CodeType):
+        return False
+    code_source = Path(code.co_filename)
+    if not code_source.is_absolute():
+        code_source = Path.cwd() / code_source
+    if code_source.resolve() != source.resolve():
+        return False
+    if hash_mode:
+        return True
+    if not protected_strings:
+        return False
+    source_flat = _normalised_for_retraction(
+        source_bytes.decode("utf-8", errors="replace"))
+    payload_flat = _normalised_for_retraction(
+        payload.decode("utf-8", errors="replace"))
+    return all(
+        (_normalised_for_retraction(item) in payload_flat)
+        == (_normalised_for_retraction(item) in source_flat)
+        for item in protected_strings)
+
+
+def files_carrying_retracted_citations(root: Path = REPO) -> dict:
+    """{repo-relative path: [dois]} for every file containing a withdrawn DOI.
+
+    SCOPE: every readable file in the repository except `.git`. Shared by the check
+    and its control so the control cannot pass against a regressed check.
+    """
+    out: dict[str, list[str]] = {}
+    for path in root.rglob("*"):
+        # THE EXCLUSION IS "DERIVED FROM A SOURCE ALREADY SCANNED", NOT "IS A BUILD
+        # ARTIFACT", AND THE TWO RULES HAVE DIFFERENT FUTURE COVERAGE. The first
+        # version of this skipped `path.suffix in {.pyc, .pdf, .png, .so, .o}`,
+        # which would silently admit any future artifact of those types carrying a
+        # forbidden string -- and `preprint/*.pdf` is the manuscript's own build
+        # output, so the rule excluded the one artifact a reader actually receives.
+        # Measured: with no type exclusion at all, 14 PDFs in the tree produce zero
+        # hits, because PDF text is compressed. The suffix rule bought nothing and
+        # cost coverage.
+        #
+        # A `.pyc` is excludable for a narrower and checkable reason: it is a
+        # compiled copy of a `.py` that is itself in scope, so its content is
+        # already being read at its source. That justification is ASSERTED below
+        # rather than assumed -- if the sibling source is missing, the file is
+        # scanned rather than skipped.
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        if _is_derived_from_a_scanned_source(path, RETRACTED_CITATIONS):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        flat = _normalised_for_retraction(text)
+        hits = [d for d in RETRACTED_CITATIONS
+                if _normalised_for_retraction(d) in flat]
+        if hits:
+            out[str(path.relative_to(root)).replace("\\", "/")] = sorted(hits)
+    return out
+
+
+def test_no_withdrawn_citation_survives_outside_the_recording_layer():
+    carrying = files_carrying_retracted_citations()
+    undeclared = {p: d for p, d in carrying.items()
+                  if p not in CITATION_RECORDING_FILES}
+    assert not undeclared, (
+        "these files carry a DOI the ledger withdrew, and are not declared as "
+        f"recording documents: {undeclared}. If this is the manuscript or the "
+        "README, the retraction was never applied. If it is a new document that "
+        "records the withdrawal, add it to CITATION_RECORDING_FILES deliberately.")
+
+
+def test_the_replacements_the_ledger_prescribed_are_present():
+    """The other half: absence of the wrong DOI is not presence of the right one.
+
+    SCOPE: the manuscript only. A guard that checked only for the withdrawn string
+    would pass against a bibliography with the entry simply deleted.
+    """
+    tex = PREPRINT.read_text(encoding="utf-8")
+    for doi, row in (("10.1007/s11538-015-0117-1", "PP-REF-01"),
+                     ("10.3390/math8010025", "PP-REF-02")):
+        assert doi in tex, f"{row}'s prescribed replacement {doi} is not in the manuscript"
+
+
+@pytest.mark.parametrize("representation", ("exact", "uppercase", "wrapped", "encoded"))
+def test_citation_normalisation_enters_through_the_production_scanner(
+        tmp_path, representation):
+    """CONTROL: the manuscript as it stood before the fix must be caught.
+
+    SCOPE: one file, recovered from git rather than written here. The known-bad is
+    drawn from the artifact path -- a hand-written string would test the scanner
+    against my idea of the citation, which is the control-that-never-met-the-
+    pipeline defect AGENTS.md rule 1 records from the figure-sidecar case.
+    """
+    import subprocess
+    before = subprocess.run(
+        ["git", "show",
+         "a8ba2b0:preprint/modeling_radioresistance_and_radiotropic_fitness.tex"],
+        cwd=REPO, capture_output=True, text=True)
+    if before.returncode != 0:
+        pytest.skip("pre-fix manuscript not reachable from git")
+    victim = next((d for d in RETRACTED_CITATIONS if d in before.stdout), None)
+    assert victim, "the pre-fix artifact contains no vocabulary victim"
+    rendered = {
+        "exact": victim,
+        "uppercase": victim.upper(),
+        "wrapped": victim.replace("mma.", "mma.\n% "),
+        "encoded": victim.replace("/", "%2F"),
+    }[representation]
+    candidate = tmp_path / "candidate.tex"
+    candidate.write_text(rendered, encoding="utf-8")
+    found = files_carrying_retracted_citations(tmp_path)
+    assert found == {"candidate.tex": [victim]}, (
+        f"the {representation} artifact-derived DOI did not traverse the same "
+        f"root walk, file read and normalisation as production: {found}")
+    assert not [d for d in RETRACTED_CITATIONS
+                if d in PREPRINT.read_text(encoding="utf-8")], \
+        "and the current manuscript must contain neither"
+
+
+def test_only_current_bytecode_is_exempt_from_the_production_scanners(tmp_path):
+    """CONTROL: a cache-looking sibling is input; current bytecode is derived.
+
+    Both assertions call the complete production scanners. Testing the predicate
+    alone would leave either walker free to reinstate a location-based bypass.
+    """
+    import importlib.util
+    import py_compile
+
+    doi = next(iter(RETRACTED_CITATIONS))
+    source_claim = next(iter(RETRACTED_IN_SOURCES))
+    source = tmp_path / "foo.py"
+    source.write_text(
+        f"WITHDRAWN_DOI = {doi!r}\nWITHDRAWN_CLAIM = {source_claim!r}\n",
+        encoding="utf-8")
+    cache = Path(importlib.util.cache_from_source(str(source)))
+    py_compile.compile(str(source), cfile=str(cache), doraise=True)
+    assert doi.encode() in cache.read_bytes(), "bytecode control lost its DOI payload"
+    assert _is_derived_from_a_scanned_source(cache, RETRACTED_CITATIONS), (
+        "py_compile output did not satisfy the production derivation contract")
+    masquerade = cache.parent / "foo.py"
+    masquerade.write_text(f"# {doi}\n# {source_claim}\n", encoding="utf-8")
+
+    citations = files_carrying_retracted_citations(tmp_path)
+    sources = sources_carrying_retracted_strings(tmp_path)
+    assert set(citations) == {"foo.py", "__pycache__/foo.py"}, citations
+    assert set(sources) == {"foo.py", "__pycache__/foo.py"}, sources
+    assert str(cache.relative_to(tmp_path)).replace("\\", "/") not in citations
+
+
+def test_timestamp_cache_cannot_hide_a_same_length_source_rewrite(tmp_path):
+    """CONTROL: timestamp and size equality are not source identity."""
+    import importlib.util
+    import os
+    import py_compile
+    import struct
+
+    doi = next(iter(RETRACTED_CITATIONS))
+    source = tmp_path / "stale.py"
+    before = f"VALUE = {doi!r}\n"
+    source.write_text(before, encoding="utf-8")
+    cache = Path(importlib.util.cache_from_source(str(source)))
+    py_compile.compile(str(source), cfile=str(cache), doraise=True)
+    stamp = source.stat()
+    after = before.replace(doi, "x" * len(doi))
+    assert len(after.encode()) == len(before.encode())
+    source.write_text(after, encoding="utf-8")
+    os.utime(source, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    cached_mtime, cached_size = struct.unpack("<II", cache.read_bytes()[8:16])
+    assert cached_mtime == int(source.stat().st_mtime) & 0xFFFFFFFF
+    assert cached_size == len(source.read_bytes()) & 0xFFFFFFFF
+
+    assert not _is_derived_from_a_scanned_source(cache, RETRACTED_CITATIONS)
+    found = files_carrying_retracted_citations(tmp_path)
+    cache_key = str(cache.relative_to(tmp_path)).replace("\\", "/")
+    assert found == {cache_key: [doi]}, found
+
+
+# ------------------------------------------------------ retracted in sources
+#
+# CAUSE 1 OF THE UNAPPLIED-VERDICT PATTERN, AND THE LAST OF THE THREE TIERS.
+# A ledger verdict is enforced only in the file its `document` column names. Two
+# ways that leaves a claim unguarded, and they are different:
+#
+#   (a) the column names ANOTHER file. RM-G04-01 was restated in README while
+#       biofilms_potts.jl:16 went on listing a five-term Hamiltonian, because no
+#       guard reads source comments.
+#   (b) the column names NO file. `document = repository` is a PSEUDO_DOCUMENT,
+#       so document_path returns None and the row is never searched at all.
+#       Measured: 37 rows sit in that class, 5 of them carrying an unresolved
+#       verdict that names a source file. PP-DEFF-01 is one, and its prescribed
+#       comment fix sat unapplied at biofilms_radiodialysis.R:242 until
+#       2026-08-31 -- the fifth instance of the pattern found this session.
+#
+# WHY A DECLARED VOCABULARY RATHER THAN A PHRASE SWEEP, MEASURED BEFORE CHOOSING.
+# Running distinguishing_phrase over every `delete` row against all 144 source
+# files returns ZERO hits. The phrase tier cannot reach these claims: the ones
+# that live in source comments are short -- a formula, a range, a symbol -- and
+# split into runs under MIN_WORDS, exactly as figure labels and citations do.
+# So this is the third vocabulary tier, beside RETRACTED_IN_FIGURES and
+# RETRACTED_CITATIONS, for the same reason each of those exists.
+#
+# SEEDED FROM ACTUAL RETRACTIONS, NOT FROM INVENTED VOCABULARY, AND THE SEED IS
+# SMALL ON PURPOSE. Two entries is what the ledger actually supports today. A
+# guard whose value is that the NEXT one is caught does not need a long list, and
+# a long list of invented strings would be the can't-fail shape in a new costume.
+# `restate` verdicts are NOT swept generally -- AGENTS.md is explicit that a
+# restate asks whether the revision says the right thing, which is a judgement
+# and stays with a reviewer. Only the specific withdrawn STRING is mechanical.
+RETRACTED_IN_SOURCES = {
+    "Table 2 range 1e-4..1e-2":
+        "PP-DEFF-01: the range is refuted at its upper end and unresolved at its "
+        "lower, and Table 2 (tab:params) carries no D_eff row at all",
+    "H_radiation + H_pairwise":
+        "RM-G04-01: the Hamiltonian has four terms; total_pairwise_energy is real "
+        "but is called from take_snapshot alone and never enters acceptance",
+}
+
+# The same use-versus-mention resolution as RETRACTED_CITATIONS, and it is needed
+# for the same reason: recording a withdrawal requires naming it. EXPLICIT NAMES,
+# NOT A GLOB -- a glob would auto-admit every future file matching a pattern,
+# which is the property the allow-list exists to prevent.
+SOURCE_RECORDING_FILES = {
+    "data/claims_ledger.csv",
+    "docs/research/external_reviews_2026-08-31_redteam.md",
+    "calibration/tests/test_claims_ledger.py",
+}
+
+SOURCE_SUFFIXES = {".jl", ".R", ".py"}
+
+
+def sources_carrying_retracted_strings(root: Path = REPO) -> dict:
+    """{repo-relative path: [strings]} for every source carrying a withdrawn string.
+
+    SCOPE: files with a SOURCE_SUFFIXES extension anywhere in the repository,
+    excluding `.git` and any file derived from a source already scanned. Shared by
+    the check and its control.
+    """
+    out: dict[str, list[str]] = {}
+    for path in root.rglob("*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        if path.suffix not in SOURCE_SUFFIXES:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        flat = _normalised_for_retraction(text)
+        hits = [s for s in RETRACTED_IN_SOURCES
+                if _normalised_for_retraction(s) in flat]
+        if hits:
+            out[str(path.relative_to(root)).replace("\\", "/")] = sorted(hits)
+    return out
+
+
+def test_no_retracted_string_survives_in_a_source_file():
+    carrying = sources_carrying_retracted_strings()
+    undeclared = {p: s for p, s in carrying.items()
+                  if p not in SOURCE_RECORDING_FILES}
+    assert not undeclared, (
+        "these sources carry a string the ledger withdrew, and are not declared "
+        f"recording files: {undeclared}. The ledger holds the withdrawn wording; "
+        "a correction comment must point at the row rather than repeat the "
+        "string, or the source someone copies from still carries it.")
+
+
+@pytest.mark.parametrize("representation", ("exact", "uppercase", "wrapped"))
+def test_source_normalisation_enters_through_the_production_scanner(
+        tmp_path, representation):
+    """CONTROL: the R file as it stood before the fix must be caught.
+
+    SCOPE: one file, recovered from git. Drawn from the artifact path rather than
+    written here -- a hand-typed string would test the scanner against my idea of
+    the comment, which is the control-that-never-met-the-pipeline defect.
+    """
+    import subprocess
+    before = subprocess.run(
+        ["git", "show", "59b7d95:biofilms_radiodialysis.R"],
+        cwd=REPO, capture_output=True, text=True)
+    if before.returncode != 0:
+        pytest.skip("pre-fix source not reachable from git")
+    victim = "Table 2 range 1e-4..1e-2"
+    assert victim in before.stdout, "the pre-fix artifact contains no vocabulary victim"
+    rendered = {
+        "exact": victim,
+        "uppercase": victim.upper(),
+        "wrapped": victim.replace("range ", "range\n# "),
+    }[representation]
+    candidate = tmp_path / "candidate.R"
+    candidate.write_text(rendered, encoding="utf-8")
+    found = sources_carrying_retracted_strings(tmp_path)
+    assert found == {"candidate.R": [victim]}, (
+        f"the {representation} artifact-derived source claim did not traverse "
+        f"the same root walk, suffix gate, file read and normalisation as production: {found}")
+    assert not [s for s in RETRACTED_IN_SOURCES
+                if s in (REPO / "biofilms_radiodialysis.R").read_text(encoding="utf-8")], \
+        "and the current file must carry none"
+
+
+# ---------------------------------------------------------------- addressing by key, not number
+#
+# ALL SIX PP-REF ROWS POINTED AT THE WRONG ENTRY, AND HAD FOR SOME TIME. They located
+# themselves as "References [11]", "[12]", "[15]", "[26]", "[4]", "[32]". Resolved against
+# the .tex those ordinals are slade2011, daly2009, xavier2005, karley2018, meskauskas2004
+# and kauffman1989 -- none of which is the work the row describes. Six for six wrong, and
+# wrong at HEAD before any entry was deleted, so the staleness was not caused by an edit;
+# it was caused by ADDRESSING A RENDER ARTIFACT. A \bibitem key is stable. Its printed
+# number is a function of every entry above it, so one insertion silently re-points every
+# reference below, and nothing errors -- the row still reads plausibly and now names a
+# different paper.
+#
+# This is the identifier rule (read an identifier back against its issuing registry)
+# pointed at an internal target: the .tex is the registry, and the key is the identifier.
+# The number is a rendering of it.
+def test_no_ledger_row_locates_itself_by_printed_reference_number(rows):
+    import re
+    by_number = re.compile(r"References?\s*\[\d+\]")
+    offenders = sorted(r["claim_id"] for r in rows if by_number.search(r["location"]))
+    assert not offenders, (
+        "these rows address the bibliography by printed number, which re-points silently "
+        f"when any entry above is added or removed: {offenders}. "
+        r"Name the \bibitem key instead -- the key is stable, the number is a render artifact.")
+
+
+def test_the_by_number_guard_detects_the_pre_fix_locations(rows):
+    # The control: the form the six rows used must be caught, or the guard above is
+    # asserting over an empty set and would pass on any ledger at all.
+    import re
+    by_number = re.compile(r"References?\s*\[\d+\]")
+    for pre_fix in ("References [15]", "References [32] [20] [35]", "References[4]"):
+        assert by_number.search(pre_fix), pre_fix
+    assert not by_number.search(r"References, \bibitem{campillo2017}")

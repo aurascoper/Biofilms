@@ -1,0 +1,33 @@
+                                                          Metropolis acceptance rate per sweep                                                                            ΔH over evaluated proposals
+
+                                 0.4                                                                                seed 42                               10 4
+                                                                                                                    seed 43
+
+
+
+
+accepted / evaluated proposals
+                                                                                                                    seed 44
+                                                                                                                                                          10 3
+                                 0.3
+
+
+
+
+                                                                                                                                    evaluated proposals
+                                                                                                                                                          10 2
+                                 0.2
+
+
+                                                                                                                                                          10 1
+                                 0.1
+
+                                                                                                                                                                                         T_cpm = 5.0
+                                                                                                                                                          10 0
+
+
+                                         0                                     50                                         100                                    −1000               0                1000
+                                                                        Monte Carlo Steps                                                                           ΔH (Metropolis acceptance functional, a.u.)
+
+                                       JACC port, threads backend, 1 thread(s) | N=40, 100 MCS, seeds 42,43,44, color_order=identity | pooled rate 0.0620 (min 0.0253, max 0.4140), n_ΔH=94010 sampled every 10 sweeps
+

@@ -13,7 +13,16 @@
 #  motivates the per-species magnitudes below; it is not what the term computes.
 #
 #  Maps the paper's Hamiltonian (Eq. 2, Section 3.3) to CPM energy:
-#    H_CPM = H_adhesion + H_volume + H_radiation + H_pairwise + H_melanin
+#    H_CPM = H_adhesion + H_volume + H_radiation + H_melanin
+#
+#  FOUR TERMS, NOT FIVE. compute_delta_H_terms returns (adh, vol, rad, mel) and
+#  compute_delta_H sums exactly those. total_pairwise_energy IS real, but it is
+#  called from take_snapshot alone and never enters Metropolis acceptance, so
+#  nothing in the simulation minimises it -- it records mutualistic-pair
+#  proximity under adhesion, not a selected-for outcome. Listing it here as a
+#  term of H_CPM was claims_ledger row RM-G04-01 (verdict restate); that verdict
+#  was applied to README and not to this comment, because the ledger guard
+#  resolves a row's `document` column and nothing reads source comments.
 #
 #  Coupled fields (melanin, nutrient, radiation) updated each MCS
 #  per Eq. 7 (melanin RD) and Eq. 5 (radiation field).
@@ -496,12 +505,23 @@ function site_adhesion(lattice, cells, J, x, y, z, N)
 end
 
 """
-Compute ΔH for a proposed copy: source site (sx,sy,sz) copies into target (tx,ty,tz).
-Only recomputes terms affected by the single-site change.
-Returns the total energy change ΔH.
+    compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+
+The four Hamiltonian contributions to a copy attempt, separately.
+
+THIS FUNCTION IS THE OLD BODY OF `compute_delta_H`, WHICH ALREADY COMPUTED ALL
+FOUR AND THEN DISCARDED THEM on its return line. Nothing new is calculated here.
+`compute_delta_H` now sums this in the same order it used to add them, so the
+scalar it returns is bit-identical by construction rather than by luck — same
+operands, same associativity, same result.
+
+It is split rather than retyped because three callers outside this file want the
+scalar, and one of them is `biofilms_potts_jacc.jl`'s cross-implementation check
+against the parallel port. Changing what that reads to prove a rendering point
+would be trading a real guard for a picture.
 """
-function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
-                          tx::Int, ty::Int, tz::Int)
+function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
+                               tx::Int, ty::Int, tz::Int)
     lat = state.lattice
     cells = state.cells
     J = state.J
@@ -557,10 +577,15 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
     # THE 0.5 BELOW IS THE COEFFICIENT THAT ACTUALLY MOVES THIS MODEL, and it is
     # hard-coded here rather than tabulated. At the shipped I0 = 1.0 and
     # T_cpm = 5.0, the radiation term for a radiotropic species is
-    # β_ion·I = -5e-5, an acceptance bias of 1.000010 — one part in 1e5. This
-    # term at the reported M = 1.44 is -0.72, a bias of 1.155. Four orders of
-    # magnitude. The radial stratification is therefore melanin-mediated, not
-    # β_ion-mediated. Radiation still drives it, but only indirectly:
+    # β_ion·I = -5e-5 for a NEGATIVELY signed species OCCUPYING a site, an
+    # acceptance bias of 1.000010. That is one role of one pair of species and
+    # is NOT the term's reach: signed by role, the extremum over source/target
+    # pairings is 7.505e-2 (see §6.2 and tests/prose_bounds.jl). This term at
+    # the reported M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of
+    # 9.6 in ΔH, NOT by four orders. CORRECTED 2026-08-30: this comment carried
+    # the version-1.1 claim in a file the manuscript sweep never covered, which
+    # is what a sweep bounded to one file cannot find.
+    # The radial stratification is still melanin-mediated, not β_ion-mediated. Radiation still drives it, but only indirectly:
     # melanin_drive is copied from the radiation field, so
     #   radiation -> production (α_M, tabulated) -> M -> here -> tropism.
     # Ledgered as cpm.melanin_coupling in data/parameter_provenance.csv.
@@ -571,18 +596,154 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
         ΔH_mel += 0.5 * M_local  # losing a melanin-rich site costs
     end
 
-    return ΔH_adh + ΔH_vol + ΔH_rad + ΔH_mel
+    return (adh = ΔH_adh, vol = ΔH_vol, rad = ΔH_rad, mel = ΔH_mel)
+end
+
+"""
+Compute ΔH for a proposed copy: source site (sx,sy,sz) copies into target (tx,ty,tz).
+Only recomputes terms affected by the single-site change.
+Returns the total energy change ΔH.
+
+Unchanged in value, type and summation order; it now adds up
+`compute_delta_H_terms` instead of four locals with the same names.
+"""
+function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
+                         tx::Int, ty::Int, tz::Int)
+    t = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+    return t.adh + t.vol + t.rad + t.mel
 end
 
 # ============================================================
 #  6. Monte Carlo Step (MCS)
 # ============================================================
 
+# ------------------------------------------------------------------
+#  Which term drove an accepted move
+# ------------------------------------------------------------------
+
+# Order matches `compute_delta_H_terms`' fields and the layer's colour key.
+const DRIVER_LABELS = (:none, :adh, :vol, :rad, :mel, :multiple, :contingent)
+
+const DRIVER_NONE       = 0x01
+const DRIVER_MULTIPLE   = 0x06
+const DRIVER_CONTINGENT = 0x07
+
+"""
+    decisive_label(terms, ΔH, u, T) -> UInt8
+
+Which single term, if any, DECIDED an accepted move — by counterfactual, on the
+uniform that was actually drawn.
+
+A term is decisive when removing it flips the outcome. That is answered here by
+arithmetic on `u` and never by consulting a generator: drawing again would
+advance the stream and break the byte contract, a second generator would make
+the answer stochastic and add a seed to declare, and a probability threshold
+would invent a constant. All three fabricate something.
+
+THE TWO ACCEPTANCE BRANCHES PRODUCE DISJOINT LABEL SETS, which is worth stating
+because it is not obvious and it is what makes `contingent` a category rather
+than a patch:
+
+  * `ΔH <= 0` — accepted outright, `u` is NaN because no draw was taken. Removing
+    a term can raise ΔH above zero, and what would have happened then needs a
+    number nobody drew. No term here can be shown to flip the move to REJECT;
+    it can only remove the certainty. So this branch yields `none` or
+    `contingent`, never a named term.
+  * `ΔH > 0` — a draw exists, so every counterfactual is decidable and nothing
+    is contingent. Only a term that HELPED (ΔH_t < 0) can be decisive: removing
+    a term that hurt lowers ΔH and the move stays accepted. So this branch
+    yields `none`, one of the four, or `multiple`.
+
+`none` is the informative cell in both branches, not the empty one: it says the
+SUM drove the move and no single term owns it. Given §6.2's ~1.5e4 separation
+between the melanin and direct-radiation terms it is expected to be common, and
+it must not be drawn as background.
+"""
+function decisive_label(terms, ΔH::Float64, u::Float64, T::Float64)
+    if ΔH <= 0
+        # Would removing any single term have cost this move its certainty?
+        for v in (terms.adh, terms.vol, terms.rad, terms.mel)
+            ΔH - v > 0 && return DRIVER_CONTINGENT
+        end
+        return DRIVER_NONE
+    end
+    found = 0x00
+    for (i, v) in enumerate((terms.adh, terms.vol, terms.rad, terms.mel))
+        ΔH′ = ΔH - v
+        # The move was accepted, so `u < exp(-ΔH/T)`. Without this term it is
+        # accepted iff ΔH′ <= 0 or `u` still clears the new, smaller threshold.
+        still = ΔH′ <= 0 || u < exp(-ΔH′ / T)
+        if !still
+            found == 0x00 || return DRIVER_MULTIPLE
+            found = UInt8(i + 1)          # 0x02..0x05, past DRIVER_NONE
+        end
+    end
+    return found == 0x00 ? DRIVER_NONE : found
+end
+
+"""
+Per-voxel tally of which term drove each accepted move.
+
+ACCEPTED MOVES ONLY, and deliberately: an attempted-move tally answers "where
+did the sampler look", which is uniform by construction and says nothing about
+the dynamics. `n_accepted` is DERIVED by summing the labels rather than counted
+alongside them, so there is one source for it and not two that can disagree.
+"""
+struct DriverCounts
+    counts::Array{Int32, 4}   # (N, N, N, length(DRIVER_LABELS))
+end
+
+DriverCounts(N::Int) = DriverCounts(zeros(Int32, N, N, N, length(DRIVER_LABELS)))
+
+@inline function record_driver!(d::DriverCounts, x::Int, y::Int, z::Int,
+                                label::UInt8)
+    d.counts[x, y, z, Int(label)] += Int32(1)
+    return nothing
+end
+
+n_accepted(d::DriverCounts) = dropdims(sum(d.counts, dims = 4), dims = 4)
+
+"""
+Modal label per voxel, 0 where no move was ever accepted there.
+
+0 IS NOT `none`. "The sum drove every move here" and "nothing happened here" are
+different statements and must not share a colour; `none` is a result and 0 is an
+absence. Ties go to the lower label index, which is stated rather than left to
+whatever `argmax` happens to do.
+"""
+function modal_driver(d::DriverCounts)
+    N = size(d.counts, 1)
+    out = zeros(UInt8, N, N, N)
+    @inbounds for z in 1:N, y in 1:N, x in 1:N
+        best = 0; best_n = 0
+        for k in 1:length(DRIVER_LABELS)
+            c = d.counts[x, y, z, k]
+            if c > best_n
+                best_n = c; best = k
+            end
+        end
+        out[x, y, z] = UInt8(best)
+    end
+    return out
+end
+
 """
 Perform one Monte Carlo Step = N³ attempted copy operations.
 Standard CPM Metropolis dynamics (Section 3.4 analog → stochastic accept/reject).
+
+`on_proposal`, when given, is called as `on_proposal(terms, ΔH)` for every
+EVALUATED proposal -- after the site pair survives the skip conditions and the
+energy is computed, and before the acceptance draw. It is the producer for the
+per-proposal ΔH_rad statistics quoted in §6.2; without it those numbers came
+from an uncommitted rewrite of this file and nobody could re-run them, which is
+PP-62-11's defect and is why this hook exists rather than a scratch script.
+
+IT MUST NOT CONSULT `rng`. The hook is called before the draw, so a closure that
+touches the generator moves the trajectory; `tests/rad_proposals_tests.jl` pins
+the shipped harness inert against the bare path with a different-seed control.
 """
-function mcs_step!(state::CPMState, rng::AbstractRNG)
+function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
+                   on_proposal = nothing)
     p = state.params
     N = p.N
     lat = state.lattice
@@ -620,13 +781,28 @@ function mcs_step!(state::CPMState, rng::AbstractRNG)
         end
 
         # 4. Compute ΔH
-        ΔH = compute_delta_H(state, sx, sy, sz, tx, ty, tz)
+        terms = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+        ΔH = terms.adh + terms.vol + terms.rad + terms.mel
+
+        # Evaluated, not attempted: the skip conditions above have already
+        # rejected same-cell and medium-into-medium pairs, and the denominator
+        # the paper reports is this one.
+        on_proposal === nothing || on_proposal(terms, ΔH)
 
         # 5. Metropolis acceptance
-        accept = if ΔH <= 0
-            true
-        else
-            rand(rng) < exp(-ΔH / p.T_cpm)
+        #
+        # `u` IS NaN WHEN NO DRAW WAS TAKEN, and that is a fact about the
+        # acceptance rule rather than a missing value: at ΔH <= 0 the move is
+        # accepted outright and the generator is never consulted. The ternary
+        # evaluates only its taken branch, so `rand` is called exactly where it
+        # was before and the stream is untouched. Keeping `u` is what lets a
+        # counterfactual be answered by arithmetic instead of a second draw.
+        u = ΔH <= 0 ? NaN : rand(rng)
+        accept = ΔH <= 0 ? true : u < exp(-ΔH / p.T_cpm)
+
+        if accept && driver !== nothing
+            record_driver!(driver, tx, ty, tz,
+                           decisive_label(terms, ΔH, u, p.T_cpm))
         end
 
         if accept
@@ -2069,7 +2245,7 @@ function export_figures(trajectory::Vector{<:Any},
     ax1  = Axis(fig1[1,1],
                 xlabel      = "Monte Carlo Steps",
                 ylabel      = "Mean radial position  r / R",
-                title       = "Radial stratification — cylindrical CPM bioreactor",
+                title       = "Mean radial position — cylindrical CPM bioreactor",
                 titlesize   = 15,
                 xlabelsize  = 13,
                 ylabelsize  = 13,
@@ -2156,7 +2332,7 @@ function export_figures(trajectory::Vector{<:Any},
     ax2  = Axis(fig2[1,1],
                 xlabel    = "Monte Carlo Steps",
                 ylabel    = "Mean melanin field value at occupied sites",
-                title     = "Melanin accumulation — radiation-driven production",
+                title     = "Melanin field at occupied sites — dimensionless model units",
                 titlesize = 15,
                 xlabelsize = 13,
                 ylabelsize = 13)
@@ -2184,11 +2360,11 @@ function export_figures(trajectory::Vector{<:Any},
            labelsize    = 11,
            rowgap       = 4,
            framevisible = false,
-           title        = "Melanin producers\n(★ radiotropic)",
+           title        = "Melanin producers",
            titlesize    = 11)
     # Override first two labels to add star
     text!(ax2, mcs_vec[1], -0.05;
-          text = "★ C. neoformans, C. sphaerospermum drift toward the source (radiotropic)",
+          text = "Ordering follows the hand-specified alpha_M_species scales; not a measured quantity",
           fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
 
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)
@@ -2251,13 +2427,29 @@ function export_figures(trajectory::Vector{<:Any},
                 linestyle = :dash,
                 label     = "P_eff / P₀  permeability ratio")
 
-    # Key annotations
-    m_final   = m_vec[end]
+    # Key annotations.
+    #
+    # BOTH WERE PLACED AT x = 0.55*t_end FROM FINAL VALUES, AND COLLIDED. The
+    # two y-positions -- m_final + 0.05 = 0.829 on the left axis and
+    # Peff_final * 0.88 = 2.385 on the right -- are independent numbers on
+    # independently autoscaled axes, and they happened to map to the same 79% of
+    # plot height, so the two labels printed on top of each other and neither
+    # was readable. That is arithmetic, not a rendering fluke: it recurred on
+    # every regeneration.
+    #
+    # The fix separates them HORIZONTALLY, which makes the vertical coincidence
+    # moot however the axes rescale, and anchors each label to its own curve at
+    # its own x so it stays beside the line it describes rather than at a height
+    # derived from a value plotted somewhere else.
+    m_final    = m_vec[end]
     Peff_final = Peff_norm[end]
-    text!(ax3l, Float64(t_vec[end]) * 0.55, m_final + 0.05;
+    i_at(frac) = argmin(abs.(Float64.(t_vec) .- Float64(t_vec[end]) * frac))
+    i_m, i_p   = i_at(0.35), i_at(0.80)
+    Peff_span  = maximum(Peff_norm) - minimum(Peff_norm)
+    text!(ax3l, Float64(t_vec[i_m]), m_vec[i_m] + 0.04;
           text    = @sprintf("m = %.3f", m_final),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
-    text!(ax3r, Float64(t_vec[end]) * 0.55, Peff_final * 0.88;
+    text!(ax3r, Float64(t_vec[i_p]), Peff_norm[i_p] - 0.18 * Peff_span;
           text    = @sprintf("%.1f× baseline", Peff_final),
           fontsize = 10, color = colorant"#d62728", align = (:center, :top))
 
@@ -2326,7 +2518,7 @@ function export_figures(trajectory::Vector{<:Any},
           text    = @sprintf("c(R) = %.0f%% c_ext", c_wall_final * 100),
           fontsize = 10, color = colorant"#d62728", align = (:center, :bottom))
     text!(ax4l, Float64(t_vec[end]) * 0.55, c_mean_final + 0.04;
-          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% depleted)",
+          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% non-penetration)",
                              c_mean_final * 100, (1.0 - c_mean_final) * 100),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
 

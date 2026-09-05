@@ -239,7 +239,27 @@ default_parms <- function(Nr = 40, R = 1.0) {
     w_minus = w$w_minus,
 
     # --- Transport ---
-    D_eff   = 1e-3,    # effective diffusivity (cm² s⁻¹), Table 2 range 1e-4..1e-2
+    # RESTATED 2026-08-31 per claims_ledger PP-DEFF-01, which holds the withdrawn
+    # wording verbatim. It is deliberately NOT repeated here: this file is scanned
+    # by RETRACTED_IN_SOURCES and a withdrawn string in a correction comment is
+    # still a withdrawn string in the source someone copies from. The previous
+    # comment named a literature range and a Table 2 provenance, and both halves
+    # were wrong. THE RANGE: withdrawn. Its upper end lies two orders of
+    # magnitude above the free diffusivity of any aqueous solute, so it cannot
+    # contain a film-scale effective diffusivity; its lower end is unresolved,
+    # because neither the solute nor a transport temperature is declared anywhere
+    # in this file. THE PROVENANCE: Table 2 is tab:params, it exists, and its only
+    # diffusion rows are per-species cell motility D_s in µm²/s -- no D_eff, no
+    # cm²/s, no such range.
+    #
+    # AND THIS VALUE IS NOT A FILM-SCALE D_eff. One symbol carries three distinct
+    # quantities: the film-scale coefficient D0*eps/tau, which is strictly below
+    # D0; the bench observable D_app = D_eff/R, lumped by sorption; and this
+    # solver's own D_eff, which is UNRETARDED because sorption is carried
+    # explicitly by the two-phase c/s system below. This default is none of them
+    # -- at 1e-3 it is a reactor-scale dispersion coefficient under a film-scale
+    # name. See PP-DEFF-01 and PP-DAM-01.
+    D_eff   = 1e-3,    # cm² s⁻¹ -- see the note above; NOT a film-scale value
 
     # --- Biosorption / bioreduction (Renslow et al. 2017) ---
     k_ads   = 0.05,    # adsorption rate constant (cm³ g⁻¹ s⁻¹)
