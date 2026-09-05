@@ -554,6 +554,78 @@ end
     end
 end
 
+# ------------------------------------------------ symbols in eq:adaptive have a definition
+#
+# PP-T2-25 deleted Table 2's omega_s row on 2026-09-01 and kept the symbol in the equation --
+# deleting a parameter claim is not deleting an equation. That row was the symbol's ONLY
+# description, so the deletion's side effect was a symbol defined nowhere: Table 1 listed its
+# equation-mates theta_s and gamma_s and not omega_s. The \ref guard below cannot see this,
+# because a math symbol is not a \ref. Found by a reader, 2026-09-05.
+#
+# SCOPE: the symbols of Eq. eq:adaptive and the "where ..." sentence after it. A symbol is
+# defined if tab:notation carries a row for it, or that sentence defines it inline in the form
+# "$X(t) = ...$ is the ...". This is not a manuscript-wide symbol audit; that is a larger claim
+# and it is not made here.
+const _ADAPTIVE_SYM = r"(?:\\[A-Za-z]+|[A-Za-z])_(?:s\b|\{s[^}]*\})"
+
+function _adaptive_parts(tex)
+    m = match(r"\\label\{eq:adaptive\}(.*?)\\end\{equation\}\s*(where[^\n]*\n[^\n]*)"s, tex)
+    m === nothing && error("eq:adaptive and its where-sentence not found")
+    table = match(r"\\label\{tab:notation\}(.*?)\\end\{tabular\}"s, tex)
+    table === nothing && error("tab:notation not found")
+    (String(m[1]), String(m[2]), String(table[1]))
+end
+
+_adaptive_symbols(tex) = unique(m.match for m in eachmatch(_ADAPTIVE_SYM, join(_adaptive_parts(tex)[1:2], " ")))
+
+function _inline_defined(sym, sent)
+    i = findfirst("\$" * sym, sent)
+    i === nothing && return false
+    j = findnext('$', sent, last(i) + 1)
+    j === nothing && return false
+    occursin(r"^\s*is\s+(?:the|an?)\b", sent[nextind(sent, j):end])
+end
+
+function _adaptive_missing(tex)
+    _, sent, table = _adaptive_parts(tex)
+    [s for s in _adaptive_symbols(tex)
+       if !occursin("\$" * s, table) && !_inline_defined(s, sent)]
+end
+
+@testset "every symbol in the adaptive-feedback equation is defined" begin
+    tex = read(joinpath(REPO, "preprint",
+                        "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
+
+    # THE PRECONDITION IS ASSERTED SEPARATELY FROM THE OUTCOME. "Zero missing" over zero
+    # symbols is the vacuous pass; the detector must have found the equation's symbols first.
+    used = _adaptive_symbols(tex)
+    @test length(used) >= 4
+    @test raw"\omega_s" in used && raw"\theta_s" in used && raw"\gamma_s" in used
+
+    @test isempty(_adaptive_missing(tex))
+
+    @testset "the controls, in both directions" begin
+        # Clean direction: the unmodified manuscript reports nothing missing (above), AND
+        # inline definition is recognised, or phi_s and A_s would be false positives.
+        _, sent, _ = _adaptive_parts(tex)
+        @test _inline_defined(raw"\phi_s", sent)
+        @test _inline_defined("A_s", sent)
+        @test !_inline_defined(raw"\omega_s", sent)   # inside phi_s's group, not defined by it
+
+        # Failing direction: the victim is SELECTED FROM THE ARTIFACT, the mutation is
+        # asserted to have applied, and asserted to have applied WHERE intended -- the table
+        # row goes, the equation's use of the symbol stays. Then the check must name exactly
+        # that symbol: a detector that flagged every symbol would pass "fires" and fail this.
+        row = match(r"^\$\\omega_s\$.*\n"m, tex)
+        @test row !== nothing
+        mutated = replace(tex, row.match => "")
+        @test mutated != tex
+        @test !occursin(raw"$\omega_s$", _adaptive_parts(mutated)[3])
+        @test occursin(raw"\cos(\omega_s t", mutated)
+        @test _adaptive_missing(mutated) == [raw"\omega_s"]
+    end
+end
+
 # ------------------------------------------------- cross-references resolve, and are not numerals
 #
 # SCOPE: \ref and \label in the manuscript .tex, and literal `Section~<digit>` forms.
