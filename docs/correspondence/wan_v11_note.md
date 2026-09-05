@@ -1,13 +1,47 @@
-# Draft note to Caixia Wan — figure correction, and the numerical one that followed
+# Note to Caixia Wan — the v1.2 correction
 
-Not sent. Send it before Andrew Hoffman opens the version she has.
+**Status 2026-09-05: drafted in Gmail, not sent.** Draft `r-6289988137812887310`, to
+`wanca@missouri.edu`, subject "Preprint v1.2: two numbers corrected in the copy you have".
+The attachment is the CI artifact of run 33948889434 at `26b3a14` (36 pages, sha256
+`672c78d3…`), added by hand because no tool here attaches a file of that size. When it
+goes, replace this block with the sent date and Gmail thread id: a sent email is a claim
+sink and belongs in the dependents enumeration (AGENTS.md, "Correcting a published number").
 
-**Superseded twice since drafting, and the second time it said something false.** The note was
-written for v1.1, which corrected two figures and no numbers. v1.2 corrects numbers, including
-the radiation count this note quotes. Anything below that still reads as v1.1 has been marked
-rather than silently swapped, because the difference is the point: a note saying "no number
-changed" arriving with a paper whose correction block says two published numbers moved is worse
-than a late note.
+Recipient address: last read back as her sending address on 2024-10-31 (thread "Modeling
+Radiotrophy"); her reply that this note answers is not in this mailbox. Her MU faculty page
+(water.missouri.edu) was live on 2026-09-05 and prints no address.
+
+## Final text (v1.2 form)
+
+Everything in it was checked against the diff f72aabb..26b3a14 of the manuscript: the
+withdrawn bound lived in section 6.2 of v1.1, not the abstract (the v1.1 abstract carried no
+figure); sections 7.2 and 7.3 have no content change; the four listed changes are the ones
+outside 6.2 a reader would notice. Gated through copydesk (no hard fails) and prose-craft-2.
+
+```
+Hi Ellen,
+
+Thanks for getting back to me, and for asking around about RA positions; I appreciate you looking.
+
+The version you have is v1.1, and I've since corrected two numbers in it. The direct radiation term's effect on acceptance was understated. The bound I'd published counted only one of the two roles a cell can play in the energy term, so the real reach is about 1,500 times larger than the bound stated in section 6.2 of your copy. Both numbers were caught in automated review of the pull request and are corrected in section 6.2 with the reasoning shown, and there is now a test that recomputes the bound from the code, so that class of error cannot recur silently.
+
+Four smaller things moved with it, and I'd rather you heard them from me than found them. Section 2.1 adds Robertson 2012, whose growth result reproduces while its attribution to melanin does not. Section 2.6 adds a paragraph on what actually lives in a spent fuel pool. Table 2 lost its phase-locking frequency row, which had no literature source. And several reference entries with wrong DOIs were corrected. The phenotype boundary in 7.2 and the spent-fuel-pool literature in 7.3 are as you saw them.
+
+I have a short memo on the FeCrAl question if that's useful for the MURR conversation.
+
+v1.2 is attached; it's the one to forward if things move.
+
+Hunter
+```
+
+---
+
+## Earlier draft (v1.1 form, superseded by the text above)
+
+Superseded twice since drafting, and the second time it said something false. It
+was written for v1.1, which corrected two figures and no numbers. v1.2 corrects numbers,
+including the radiation count this draft quotes. Kept as the record of what the note said
+before the diff was checked; do not send any part of it.
 
 ---
 
