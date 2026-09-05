@@ -236,7 +236,7 @@ end
     # digits, so they are pinned by phrase. Naming that difference is the point:
     # an unlabelled sweep would report them as covered.
     @test occursin("exceeding the direct\nspecies-specific radiation term by about an order of magnitude in \$\\Delta H\$", tex)
-    @test occursin("an acceptance bias about ten\ntimes smaller rather than four orders smaller", tex)
+    @test occursin("(a 1.5\\% acceptance bias), about ten\ntimes smaller than the melanin term rather than four orders smaller", tex)
 
     @testset "the control generalises past the value it was built from" begin
         # A synthetic sentence stating FIFTEEN failing would only re-test the

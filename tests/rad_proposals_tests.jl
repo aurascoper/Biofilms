@@ -112,7 +112,7 @@ include(joinpath(REPO, "rad_proposals.jl"))
         # the paper from recording its own correction. What must not survive is
         # the phrasing that reported a measurement over a run nothing identified.
         @test !occursin("Measured over the run", tex)
-        @test occursin(raw"Measured over the three runs of Table~\ref{tab:decided_moves}", tex)
+        @test occursin(raw"Measured over the three $N=40$ runs, seeds 42, 43 and 44 at 400~MCS, of which Table~\ref{tab:decided_moves} shows seed 42", tex)
         @test count(_ -> true, eachmatch(r"29\.8", tex)) == 1
     end
 end

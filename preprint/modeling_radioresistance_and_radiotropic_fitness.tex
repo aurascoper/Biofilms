@@ -79,12 +79,12 @@
   {\large\bfseries A Computational Framework, Implementation Audit,\\
    and One-Way Radiation-Transport Foundation}\\[14pt]
   {\normalsize
-    \textbf{Hunter Kinder}, B.A., M.A.T.L. --- Independent Researcher, Missouri, USA\\[2pt]
+    \textbf{Hunter Kinder}, B.A. --- Independent Researcher, Missouri, USA\\[2pt]
     \textbf{Brett Faulkner}, B.Sc. --- Independent Researcher\\[10pt]
   }
   {\small
     \textit{Preprint --- not peer reviewed}\\
-    \textit{Version 1.2 --- September 2026}
+    \textit{Version 1.2.1 --- September 2026}
   }
 \end{center}
 \vspace{4pt}
@@ -107,8 +107,8 @@ transport code and a new biological target rather than introducing the paradigm.
 
 Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
 measured results. The melanin term changes Metropolis acceptance by approximately 15.5\%, whereas
-the direct per-species radiation term reaches $7.505\times10^{-2}$, an acceptance bias about ten
-times smaller rather than four orders smaller; only the product of melanin production and melanin
+the direct per-species radiation term reaches $7.505\times10^{-2}$ in $\Delta H$ (a 1.5\% acceptance bias), about ten
+times smaller than the melanin term rather than four orders smaller; only the product of melanin production and melanin
 coupling reaches the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
 opposite to the direction implied by the direct tropism coefficient and is not clearly separated
 from the approximate seeding null at six parcels per species.
@@ -170,7 +170,7 @@ presented here expresses the first of the five, and the paper's title says so.
 
 The same test excludes as includes: a word enters this vocabulary only if the endpoint it names can
 be stated. \emph{Reasoning} has no statable endpoint in these systems and is therefore not used
-here, including as metaphor.
+here.
 
 % ---- 2. Related Work -----------------------------------------
 \section{Related Work}
@@ -1171,7 +1171,7 @@ with \texttt{Random.Xoshiro(seed)} and the melanin field updated each sweep, wit
 coupling --- \emph{not} \texttt{run\_simulation} or \texttt{run\_simulation\_coupled}, which seed
 \texttt{MersenneTwister} and give 14\,281 accepted moves at 100~MCS rather than 16\,037. Version 1.1
 recorded neither the generator nor that distinction, so the table could not be re-executed; it is
-now reproduced by \texttt{julia --project=. decided\_moves.jl}, which compares its own output
+now reproduced by \texttt{julia -{}-project=. decided\_moves.jl}, which compares its own output
 against the values printed here.}
 \label{tab:decided_moves}
 \begin{tabular}{@{}lrr@{}}
@@ -1190,9 +1190,9 @@ contingent                       & 49.39\% & 23.72\% \\
 \end{tabular}
 \end{table}
 
-\emph{Corrected, version 1.2; see the correction note in the Data and Code Availability section.}
+\emph{Corrected, version 1.2; see the correction note in the Software and Data Availability section.}
 The direct radiation term was the sole decisive term in one accepted move of 206\,042 across seeds
-42, 43 and 44 at 400~MCS --- none under seeds 42 and 43, one under seed 44 --- and in none at
+42, 43 and 44 at 400~MCS (53\,603, 68\,465 and 83\,974 accepted moves respectively; Table~\ref{tab:decided_moves} shows seed 42) --- none under seeds 42 and 43, one under seed 44 --- and in none at
 100~MCS. That count is small, but it does \emph{not} follow from the one-part-in-$10^5$ row of
 Table~\ref{tab:term_magnitudes}, and the argument that it did was wrong.
 
@@ -1206,13 +1206,13 @@ parcels carries both roles at once and contributes $(\beta_{s,\mathrm{ion}} - \b
 I_\gamma$, so the reach is an extremum over source/target pairings rather than over species:
 $\max_{s,t}(\beta_{t,\mathrm{ion}} - \beta_{s,\mathrm{ion}})\,I_\gamma = 7.505\times10^{-2}$, which is
 $1.5\times10^{3}$ times the $5\times10^{-5}$ that version 1.1 of this paragraph claimed as a bound.
-Measured over the three runs of Table~\ref{tab:decided_moves} --- $3\,968\,838$ evaluated proposals
-across seeds 42, 43 and 44 at 400~MCS --- $26.7\%$ carry
+Measured over the three $N=40$ runs, seeds 42, 43 and 44 at 400~MCS, of which Table~\ref{tab:decided_moves} shows seed 42 --- $3\,968\,838$ evaluated proposals
+--- $26.7\%$ carry
 $\Delta H_{\mathrm{rad}} < -5\times10^{-5}$, and the most acceptance-favouring value reached is
 $-7.5\times10^{-2}$, a vacating \emph{S.\ oneidensis} target with no occupied source. The pairwise
 extremum itself is attained but rare: a \emph{C.\ sphaerospermum} source copying into an
 \emph{S.\ oneidensis} target reaches $-7.505\times10^{-2}$ four times in $1\,298\,668$ proposals at
-$N=20$; the three $N=40$ runs of Table~\ref{tab:decided_moves} do not reach it, which is why the
+$N=20$; the three $N=40$ runs behind Table~\ref{tab:decided_moves} do not reach it, which is why the
 single-role figure went unchallenged by the measurement that accompanied it.
 
 Recomputed on that basis, the expected number of accepted moves that removing
@@ -1477,8 +1477,8 @@ whether plausible biological material changes are large enough to justify any on
 \section*{Software and Data Availability}
 All source code, configuration schemas, tests, provenance ledgers, and figure-generation materials
 are available in the public repository at
-\url{https://github.com/aurascoper/Biofilms/tree/preprint-v1.2}. Version 1.0 was prepared against repository
-revision \texttt{c7539a9}; this revision is prepared against \texttt{8754762}. Each names the
+\url{https://github.com/aurascoper/Biofilms/tree/preprint-v1.2.1}. Version 1.0 was prepared against repository
+revision \texttt{c7539a9}; this revision is prepared against \texttt{4bf1ba9}. Each names the
 parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.
@@ -1911,6 +1911,7 @@ Solving differential equations in R: package deSolve.
 Cortes\~{a}o, M., et al. (2020).
 Aspergillus niger spores are highly resistant to space radiation.
 \textit{Frontiers in Microbiology}, 11, article 560.
+\url{https://doi.org/10.3389/fmicb.2020.00560}
 (LD$_{90}$ values for N402 and the pigmentation-deficient $\Delta fwnA$ mutant MA93.1 under
 X-ray, He-ion and Fe-ion exposure; open access, CC BY 4.0.)
 
@@ -1918,12 +1919,14 @@ X-ray, He-ion and Fe-ion exposure; open access, CC BY 4.0.)
 Foster, L., Boothman, C., Ruiz-Lopez, S., et al. (2020).
 Identification of a stable hydrogen-driven microbiome in a highly radioactive storage facility on
 the Sellafield site. \textit{Frontiers in Microbiology}, 11, 587556.
+\url{https://doi.org/10.3389/fmicb.2020.587556}
 
 \bibitem{sellafield2023}
 Ruiz-Lopez, S., et al. (2023).
 Identification of algal rich microbial blooms in the Sellafield Pile Fuel Storage Pond and the
 application of ultrasonic treatment to control the formation of blooms.
 \textit{Frontiers in Microbiology}, 14, 1261801.
+\url{https://doi.org/10.3389/fmicb.2023.1261801}
 
 \bibitem{walberg2015}
 Walberg, K. (2015).

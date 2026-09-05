@@ -4,7 +4,7 @@
 correcting the 29 August v1.1 you have". The copy she holds is the v1.1 build of 29 August 2026,
 08:40 CDT, the working tree of `d404438` (bound −5×10⁻⁵, Table 4 with "none of 206 042",
 "several orders" in §7.1, figures already corrected). The attachment is the CI build of the
-commit tagged `preprint-v1.2`, added by hand because no tool here attaches a file of that size.
+commit tagged `preprint-v1.2.1`, added by hand because no tool here attaches a file of that size.
 When it goes, replace this block with the sent date: a sent email is a claim sink and belongs in
 the dependents enumeration (AGENTS.md, "Correcting a published number"). No mailbox identifiers
 or addresses are recorded here; the mailbox holds them.
