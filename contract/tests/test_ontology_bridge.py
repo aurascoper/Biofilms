@@ -23,8 +23,8 @@ import pytest
 
 from physical_contract import (BRIDGE_AXES, CLAIM_EVIDENCE_BASIS,
                                EVIDENCE_NULLS, PARAMETER_EVIDENCE_BASIS,
-                               PHENOMENA, PROJECT_NAMESPACE,
-                               PROVENANCE_SOURCES)
+                               PARENT_RELATIONS, PHENOMENA,
+                               PROJECT_NAMESPACE, PROVENANCE_SOURCES)
 
 REPO = Path(__file__).resolve().parents[2]
 BRIDGE = REPO / "data" / "ontology_bridge.csv"
@@ -48,6 +48,9 @@ COUNTED = {"cells mm^-3": "cell", "ug cell^-1 Gy^-1": "cell", "per_s": "photon",
            "species": "species", "rows": "rows"}
 DIMS = ("L", "M", "T", "I", "Theta", "N", "J")
 QUDT_VERSION = "QUDT v3.5.1"
+OBO = "http://purl.obolibrary.org/obo/"
+# A model term is an equation or a process, never a quantity.
+MODEL_TERM_PARENTS = frozenset({OBO + "IAO_0000030", OBO + "BFO_0000015"})
 
 
 def _read(path):
@@ -74,6 +77,7 @@ def bridge_problems(rows) -> list:
     """Every structural rule, as a list so planted rows can be checked."""
     out = []
     mirrored = {r["iri"] for r in rows if r["namespace"] == "mirrored"}
+    by_iri = {r["iri"]: r for r in rows if r["iri"]}
     kinds = {r["local_term"]: r for r in rows if r["axis"] == "quantity_kind"}
     for r in rows:
         key = (r["local_term"], r["axis"])
@@ -91,11 +95,27 @@ def bridge_problems(rows) -> list:
                     out.append(f"{key}: a null has no external parent")
             elif r["nearest_parent"] not in mirrored:
                 out.append(f"{key}: nearest_parent is not a mirrored row")
+            elif r["parent_relation"] not in PARENT_RELATIONS:
+                out.append(f"{key}: parent_relation {r['parent_relation']!r}")
+            elif r["parent_relation"] == "same_dimension":
+                par = by_iri[r["nearest_parent"]]
+                if par["axis"] not in ("unit", "quantity_kind") or exponents(par) != exponents(r):
+                    out.append(f"{key}: same_dimension parent {par['local_term']} has other exponents")
+            if r["axis"] == "model_term" and r["nearest_parent"] not in MODEL_TERM_PARENTS:
+                out.append(f"{key}: a model term's parent is an information entity or a process")
         elif ns == "unmapped":
             if key not in UNMAPPED or iri:
                 out.append(f"{key}: only derived may be unmapped")
         else:
             out.append(f"{key}: namespace {ns!r}")
+        if ns != "minted" and r["parent_relation"]:
+            out.append(f"{key}: parent_relation on a row that is not minted")
+        if r["xref"] and r["xref"] not in mirrored:
+            out.append(f"{key}: xref is not a mirrored row")
+        needs_definition = (r["axis"] == "model_term"
+                            or (r["axis"] == "quantity_kind" and (ns == "minted" or exponents(r) == (0,) * 7)))
+        if needs_definition and not r["definition"].strip():
+            out.append(f"{key}: no definition; exponents alone cannot identify it")
         if not iri and key not in UNMAPPED:
             out.append(f"{key}: no IRI")
         if not r["verified_on"] and key not in UNMAPPED and key[0] not in VERIFIED_ON_EXCEPTIONS:
@@ -200,3 +220,16 @@ def test_endpoint_rule_derived_rule_and_verified_on_rule_fire(rows):
                for p in bridge_problems(_plant(rows, "cm", "unit", verified_on="")))
     assert any("count_of" in p
                for p in bridge_problems(_plant(rows, "cells mm^-3", "unit", count_of="")))
+
+
+def test_step3_controls_fire(rows):
+    orphan = _plant(rows, "henry_isotherm", "model_term", nearest_parent=PROJECT_NAMESPACE + "nothing")
+    assert any("nearest_parent is not a mirrored row" in p for p in bridge_problems(orphan))
+    quantity_parent = _plant(rows, "donnan_dialysis", "model_term", nearest_parent="http://qudt.org/vocab/quantitykind/Velocity")
+    assert any("information entity or a process" in p for p in bridge_problems(quantity_parent))
+    nameless = _plant(rows, "thiele_modulus", "quantity_kind", definition="")
+    assert any("no definition" in p for p in bridge_problems(nameless))
+    wrong_parent = _plant(rows, "porosity", "quantity_kind", nearest_parent="http://qudt.org/vocab/quantitykind/Length")
+    assert any("same_dimension parent Length has other exponents" in p for p in bridge_problems(wrong_parent))
+    bad_xref = _plant(rows, "radiolysis_of_water", "model_term", xref=PROJECT_NAMESPACE + "hydroxyl")
+    assert any("xref is not a mirrored row" in p for p in bridge_problems(bad_xref))

@@ -26,7 +26,7 @@ __all__ = [
     "PARAMETER_EVIDENCE_BASIS", "CLAIM_EVIDENCE_BASIS", "PROVENANCE_SOURCES",
     "EVIDENCE_NULLS", "LEGACY_CLAIM_EVIDENCE", "canonical_claim_evidence",
     "parameter_evidence_problems", "claim_evidence_problems",
-    "PROJECT_NAMESPACE", "PHENOMENA", "BRIDGE_AXES",
+    "PROJECT_NAMESPACE", "PHENOMENA", "BRIDGE_AXES", "PARENT_RELATIONS",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "source_placement_problems",
     "git_provenance",
@@ -124,7 +124,16 @@ PHENOMENA = frozenset({"radiotropic", "radiotrophic", "radioresistant",
                        "melanized_radioprotective", "radiation_responsive"})
 
 BRIDGE_AXES = frozenset({"phenomenon", "value_basis", "claim_basis", "source",
-                         "null", "status", "unit", "quantity_kind", "category"})
+                         "null", "status", "unit", "quantity_kind", "category",
+                         "model_term"})
+
+# How a minted term relates to the mirrored row it names as nearest_parent.
+# `same_dimension`: the parent has the same SI exponents and the test checks
+# that arithmetic; the row is a distinct quantity, not the parent's meaning
+# (membrane permeability is L T^-1 and so is Velocity; it is not a velocity).
+# `semantic`: the parent is the nearest class by meaning and no dimension
+# claim is made.
+PARENT_RELATIONS = frozenset({"same_dimension", "semantic"})
 
 # Values the claims ledger stored before the two relations were separated,
 # with what each means. The ledger's convention is additive (corrections are
