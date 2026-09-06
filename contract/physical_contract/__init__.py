@@ -23,6 +23,9 @@ __all__ = [
     "ALLOWED_BOUNDARY_CONDITIONS", "ALLOWED_SOURCE_SPATIAL",
     "ALLOWED_SOURCE_ANGULAR", "EVIDENCE_POLICIES", "EXECUTION_CLASSES",
     "SYSTEM_PROVENANCE",
+    "PARAMETER_EVIDENCE_BASIS", "CLAIM_EVIDENCE_BASIS", "PROVENANCE_SOURCES",
+    "EVIDENCE_NULLS", "LEGACY_CLAIM_EVIDENCE", "canonical_claim_evidence",
+    "parameter_evidence_problems", "claim_evidence_problems",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "source_placement_problems",
     "git_provenance",
@@ -53,6 +56,113 @@ EVIDENCE_POLICIES = frozenset({"measured_only", "synthetic"})
 # the ledger test all read one definition.
 SYSTEM_PROVENANCE = frozenset({"published_replica", "certified_component",
                                "engineered_composite", "declared"})
+
+# --- evidence basis: one word, two relations ------------------------------
+# A VALUE's evidence basis and a CLAIM's evidence basis are different
+# relations. A value (a ledger row with a number) is backed by how the number
+# was obtained: measured, certified, read from a datasheet, taken from a paper.
+# A claim (a sentence in the manuscript or README) is backed by what supports
+# the sentence: a paper, a computation, a declared rule. The two overlap in
+# four words and differ everywhere else, and before this block existed the
+# repository held four disagreeing copies of "the" evidence vocabulary: the
+# parameter-ledger test, the calibration schema, the claims ledger's header and
+# the claims ledger's data (twelve values in use against five declared).
+#
+# `derived` is kept in BOTH sets so nothing breaks, but it is not an evidence
+# kind. It is a SOURCE (how the value was produced) carrying an UNRESOLVED
+# basis: the manuscript's rule (sec:planned_feedback) is that a derived
+# parameter inherits the weakest basis it was built from, and a measured
+# capacity times a prior density is a prior. Resolving that needs a
+# `depends_on` column no ledger has yet, so no external evidence class may be
+# asserted for `derived` -- the ontology bridge must leave it unmapped.
+#
+# `synthetic` and `declared` are both chosen rather than evidenced, and the
+# difference a reader can apply is physical intent: a `synthetic` value is
+# explicitly non-physical and exists to exercise the software path (the
+# `synthetic_validation` execution class), while a `declared` value is a
+# modelling choice that claims physical motivation and simply has no external
+# referent yet. A synthetic value can never become ready by measurement; a
+# declared one can.
+PARAMETER_EVIDENCE_BASIS = frozenset({
+    "direct_measurement", "assay_certificate", "manufacturer_datasheet",
+    "evaluated_nuclear_data", "proxy",              # value-only
+    "primary_literature", "derived", "declared", "synthetic",
+})
+CLAIM_EVIDENCE_BASIS = frozenset({
+    "computational", "prior_search",                # claim-only
+    "primary_literature", "derived", "declared", "synthetic",
+})
+
+# The SOURCE axis, orthogonal to the basis: where a computational or declared
+# claim's support lives. `simulation_output` is a run's artifact, `code` is the
+# program text, `code_inspection` is a human reading of it, and
+# `repository_policy` is a rule in AGENTS.md or its siblings. The claims ledger
+# stored these in its evidence_basis column, which is the conflation the two
+# sets above undo.
+PROVENANCE_SOURCES = frozenset({"simulation_output", "code", "code_inspection",
+                                "repository_policy"})
+
+# Two nulls that are not the same null. `absent` is an ESTABLISHED none: the
+# claim was audited and nothing supports it. "" is NOT ESTABLISHED, per the
+# ledgers' "empty is not zero" rule. Folding them would turn an unaudited row
+# into an audited one.
+EVIDENCE_NULLS = frozenset({"absent", ""})
+
+# Values the claims ledger stored before the two relations were separated,
+# with what each means. The ledger's convention is additive (corrections are
+# notes and superseding rows; evidence_basis has never been edited in place),
+# so the stored values stay, this table reads them, and the allowlist in
+# contract/tests/fixtures pins exactly which rows may still carry them. A NEW
+# row must use the canonical form; `claim_evidence_problems` says so.
+LEGACY_CLAIM_EVIDENCE = {
+    "literature":        ("primary_literature", None),
+    "simulation_output": ("computational", "simulation_output"),
+    "code":              ("computational", "code"),
+    "code_inspection":   ("computational", "code_inspection"),
+    "repository_policy": ("declared", "repository_policy"),
+    "none":              ("absent", None),
+}
+
+
+def canonical_claim_evidence(stored) -> tuple:
+    """(basis, source) for a stored claims-ledger evidence_basis value.
+
+    Canonical values map to themselves with no source; legacy values map
+    through LEGACY_CLAIM_EVIDENCE; anything else raises, because a value
+    that is neither canonical nor known-legacy is a new word entering the
+    vocabulary unreviewed.
+    """
+    value = "" if stored is None else str(stored).strip()
+    if value in CLAIM_EVIDENCE_BASIS or value in EVIDENCE_NULLS:
+        return value, None
+    if value in LEGACY_CLAIM_EVIDENCE:
+        return LEGACY_CLAIM_EVIDENCE[value]
+    raise ValueError(f"evidence_basis {stored!r} is neither a canonical claim "
+                     f"evidence basis nor a known legacy value")
+
+
+def parameter_evidence_problems(value) -> list:
+    """Why `value` is not a usable evidence basis for a ledger VALUE."""
+    v = "" if value is None else str(value).strip()
+    if v in PARAMETER_EVIDENCE_BASIS or v == "":
+        return []
+    if v in CLAIM_EVIDENCE_BASIS:
+        return [f"{v!r} is a claim's evidence basis, not a value's"]
+    return [f"{v!r} is not a parameter evidence basis"]
+
+
+def claim_evidence_problems(value) -> list:
+    """Why `value` is not a usable evidence basis for a NEW claim row."""
+    v = "" if value is None else str(value).strip()
+    if v in CLAIM_EVIDENCE_BASIS or v in EVIDENCE_NULLS:
+        return []
+    if v in LEGACY_CLAIM_EVIDENCE:
+        basis, source = LEGACY_CLAIM_EVIDENCE[v]
+        return [f"{v!r} is a legacy spelling; new rows write basis {basis!r}"
+                + (f" with source {source!r}" if source else "")]
+    if v in PARAMETER_EVIDENCE_BASIS:
+        return [f"{v!r} is a value's evidence basis, not a claim's"]
+    return [f"{v!r} is not a claim evidence basis"]
 
 # What kind of document a source record pins. Without this a source_id resolves
 # happily to any registered document, so an approval field could cite a
