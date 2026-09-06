@@ -1,0 +1,9 @@
+name,country,latitude,longitude,stage,capacity_mw,status,source
+SETI@home,United States,37.87,-122.26,boinc_server,0,operating,BOINC
+Einstein@Home,Germany,52.52,13.40,boinc_server,0,operating,BOINC
+Rosetta@home,United States,47.61,-122.33,boinc_server,0,operating,BOINC
+MilkyWay@home,United States,42.44,-76.48,boinc_server,0,operating,BOINC
+LHC@home,Switzerland,46.23,6.05,boinc_server,0,operating,BOINC
+World Community Grid,United States,41.18,-73.96,boinc_server,0,operating,BOINC
+PrimeGrid,Netherlands,52.37,4.90,boinc_server,0,operating,BOINC
+Asteroids@home,Czech Republic,50.08,14.42,boinc_server,0,operating,BOINC

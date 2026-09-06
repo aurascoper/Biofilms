@@ -1,0 +1,9 @@
+name,ra,dec,distance_ly,star_type,energy_class,status,note
+Proxima Centauri,217.43,-62.68,4.2,M5.5,gridcoin_relay,hypothetical,SPECULATIVE - generated, not observed
+TRAPPIST-1,344.41,-5.04,39,M8,stellar_lens,hypothetical,SPECULATIVE - generated, not observed
+Kepler-186,297.70,43.68,580,M1,dyson_swarm,hypothetical,SPECULATIVE - generated, not observed
+Kepler-452,293.25,44.37,1400,G2,fusion_core,hypothetical,SPECULATIVE - generated, not observed
+Tau Ceti,26.02,-15.94,11.9,G8,gridcoin_relay,hypothetical,SPECULATIVE - generated, not observed
+55 Cancri,133.15,28.33,41,G8,fusion_core,hypothetical,SPECULATIVE - generated, not observed
+HD 209458,330.79,18.88,159,G0,radio_silent,hypothetical,SPECULATIVE - generated, not observed
+WASP-12,94.05,29.67,1400,G0,dyson_swarm,hypothetical,SPECULATIVE - generated, not observed

@@ -61,3 +61,17 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Vendored reference datasets are byte-exact artifacts, not text to normalize.
+#
+# Their SHA-256 is declared in the matching *.provenance.json and is checked by
+# the test suite. Under the `* text=auto` rule above, that hash is not
+# reproducible: git stores LF, checks out LF on macOS/Linux and CRLF on Windows,
+# so the same commit yields different bytes per platform and the declaration
+# becomes unverifiable. Pinning these as binary makes the declared hash mean
+# exactly one thing everywhere.
+###############################################################################
+power_plant_database_global.csv -text
+geolocator/sample_power_plants.csv -text
+geolocator/data/*.csv -text
