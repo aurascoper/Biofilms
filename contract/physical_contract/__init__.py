@@ -27,6 +27,7 @@ __all__ = [
     "EVIDENCE_NULLS", "LEGACY_CLAIM_EVIDENCE", "canonical_claim_evidence",
     "parameter_evidence_problems", "claim_evidence_problems",
     "PROJECT_NAMESPACE", "PHENOMENA", "BRIDGE_AXES", "PARENT_RELATIONS",
+    "UNIT_SYSTEMS", "CONVERSION_STATUSES",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "source_placement_problems",
     "git_provenance",
@@ -125,7 +126,23 @@ PHENOMENA = frozenset({"radiotropic", "radiotrophic", "radioresistant",
 
 BRIDGE_AXES = frozenset({"phenomenon", "value_basis", "claim_basis", "source",
                          "null", "status", "unit", "quantity_kind", "category",
-                         "model_term"})
+                         "model_term", "conversion"})
+
+# A unit row belongs to one unit system. SI rows have metre, kilogram, second
+# bases. `lattice` rows keep the same exponent pattern (a lattice diffusivity
+# is still L^2 T^-1) over the bases latt, MCS and H, the CPM's own length, clock
+# and energy, so the unit-equals-kind arithmetic holds within a system and the
+# H column is the only one an SI row never uses. `synthetic_reference` is the
+# declared 1.2 cm dosimetry pitch of the synthetic reference system, which is
+# not a biofilm pitch and gets its own system so it can never be read as one.
+UNIT_SYSTEMS = frozenset({"SI", "lattice", "synthetic_reference"})
+
+# A conversion row carries the factor between two systems, or says why not.
+# `blocked` names a requirement in reference_d_requirements.csv that is still
+# awaiting measurement; the day that requirement flips, the bridge goes red
+# until someone fills the factor. `declared` is a chosen factor with no
+# physical claim. `ready` carries a factor and a satisfied requirement.
+CONVERSION_STATUSES = frozenset({"blocked", "declared", "ready"})
 
 # How a minted term relates to the mirrored row it names as nearest_parent.
 # `same_dimension`: the parent has the same SI exponents and the test checks

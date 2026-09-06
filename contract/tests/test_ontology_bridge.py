@@ -22,9 +22,10 @@ from pathlib import Path
 import pytest
 
 from physical_contract import (BRIDGE_AXES, CLAIM_EVIDENCE_BASIS,
-                               EVIDENCE_NULLS, PARAMETER_EVIDENCE_BASIS,
-                               PARENT_RELATIONS, PHENOMENA,
-                               PROJECT_NAMESPACE, PROVENANCE_SOURCES)
+                               CONVERSION_STATUSES, EVIDENCE_NULLS,
+                               PARAMETER_EVIDENCE_BASIS, PARENT_RELATIONS,
+                               PHENOMENA, PROJECT_NAMESPACE,
+                               PROVENANCE_SOURCES, UNIT_SYSTEMS)
 
 REPO = Path(__file__).resolve().parents[2]
 BRIDGE = REPO / "data" / "ontology_bridge.csv"
@@ -45,8 +46,12 @@ UNMAPPED = frozenset({("derived", "value_basis"), ("derived", "claim_basis")})
 # Units whose `count_of` must be filled: a count is dimensionless, so this is
 # the only place the counted thing survives.
 COUNTED = {"cells mm^-3": "cell", "ug cell^-1 Gy^-1": "cell", "per_s": "photon",
-           "species": "species", "rows": "rows"}
-DIMS = ("L", "M", "T", "I", "Theta", "N", "J")
+           "species": "species", "rows": "rows", "sites": "site"}
+DIMS = ("L", "M", "T", "I", "Theta", "N", "J", "H")
+REQUIREMENTS = REPO / "data" / "calibration" / "reference_d_requirements.csv"
+# Unit rows that carry no quantity kind: a marker for "no value" and a marker for
+# "no unit yet". Anything else with kind `none` is a number hiding its unit.
+NO_KIND = frozenset({"n/a", "placeholder"})
 QUDT_VERSION = "QUDT v3.5.1"
 OBO = "http://purl.obolibrary.org/obo/"
 # A model term is an equation or a process, never a quantity.
@@ -73,9 +78,15 @@ def exponents(r):
     return tuple(int(r[d]) for d in DIMS)
 
 
-def bridge_problems(rows) -> list:
+def requirement_status(path=REQUIREMENTS) -> dict:
+    return {r["requirement_id"]: r["status"] for r in _read(path)}
+
+
+def bridge_problems(rows, requirements=None) -> list:
     """Every structural rule, as a list so planted rows can be checked."""
     out = []
+    requirements = requirement_status() if requirements is None else requirements
+    by_term = {(r["local_term"], r["axis"]): r for r in rows}
     mirrored = {r["iri"] for r in rows if r["namespace"] == "mirrored"}
     by_iri = {r["iri"]: r for r in rows if r["iri"]}
     kinds = {r["local_term"]: r for r in rows if r["axis"] == "quantity_kind"}
@@ -90,9 +101,9 @@ def bridge_problems(rows) -> list:
         elif ns == "minted":
             if not iri.startswith(PROJECT_NAMESPACE):
                 out.append(f"{key}: minted row carries an external IRI")
-            if r["axis"] == "null":
+            if r["axis"] in ("null", "conversion"):
                 if r["nearest_parent"]:
-                    out.append(f"{key}: a null has no external parent")
+                    out.append(f"{key}: a {r['axis']} row has no external parent")
             elif r["nearest_parent"] not in mirrored:
                 out.append(f"{key}: nearest_parent is not a mirrored row")
             elif r["parent_relation"] not in PARENT_RELATIONS:
@@ -112,8 +123,30 @@ def bridge_problems(rows) -> list:
             out.append(f"{key}: parent_relation on a row that is not minted")
         if r["xref"] and r["xref"] not in mirrored:
             out.append(f"{key}: xref is not a mirrored row")
-        needs_definition = (r["axis"] == "model_term"
-                            or (r["axis"] == "quantity_kind" and (ns == "minted" or exponents(r) == (0,) * 7)))
+        if r["axis"] == "conversion":
+            st, factor, req = r["conversion_status"], r["conversion_factor"].strip(), r["requirement_id"].strip()
+            if st not in CONVERSION_STATUSES:
+                out.append(f"{key}: conversion_status {st!r}")
+            elif st == "blocked":
+                if factor:
+                    out.append(f"{key}: blocked with a factor")
+                if requirements.get(req) != "awaiting_measurement":
+                    out.append(f"{key}: blocked on {req!r}, whose status is {requirements.get(req)!r}; fill the factor or re-block")
+            elif st == "declared":
+                if not factor or r["basis"] not in ("synthetic", "declared") or r["unit_system"] != "synthetic_reference":
+                    out.append(f"{key}: a declared conversion needs a factor, a synthetic or declared basis and the synthetic_reference system")
+            elif st == "ready":
+                if not factor:
+                    out.append(f"{key}: ready with no factor")
+                if requirements.get(req) not in ("satisfied", "measured"):
+                    out.append(f"{key}: ready while {req!r} is {requirements.get(req)!r}")
+                dep = r["depends_on"].strip()
+                if dep and by_term.get((dep, "conversion"), {}).get("conversion_status") != "ready":
+                    out.append(f"{key}: ready before {dep!r} is")
+        elif r["conversion_status"] or r["conversion_factor"] or r["requirement_id"]:
+            out.append(f"{key}: conversion columns on a non-conversion row")
+        needs_definition = (r["axis"] == "model_term" or r["axis"] == "conversion"
+                            or (r["axis"] == "quantity_kind" and (ns == "minted" or exponents(r) == (0,) * 8)))
         if needs_definition and not r["definition"].strip():
             out.append(f"{key}: no definition; exponents alone cannot identify it")
         if not iri and key not in UNMAPPED:
@@ -123,10 +156,16 @@ def bridge_problems(rows) -> list:
         if r["axis"] == "phenomenon" and not r["endpoint_assay"].strip():
             out.append(f"{key}: phenomenon with no statable endpoint")
         if r["axis"] == "unit":
+            if r["unit_system"] not in UNIT_SYSTEMS:
+                out.append(f"{key}: unit_system {r['unit_system']!r}")
+            elif r["unit_system"] == "SI" and r["H"] != "0":
+                out.append(f"{key}: an SI unit has no Hamiltonian exponent")
             kind = r["quantity_kind"]
+            if r["local_term"] in NO_KIND and kind != "none":
+                out.append(f"{key}: a placeholder may not acquire a quantity kind")
             if kind == "none":
-                if r["local_term"] != "n/a":
-                    out.append(f"{key}: only n/a may have no quantity kind")
+                if r["local_term"] not in NO_KIND:
+                    out.append(f"{key}: only {sorted(NO_KIND)} may have no quantity kind")
             elif kind not in kinds:
                 out.append(f"{key}: quantity kind {kind!r} has no row")
             elif exponents(r) != exponents(kinds[kind]):
@@ -159,7 +198,12 @@ def test_contract_sets_and_bridge_agree_in_both_directions(rows):
 
 
 def test_every_ledger_unit_string_has_a_row(rows):
+    # The reverse direction is over SI rows: a lattice unit comes from the
+    # code, not a ledger, and must say which field in its definition.
     units = by_axis(rows, "unit")
+    lattice = [r for r in rows if r["axis"] == "unit" and r["unit_system"] != "SI"]
+    assert lattice and all(r["definition"].strip() for r in lattice), "a lattice unit with no definition"
+    units -= {r["local_term"] for r in lattice}
     seen = set()
     for path, col in UNIT_LEDGERS.items():
         strings = {r[col] for r in _read(path)}
@@ -172,9 +216,9 @@ def test_every_ledger_unit_string_has_a_row(rows):
 
 def test_the_two_rate_strings_are_not_dose_rates(rows):
     r = {x["local_term"]: x for x in rows if x["axis"] == "unit"}
-    assert r["rad hr^-1"]["quantity_kind"] == "AngularVelocity" and exponents(r["rad hr^-1"]) == (0, 0, -1, 0, 0, 0, 0)
-    assert r["R h^-1"]["quantity_kind"] == "ExposureRate" and exponents(r["R h^-1"]) == (0, -1, 0, 1, 0, 0, 0)
-    assert exponents(r["mGy h^-1"]) == (2, 0, -3, 0, 0, 0, 0)
+    assert r["rad hr^-1"]["quantity_kind"] == "AngularVelocity" and exponents(r["rad hr^-1"]) == (0, 0, -1, 0, 0, 0, 0, 0)
+    assert r["R h^-1"]["quantity_kind"] == "ExposureRate" and exponents(r["R h^-1"]) == (0, -1, 0, 1, 0, 0, 0, 0)
+    assert exponents(r["mGy h^-1"]) == (2, 0, -3, 0, 0, 0, 0, 0)
 
 
 # --- planted failures ------------------------------------------------------
@@ -190,13 +234,13 @@ def _plant(rows, term, axis, **changes):
 
 def test_rad_per_hour_mapped_to_the_dose_rate_fails_on_arithmetic(rows):
     planted = _plant(rows, "rad hr^-1", "unit", quantity_kind="AbsorbedDoseRate")
-    assert any("exponents (0, 0, -1, 0, 0, 0, 0) differ from AbsorbedDoseRate (2, 0, -3" in p
+    assert any("exponents (0, 0, -1, 0, 0, 0, 0, 0) differ from AbsorbedDoseRate (2, 0, -3" in p
                for p in bridge_problems(planted))
 
 
 def test_roentgen_per_hour_mapped_to_the_dose_rate_fails_on_arithmetic(rows):
     planted = _plant(rows, "R h^-1", "unit", quantity_kind="AbsorbedDoseRate")
-    assert any("exponents (0, -1, 0, 1, 0, 0, 0) differ from AbsorbedDoseRate" in p
+    assert any("exponents (0, -1, 0, 1, 0, 0, 0, 0) differ from AbsorbedDoseRate" in p
                for p in bridge_problems(planted))
 
 
@@ -233,3 +277,38 @@ def test_step3_controls_fire(rows):
     assert any("same_dimension parent Length has other exponents" in p for p in bridge_problems(wrong_parent))
     bad_xref = _plant(rows, "radiolysis_of_water", "model_term", xref=PROJECT_NAMESPACE + "hydroxyl")
     assert any("xref is not a mirrored row" in p for p in bridge_problems(bad_xref))
+
+
+def test_lattice_system_and_the_gate(rows):
+    lattice = {r["local_term"] for r in rows if r["axis"] == "unit" and r["unit_system"] == "lattice"}
+    assert {"latt", "MCS", "H", "latt^2/field_step", "placeholder", "normalised"} <= lattice
+    conv = {r["local_term"]: r for r in rows if r["axis"] == "conversion"}
+    assert conv["latt->m"]["conversion_status"] == "blocked" and conv["latt->m"]["requirement_id"] == "D-PITCH"
+    assert conv["MCS->s"]["depends_on"] == "latt->m"
+    assert conv["latt->cm (synthetic dosimetry)"]["unit_system"] == "synthetic_reference"
+    assert requirement_status()["D-PITCH"] == "awaiting_measurement"
+
+
+def test_step4_controls_fire(rows, tmp_path):
+    ready_no_factor = _plant(rows, "latt->m", "conversion", conversion_status="ready")
+    problems = bridge_problems(ready_no_factor)
+    assert any("ready with no factor" in p for p in problems)
+    assert any("ready while 'D-PITCH' is 'awaiting_measurement'" in p for p in problems)
+
+    dosed = _plant(rows, "placeholder", "unit", quantity_kind="AbsorbedDoseRate")
+    assert any("a placeholder may not acquire a quantity kind" in p for p in bridge_problems(dosed))
+
+    # The register flips in a temporary copy: D-PITCH measured, the bridge unchanged.
+    text = REQUIREMENTS.read_text(encoding="utf-8")
+    assert text.count("D-PITCH,lattice_pitch_um,") == 1
+    flipped = tmp_path / "reference_d_requirements.csv"
+    body = [l for l in text.split("\n") if l.startswith("D-PITCH,")][0]
+    assert ",awaiting_measurement," in body
+    flipped.write_text(text.replace(body, body.replace(",awaiting_measurement,", ",measured,", 1)), encoding="utf-8")
+    reg = requirement_status(flipped)
+    assert reg["D-PITCH"] == "measured", "mutation did not reach the parsed column"
+    assert any("blocked on 'D-PITCH', whose status is 'measured'" in p for p in bridge_problems(rows, reg))
+    assert bridge_problems(rows) == []
+
+    clock_first = _plant(rows, "MCS->s", "conversion", conversion_status="ready", conversion_factor="1 s")
+    assert any("ready before 'latt->m' is" in p for p in bridge_problems(clock_first))
