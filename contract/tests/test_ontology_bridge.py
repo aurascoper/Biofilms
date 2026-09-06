@@ -98,6 +98,8 @@ def bridge_problems(rows, requirements=None) -> list:
     out = []
     requirements = requirement_status() if requirements is None else requirements
     by_term = {(r["local_term"], r["axis"]): r for r in rows}
+    ledger_basis = {r["claim_id"]: r["evidence_basis"] for r in _read(SPECIES_TABLE)}
+    ledger_basis.update({r["config_key"]: r["evidence_basis"] for r in _read(PARAMETERS)})
     mirrored = {r["iri"] for r in rows if r["namespace"] == "mirrored"}
     by_iri = {r["iri"]: r for r in rows if r["iri"]}
     kinds = {r["local_term"]: r for r in rows if r["axis"] == "quantity_kind"}
@@ -175,6 +177,18 @@ def bridge_problems(rows, requirements=None) -> list:
                     out.append(f"{key}: a shipped coefficient names where it ships")
             if not r["ledger_rows"].strip():
                 out.append(f"{key}: no ledger rows")
+            # The row's basis is the ledger's, not the bridge's: it must agree
+            # with every ledger row it names, and a hard-coded literal is a
+            # declared choice by definition (PP-T2-29).
+            if r["basis"] not in PARAMETER_EVIDENCE_BASIS:
+                out.append(f"{key}: basis {r['basis']!r}")
+            else:
+                for lid in r["ledger_rows"].split(";"):
+                    lb = ledger_basis.get(lid)
+                    if lb is not None and lb != r["basis"]:
+                        out.append(f"{key}: basis {r['basis']!r} disagrees with {lid} ({lb!r})")
+            if r["relation"] == "hard_coded_replacement" and r["basis"] != "declared":
+                out.append(f"{key}: a hard-coded literal has no basis but declared")
         elif r["substitution_of"] or r["relation"] or r["unit"]:
             out.append(f"{key}: coefficient columns on a non-coefficient row")
         if r["axis"] == "coefficient" or r["conversion_status"] or r["conversion_factor"] or r["requirement_id"]:
@@ -427,3 +441,15 @@ def test_step5_controls_fire(rows):
     assert any("substitutes nothing" in p for p in bridge_problems(prior_substituting))
     wrong_unit = _plant(rows, "beta_ion_cpm", "coefficient", unit="Gy^-1")
     assert any("kind or system disagrees" in p for p in bridge_problems(wrong_unit))
+
+
+def test_the_hard_coded_coupling_can_only_be_declared(rows):
+    coef = {r["local_term"]: r for r in rows if r["axis"] == "coefficient"}
+    assert coef["melanin_coupling_cpm"]["basis"] == "declared"
+    assert coef["beta_ion_prior"]["basis"] == "derived"     # the ledger's word for these six rows
+    cited = _plant(rows, "melanin_coupling_cpm", "coefficient", basis="primary_literature")
+    problems = bridge_problems(cited)
+    assert any("has no basis but declared" in p for p in problems)
+    assert any("disagrees with PP-T2-29" in p for p in problems)
+    relabelled = _plant(rows, "beta_ion_prior", "coefficient", basis="declared")
+    assert any("disagrees with PP-T2-12" in p for p in bridge_problems(relabelled))
