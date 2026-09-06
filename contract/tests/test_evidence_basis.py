@@ -67,12 +67,10 @@ def test_the_two_relations_overlap_by_design_and_differ_by_design():
     assert "unresolved" not in PARAMETER_EVIDENCE_BASIS
 
 
-def test_the_calibration_schema_reads_the_contract_object():
-    from biofilm_calibration.schema import EVIDENCE_BASIS
-    from biofilm_calibration.materials.export import EXPORTABLE_EVIDENCE
-
-    assert EVIDENCE_BASIS is PARAMETER_EVIDENCE_BASIS
-    assert EXPORTABLE_EVIDENCE <= PARAMETER_EVIDENCE_BASIS
+# The calibration schema must read PARAMETER_EVIDENCE_BASIS as the same object.
+# That assertion lives in calibration/tests/test_evidence_vocabulary.py, because
+# CI's shared-contract tier installs contract and coupling only, and a test that
+# cannot import its subject would skip or error rather than check.
 
 
 # --- the canonicaliser ---------------------------------------------------
