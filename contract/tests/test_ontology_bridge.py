@@ -25,7 +25,8 @@ from physical_contract import (BRIDGE_AXES, CLAIM_EVIDENCE_BASIS,
                                CONVERSION_STATUSES, EVIDENCE_NULLS,
                                PARAMETER_EVIDENCE_BASIS, PARENT_RELATIONS,
                                PHENOMENA, PROJECT_NAMESPACE,
-                               PROVENANCE_SOURCES, UNIT_SYSTEMS)
+                               PROVENANCE_SOURCES, SUBSTITUTION_RELATIONS,
+                               UNIT_SYSTEMS)
 
 REPO = Path(__file__).resolve().parents[2]
 BRIDGE = REPO / "data" / "ontology_bridge.csv"
@@ -52,6 +53,16 @@ REQUIREMENTS = REPO / "data" / "calibration" / "reference_d_requirements.csv"
 # Unit rows that carry no quantity kind: a marker for "no value" and a marker for
 # "no unit yet". Anything else with kind `none` is a number hiding its unit.
 NO_KIND = frozenset({"n/a", "placeholder"})
+TEX = REPO / "preprint" / "modeling_radioresistance_and_radiotropic_fitness.tex"
+SPECIES_TABLE = REPO / "data" / "species_parameter_provenance.csv"
+PARAMETERS = REPO / "data" / "parameter_provenance.csv"
+POTTS = REPO / "biofilms_potts.jl"
+# Code species tag -> species table name; OI has no Table 2 row at all.
+SPECIES = {"CN": "C. neoformans", "DR": "D. radiodurans", "CS": "C. sphaerospermum",
+           "BS": "B. subtilis", "AN": "A. niger", "SO": "S. oneidensis", "OI": None}
+# A code coefficient with no tabulated row must be zero, except these, which
+# the source comments as estimated.
+UNTABULATED_NONZERO = frozenset({("beta_s_ion", "OI")})
 QUDT_VERSION = "QUDT v3.5.1"
 OBO = "http://purl.obolibrary.org/obo/"
 # A model term is an equation or a process, never a quantity.
@@ -101,7 +112,7 @@ def bridge_problems(rows, requirements=None) -> list:
         elif ns == "minted":
             if not iri.startswith(PROJECT_NAMESPACE):
                 out.append(f"{key}: minted row carries an external IRI")
-            if r["axis"] in ("null", "conversion"):
+            if r["axis"] in ("null", "conversion", "coefficient"):
                 if r["nearest_parent"]:
                     out.append(f"{key}: a {r['axis']} row has no external parent")
             elif r["nearest_parent"] not in mirrored:
@@ -143,9 +154,34 @@ def bridge_problems(rows, requirements=None) -> list:
                 dep = r["depends_on"].strip()
                 if dep and by_term.get((dep, "conversion"), {}).get("conversion_status") != "ready":
                     out.append(f"{key}: ready before {dep!r} is")
-        elif r["conversion_status"] or r["conversion_factor"] or r["requirement_id"]:
+        if r["axis"] == "coefficient":
+            unit = by_term.get((r["unit"], "unit"))
+            if unit is None:
+                out.append(f"{key}: unit {r['unit']!r} is not a unit row")
+            elif unit["quantity_kind"] != r["quantity_kind"] or unit["unit_system"] != r["unit_system"]:
+                out.append(f"{key}: kind or system disagrees with its unit row")
+            if r["unit_system"] == "SI":
+                if r["substitution_of"] or r["relation"]:
+                    out.append(f"{key}: a tabulated prior substitutes nothing")
+            else:
+                prior = by_term.get((r["substitution_of"], "coefficient"))
+                if prior is None:
+                    out.append(f"{key}: substitution_of names no coefficient row")
+                elif prior["unit_system"] != "SI" or prior["unit"] == r["unit"]:
+                    out.append(f"{key}: a shipped coefficient must substitute a tabulated SI prior in another unit")
+                if r["relation"] not in SUBSTITUTION_RELATIONS:
+                    out.append(f"{key}: relation {r['relation']!r}")
+                if not r["code_location"].strip():
+                    out.append(f"{key}: a shipped coefficient names where it ships")
+            if not r["ledger_rows"].strip():
+                out.append(f"{key}: no ledger rows")
+        elif r["substitution_of"] or r["relation"] or r["unit"]:
+            out.append(f"{key}: coefficient columns on a non-coefficient row")
+        if r["axis"] == "coefficient" or r["conversion_status"] or r["conversion_factor"] or r["requirement_id"]:
+            pass
+        if r["axis"] != "conversion" and (r["conversion_status"] or r["conversion_factor"] or r["requirement_id"]):
             out.append(f"{key}: conversion columns on a non-conversion row")
-        needs_definition = (r["axis"] == "model_term" or r["axis"] == "conversion"
+        needs_definition = (r["axis"] in ("model_term", "conversion", "coefficient")
                             or (r["axis"] == "quantity_kind" and (ns == "minted" or exponents(r) == (0,) * 8)))
         if needs_definition and not r["definition"].strip():
             out.append(f"{key}: no definition; exponents alone cannot identify it")
@@ -312,3 +348,82 @@ def test_step4_controls_fire(rows, tmp_path):
 
     clock_first = _plant(rows, "MCS->s", "conversion", conversion_status="ready", conversion_factor="1 s")
     assert any("ready before 'latt->m' is" in p for p in bridge_problems(clock_first))
+
+
+# --- step 5: the tabulated prior and the shipped coefficient -----------------
+
+def code_vectors(text=None) -> dict:
+    """{symbol: {species tag: value}} parsed from CPMParams' commented vectors."""
+    import re
+    text = POTTS.read_text(encoding="utf-8") if text is None else text
+    out = {}
+    for field, symbol in (("β_ion", "beta_s_ion"), ("α_M_species", "alpha_M")):
+        block = re.search(field + r"::Vector\{Float64\} = \[(.*?)\n\s*\]", text, re.S)
+        assert block, f"{field} vector not found"
+        vals = {tag: v for v, tag in re.findall(r"^\s*(-?[0-9.e+-]+),?\s*#\s*([A-Z]{2})\b", block.group(1), re.M)}
+        assert set(vals) == set(SPECIES), (field, sorted(vals))
+        out[symbol] = {k: float(v) for k, v in vals.items()}
+    return out
+
+
+def table_ranges() -> dict:
+    """{(symbol, species name): (lo, hi)} from the species table."""
+    import re
+    out = {}
+    for r in _read(SPECIES_TABLE):
+        if r["symbol"] in ("beta_s_ion", "alpha_M"):
+            lo, hi = re.split(r"\s+to\s+|(?<=\d)-(?=\d)", r["range"])
+            out[(r["symbol"], r["species"])] = (float(lo), float(hi))
+    assert len(out) == 9, sorted(out)
+    return out
+
+
+def substitution_problems(vectors, ranges) -> list:
+    out = []
+    for symbol, values in vectors.items():
+        for tag, value in values.items():
+            name = SPECIES[tag]
+            rng = ranges.get((symbol, name)) if name else None
+            if rng is None:
+                if value != 0.0 and (symbol, tag) not in UNTABULATED_NONZERO:
+                    out.append(f"{symbol}[{tag}] = {value} with no Table 2 row")
+            elif not rng[0] <= abs(value) <= rng[1]:
+                out.append(f"{symbol}[{tag}] = {value} outside Table 2's {rng}")
+    return out
+
+
+def test_coefficient_rows_pair_prior_with_shipped(rows):
+    coef = {r["local_term"]: r for r in rows if r["axis"] == "coefficient"}
+    assert set(coef) == {"beta_ion_prior", "beta_ion_cpm", "alpha_M_prior", "alpha_M_cpm", "melanin_coupling_cpm"}
+    for r in coef.values():
+        assert f"\\label{{{r['declared_in']}}}" in TEX.read_text(encoding="utf-8"), r["declared_in"]
+    ids = {r["claim_id"] for r in _read(SPECIES_TABLE)} | {r["config_key"] for r in _read(PARAMETERS)}
+    for r in coef.values():
+        missing = set(r["ledger_rows"].split(";")) - ids
+        assert not missing, (r["local_term"], missing)
+    # The distinguishing fact: same number, different unit system.
+    assert coef["beta_ion_cpm"]["unit_system"] != coef["beta_ion_prior"]["unit_system"]
+    assert coef["melanin_coupling_cpm"]["relation"] == "hard_coded_replacement"
+    text = POTTS.read_text(encoding="utf-8")
+    assert text.count("0.5 * M_local") == 2, "the hard-coded coupling moved"
+
+
+def test_shipped_numbers_are_the_tabulated_priors():
+    vectors, ranges = code_vectors(), table_ranges()
+    assert substitution_problems(vectors, ranges) == []
+    assert vectors["beta_s_ion"]["CN"] < 0 and vectors["alpha_M"]["DR"] == 0.0   # sign by role; no melanin
+
+
+def test_step5_controls_fire(rows):
+    vectors, ranges = code_vectors(), table_ranges()
+    drifted = {k: dict(v) for k, v in vectors.items()}; drifted["beta_s_ion"]["CN"] = -5e-3
+    assert any("outside Table 2" in p for p in substitution_problems(drifted, ranges))
+    invented = {k: dict(v) for k, v in vectors.items()}; invented["alpha_M"]["DR"] = 0.2
+    assert any("no Table 2 row" in p for p in substitution_problems(invented, ranges))
+    assert any("relation ''" in p for p in bridge_problems(_plant(rows, "beta_ion_cpm", "coefficient", relation="")))
+    same_system = _plant(rows, "beta_ion_cpm", "coefficient", substitution_of="alpha_M_cpm")
+    assert any("must substitute a tabulated SI prior" in p for p in bridge_problems(same_system))
+    prior_substituting = _plant(rows, "beta_ion_prior", "coefficient", substitution_of="alpha_M_prior")
+    assert any("substitutes nothing" in p for p in bridge_problems(prior_substituting))
+    wrong_unit = _plant(rows, "beta_ion_cpm", "coefficient", unit="Gy^-1")
+    assert any("kind or system disagrees" in p for p in bridge_problems(wrong_unit))

@@ -27,7 +27,7 @@ __all__ = [
     "EVIDENCE_NULLS", "LEGACY_CLAIM_EVIDENCE", "canonical_claim_evidence",
     "parameter_evidence_problems", "claim_evidence_problems",
     "PROJECT_NAMESPACE", "PHENOMENA", "BRIDGE_AXES", "PARENT_RELATIONS",
-    "UNIT_SYSTEMS", "CONVERSION_STATUSES",
+    "UNIT_SYSTEMS", "CONVERSION_STATUSES", "SUBSTITUTION_RELATIONS",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "source_placement_problems",
     "git_provenance",
@@ -126,7 +126,16 @@ PHENOMENA = frozenset({"radiotropic", "radiotrophic", "radioresistant",
 
 BRIDGE_AXES = frozenset({"phenomenon", "value_basis", "claim_basis", "source",
                          "null", "status", "unit", "quantity_kind", "category",
-                         "model_term", "conversion"})
+                         "model_term", "conversion", "coefficient"})
+
+# How a coefficient the code ships relates to the prior the manuscript
+# tabulates. `declared_substitution`: the tabulated number is used as the
+# coefficient in another unit system, and the manuscript declares it
+# (sec:params: "That substitution is legitimate only as a declared modelling
+# choice, and this is the declaration"). `hard_coded_replacement`: a literal in
+# the source stands where the tabulated coefficient would go (the 0.5 melanin
+# coupling, PP-T2-29).
+SUBSTITUTION_RELATIONS = frozenset({"declared_substitution", "hard_coded_replacement"})
 
 # A unit row belongs to one unit system. SI rows have metre, kilogram, second
 # bases. `lattice` rows keep the same exponent pattern (a lattice diffusivity
