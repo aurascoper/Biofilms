@@ -1,0 +1,97 @@
+# ontology_bridge — every controlled vocabulary value, unit string and phenomenon word in this
+# repository, mapped to an external IRI (namespace=mirrored) or to a term under the project
+# namespace (namespace=minted) when nothing external exists. `derived` is namespace=unmapped on
+# purpose: it is a source with an unresolved basis and may carry no evidence class.
+# External terms re-verified 2026-09-06: OBO labels through the OLS4 API (defining ontology only);
+# units and quantity kinds against QUDT v3.5.1 (released 2026-08-29), files
+# VOCAB_QUDT-UNITS-ALL.ttl and VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl at that tag.
+# Exponents L M T I Theta N J are SI base dimensions, taken from the QUDT dimension vectors for
+# mirrored rows (QUDT's E is electric current, its I is luminous intensity). A count is
+# dimensionless (UCUM {cell} = 1); `count_of` keeps what was counted. The rad/hr row is an ANGLE
+# rate; the R/h row is an EXPOSURE rate. Enforced by contract/tests/test_ontology_bridge.py.
+local_term,axis,namespace,iri,published_label,verified_on,verified_via,nearest_parent,endpoint_assay,bfo_category,quantity_kind,count_of,L,M,T,I,Theta,N,J,notes
+process,category,mirrored,http://purl.obolibrary.org/obo/BFO_0000015,process,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+disposition,category,mirrored,http://purl.obolibrary.org/obo/BFO_0000016,disposition,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+quality,category,mirrored,http://purl.obolibrary.org/obo/BFO_0000019,quality,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+evidence,category,mirrored,http://purl.obolibrary.org/obo/ECO_0000000,evidence,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+background_inference,category,mirrored,http://purl.obolibrary.org/obo/ECO_0000001,inference from background scientific knowledge,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+information_content_entity,category,mirrored,http://purl.obolibrary.org/obo/IAO_0000030,information content entity,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+software,category,mirrored,http://purl.obolibrary.org/obo/IAO_0000010,software,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+measurement_datum,category,mirrored,http://purl.obolibrary.org/obo/IAO_0000109,measurement datum,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+assay,category,mirrored,http://purl.obolibrary.org/obo/OBI_0000070,assay,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+tropism,category,mirrored,http://purl.obolibrary.org/obo/GO_0009606,tropism,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+response_to_ionizing_radiation,category,mirrored,http://purl.obolibrary.org/obo/GO_0010212,response to ionizing radiation,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+pato_quality,category,mirrored,http://purl.obolibrary.org/obo/PATO_0000001,quality,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+radiotropic,phenomenon,minted,https://github.com/aurascoper/Biofilms/onto#radiotropism,radiotropism,2026-09-06,minted,http://purl.obolibrary.org/obo/GO_0009606,displacement of biomass-parcel centroid per unit dose gradient; redistribution assay (child of OBI:0000070; no exact OBI class located),http://purl.obolibrary.org/obo/BFO_0000016,,,,,,,,,,GO tropism is directional growth toward a stimulus; no term for ionizing radiation as the stimulus
+radiotrophic,phenomenon,minted,https://github.com/aurascoper/Biofilms/onto#radiotrophy,radiotrophy,2026-09-06,minted,http://purl.obolibrary.org/obo/GO_0010212,"growth-rate ratio, irradiated over control, above 1; growth assay (child of OBI:0000070; no exact OBI class located)",http://purl.obolibrary.org/obo/BFO_0000016,,,,,,,,,,GO:0010212 is neutral on direction; no growth-enhancement-by-ionizing-radiation phenotype in GO or OMP
+radioresistant,phenomenon,minted,https://github.com/aurascoper/Biofilms/onto#radioresistance,radioresistance,2026-09-06,minted,http://purl.obolibrary.org/obo/PATO_0000001,"D10, dose for a one-log reduction in survival; colony-forming survival assay (child of OBI:0000070; no exact OBI class located)",http://purl.obolibrary.org/obo/BFO_0000019,,,,,,,,,,PATO has no radiation-sensitivity quality; PATO:0001297 resolves but means reflectivity. OMP covers UV only
+melanized_radioprotective,phenomenon,minted,https://github.com/aurascoper/Biofilms/onto#melanin_radioprotection,melanin radioprotection,2026-09-06,minted,http://purl.obolibrary.org/obo/BFO_0000016,"dose-modifying factor or survival difference, melanized against isogenic albino strain; survival assay (child of OBI:0000070; no exact OBI class located)",http://purl.obolibrary.org/obo/BFO_0000016,,,,,,,,,,"GO:0042438 covers melanin synthesis, not protection; the nearest external class is the upper category"
+radiation_responsive,phenomenon,mirrored,http://purl.obolibrary.org/obo/GO_0009314,response to radiation,2026-09-06,"OLS4 API, is_defining_ontology",,"any measured molecular, morphological or material change after exposure; the assay is named per measurement",http://purl.obolibrary.org/obo/BFO_0000015,,,,,,,,,,
+direct_measurement,value_basis,mirrored,http://purl.obolibrary.org/obo/ECO_0000002,direct assay evidence,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+assay_certificate,value_basis,minted,https://github.com/aurascoper/Biofilms/onto#assay_certificate,assay certificate,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000002,,,,,,,,,,,,a certificate of analysis is direct assay evidence produced by a third party
+manufacturer_datasheet,value_basis,minted,https://github.com/aurascoper/Biofilms/onto#manufacturer_datasheet,manufacturer datasheet,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000033,,,,,,,,,,,,a datasheet is a traceable reference that is not a scholarly one
+evaluated_nuclear_data,value_basis,minted,https://github.com/aurascoper/Biofilms/onto#evaluated_nuclear_data,evaluated nuclear data,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000033,,,,,,,,,,,,"a published evaluation (LNHB, ENSDF); traceable, not a primary measurement"
+proxy,value_basis,minted,https://github.com/aurascoper/Biofilms/onto#proxy_value,proxy value,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000001,,,,,,,,,,,,a stand-in from a related system; inference from background knowledge that the systems agree
+primary_literature,value_basis,mirrored,http://purl.obolibrary.org/obo/ECO_0000033,author statement supported by traceable reference,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+derived,value_basis,unmapped,,,,,,,,,,,,,,,,,a SOURCE with an unresolved basis: inherits the weakest input (sec:planned_feedback); no evidence class may be asserted
+declared,value_basis,minted,https://github.com/aurascoper/Biofilms/onto#declared,declared modelling choice,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000000,,,,,,,,,,,,chosen with physical intent and no external referent; can become ready by measurement
+synthetic,value_basis,minted,https://github.com/aurascoper/Biofilms/onto#synthetic,synthetic value,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000000,,,,,,,,,,,,"explicitly non-physical, exists to exercise the software path; can never become ready by measurement"
+computational,claim_basis,mirrored,http://purl.obolibrary.org/obo/ECO_0007672,computational evidence,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+prior_search,claim_basis,minted,https://github.com/aurascoper/Biofilms/onto#prior_search,prior search with negative result,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000000,,,,,,,,,,,,supports an absence claim; ECO has no verified absence-by-search code
+primary_literature,claim_basis,mirrored,http://purl.obolibrary.org/obo/ECO_0000033,author statement supported by traceable reference,2026-09-06,"OLS4 API, is_defining_ontology",,,,,,,,,,,,,
+derived,claim_basis,unmapped,,,,,,,,,,,,,,,,,as on the value axis
+declared,claim_basis,minted,https://github.com/aurascoper/Biofilms/onto#declared,declared modelling choice,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000000,,,,,,,,,,,,
+synthetic,claim_basis,minted,https://github.com/aurascoper/Biofilms/onto#synthetic,synthetic value,2026-09-06,minted,http://purl.obolibrary.org/obo/ECO_0000000,,,,,,,,,,,,
+simulation_output,source,minted,https://github.com/aurascoper/Biofilms/onto#simulation_output,simulation output,2026-09-06,minted,http://purl.obolibrary.org/obo/IAO_0000030,,,,,,,,,,,,
+code,source,minted,https://github.com/aurascoper/Biofilms/onto#source_code,source code,2026-09-06,minted,http://purl.obolibrary.org/obo/IAO_0000010,,,,,,,,,,,,
+code_inspection,source,minted,https://github.com/aurascoper/Biofilms/onto#code_inspection,human reading of source code,2026-09-06,minted,http://purl.obolibrary.org/obo/IAO_0000030,,,,,,,,,,,,
+repository_policy,source,minted,https://github.com/aurascoper/Biofilms/onto#repository_policy,repository policy document,2026-09-06,minted,http://purl.obolibrary.org/obo/IAO_0000030,,,,,,,,,,,,
+absent,null,minted,https://github.com/aurascoper/Biofilms/onto#evidence_absent,"audited, nothing supports it",2026-09-06,minted,,,,,,,,,,,,,
+blank,null,minted,https://github.com/aurascoper/Biofilms/onto#evidence_not_established,not established,2026-09-06,minted,,,,,,,,,,,,,"the empty string in a ledger; ""empty is not zero"""
+Length,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Length,Length,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,1,0,0,0,0,0,0,
+Dimensionless,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Dimensionless,Dimensionless,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,0,0,0,0,0,
+Energy,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Energy,Energy,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,2,1,-2,0,0,0,0,
+MassDensity,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/MassDensity,Mass Density,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,-3,1,0,0,0,0,0,
+Time,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Time,Time,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,1,0,0,0,0,
+DiffusionCoefficient,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/DiffusionCoefficient,Diffusion Coefficient,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,2,0,-1,0,0,0,0,
+Velocity,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Velocity,Velocity,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,1,0,-1,0,0,0,0,
+NumberDensity,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/NumberDensity,Number Density,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,-3,0,0,0,0,0,0,
+AngularVelocity,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/AngularVelocity,Angular Velocity,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,-1,0,0,0,0,
+Count,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Count,Count,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,0,0,0,0,0,
+Volume,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Volume,Volume,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,3,0,0,0,0,0,0,
+MassFraction,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/MassFraction,Mass Fraction,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,0,0,0,0,0,
+MassRatio,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/MassRatio,Mass Ratio,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,0,0,0,0,0,
+MassConcentration,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/MassConcentration,Mass Concentration,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,-3,1,0,0,0,0,0,
+InverseTime,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/InverseTime,Inverse Time,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,0,-1,0,0,0,0,
+ExposureRate,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/ExposureRate,Exposure Rate,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,-1,0,1,0,0,0,
+Exposure,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/Exposure,Exposure,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,0,-1,1,1,0,0,0,
+AbsorbedDoseRate,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/AbsorbedDoseRate,Absorbed Dose Rate,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,2,0,-3,0,0,0,0,
+AbsorbedDose,quantity_kind,mirrored,http://qudt.org/vocab/quantitykind/AbsorbedDose,Absorbed Dose,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-QUANTITY-KINDS-ALL.ttl,,,,,,2,0,-2,0,0,0,0,
+radiation_sensitivity,quantity_kind,minted,https://github.com/aurascoper/Biofilms/onto#radiation_sensitivity,radiation sensitivity (per absorbed dose),2026-09-06,minted,http://qudt.org/vocab/quantitykind/AbsorbedDose,,,,,-2,0,2,0,0,0,0,
+mass_yield_per_dose,quantity_kind,minted,https://github.com/aurascoper/Biofilms/onto#mass_yield_per_dose,mass produced per organism per absorbed dose,2026-09-06,minted,http://qudt.org/vocab/quantitykind/AbsorbedDose,,,,,-2,1,2,0,0,0,0,the per-organism factor is a count and carries no dimension
+cm,unit,mirrored,http://qudt.org/vocab/unit/CentiM,Centimeter,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Length,,1,0,0,0,0,0,0,
+dimensionless,unit,mirrored,http://qudt.org/vocab/unit/UNITLESS,Unitless,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Dimensionless,,0,0,0,0,0,0,0,
+(declared dimensionless),unit,mirrored,http://qudt.org/vocab/unit/UNITLESS,Unitless,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Dimensionless,,0,0,0,0,0,0,0,
+eV,unit,mirrored,http://qudt.org/vocab/unit/EV,Electron Volt,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Energy,,2,1,-2,0,0,0,0,
+g_cm3,unit,mirrored,http://qudt.org/vocab/unit/GM-PER-CentiM3,Gram per Cubic Centimeter,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,MassDensity,,-3,1,0,0,0,0,0,
+s,unit,mirrored,http://qudt.org/vocab/unit/SEC,Second,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Time,,0,0,1,0,0,0,0,
+a,unit,mirrored,http://qudt.org/vocab/unit/YR,Year,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Time,,0,0,1,0,0,0,0,annum; the ledger's half-life unit
+um/s,unit,mirrored,http://qudt.org/vocab/unit/MicroM-PER-SEC,Micrometer per Second,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Velocity,,1,0,-1,0,0,0,0,
+cells mm^-3,unit,mirrored,http://qudt.org/vocab/unit/NUM-PER-MilliM3,Number per Cubic Millimeter,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,NumberDensity,cell,-3,0,0,0,0,0,0,
+rad hr^-1,unit,mirrored,http://qudt.org/vocab/unit/RAD-PER-HR,Radian per Hour,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,AngularVelocity,,0,0,-1,0,0,0,0,"phase-locking frequency: radians, an angle, NOT the absorbed-dose rad (unit:RAD_R, L2 T-2)"
+cm3,unit,mirrored,http://qudt.org/vocab/unit/CentiM3,Cubic Centimeter,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Volume,,3,0,0,0,0,0,0,
+mass_fraction,unit,mirrored,http://qudt.org/vocab/unit/UNITLESS,Unitless,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,MassFraction,,0,0,0,0,0,0,0,dimensionless by definition; the kind carries the meaning
+per_s,unit,mirrored,http://qudt.org/vocab/unit/PER-SEC,Reciprocal Second,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,InverseTime,photon,0,0,-1,0,0,0,0,"photons per second, a count rate"
+mg_per_g_dry,unit,mirrored,http://qudt.org/vocab/unit/MilliGM-PER-GM,Milligram per Gram,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,MassRatio,,0,0,0,0,0,0,0,"per dry biomass; the basis travels in the ledger's basis column, not in the unit"
+mg_per_L,unit,mirrored,http://qudt.org/vocab/unit/MilliGM-PER-L,Milligram per Liter,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,MassConcentration,,-3,1,0,0,0,0,0,
+cm2_per_s,unit,mirrored,http://qudt.org/vocab/unit/CentiM2-PER-SEC,Square Centimeter per Second,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,DiffusionCoefficient,,2,0,-1,0,0,0,0,
+Gy,unit,mirrored,http://qudt.org/vocab/unit/GRAY,Gray,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,AbsorbedDose,,2,0,-2,0,0,0,0,
+mGy h^-1,unit,mirrored,http://qudt.org/vocab/unit/MilliGRAY-PER-HR,Milligray per Hour,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,AbsorbedDoseRate,,2,0,-3,0,0,0,0,
+R,unit,mirrored,http://qudt.org/vocab/unit/R,Roentgen,2026-09-06,QUDT v3.5.1 VOCAB_QUDT-UNITS-ALL.ttl,,,,Exposure,,0,-1,1,1,0,0,0,"exposure, coulomb per kilogram; manuscript only"
+um^2/s,unit,minted,https://github.com/aurascoper/Biofilms/onto#square_micrometer_per_second,square micrometer per second,2026-09-06,minted,http://qudt.org/vocab/unit/CentiM2-PER-SEC,,,DiffusionCoefficient,,2,0,-1,0,0,0,0,QUDT v3.5.1 has MicroM2 and CentiM2-PER-SEC but no MicroM2-PER-SEC; UCUM um2/s
+Gy^-1,unit,minted,https://github.com/aurascoper/Biofilms/onto#per_gray,per gray,2026-09-06,minted,http://qudt.org/vocab/unit/GRAY,,,radiation_sensitivity,,-2,0,2,0,0,0,0,no PER-GRAY in QUDT v3.5.1; UCUM /Gy
+ug cell^-1 Gy^-1,unit,minted,https://github.com/aurascoper/Biofilms/onto#microgram_per_cell_per_gray,microgram per cell per gray,2026-09-06,minted,http://qudt.org/vocab/unit/GRAY,,,mass_yield_per_dose,cell,-2,1,2,0,0,0,0,UCUM ug/({cell}.Gy); {cell} is an annotation equal to 1
+species,unit,minted,https://github.com/aurascoper/Biofilms/onto#count_of_species,count of species,2026-09-06,minted,http://qudt.org/vocab/unit/UNITLESS,,,Count,species,0,0,0,0,0,0,0,"a table-header claim's unit, not a physical one"
+rows,unit,minted,https://github.com/aurascoper/Biofilms/onto#count_of_rows,count of rows,2026-09-06,minted,http://qudt.org/vocab/unit/UNITLESS,,,Count,rows,0,0,0,0,0,0,0,"a whole-table claim's unit, not a physical one"
+R h^-1,unit,minted,https://github.com/aurascoper/Biofilms/onto#roentgen_per_hour,roentgen per hour,2026-09-06,minted,http://qudt.org/vocab/unit/R,,,ExposureRate,,0,-1,0,1,0,0,0,"exposure rate, M-1 I. The manuscript's 0.03 R/h to 0.3 mGy/h conversion is Robertson's stated equivalence and stays in prose; no QUDT R-PER-HR at v3.5.1"
+n/a,unit,minted,https://github.com/aurascoper/Biofilms/onto#unit_not_applicable,no unit applies,2026-09-06,minted,http://qudt.org/vocab/unit/UNITLESS,,,none,,0,0,0,0,0,0,0,the distributions ledger's marker for a row that carries no value

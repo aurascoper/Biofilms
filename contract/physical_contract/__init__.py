@@ -26,6 +26,7 @@ __all__ = [
     "PARAMETER_EVIDENCE_BASIS", "CLAIM_EVIDENCE_BASIS", "PROVENANCE_SOURCES",
     "EVIDENCE_NULLS", "LEGACY_CLAIM_EVIDENCE", "canonical_claim_evidence",
     "parameter_evidence_problems", "claim_evidence_problems",
+    "PROJECT_NAMESPACE", "PHENOMENA", "BRIDGE_AXES",
     "MaterialSpec", "closed_composition_problems", "render_material_toml",
     "source_placement_problems",
     "git_provenance",
@@ -107,6 +108,23 @@ PROVENANCE_SOURCES = frozenset({"simulation_output", "code", "code_inspection",
 # ledgers' "empty is not zero" rule. Folding them would turn an unaudited row
 # into an audited one.
 EVIDENCE_NULLS = frozenset({"absent", ""})
+
+# --- the ontology bridge ---------------------------------------------------
+# data/ontology_bridge.csv maps every controlled value, unit string and
+# phenomenon word to an external IRI or to a term minted under this namespace.
+# The namespace is a name, not a resolvable URL, until a w3id is registered;
+# the test asserts mirrored and minted IRIs are disjoint by prefix.
+PROJECT_NAMESPACE = "https://github.com/aurascoper/Biofilms/onto#"
+
+# The manuscript's five phenomenon words (Introduction: "Five phenomena travel
+# under one loose vocabulary"). Each word enters only if its endpoint can be
+# stated, and the bridge carries that endpoint as a column that may not be
+# blank. `radiation_responsive` is the only one with an external class.
+PHENOMENA = frozenset({"radiotropic", "radiotrophic", "radioresistant",
+                       "melanized_radioprotective", "radiation_responsive"})
+
+BRIDGE_AXES = frozenset({"phenomenon", "value_basis", "claim_basis", "source",
+                         "null", "status", "unit", "quantity_kind", "category"})
 
 # Values the claims ledger stored before the two relations were separated,
 # with what each means. The ledger's convention is additive (corrections are
