@@ -133,16 +133,17 @@ end
     @test occursin("synthetic source rate, not a physical target", u)
     @test occursin("3.7e9", u) && occursin("mesh/dose_rate_mean_Gy_s", u)
     target = fake_result(joinpath(tmp, "tr_target.h5"); target_calibration = 1,
-                         source_rate_photons_per_s = 1.0e8)
+                         source_rate_photons_per_s = 1.0e8, logical_axis_order = "xyz")
     export_vti(snap, joinpath(tmp, "with_target"); dose = target)
     @test occursin("target_calibration = true", vti_field_string(joinpath(tmp, "with_target.vti"), "dose_rate_mean_Gy_s_units"))
-    bare = fake_result(joinpath(tmp, "tr_bare.h5"); source_rate_photons_per_s = 1.0e8)
+    bare = fake_result(joinpath(tmp, "tr_bare.h5"); source_rate_photons_per_s = 1.0e8, logical_axis_order = "xyz")
     @test_throws ArgumentError export_vti(snap, joinpath(tmp, "bare"); dose = bare)
     @test !isfile(joinpath(tmp, "bare.vti"))
     wrong = joinpath(tmp, "tr_wrong.h5")
     h5open(wrong, "w") do g
         g["mesh/dose_rate_mean_Gy_s"] = zeros(4, 4, 4)
         attributes(g)["target_calibration"] = 0; attributes(g)["source_rate_photons_per_s"] = 1.0
+        attributes(g)["logical_axis_order"] = "xyz"
     end
     @test_throws ArgumentError export_vti(snap, joinpath(tmp, "wrong"); dose = wrong)
 end
@@ -159,6 +160,124 @@ end
     @test occursin("timestep=\"2.0\"", pvd) && occursin("timestep=\"5.0\"", pvd)
     cp(snap, joinpath(d, "c.h5"))   # a second snapshot at mcs 2
     @test_throws ArgumentError export_series(d, joinpath(tmp, "dup"))
+end
+
+@testset "a restart from another time is refused; the same time is accepted" begin
+    same = joinpath(tmp, "restart_same.h5")
+    export_restart_checkpoint(SR, sim, same)          # sim is at mcs 2, like snap
+    export_vti(snap, joinpath(tmp, "with_nutrient"); restart = same)
+    f = VTKFile(joinpath(tmp, "with_nutrient.vti"))
+    @test "nutrient" in keys(get_cell_data(f))
+    later = SR.init_coupled_simulation(p, rp; seed = 9)
+    SR.advance_window!(later, 5)
+    other = joinpath(tmp, "restart_other.h5")
+    export_restart_checkpoint(SR, later, other)
+    @test_throws ArgumentError export_vti(snap, joinpath(tmp, "wrong_time"); restart = other)
+    @test !isfile(joinpath(tmp, "wrong_time.vti"))
+end
+
+@testset "a dose file declaring another axis order is refused" begin
+    zyx = joinpath(tmp, "tr_zyx.h5")
+    h5open(zyx, "w") do g
+        g["mesh/dose_rate_mean_Gy_s"] = fill(0.25, N)
+        attributes(g)["target_calibration"] = 0
+        attributes(g)["source_rate_photons_per_s"] = 1.0
+        attributes(g)["logical_axis_order"] = "zyx"
+    end
+    @test_throws ArgumentError export_vti(snap, joinpath(tmp, "zyx"); dose = zyx)
+    @test !isfile(joinpath(tmp, "zyx.vti"))
+end
+
+# ---------- the viewer's renderer-free half, in CI ----------
+include(joinpath(REPO, "viewer", "lattice_grid.jl"))
+
+@testset "viewer grid: air exactly where the file's sentinels say, ids elsewhere" begin
+    grid, mcs = species_grid(snap)
+    @test mcs == 2 && size(grid) == N && eltype(grid) == UInt8
+    h5open(snap, "r") do h
+        cid = read(h["lattice/cell_id"]); sp = read(h["lattice/species_id"])
+        @test all(grid[cid .<= 0] .== 0x00)
+        @test grid[cid .> 0] == UInt8.(sp[cid .> 0])
+    end
+    @test length(COLORS) == 7 && length(LABELS) == 7
+    @test_throws ArgumentError species_grid(joinpath(tmp, "odd.h5"))   # logical_axis_order zyx
+end
+
+@testset "viewer CLI contract" begin
+    o = viewer_options(["s.h5"])
+    @test o.snapshot == "s.h5" && o.still === nothing && o.record_to === nothing && o.frames == 120
+    o = viewer_options(["s.h5", "--still", "a.png", "--frames", "12"])
+    @test o.still == "a.png" && o.frames == 12
+    @test_throws ArgumentError viewer_options(String[])
+    @test_throws ArgumentError viewer_options(["s.h5", "--bogus", "x"])
+    @test_throws ArgumentError viewer_options(["s.h5", "--still"])
+    @test_throws ArgumentError viewer_options(["s.h5", "--still", "a.png", "--record", "b.mp4"])
+    @test_throws ArgumentError viewer_options(["s.h5", "--frames", "0"])
+end
+
+# The GL half cannot run here. What can be decided statically is decided statically: the
+# file parses, and every name it uses resolves in Base, HDF5, lattice_grid.jl, a local
+# binding, or the declared list of GLMakie names it relies on. A first-render UndefVarError
+# is the class this catches (AGENTS.md rule 2).
+GLMAKIE_NAMES = Set([:GLMakie, :Makie, :Figure, :Axis3, :voxels!, :Legend, :PolyElement,
+                     :save, :record, :display, :Colorant, :Screen, :wait, :..])
+function free_names(ex)
+    defined = Set{Symbol}([:ARGS, :PROGRAM_FILE, :__DIR__, :__FILE__])
+    used = Set{Symbol}()
+    function define!(lhs)
+        lhs isa Symbol && push!(defined, lhs)
+        lhs isa Expr && lhs.head in (:tuple, :parameters, :kw, :(::), :(=), :call) && foreach(define!, lhs.args)
+    end
+    function walk(e, ctx)
+        if e isa Symbol
+            push!(used, e)
+        elseif e isa QuoteNode
+            return
+        elseif e isa Expr
+            h = e.head
+            if h === :function
+                define!(e.args[1]); foreach(a -> walk(a, ctx), e.args[2:end])
+            elseif h === :(=) && !(e.args[1] isa Expr && e.args[1].head === :.)
+                define!(e.args[1]); walk(e.args[2], ctx)
+            elseif h === :kw
+                walk(e.args[2], ctx)               # keyword name is not a reference
+            elseif h === :for
+                define!(e.args[1].args[1]); walk(e.args[1].args[2], ctx); walk(e.args[2], ctx)
+            elseif h === :-> || h === :do
+                define!(e.args[1]); foreach(a -> walk(a, ctx), e.args[2:end])
+            elseif h === :.
+                walk(e.args[1], ctx)               # module.name: the module is the reference
+            elseif h === :macrocall
+                foreach(a -> walk(a, ctx), e.args[2:end])
+            elseif h in (:using, :import, :line)
+                return
+            else
+                foreach(a -> walk(a, ctx), e.args)
+            end
+        end
+    end
+    walk(ex, nothing)
+    return setdiff(used, defined)
+end
+function unresolved_viewer_names(src::AbstractString)
+    ex = Meta.parseall(src)
+    names = free_names(ex)
+    filter(n -> !(n in GLMAKIE_NAMES) && !isdefined(Base, n) && !isdefined(Core, n) &&
+                !isdefined(HDF5, n) && !isdefined(Main, n) && !startswith(string(n), "@"), collect(names))
+end
+
+@testset "viewer GL half: parses, and every name it uses resolves statically" begin
+    src = read(joinpath(REPO, "viewer", "visualize_lattice.jl"), String)
+    @test Meta.parseall(src) isa Expr
+    bad = unresolved_viewer_names(src)
+    isempty(bad) || println("unresolved names in visualize_lattice.jl: ", bad)
+    @test isempty(bad)
+    # control: an undefined name planted in the source is reported by the same walker
+    planted = replace(src, "save(still, fig)" => "save(still, fig); polish_frame(fig)")
+    @test planted != src
+    @test :polish_frame in unresolved_viewer_names(planted)
+    # and the declared GLMakie list is not a blanket: a bare unknown symbol is still reported
+    @test :not_a_makie_thing in unresolved_viewer_names(src * "\nnot_a_makie_thing(1)\n")
 end
 
 @testset "one run, a snapshot every k MCS, keyed for the series" begin

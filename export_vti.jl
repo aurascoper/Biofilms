@@ -68,14 +68,20 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
         for (ds, name) in SITE_ARRAYS
             vtk[name, VTKCellData()] = read(f[ds])
         end
+        mcs = Int(read(a["mcs"]))
         if restart !== nothing
-            nut = h5open(g -> read(g["fields/nutrient"]), restart, "r")
+            nut, rmcs = h5open(g -> (read(g["fields/nutrient"]), Int(read(attributes(g)["mcs"]))), restart, "r")
+            rmcs == mcs || throw(ArgumentError("restart $restart is at mcs=$rmcs, the snapshot at mcs=$mcs; " *
+                                               "a nutrient field from another time is not this snapshot's"))
             size(nut) == N || throw(ArgumentError("restart nutrient field $(size(nut)) is not the lattice $N"))
             vtk["nutrient", VTKCellData()] = nut
         end
         if dose !== nothing
             d, label = h5open(dose, "r") do g
                 da = attributes(g)
+                dorder = haskey(da, "logical_axis_order") ? read(da["logical_axis_order"]) : "absent"
+                dorder == "xyz" || throw(ArgumentError("$dose declares logical_axis_order=\"$dorder\"; a cubic " *
+                                                       "mesh permuted has the snapshot's size and none of its geometry"))
                 # The file's own qualifiers, or nothing: a Gy/s array without them is the
                 # withdrawn-annotation class with a different unit.
                 haskey(da, "target_calibration") || throw(ArgumentError(

@@ -407,3 +407,4 @@ geolocator/cache/
 # Rendered lattice exports (export_vti.jl); regenerate from snapshots, never commit
 *.vti
 *.pvd
+*.pvsm

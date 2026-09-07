@@ -165,7 +165,7 @@ range writes the declared spacing. The exporter's only output form is uncompress
 compressor, so the path the tests read is the path a user gets; WriteVTK's compressed form is
 not offered and not tested.
 
-## Tests and their controls (`tests/vti_export_tests.jl`, 58 assertions)
+## Tests and their controls (`tests/vti_export_tests.jl`, 80 assertions)
 
 The fixture is an N = 12 snapshot with two cells per species written by `export_transport_snapshot`
 after two MCS (N = 8 cannot be initialised; N = 10 places five of seven species). The
@@ -186,6 +186,20 @@ fixture's `basis_gate_ack` is enumerated in the census in `tests/radiodialysis_b
 - Every k. One run with `every = 2, n_mcs = 7` writes files at 2, 4, 6 and 7 whose `mcs`
   attributes say so, and the `.pvd` built from them carries those four timesteps; `every = 0`
   and `every > n_mcs` are refused.
+- Restart time. A restart checkpoint at the snapshot's `mcs` contributes its nutrient field; one
+  at another `mcs` is refused by name and nothing is written (Codex on #25).
+- Dose axis order. A transport result declaring anything but `logical_axis_order = "xyz"`, or
+  declaring nothing, is refused, since a permuted cubic mesh has the snapshot's size and none of its
+  geometry (Codex on #25).
+- Viewer, renderer-free half. `viewer/lattice_grid.jl` (HDF5 only) is included from the main
+  environment. `species_grid` puts air exactly where the file's sentinels say and the species id
+  elsewhere, refuses a non-xyz file; `viewer_options` enforces the CLI contract (unknown flag, a
+  flag without a value, both outputs, zero frames all refused).
+- Viewer, GL half, statically. `visualize_lattice.jl` parses, and every free name it uses
+  resolves in Base, Core, HDF5, `lattice_grid.jl`, a local binding, or the declared list of
+  GLMakie names it relies on; an undefined call planted in the source is reported by the same
+  walker, and so is a bare unknown symbol. A first-render `UndefVarError` is the class this
+  catches without an OpenGL context (Codex on #25).
 
 Controls, each planted on committed state d49aac0, run through a narrow driver that includes
 the test file alone, restored from a scratch copy and confirmed byte-identical, tree clean:
@@ -198,20 +212,22 @@ the test file alone, restored from a scratch copy and confirmed byte-identical, 
 
 ## What CI covers, and what it does not
 
-The exporter and its tests run in the julia-tests job. The viewer does not, because GLMakie needs an
-OpenGL 3.3 context, and the hosted runner has none. That is uncovered surface, stated here,
-not a skip. An xvfb workflow is possible and was not added; if one is added it is opt-in.
+The exporter and its tests run in the julia-tests job. So does the viewer's renderer-free half
+(`viewer/lattice_grid.jl`) and a static check of the GL half. What CI does not run is the render
+itself, because GLMakie needs an OpenGL 3.3 context and the hosted runner has none. That is
+uncovered surface, stated here, not a skip. An xvfb workflow is possible and was not added; if one is added it is opt-in.
 
 One guard was missing and is now present. Planting the retracted word in the viewer's title
 on 2026-09-07 left every suite green. The figure-vocabulary guard reads
 `preprint/figures/*.txt` sidecars (`figure_sidecars()` in `test_claims_ledger.py`), and the
 ceiling-vocabulary walk scans three other terms. A first fix scanned only `viewer/`, the
 directory the plant landed in, which is the defect relocated. `tests/manuscript_claims_tests.jl`
-now walks every `.jl`, `.R` and `.py` under the root minus `.git` and virtualenvs against a
-declared allowlist (`RETRACTED_WORD_ALLOWED`, five files that carry the word in comments or as a
-vocabulary), with a synthetic control and a control that plants the word under a directory that
-did not exist when the scan was written, through the same walker. A `bench/plant.jl` planted by
-hand on committed state failed it by name; removing the file returned 117 of 117. Ledger row
+now reads the whole `RETRACTED_IN_FIGURES` vocabulary out of the python file at test time (one
+source, no mirror; Codex on #25 caught the one-term version) and walks every `.jl`, `.R` and
+`.py` under the root minus `.git` and virtualenvs for each term against a per-term declared
+allowlist, with a synthetic control and a control that plants a term other than the first under
+a directory that did not exist when the scan was written, through the same walker. A
+`bench/plant.jl` planted by hand on committed state failed it by name. Ledger row
 `GUARD-SCOPE-01` records the gap.
 
 Any image from either tool intended for the manuscript is registered with the figure
@@ -230,8 +246,12 @@ opened the same file on a Wayland session; the "Could not find the Qt platform p
 wayland" line is Qt trying the session's compositor first, finding only `libqxcb.so` in the
 bundle, and falling back to XWayland on the X display.
 
-The interactive steps below were not exercised and no ParaView page was consulted for them,
-so the filter names and the Calculator syntax are a recipe to try, not a sourced claim. Open
+`viewer/paraview_species.py` is the pvpython script that rendered the species view on
+2026-09-07 through that binary, with a Threshold on `species` 1 to 7, Surface With Edges, categorical
+colours by id with the seven labels, one frame per MCS, and a saved `.pvsm` state the GUI loads
+with File, Load State. Run it as `pvpython viewer/paraview_species.py lattice.pvd <outdir>`.
+The interactive steps below were not exercised by hand and no ParaView page was consulted for
+them, so beyond what the script does they are a recipe to try, not a sourced claim. Open
 the `.vti`, or the `.pvd` for a series, and Apply; the time toolbar scrubs MCS. Threshold on
 `species` to drop 0 (air). Colour by `species` with "Interpret Values As Categories" and one
 name per id. Clip or slice through the cylinder axis for a radial section. A Calculator

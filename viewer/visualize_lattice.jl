@@ -9,33 +9,15 @@
 # This project pins GLMakie separately (viewer/Project.toml, viewer/Manifest.toml)
 # so the main environment pulls no OpenGL dependency. The viewer is not run in CI:
 # GLMakie needs an OpenGL 3.3 context, and that is stated as uncovered surface in
-# docs/visualization/lattice_viewer.md rather than hidden behind a skip.
+# docs/visualization/lattice_viewer.md rather than hidden behind a skip. What can be
+# checked without a context (the grid, the palette, the CLI contract, and that every
+# name this file uses resolves) lives in viewer/lattice_grid.jl and is tested in CI.
 #
 # Palette and labels are the serial script's FIG_COLORS / FIG_LABELS
 # (biofilms_potts.jl, section 13), so species s has the same colour here as in
 # every figure the repository ships.
-using HDF5, GLMakie
-
-const COLORS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6"]
-const LABELS = ["C. neoformans", "D. radiodurans", "C. sphaerospermum",
-                "B. subtilis", "A. niger", "S. oneidensis", "O. intermedium"]
-
-"""
-    species_grid(snapshot) -> (UInt8 array, mcs)
-
-0x00 where the site is medium or wall (cell_id equal to the file's own
-`cell_id_background` or `cell_id_wall`), the species index 1..7 elsewhere.
-"""
-function species_grid(snapshot::AbstractString)
-    h5open(snapshot, "r") do f
-        a = HDF5.attributes(f)
-        read(a["logical_axis_order"]) == "xyz" || error("logical_axis_order is not xyz; this viewer maps axis 1 to x")
-        background = read(a["cell_id_background"]); wall = read(a["cell_id_wall"])
-        cell_id = read(f["lattice/cell_id"]); species_id = read(f["lattice/species_id"])
-        grid = map((c, s) -> (c == background || c == wall) ? 0x00 : UInt8(s), cell_id, species_id)
-        return grid, Int(read(a["mcs"]))
-    end
-end
+using GLMakie
+include(joinpath(@__DIR__, "lattice_grid.jl"))
 
 function show_lattice(snapshot::AbstractString; record_to = nothing, still = nothing, frames::Int = 120)
     grid, mcs = species_grid(snapshot)
@@ -66,9 +48,7 @@ function show_lattice(snapshot::AbstractString; record_to = nothing, still = not
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    isempty(ARGS) && (println("usage: visualize_lattice.jl <transport_snapshot.h5> [--still out.png | --record out.mp4] [--frames N]"); exit(1))
-    opt(flag, default) = (i = findfirst(==(flag), ARGS); i === nothing ? default : ARGS[i + 1])
-    out = show_lattice(ARGS[1]; record_to = opt("--record", nothing), still = opt("--still", nothing),
-                       frames = parse(Int, opt("--frames", "120")))
+    o = viewer_options(ARGS)
+    out = show_lattice(o.snapshot; record_to = o.record_to, still = o.still, frames = o.frames)
     out isa String ? println("wrote $out") : (println("close the window to exit"); wait(GLMakie.Screen()))
 end
