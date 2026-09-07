@@ -109,6 +109,41 @@ end
     @test_throws ArgumentError export_vti(odd, joinpath(tmp, "odd"))
 end
 
+@testset "a Gy/s field is labelled from the transport result's own qualifiers, or refused" begin
+    # A transport result the shape results.py writes: mesh/dose_rate_mean_Gy_s plus attrs.
+    function fake_result(path; attrs...)
+        h5open(path, "w") do g
+            g["mesh/dose_rate_mean_Gy_s"] = fill(0.25, N)
+            for (k, v) in attrs
+                attributes(g)[string(k)] = v
+            end
+        end
+        path
+    end
+    synthetic = fake_result(joinpath(tmp, "tr_synth.h5"); target_calibration = 0,
+                            source_rate_photons_per_s = 3.7e9, logical_axis_order = "xyz")
+    stem = joinpath(tmp, "with_dose")
+    export_vti(snap, stem; dose = synthetic)
+    f = VTKFile(stem * ".vti")
+    @test reshape(get_data(get_cell_data(f)["dose_rate_mean_Gy_s"]), N) == fill(0.25, N)
+    u = vti_field_string(stem * ".vti", "dose_rate_mean_Gy_s_units")
+    @test occursin("synthetic source rate, not a physical target", u)
+    @test occursin("3.7e9", u) && occursin("mesh/dose_rate_mean_Gy_s", u)
+    target = fake_result(joinpath(tmp, "tr_target.h5"); target_calibration = 1,
+                         source_rate_photons_per_s = 1.0e8)
+    export_vti(snap, joinpath(tmp, "with_target"); dose = target)
+    @test occursin("target_calibration = true", vti_field_string(joinpath(tmp, "with_target.vti"), "dose_rate_mean_Gy_s_units"))
+    bare = fake_result(joinpath(tmp, "tr_bare.h5"); source_rate_photons_per_s = 1.0e8)
+    @test_throws ArgumentError export_vti(snap, joinpath(tmp, "bare"); dose = bare)
+    @test !isfile(joinpath(tmp, "bare.vti"))
+    wrong = joinpath(tmp, "tr_wrong.h5")
+    h5open(wrong, "w") do g
+        g["mesh/dose_rate_mean_Gy_s"] = zeros(4, 4, 4)
+        attributes(g)["target_calibration"] = 0; attributes(g)["source_rate_photons_per_s"] = 1.0
+    end
+    @test_throws ArgumentError export_vti(snap, joinpath(tmp, "wrong"); dose = wrong)
+end
+
 @testset "series: one .vti per snapshot, .pvd keyed by mcs, duplicates refused" begin
     d = joinpath(tmp, "series"); mkpath(d)
     cp(snap, joinpath(d, "a.h5"))

@@ -71,16 +71,18 @@ labels the dose array by that dataset name.
 ## GLMakie `voxels`
 
 Claims from the documentation, as consulted for the draft of this note (2026-09-07), then what
-running the viewer here established.
+running the viewer here established. The rows cite the `dev` and v0.21 pages that were consulted;
+they were not reconciled against the pinned Makie 0.24.14, so a row is a claim about those pages,
+not about the pinned release, unless the paragraph after the table confirms it by running.
 
 | Item | Value | Source | Version |
 |---|---|---|---|
 | `voxels` introduced | Makie v0.21, PR #3527 | https://makie.org/website/blogposts/v0.21/ ; https://docs.makie.org/v0.21/changelog | v0.21 |
 | Signature | `voxels(chunk::Array{<:Real,3})`, `voxels(x, y, z, chunk)`; only the extrema of x, y, z are used | https://docs.makie.org/dev/reference/plots/voxels | dev |
 | Representation | `Array{UInt8,3}`; `0x00` is always invisible air; ids 1 to 255 visible | same | dev |
-| `color` per id | `color = [c1, c2, ...]` indexed by voxel id, skipping `0x00`; `colorrange` ignored for UInt8 input | same | dev |
+| `color` per id | `color = [c1, c2, ...]` indexed by voxel id, skipping `0x00`; the page says `colorrange` is ignored for UInt8 input, which was not exercised here | same | dev |
 | `is_air` | a predicate selecting values drawn as air | same | dev |
-| Status | "experimental and may still see breaking changes in patch releases" | same | dev |
+| Status | "experimental and may still see breaking changes in patch releases"; not re-checked at the pinned 0.24.14, hence the exact pin | same | dev |
 | Backends | dedicated implementation in GLMakie and WGLMakie; CairoMakie projects 3-D flat with no z-clipping | https://makie.org/website/blogposts/v0.21/ ; https://docs.makie.org/v0.21/explanations/backends/cairomakie | v0.21 |
 | GPU | OpenGL 3.3 or higher | https://docs.makie.org/stable/explanations/backends/glmakie.html | stable |
 | Headless | xvfb software rendering is how GLMakie's own tests run | https://docs.makie.org/dev/explanations/headless | dev |
@@ -120,7 +122,7 @@ on VTK (x,y,z) with no permutation. That is a claim, so it is tested, twice (bel
 | `radiation_cpm`, `melanin` | Float64 | as stored |
 | `accumulated_dose_Gy` | Float64 | as stored; field data `accumulated_dose_Gy_units` says "Gy, physical, schema dose/accumulated_Gy: zeros until a dose was imported" |
 | `nutrient` | Float64 | only with `--restart`, from `fields/nutrient` |
-| `dose_rate_mean_Gy_s` | Float64 | only with `--dose`, from `mesh/dose_rate_mean_Gy_s`; refused unless its mesh is the lattice (the exporter resamples nothing; `viewer_bundle.h5` is where that happens) |
+| `dose_rate_mean_Gy_s` | Float64 | only with `--dose`, from `mesh/dose_rate_mean_Gy_s`; refused unless its mesh is the lattice (the exporter resamples nothing; `viewer_bundle.h5` is where that happens), and refused unless the file carries `target_calibration` and `source_rate_photons_per_s`, which are written into the unit string beside the array, so a synthetic source rate reads "synthetic source rate, not a physical target" wherever ParaView shows the number |
 
 The field data holds `units` ("lattice", or a "declared" line with value, unit and source), `species_zero`,
 the dose unit strings, and the snapshot's own attributes `schema_version`,
@@ -141,9 +143,11 @@ back in the tests. ReadVTK reads numeric arrays only, and its own documentation 
 incomplete (https://juliavtk.github.io/ReadVTK.jl/stable/). WriteVTK sources:
 https://juliavtk.github.io/WriteVTK.jl/stable/ and
 https://juliavtk.github.io/WriteVTK.jl/stable/grids/datasets/ (ImageData from ranges, cell
-versus point placement, `VTKFieldData`, `paraview_collection`), consulted 2026-09-07.
+versus point placement, `VTKFieldData`, `paraview_collection`), consulted 2026-09-07 at
+whatever tag `stable` resolved to that day, not confirmed against the pinned 1.22.0 and 0.2.6
+except where the tests exercise the call, which they do for each of those four.
 
-## Tests and their controls (`tests/vti_export_tests.jl`, 44 assertions)
+## Tests and their controls (`tests/vti_export_tests.jl`, 51 assertions)
 
 The fixture is an N = 12 snapshot with two cells per species written by `export_transport_snapshot`
 after two MCS (N = 8 cannot be initialised; N = 10 places five of seven species). The
@@ -157,6 +161,9 @@ fixture's `basis_gate_ack` is enumerated in the census in `tests/radiodialysis_b
   exporter's own `cell_id` output satisfies every row of the snapshot's `orientation_probes`.
 - Refusal. Spacing 0.012 throws and writes nothing; with a declared pitch it writes 0.012 and
   `units` begins "declared:"; a snapshot whose `logical_axis_order` is not "xyz" is refused.
+- Dose qualifiers. A transport result with `target_calibration = 0` yields a unit string carrying
+  "synthetic source rate, not a physical target" and the source rate; one with the attribute
+  missing is refused and nothing is written; a mesh that is not the lattice is refused.
 - Series. One `.vti` per snapshot, `.pvd` timesteps 2.0 and 5.0, a duplicate `mcs` refused.
 
 Controls, each planted on committed state d49aac0, run through a narrow driver that includes
@@ -177,10 +184,14 @@ not a skip. An xvfb workflow is possible and was not added; if one is added it i
 One guard was missing and is now present. Planting the retracted word in the viewer's title
 on 2026-09-07 left every suite green. The figure-vocabulary guard reads
 `preprint/figures/*.txt` sidecars (`figure_sidecars()` in `test_claims_ledger.py`), and the
-ceiling-vocabulary walk scans three other terms. `tests/manuscript_claims_tests.jl` now scans
-every `.jl` under `viewer/` and `export_vti.jl` for that word with a synthetic control; the
-same plant on committed state a44a792 fails it at the planted line, and restoring the file
-returns 117 of 117.
+ceiling-vocabulary walk scans three other terms. A first fix scanned only `viewer/`, the
+directory the plant landed in, which is the defect relocated. `tests/manuscript_claims_tests.jl`
+now walks every `.jl`, `.R` and `.py` under the root minus `.git` and virtualenvs against a
+declared allowlist (`RETRACTED_WORD_ALLOWED`, five files that carry the word in comments or as a
+vocabulary), with a synthetic control and a control that plants the word under a directory that
+did not exist when the scan was written, through the same walker. A `bench/plant.jl` planted by
+hand on committed state failed it by name; removing the file returned 117 of 117. Ledger row
+`GUARD-SCOPE-01` records the gap.
 
 Any image from either tool intended for the manuscript is registered with the figure
 staleness guard first (FIG-01 to FIG-07 in `data/claims_ledger.csv`). Until then, viewer and
@@ -190,14 +201,16 @@ exporter output is exploratory.
 
 ParaView is not installed on the machine this was built on (the scope searched was `which paraview
 pvpython` and `/opt`, 2026-09-07), so the steps below are from the ParaView documentation and
-were not exercised. Open the `.vti`, or the `.pvd` for a series. Threshold on `species` to
+were not exercised, and no ParaView page was consulted for them, so the filter names and the
+Calculator syntax below are a recipe to try, not a sourced claim. Open the `.vti`, or the `.pvd` for a series. Threshold on `species` to
 drop 0 (air). Colour by `species` with "Interpret Values As Categories" and one name per id.
 Clip or slice through the cylinder axis for a radial section. A Calculator expression
 `sqrt((coordsX - x0)^2 + (coordsY - y0)^2)` gives a radial coordinate in sites. Colour by
 `dose_rate_mean_Gy_s` or `accumulated_dose_Gy` for the dose, keeping the unit strings from
 the field data in any caption. The Python side can read the same file with `pyvista.read`
-(https://docs.pyvista.org/api/utilities/_autosummary/pyvista.read.html); pyvista, vtk and h5py
-are in the coupling venv here, none of them in CI's tier.
+(https://docs.pyvista.org/api/utilities/_autosummary/pyvista.read.html, consulted for the draft;
+the URL carries no version); pyvista 0.48.4, vtk and h5py are in the coupling venv here, none
+of them in CI's tier, and the read was not exercised.
 
 ## Open decisions
 

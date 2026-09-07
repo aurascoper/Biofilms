@@ -18,7 +18,8 @@
 #   lineage_id, generation, interior_mask, radiation_cpm, melanin  as stored
 #   accumulated_dose_Gy      as stored; physical Gy, zero until a dose was imported
 #   nutrient                 only with --restart (the snapshot does not carry it)
-#   dose_rate_mean_Gy_s      only with --dose (transport_result_*.h5, mesh/dose_rate_mean_Gy_s)
+#   dose_rate_mean_Gy_s      only with --dose (transport_result_*.h5, mesh/dose_rate_mean_Gy_s), labelled
+#                            from that file's own source_rate_photons_per_s and target_calibration attributes
 using HDF5, WriteVTK
 
 const CARRIED_NUMERIC = ("schema_version", "coordinate_index_base", "cell_id_background",
@@ -73,12 +74,25 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
             vtk["nutrient", VTKCellData()] = nut
         end
         if dose !== nothing
-            d = h5open(g -> read(g["mesh/dose_rate_mean_Gy_s"]), dose, "r")
+            d, label = h5open(dose, "r") do g
+                da = attributes(g)
+                # The file's own qualifiers, or nothing: a Gy/s array without them is the
+                # withdrawn-annotation class with a different unit.
+                haskey(da, "target_calibration") || throw(ArgumentError(
+                    "$dose carries no target_calibration attribute; a Gy/s field cannot be labelled without it"))
+                haskey(da, "source_rate_photons_per_s") || throw(ArgumentError(
+                    "$dose carries no source_rate_photons_per_s attribute"))
+                target = Bool(read(da["target_calibration"]))
+                rate = read(da["source_rate_photons_per_s"])
+                qualifier = target ? "target_calibration = true" :
+                    "target_calibration = false: synthetic source rate, not a physical target"
+                read(g["mesh/dose_rate_mean_Gy_s"]),
+                "Gy s^-1, schema mesh/dose_rate_mean_Gy_s, at source_rate_photons_per_s = $rate; $qualifier"
+            end
             size(d) == N || throw(ArgumentError("dose mesh $(size(d)) is not the lattice $N; this exporter " *
                                                 "resamples nothing (viewer_bundle.h5 is where that happens)"))
             vtk["dose_rate_mean_Gy_s", VTKCellData()] = d
-            vtk["dose_rate_mean_Gy_s_units", VTKFieldData()] =
-                "Gy s^-1, schema mesh/dose_rate_mean_Gy_s: source activity applied (per-source-particle fields never reach a file)"
+            vtk["dose_rate_mean_Gy_s_units", VTKFieldData()] = label
         end
         vtk["units", VTKFieldData()] = units
         vtk["species_zero", VTKFieldData()] = "0 = medium or wall (cell_id $background or $wall); 1..7 = species index"

@@ -92,21 +92,50 @@ end
 # does not violate the claim; the corrected .tex prose (section 3.4) makes this same
 # distinction explicit. "momentum" has no such false-positive source and is checked directly.
 
-# Retracted figure vocabulary must not enter an image from viewer/ either. The python
-# guard (RETRACTED_IN_FIGURES in calibration/tests/test_claims_ledger.py) reads the
-# figure sidecars under preprint/figures; a title string in a viewer script produces an
-# image no sidecar records. SCOPE: every .jl under viewer/ and the .vti exporter, the
-# files that write images or files a viewer reads. Planted "Radiotrophic biofilm" in the
-# viewer title on 2026-09-07 stayed green until this block existed.
-VIEWER_FILES = vcat([joinpath(REPO, "viewer", f) for f in readdir(joinpath(REPO, "viewer")) if endswith(f, ".jl")],
-                    [joinpath(REPO, "export_vti.jl")])
+# Retracted figure vocabulary must not enter an image from any source file. The python
+# guard (RETRACTED_IN_FIGURES in calibration/tests/test_claims_ledger.py) reads the figure
+# sidecars under preprint/figures; a title string in a script produces an image no sidecar
+# records. On 2026-09-07 the word planted in a viewer title stayed green under every suite,
+# and a first fix scanned only viewer/, the directory where the plant landed. The scope is
+# now the same shape as CEILING_VOCAB_ALLOWED: every .jl, .R and .py under the root minus
+# .git and virtualenvs, and every file carrying the word must be on a DECLARED list. The
+# list is the claim; a new file gets added deliberately or the suite fails.
+RETRACTED_WORD_ALLOWED = [
+    # comments that deny the property, naming it to deny it
+    "biofilms_3d.R", "biofilms_potts.jl",
+    # a path to the audit document, whose filename carries the word
+    "biofilms_radiodialysis.R",
+    # the vocabulary itself, and this file's own controls
+    "calibration/tests/test_claims_ledger.py", "tests/manuscript_claims_tests.jl",
+]
+function _retracted_word_files(root)
+    hits = String[]
+    for (dir, _, files) in walkdir(root)
+        rel_dir = relpath(dir, root)
+        any(part -> part in (".git", ".venv", "node_modules"), splitpath(rel_dir)) && continue
+        for f in files
+            endswith(f, ".jl") || endswith(f, ".R") || endswith(f, ".py") || continue
+            p = joinpath(dir, f)
+            isempty(_scan([p], r"radiotroph"i)) || push!(hits, relpath(p, root))
+        end
+    end
+    return sort(hits)
+end
 let
     control = _scan_text([("fake.jl", "title = \"Radiotrophic biofilm, MCS \$mcs\"\n")], r"radiotroph"i)
     @test length(control) == 1
-    @test length(VIEWER_FILES) >= 2
-    real = _scan(VIEWER_FILES, r"radiotroph"i)
-    @test isempty(real)
-    isempty(real) || foreach(h -> println("retracted word in viewer scope: ", h), real)
+    # The walk reaches a directory that did not exist when it was written: a fresh root with
+    # one file under a new subdirectory, through the same walker production uses.
+    fresh = mktempdir()
+    mkpath(joinpath(fresh, "bench"))
+    write(joinpath(fresh, "bench", "plant.jl"), "ax.title = \"Radiotrophic biofilm\"\n")
+    write(joinpath(fresh, "bench", "clean.py"), "title = 'MCS 20'\n")
+    @test _retracted_word_files(fresh) == [joinpath("bench", "plant.jl")]
+    found = _retracted_word_files(REPO)
+    @test found == sort(RETRACTED_WORD_ALLOWED)
+    for extra in setdiff(found, RETRACTED_WORD_ALLOWED)
+        println("retracted word in an undeclared source file: ", extra)
+    end
 end
 
 let
