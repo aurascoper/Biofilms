@@ -41,6 +41,9 @@ N = (12, 12, 12)
     f = VTKFile(path)
     @test collect(get_spacing(f)) == [1.0, 1.0, 1.0]
     @test collect(get_origin(f)) == [0.0, 0.0, 0.0]
+    # The exporter's default is the uncompressed appended form, and this file was written
+    # with that default: the path the tests read is the path a user gets.
+    @test !occursin("compressor=", read(path, String)) && occursin("encoding=\"raw\"", read(path, String))
     @test vti_field_string(path, "units") == "lattice"
     @test occursin("zeros until a dose was imported", vti_field_string(path, "accumulated_dose_Gy_units"))
     @test vti_field_string(path, "logical_axis_order") == "xyz"

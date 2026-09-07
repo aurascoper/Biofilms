@@ -153,10 +153,12 @@ that ReadVTK reads back with spacing 1.0 and the cell count of the lattice; `VTK
 places an (N,N,N) array as cell data that reads back element for element; `VTKFieldData()`
 with a Float64 reads back through ReadVTK, and with a String is written appended and read back
 by hand; `paraview_collection` writes a `.pvd` whose timesteps are the `mcs` keys; a float
-range writes the declared spacing. What no test exercises is compression, since every file is
-written with `compress = false`.
+range writes the declared spacing. The exporter's only output form is uncompressed appended binary (`compress = false` in
+`export_vti`, not an option), and one assertion checks the round-trip file carries no
+compressor, so the path the tests read is the path a user gets; WriteVTK's compressed form is
+not offered and not tested.
 
-## Tests and their controls (`tests/vti_export_tests.jl`, 51 assertions)
+## Tests and their controls (`tests/vti_export_tests.jl`, 52 assertions)
 
 The fixture is an N = 12 snapshot with two cells per species written by `export_transport_snapshot`
 after two MCS (N = 8 cannot be initialised; N = 10 places five of seven species). The
