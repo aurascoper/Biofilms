@@ -189,6 +189,8 @@
             "validate_serial.jl",              # CPM trajectory determinism
             "tests/genealogy_tests.jl",        # legacy vs windowed API equivalence
             "tests/checkpoint_io_tests.jl",    # snapshot/restart round trip
+            "tests/vti_export_tests.jl",       # snapshot fixture for the .vti
+                                              # round trip; asserts no magnitude
             "export_checkpoint.jl",            # interchange export; labels the file
             "tests/radiodialysis_basis_gate.jl",  # this file, testing the gate
             "tests/jacc_parity_tests.jl",      # CPM acceptance counts; the
