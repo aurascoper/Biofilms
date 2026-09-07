@@ -101,6 +101,20 @@ DOCUMENT_ALIASES = {
 # print the same nothing.
 PSEUDO_DOCUMENTS = {"repository", "correspondence"}
 
+# NOT SOURCE, AND NOT IN THE REPOSITORY. `artifacts/` is gitignored
+# (`.gitignore:76`) and nothing under it is tracked, so a row naming a pilot
+# artifact resolves to a file only on a machine where that pilot has been run.
+# Both document-resolution tests below were therefore passing on local state and
+# would have failed on CI or any clean checkout — a check whose outcome depends
+# on untracked files is rule 1 wearing rule 2's clothes. They are DECLARED here
+# rather than removed from the ledger: the rows are real verdicts on real
+# numbers, they are simply unenforceable from a clean tree, and saying that is
+# the point. When the artifact happens to be present it is still read.
+GENERATED_ARTIFACTS = {
+    "artifacts/pilot/openmc_nested_pilot_budget.json",
+    "artifacts/pilot/openmc_nested_pilot_verdict.json",
+}
+
 
 def document_path(document: str) -> Path | None:
     if document in PSEUDO_DOCUMENTS:
@@ -280,11 +294,11 @@ def test_every_deleted_claim_names_a_document_the_guard_can_read(rows):
     unreadable = sorted({r["document"] for r in deleted_rows(rows)
                          if (lambda q: q is None or not q.is_file())(
                              document_path(r["document"]))}
-                        - PSEUDO_DOCUMENTS)
+                        - PSEUDO_DOCUMENTS - GENERATED_ARTIFACTS)
     assert not unreadable, (
         "`delete` rows name documents that cannot be read, so those verdicts "
         f"are unguarded: {unreadable}. Add a path alias, fix the row, or "
-        "declare it in PSEUDO_DOCUMENTS.")
+        "declare it in PSEUDO_DOCUMENTS / GENERATED_ARTIFACTS.")
 
 
 def test_coverage_is_reported_as_detection_not_as_phrase_count(rows, capsys):
@@ -345,8 +359,18 @@ def test_every_claim_names_a_document_that_exists(rows):
     # and only a resolvable-but-missing path is a fault here.
     unresolved = sorted({r["document"] for r in rows
                          if (lambda q: q is not None and not q.is_file())(
-                             document_path(r["document"]))})
+                             document_path(r["document"]))}
+                        - GENERATED_ARTIFACTS)
     assert not unresolved, f"rows name documents that do not exist: {unresolved}"
+
+    # AND THE DECLARATION MUST STAY TRUE. Listing a document here excuses it
+    # from the check above, so an entry that is no longer a gitignored artifact
+    # — committed since, or renamed — would silently excuse nothing while
+    # looking like it still did.
+    misdeclared = sorted(d for d in GENERATED_ARTIFACTS
+                         if d not in {r["document"] for r in rows})
+    assert not misdeclared, (
+        f"GENERATED_ARTIFACTS names documents no ledger row uses: {misdeclared}")
     assert PREPRINT.exists(), (
         f"the ledger's preprint rows describe {PREPRINT.name}, which is not in "
         "the repository")
