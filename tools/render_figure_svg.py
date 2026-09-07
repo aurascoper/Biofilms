@@ -24,6 +24,7 @@ through its own extraction paths.
 from __future__ import annotations
 
 import hashlib
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -31,7 +32,12 @@ from pathlib import Path
 CONVERTERS = [
     ("rsvg-convert", lambda src, dst: ["rsvg-convert", "-f", "pdf", "-o", str(dst), str(src)]),
 ]
-CAIRO_PY = Path("/home/aurascoper/.local/share/mamba/envs/openmc-biofilms/bin/python")
+
+
+def _has_cairosvg(python: str) -> bool:
+    """The fallback converter is cairosvg in the running interpreter, not a path baked
+    into the repository from one workstation (Copilot on #24)."""
+    return subprocess.run([python, "-c", "import cairosvg"], capture_output=True).returncode == 0
 
 
 def sha256(path: Path) -> str:
@@ -50,14 +56,13 @@ def pair_sha256(svg: Path, pdf: Path) -> str:
 
 def render(svg: Path) -> Path:
     pdf = svg.with_suffix(".pdf")
-    import shutil
     for name, argv in CONVERTERS:
         if shutil.which(name):
             subprocess.run(argv(svg, pdf), check=True)
             return pdf
-    if CAIRO_PY.is_file():
+    if _has_cairosvg(sys.executable):
         subprocess.run(
-            [str(CAIRO_PY), "-c",
+            [sys.executable, "-c",
              "import sys,cairosvg;cairosvg.svg2pdf(url=sys.argv[1],write_to=sys.argv[2])",
              str(svg), str(pdf)], check=True)
         return pdf
@@ -77,10 +82,12 @@ def sidecars(pdf: Path) -> None:
     # wrote "<hash>  <name>", a format invented beside the convention rather than
     # mirroring it, and the existing comparison reads the whole file.
     pdf.with_suffix(".sha256").write_text(f"{sha256(pdf)}\n", encoding="utf-8")
+    if not shutil.which("pdftotext"):
+        raise SystemExit("pdftotext (poppler-utils) is required: the .txt sidecar it writes is what "
+                         "RETRACTED_IN_FIGURES scans, so a figure without it is unguarded")
     txt = subprocess.run(["pdftotext", "-layout", str(pdf), "-"],
                          capture_output=True, text=True, check=True).stdout
     pdf.with_suffix(".txt").write_text(txt, encoding="utf-8")
-    import shutil
     if shutil.which("pdftoppm"):
         subprocess.run(["pdftoppm", "-png", "-r", "150", "-singlefile",
                         str(pdf), str(pdf.with_suffix(""))], check=True)

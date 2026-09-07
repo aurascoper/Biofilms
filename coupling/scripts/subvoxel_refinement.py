@@ -130,6 +130,22 @@ def _seed(rep: int, state: str, paired: bool) -> int:
     return 7000 + rep + (0 if paired or state == "baseline" else 500_000)
 
 
+def parse_ratios(text: str) -> list[int]:
+    """The comma-separated ratio list, sorted, with its two requirements checked by name.
+
+    Every ratio must be >= 1, and 1 must be present because it defines the common
+    Omega_b every finer ratio is evaluated on. Checking only the smallest element
+    conflated the two: "0,1,2" was refused for lacking ratio 1 (Copilot on #24).
+    """
+    ratios = sorted({int(r) for r in text.split(",")})
+    bad = [r for r in ratios if r < 1]
+    if bad:
+        raise SystemExit(f"ratios must be >= 1; got {bad}")
+    if 1 not in ratios:
+        raise SystemExit("ratio 1 is the reference grid and must be included")
+    return ratios
+
+
 def refuse_non_divisor_ratios(ratios) -> None:
     """EVERY RATIO MUST DIVIDE THE FINEST, checked before any transport.
 
@@ -218,9 +234,7 @@ def main(argv=None) -> int:
     #
     # Sorted so ratio 1 runs first: it defines the common Omega_b that every
     # finer ratio is then evaluated on.
-    ratios = sorted({int(r) for r in args.ratios.split(",")})
-    if ratios[0] != 1:
-        raise SystemExit("ratio 1 is the reference grid and must be included")
+    ratios = parse_ratios(args.ratios)
     refuse_non_divisor_ratios(ratios)
 
     import openmc
