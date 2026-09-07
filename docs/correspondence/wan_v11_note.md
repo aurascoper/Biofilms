@@ -1,15 +1,54 @@
 # Note to Caixia Wan — the v1.2 correction
 
-**Status 2026-09-05: drafted in Gmail, not sent.** To Caixia Wan, subject "Preprint v1.2,
-correcting the 29 August v1.1 you have". The copy she holds is the v1.1 build of 29 August 2026,
-08:40 CDT, the working tree of `d404438` (bound −5×10⁻⁵, Table 4 with "none of 206 042",
-"several orders" in §7.1, figures already corrected). The attachment is the CI build of the
-commit tagged `preprint-v1.2.1`, added by hand because no tool here attaches a file of that size.
-When it goes, replace this block with the sent date: a sent email is a claim sink and belongs in
-the dependents enumeration (AGENTS.md, "Correcting a published number"). No mailbox identifiers
-or addresses are recorded here; the mailbox holds them.
+**Status 2026-09-06: still drafted in Gmail, not sent.** Checked against the mailbox on
+2026-09-06: no message to Caixia Wan has been sent since the October 2024 thread, and the draft
+stands with subject "Preprint v1.2.1, correcting the 29 August v1.1 you have" and the text in the
+next section. The copy she holds is the v1.1 build of 29 August 2026, 08:40 CDT, the working tree
+of `d404438` (bound −5×10⁻⁵, Table 4 with "none of 206 042", "several orders" in §7.1, figures
+already corrected). The attachment is the CI build of the commit tagged `preprint-v1.2.1`
+(3081a58, 37 pages), added by hand because no tool here attaches a file of that size. When it
+goes, replace this block with the sent date: a sent email is a claim sink and belongs in the
+dependents enumeration (AGENTS.md, "Correcting a published number"). No mailbox identifiers or
+addresses are recorded here; the mailbox holds them.
 
-## Final text (v1.2 form)
+## Final text (v1.2.1 form, the draft as it stands)
+
+Written against her pinned build rather than "v1.1", which is nine commits. Every number in it
+was read back from the manuscript diff d404438..3081a58: the bound and both moved counts sit in
+§6.2 and Table 4 of her copy, the three changes that matter to a reader are §3.10, §§2.5 and 3.8,
+and the three replaced references, and the phase-locking row's citations were theory sources.
+Gated through copydesk (discipline check all zeros, no hard fails) and prose-craft-2; the one
+accepted advisory unpacked "in and beneath Table 4" into "one in Table 4 and one beneath it".
+
+```
+Hi Ellen,
+
+Thanks for getting back to me, and for asking around about RA positions; I appreciate you looking.
+
+The version you have is v1.1 as built on the morning of 29 August. One bound in section 6.2 was wrong. It counted only one of the two roles a cell can play in the direct radiation term, so its reach is about 1,500 times what your copy states. Two counts, one in Table 4 and one beneath it, that rested on the bound moved with it. The direct term alone decides one accepted move in 206,042, not none, and sixteen moves would reverse without it. The bound was raised in review by Codex on the pull request; the counts follow from re-running the tally with it corrected. The reasoning is shown inline in 6.2, and a test now recomputes the bound from the shipped coefficients and fails on either withdrawn form.
+
+Among the other changes, three matter to a reader. Section 3.10 now says no mechanical term exists in any source file and that a measured modulus could not enter the model as written. Sections 2.5 and 3.8 withdraw the claim that the kNN decision tree operationalizes anything and call the name a coinage. And three cited references were not the papers the text needed and have been replaced, with six uncited entries removed and Malo 2018's authors, title and DOI corrected.
+
+Smaller ones you may notice. Section 2.1 adds Robertson 2012, whose growth result reproduces while its attribution to melanin does not. Section 2.6 cites Turick 2011 as a positive measurement running opposite to the mechanism, quotes Casadevall 2017's own concession, and adds a paragraph on what actually lives in a spent fuel pool. Section 2.2 corrects a continuum-model attribution to Xavier 2005. Section 7.1 and the conclusion now put the melanin term at about ten times the direct radiation term (9.6 in ΔH), where your copy says several orders. And Table 2's phase-locking frequency row is gone; its citations were theory sources and nothing sourced its 0.01 to 1.0 rad per hour range, so the symbol moved to Table 1 with no value assigned. The phenotype boundary in 7.2 and the spent-fuel-pool literature in 7.3 are as you saw them.
+
+I have a short memo on the FeCrAl question if that's useful for the MURR conversation.
+
+v1.2.1 is attached; it's the one to forward if things move.
+
+Hunter
+```
+
+---
+
+## Superseded text (v1.2 form, before the eight-finding review)
+
+Kept as the record; do not send. It failed review on eight points: "v1.1" is nine builds, not
+one; "both numbers" named neither; "cannot recur silently" claimed more than the test does;
+"automated review" where the manuscript says Codex on the pull request; "four smaller things"
+undercounted; "wrong DOIs" understated three replaced papers; the Table 2 row did have citations;
+and the attachment named v1.2 when the tagged build is v1.2.1.
+
+### As it read
 
 Everything in it was checked against the diff f72aabb..26b3a14 of the manuscript: the
 withdrawn bound lived in section 6.2 of v1.1, not the abstract (the v1.1 abstract carried no
