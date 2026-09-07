@@ -81,7 +81,7 @@ function run_diagnostic(parent, output, parent_sha, config_path)
     tracked_status = readchomp(`git -C $root status --porcelain --untracked-files=no`)
     require(isempty(tracked_status), "commit tracked source changes before production")
     commit = readchomp(`git -C $root rev-parse HEAD`)
-    mkdir(output)
+    mkpath(output)
     mkpath(joinpath(output, "fields")); mkpath(joinpath(output, "paraview")); mkpath(joinpath(output, "provenance"))
     cp(config_path, joinpath(output, "provenance", "config.toml"))
     for name in ("Project.toml", "Manifest.toml", "InertSignal.jl", "run.jl")
@@ -90,6 +90,7 @@ function run_diagnostic(parent, output, parent_sha, config_path)
     A = zeros(40,40,40)
     previous_species = nothing
     metrics = Any[]
+    field_hashes = String[]
     paraview_collection(joinpath(output, "paraview", "signal_trajectory")) do pvd
         for row in m["snapshots"]
             t = row["mcs"]
@@ -102,6 +103,8 @@ function run_diagnostic(parent, output, parent_sha, config_path)
             e = endpoint(A, sp, mask, p)
             push!(metrics, (; mcs=t, e..., maximum=maximum(A), mass_balance=balance))
             name = "signal_mcs$(lpad(t,6,'0'))"
+            signal_sha = bytes2hex(sha256(reinterpret(UInt8, vec(A))))
+            push!(field_hashes, signal_sha)
             h5open(joinpath(output, "fields", name * ".h5"), "w") do f
                 f["fields/signal", deflate=6] = A
                 f["lattice/interior_mask", deflate=6] = UInt8.(mask)
@@ -110,7 +113,7 @@ function run_diagnostic(parent, output, parent_sha, config_path)
                     "parent_snapshot_sha256"=>row["sha256"], "parent_label_state_hash"=>row["label_state_hash"],
                     "logical_axis_order"=>"xyz", "dataset_axis_order_h5py"=>"zyx",
                     "signal_units"=>"declared arbitrary signal units", "time_units"=>"MCS",
-                    "signal_sha256"=>bytes2hex(sha256(reinterpret(UInt8, vec(A)))),
+                    "signal_sha256"=>signal_sha,
                     "source_timing"=>c["source_timing"], "threshold"=>p.threshold,
                     "diffusion"=>p.diffusion, "decay"=>p.decay, "production"=>collect(p.production),
                     "dt_sub"=>(t == 0 ? 0.0 : balance.dt), "n_sub"=>(t == 0 ? 0 : balance.nsteps),
@@ -141,7 +144,12 @@ function run_diagnostic(parent, output, parent_sha, config_path)
         "created_utc"=>string(now(UTC)), "rng"=>"none; deterministic field driven by pinned seed-42 labels",
         "snapshot_mcs"=>collect(0:100), "artifacts"=>artifacts,
         "scope"=>"inert generic signal on a fixed CPM trajectory; no biological QS response or physical calibration",
-        "hash_contract"=>"all output files except derived_manifest.json and its sha256 receipt")
+        "hash_contract"=>"all output files except derived_manifest.json and its sha256 receipt",
+        "field_digest"=>bytes2hex(sha256(join(field_hashes, "\n"))),
+        "field_digest_contract"=>"SHA-256 of the 101 ordered per-frame signal_sha256 values. " *
+            "This manifest's own hash embeds created_utc, julia_executable_sha256, source_commit " *
+            "and source_hashes, so it cannot match across machines; field_digest can, and is the " *
+            "receipt to compare when checking that two runs produced the same field.")
     path = joinpath(output, "derived_manifest.json")
     write(path, JSON3.write(result)); write(joinpath(output, "derived_manifest.sha256"), sha(path)*"  derived_manifest.json\n")
     verify_parent(parent, parent_sha) # original scientific evidence remains byte-identical
