@@ -4,6 +4,8 @@
 
 using Test
 
+include("signal_field_tests.jl")
+
 const REPO = dirname(@__DIR__)
 
 # Same loading trick as validate_serial.jl: the serial monolith minus its

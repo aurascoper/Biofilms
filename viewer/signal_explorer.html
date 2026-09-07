@@ -1,0 +1,215 @@
+<div id="biofilm-signal-4d">
+  <div class="viz-row"><strong>42 initial parcels · seed 42</strong><span class="text-small">101 snapshots · 14,281 accepted copies</span></div>
+  <div class="viz-controls">
+    <label class="form-label">Colour
+      <select class="form-select" id="bf-colour"><option value="species">Species labels</option><option value="parcel">Parcel IDs</option><option value="signal">Inert signal A</option></select>
+    </label>
+    <label class="form-label">Show through z = <span id="bf-z-value">39</span>
+      <input class="form-range" id="bf-z" aria-label="Upper z slice, lattice index" type="range" min="0" max="39" value="39">
+    </label>
+  </div>
+  <canvas id="bf-canvas" role="img" aria-label="Interactive voxel parcel trajectory. Drag to rotate; use sliders or arrow keys for time and clipping. Click a voxel to inspect its label.">Voxel trajectory, MCS 0 to 100.</canvas>
+  <div class="viz-row text-small"><span id="bf-frame">MCS 0</span><span>Drag to rotate · click a voxel</span><span>Raster voxel faces</span></div>
+  <div class="viz-row">
+    <button class="btn" id="bf-play" type="button">Play</button>
+    <label class="form-label" style="flex:1">MCS <span id="bf-time-value" class="tabular-nums">0</span> / 100
+      <input class="form-range" id="bf-time" aria-label="Monte Carlo step" type="range" min="0" max="100" value="0">
+    </label>
+  </div>
+  <div id="bf-legend" class="viz-row text-small"></div>
+  <div id="bf-selected" class="text-small" aria-live="polite">Computational parcel labels · lattice coordinates</div>
+  <div class="viz-row">
+    <label class="form-check"><input class="form-check-input" type="checkbox" id="bf-events"><span class="form-check-label">Accepted-copy replay</span></label>
+    <span id="bf-count" class="text-small tabular-nums"></span>
+  </div>
+  <div id="bf-event-panel" hidden>
+    <label class="form-label">Accepted copy <span id="bf-event-value" class="tabular-nums">0</span>
+      <input class="form-range" id="bf-event" aria-label="Accepted copy within this MCS" type="range" min="0" max="0" value="0">
+    </label>
+    <div id="bf-event-detail" class="text-small tabular-nums" aria-live="polite"></div>
+  </div>
+  <div id="bf-endpoint" class="text-small tabular-nums"></div>
+  <div id="bf-error" class="text-destructive" role="alert"></div>
+</div>
+<style>
+#biofilm-signal-4d canvas {display:block;width:100%;height:390px;touch-action:none;cursor:grab;}
+#biofilm-signal-4d .bf-swatch {display:inline-block;width:10px;height:10px;margin-right:5px;}
+#biofilm-signal-4d #bf-event-detail {overflow-wrap:anywhere;}
+#biofilm-signal-4d #bf-endpoint {margin-top:8px;}
+@media(max-width:440px){#biofilm-signal-4d canvas{height:330px;}}
+</style>
+<script>
+(async () => {
+const root=document.getElementById('biofilm-signal-4d');
+const el=id=>root.querySelector('#bf-'+id);
+const metadata=__METADATA__;
+const compressed='__PAYLOAD__';
+try {
+const bin=Uint8Array.from(atob(compressed),c=>c.charCodeAt(0));
+const stream=new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+const data=await new Response(stream).arrayBuffer();
+const arrays={};
+for (const [name,s] of Object.entries(metadata.specs)) {
+  const type=s.dtype==='u1'?Uint8Array:s.dtype==='<u4'?Uint32Array:Float64Array;
+  arrays[name]=new type(data.slice(s.offset,s.offset+s.length*type.BYTES_PER_ELEMENT));
+}
+const frames=[arrays.initial];
+for(let t=1;t<=100;t++) {
+  const a=frames[t-1].slice();
+  for(let k=arrays.offsets[t-1];k<arrays.offsets[t];k++) {const v=arrays.changes[k];a[v>>>6]=v&63;}
+  frames.push(a);
+}
+const N=40,V=64000,canvas=el('canvas'),ctx=canvas.getContext('2d');
+let t=0,copy=0,zmax=39,mode='species',eventMode=false,playing=null;
+let yaw=.70,pitch=.48,selected=-1,geometry=[],projected=[],state=frames[0],A=new Uint8Array(V);
+let width=0,height=0,palette=[],foreground='',outline='';
+const names=['','C. neoformans','D. radiodurans','C. sphaerospermum','B. subtilis','A. niger','S. oneidensis','O. intermedium AM7'];
+const tokens=['--viz-series-1','--viz-series-2','--viz-series-3','--viz-series-4','--viz-series-5','--viz-series-6','--yellow'];
+const colourProbe=document.createElement('span'); root.appendChild(colourProbe);
+const colourCanvas=document.createElement('canvas');colourCanvas.width=colourCanvas.height=1;
+const colourCtx=colourCanvas.getContext('2d');
+function rgb(token) {
+  colourProbe.style.color=`var(${token})`;
+  colourCtx.clearRect(0,0,1,1);colourCtx.fillStyle=getComputedStyle(colourProbe).color;colourCtx.fillRect(0,0,1,1);
+  return Array.from(colourCtx.getImageData(0,0,1,1).data).slice(0,3);
+}
+function css(a){return `rgb(${a.map(x=>Math.round(x)).join(',')})`;}
+function theme(){palette=tokens.map(rgb);foreground=css(rgb('--foreground'));outline=css(rgb('--border'));legend();draw();}
+function coords(i){return [i%N,Math.floor(i/N)%N,Math.floor(i/(N*N))];}
+function totalCopies(){return arrays.event_offsets[t+1]-arrays.event_offsets[t];}
+function eventIndex(){return eventMode&&copy>0?arrays.event_offsets[t]+copy-1:-1;}
+function signalColor(v){const f=Math.max(0,Math.min(1,v/255));return palette[0].map((x,i)=>x*(1-f)+palette[4][i]*f);}
+function voxelColor(id,i){
+  if(mode==='signal')return signalColor(A[i]);
+  if(mode==='species')return palette[arrays.species[id]-1];
+  const c=palette[(id-1)%7], factor=.64+.36*Math.floor((id-1)/7)/5;
+  return c.map(x=>x*factor);
+}
+function legend(){
+  el('legend').replaceChildren();
+  if(mode==='species')names.slice(1).forEach((name,i)=>{
+    const span=document.createElement('span'),sw=document.createElement('span');sw.className='bf-swatch';sw.style.background=css(palette[i]);
+    span.append(sw,document.createTextNode(`${i+1} ${name}`));el('legend').appendChild(span);
+  });
+  else if(mode==='signal'){
+    for(const v of [0,5,10]){const span=document.createElement('span'),sw=document.createElement('span');sw.className='bf-swatch';sw.style.background=css(signalColor(v*25.5));span.append(sw,document.createTextNode(`A = ${v}`));el('legend').appendChild(span);}
+    const span=document.createElement('span');span.textContent='Arbitrary units · display ±0.020';el('legend').appendChild(span);
+  }else el('legend').textContent='Parcel IDs 1–42 · select a voxel for its exact ID';
+}
+const faceDefs=[
+  {n:[1,0,0],off:1,verts:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
+  {n:[-1,0,0],off:-1,verts:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]]},
+  {n:[0,1,0],off:40,verts:[[0,1,0],[0,1,1],[1,1,1],[1,1,0]]},
+  {n:[0,-1,0],off:-40,verts:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]]},
+  {n:[0,0,1],off:1600,verts:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]]},
+  {n:[0,0,-1],off:-1600,verts:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]]}
+];
+function occupied(i){return i>=0&&i<V&&state[i]>0&&state[i]<255&&Math.floor(i/1600)<=zmax;}
+function makeGeometry(){
+  geometry=[];
+  for(let i=0;i<V;i++)if(occupied(i)){
+    const xyz=coords(i);
+    for(const f of faceDefs){
+      const neighbour=xyz.map((v,j)=>v+f.n[j]);
+      if(neighbour.every(v=>v>=0&&v<N)&&occupied(i+f.off))continue;
+      geometry.push({i,xyz,n:f.n,verts:f.verts});
+    }
+  }
+}
+function rebuild(){
+  if(eventMode&&t>0){
+    state=frames[t-1].slice();
+    for(let k=arrays.event_offsets[t];k<arrays.event_offsets[t]+copy;k++)state[arrays.event_recipient_site[k]-1]=arrays.event_donor_id[k];
+  }else state=frames[t];
+  A=new Uint8Array(V);let j=arrays.signal_offsets[t];
+  for(let i=0;i<V;i++)if(frames[t][i]>0&&frames[t][i]<255)A[i]=arrays.signal[j++];
+  makeGeometry();labels();draw();
+}
+function detail(){
+  if(selected<0){el('selected').textContent='Computational parcel labels · lattice coordinates';return;}
+  const id=state[selected],pos=coords(selected);
+  el('selected').textContent=`(${pos.join(', ')}) · parcel ${id===255?'wall':id} · ${id>0&&id<255?names[arrays.species[id]]:'empty'}${mode==='signal'?` · A ≈ ${(A[selected]*10/255).toFixed(2)}`:''}`;
+}
+function number(x){return Number.isNaN(x)?'no draw':Number(x).toString();}
+function labels(){
+  el('time-value').textContent=t;el('z-value').textContent=zmax;
+  el('frame').textContent=eventMode?`MCS ${t} · after accepted copy ${copy}/${totalCopies()}`:`MCS ${t} · saved snapshot`;
+  el('count').textContent=`${totalCopies()} accepted copies in MCS ${t}`;
+  el('event-value').textContent=`${copy} / ${totalCopies()}`;
+  const e=eventIndex();
+  if(e<0)el('event-detail').textContent=t===0?'Initial state':'Before the first accepted copy of this MCS';
+  else el('event-detail').textContent=`Proposal ${arrays.event_proposal_index[e]} · donor ${arrays.event_donor_id[e]} at (${coords(arrays.event_donor_site[e]-1).join(',')}) → recipient ${arrays.event_recipient_id[e]} at (${coords(arrays.event_recipient_site[e]-1).join(',')}) · ΔH ${number(arrays.event_delta_h[e])} [adh ${number(arrays.event_adh[e])}, vol ${number(arrays.event_vol[e])}, rad ${number(arrays.event_rad[e])}, mel ${number(arrays.event_mel[e])}] · draw ${number(arrays.event_draw[e])}`;
+  const m=metadata.metrics[t];
+  el('endpoint').textContent=eventMode?'Signal is sampled once per MCS; no sub-MCS signal values are assigned.':`Inert signal · A ≥ 5: ${m.above_threshold.toLocaleString()} / ${m.occupied_sites.toLocaleString()} occupied voxels (${(100*m.fraction).toFixed(1)}%)`;
+  detail();
+}
+function draw(){
+  if(!width||!palette.length)return;
+  ctx.clearRect(0,0,width,height);projected=[];
+  const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const camera=[cp*cy,cp*sy,sp],right=[-sy,cy,0],up=[-sp*cy,-sp*sy,cp];
+  const scale=Math.min(width/56,height/51);
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  function project(p){const q=p.map(v=>v-20);return [width/2+scale*dot(q,right),height/2-scale*dot(q,up),dot(q,camera)];}
+  for(const f of geometry){
+    if(dot(f.n,camera)<=0)continue;
+    const points=f.verts.map(v=>project(v.map((a,j)=>a+f.xyz[j])));
+    projected.push({i:f.i,points,depth:points.reduce((s,p)=>s+p[2],0)/4,light:.72+.28*Math.abs(f.n[2])});
+  }
+  projected.sort((a,b)=>a.depth-b.depth);
+  const e=eventIndex(),eventSite=e>=0?arrays.event_recipient_site[e]-1:-1;
+  ctx.lineWidth=.35;
+  for(const f of projected){
+    ctx.beginPath();f.points.forEach((p,k)=>k?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+    ctx.fillStyle=css(voxelColor(state[f.i],f.i).map(v=>v*f.light));ctx.fill();
+    ctx.strokeStyle=outline;ctx.stroke();
+    if(f.i===selected||f.i===eventSite){ctx.lineWidth=1.8;ctx.strokeStyle=foreground;ctx.stroke();ctx.lineWidth=.35;}
+  }
+  if(e>=0){
+    const a=project(coords(arrays.event_donor_site[e]-1).map(v=>v+.5));
+    const b=project(coords(eventSite).map(v=>v+.5));
+    ctx.strokeStyle=foreground;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+    ctx.beginPath();ctx.arc(b[0],b[1],4,0,2*Math.PI);ctx.stroke();
+  }
+  // Reference triad: orientation only; coordinate values come from voxel selection.
+  const origin=[34,height-35];ctx.font=getComputedStyle(root).font;ctx.fillStyle=foreground;
+  for(const [j,label] of ['x','y','z'].entries()){
+    const v=[0,0,0];v[j]=1;const end=[origin[0]+23*dot(v,right),origin[1]-23*dot(v,up)];
+    ctx.strokeStyle=foreground;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(...origin);ctx.lineTo(...end);ctx.stroke();ctx.fillText(label,end[0]+3,end[1]);
+  }
+}
+function setTime(value){t=value;el('time').value=t;copy=eventMode?0:totalCopies();el('event').max=totalCopies();el('event').value=copy;rebuild();}
+function stop(){if(playing)clearInterval(playing);playing=null;el('play').textContent='Play';}
+el('time').addEventListener('input',()=>{stop();setTime(+el('time').value);});
+el('play').addEventListener('click',()=>{if(playing){stop();return;}el('play').textContent='Pause';if(t===100)setTime(0);playing=setInterval(()=>{if(t===100){stop();return;}setTime(t+1);},220);});
+el('colour').addEventListener('change',()=>{mode=el('colour').value;legend();labels();draw();});
+el('z').addEventListener('input',()=>{zmax=+el('z').value;makeGeometry();labels();draw();});
+el('events').addEventListener('change',()=>{
+  stop();eventMode=el('events').checked;el('event-panel').hidden=!eventMode;
+  el('colour').querySelector('[value="signal"]').disabled=eventMode;
+  if(eventMode&&mode==='signal'){mode='parcel';el('colour').value=mode;legend();}
+  setTime(t);
+});
+el('event').addEventListener('input',()=>{copy=+el('event').value;rebuild();});
+let pointer=null;
+canvas.addEventListener('pointerdown',e=>{pointer={x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY};canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{if(!pointer)return;yaw+=(e.clientX-pointer.x)*.009;pitch=Math.max(-1.35,Math.min(1.35,pitch+(e.clientY-pointer.y)*.007));pointer.x=e.clientX;pointer.y=e.clientY;draw();});
+canvas.addEventListener('pointerup',e=>{
+  if(pointer&&Math.hypot(e.clientX-pointer.ox,e.clientY-pointer.oy)<5){
+    const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+    selected=-1;
+    for(let j=projected.length-1;j>=0;j--){const f=projected[j];ctx.beginPath();f.points.forEach((p,k)=>k?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(ctx.isPointInPath(x*devicePixelRatio,y*devicePixelRatio)){selected=f.i;break;}}
+    detail();draw();
+  }
+  pointer=null;
+});
+canvas.addEventListener('pointercancel',()=>{pointer=null;});
+new ResizeObserver(()=>{width=canvas.clientWidth;height=canvas.clientHeight;canvas.width=Math.round(width*devicePixelRatio);canvas.height=Math.round(height*devicePixelRatio);ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);draw();}).observe(canvas);
+new MutationObserver(theme).observe(document.documentElement,{attributes:true,attributeFilter:['class','style','data-theme']});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',theme);
+theme();rebuild();
+// QA reads reconstructed label bytes, never a second geometry implementation.
+root.biofilmQA={metadata,frames,arrays,getState:()=>state,getProjection:()=>projected,getTime:()=>t,setTime,ready:true};
+}catch(error){el('error').textContent=`Unable to load verified trajectory: ${error.message}`;throw error;}
+})();
+</script>
