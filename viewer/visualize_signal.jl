@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # Native GLMakie view; OpenGL window execution must be checked on the target Mac/Linux host.
 using GLMakie
-include("signal_grid.jl")
+include(joinpath(@__DIR__,"signal_grid.jl"))
 
 function show_signal(parent,derived)
     frames=[signal_grid(joinpath(parent,"snapshots","snap_mcs$(lpad(t,6,'0')).h5"),
@@ -18,15 +18,19 @@ function show_signal(parent,derived)
     fieldplot=volume!(ax,0.5..39.5,0.5..39.5,0.5..39.5,signal;algorithm=:absorption,
                      colormap=transfer,colorrange=(0,10))
     bar=Colorbar(fig[1,2],fieldplot;label="A (declared arbitrary units)")
-    legend=Legend(fig[1,2],[PolyElement(color=c) for c in COLORS],LABELS;visible=false,framevisible=false)
+    legend=Legend(fig[1,2],[PolyElement(color=c) for c in COLORS],LABELS;framevisible=false)
+    Makie.hide!(legend)
     slider=Slider(fig[2,1:2];range=0:100,startvalue=0)
     menu=Menu(fig[3,1];options=["Signal volume","Species labels"],default="Signal volume")
     labelplot.visible[]=false
     on(menu.selection) do value
         labelplot.visible[]=value=="Species labels"
         fieldplot.visible[]=value=="Signal volume"
-        bar.visible[]=value=="Signal volume"
-        legend.visible[]=value=="Species labels"
+        if value=="Species labels"
+            Makie.hide!(bar); Makie.unhide!(legend)
+        else
+            Makie.unhide!(bar); Makie.hide!(legend)
+        end
     end
     on(slider.value) do t
         species[]=frames[t+1][1];signal[]=Float32.(frames[t+1][2])

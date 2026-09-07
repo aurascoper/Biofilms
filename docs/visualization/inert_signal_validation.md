@@ -8,6 +8,7 @@ The delivered derived run is `inert_signal_seed42_v2`, driven by the immutable
 - Numerical contract and production-source mutation controls: 38 passed. Tests include all seven distinct source rates, time and slab convergence, a negative field when stability substeps are removed, and a failed slab bound when decay is removed.
 - Production input/configuration controls: 20 passed on the parent run; unknown acknowledgements, missing/duplicate MCS, wrong parcel configuration, altered hash and existing output are refused.
 - Native viewer HDF5 reader and CLI: 107 passed, including all 101 frames and mismatched-time/altered-field controls.
+- Native Makie object construction, legend switching and timeline callbacks: passed with a CairoMakie backend adapter, without opening an OpenGL window. This check caught and fixed the HDF5/Makie `attributes` name collision and the block-visibility API usage.
 - Full Julia suite: passed, including the existing basis-gate census, accepted-copy controls and the new numerical tests.
 - Calibration tier: 428 passed, 5 expected skips for unavailable Dryad ND2 inputs.
 - Browser: all 101 reconstructed label hashes match, all 14,281 accepted events replay, controls work, and light/dark narrow layouts have no runtime errors or horizontal overflow.

@@ -5,7 +5,7 @@ include("lattice_grid.jl")
 function signal_grid(snapshot, companion)
     grid,mcs=species_grid(snapshot)
     h5open(companion,"r") do f
-        a=attributes(f)
+        a=HDF5.attributes(f)
         read(a["mcs"])==mcs || throw(ArgumentError("signal MCS differs from snapshot"))
         read(a["logical_axis_order"])=="xyz" && read(a["dataset_axis_order_h5py"])=="zyx" ||
             throw(ArgumentError("unknown signal axis order"))

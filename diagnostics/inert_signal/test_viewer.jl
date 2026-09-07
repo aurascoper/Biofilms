@@ -1,4 +1,10 @@
 using Test
+# Makie exports this name too; the real reader must qualify HDF5's binding.
+module PlotNamespaceControl
+    export attributes
+    attributes(x)=error("plot attributes are not HDF5 attributes")
+end
+using .PlotNamespaceControl
 include(joinpath(@__DIR__,"..","..","viewer","signal_grid.jl"))
 
 @testset "Native viewer reader and CLI without OpenGL" begin
