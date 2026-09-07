@@ -14,7 +14,8 @@ function show_signal(parent,derived)
         color=parse.(Makie.Colorant,COLORS),is_air=(==(0x00)))
     transfer=[RGBAf(c.r,c.g,c.b,Float32(i==1 ? 0 : .015+.12*(i-1)/255))
               for (i,c) in enumerate(Makie.resample_cmap(:viridis,256))]
-    fieldplot=volume!(ax,0..40,0..40,0..40,signal;algorithm=:absorption,
+    # Cell-centred samples align with the 0..40 voxel-face extent and VTI cell data.
+    fieldplot=volume!(ax,0.5..39.5,0.5..39.5,0.5..39.5,signal;algorithm=:absorption,
                      colormap=transfer,colorrange=(0,10))
     Colorbar(fig[1,2],fieldplot;label="A (declared arbitrary units)")
     slider=Slider(fig[2,1:2];range=0:100,startvalue=0)
