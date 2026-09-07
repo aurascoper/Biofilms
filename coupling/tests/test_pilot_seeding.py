@@ -227,6 +227,23 @@ def test_a_ratio_that_cannot_share_the_mass_denominator_is_refused(
             refinement.refuse_non_divisor_ratios(ratios)
 
 
+@pytest.mark.parametrize("text, outcome", [
+    ("1,2,4", [1, 2, 4]),
+    ("4,1,2,2", [1, 2, 4]),
+    ("0,1,2", "ratios must be >= 1"),
+    ("-2,1", "ratios must be >= 1"),
+    ("2,4", "ratio 1 is the reference grid"),
+])
+def test_parse_ratios_checks_each_requirement_by_name(text, outcome):
+    """Two requirements, two messages. Checking only the smallest element told a
+    caller of "0,1,2" that ratio 1 was missing when it was present (Copilot on #24)."""
+    if isinstance(outcome, list):
+        assert refinement.parse_ratios(text) == outcome
+    else:
+        with pytest.raises(SystemExit, match=outcome):
+            refinement.parse_ratios(text)
+
+
 # ------------------------- the guards, reached the way production reaches them
 
 def test_the_canonical_tables_are_unreachable_after_a_partial_run(tmp_path):
