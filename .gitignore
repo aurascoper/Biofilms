@@ -375,6 +375,7 @@ MigrationBackup/
 FodyWeavers.xsd
 # Machine-local Julia state (JACC is dev-pathed; backend is a local preference)
 Manifest.toml
+!viewer/Manifest.toml
 LocalPreferences.toml
 
 # Python coupling env/artifacts

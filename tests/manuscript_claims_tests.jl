@@ -92,6 +92,23 @@ end
 # does not violate the claim; the corrected .tex prose (section 3.4) makes this same
 # distinction explicit. "momentum" has no such false-positive source and is checked directly.
 
+# Retracted figure vocabulary must not enter an image from viewer/ either. The python
+# guard (RETRACTED_IN_FIGURES in calibration/tests/test_claims_ledger.py) reads the
+# figure sidecars under preprint/figures; a title string in a viewer script produces an
+# image no sidecar records. SCOPE: every .jl under viewer/ and the .vti exporter, the
+# files that write images or files a viewer reads. Planted "Radiotrophic biofilm" in the
+# viewer title on 2026-09-07 stayed green until this block existed.
+VIEWER_FILES = vcat([joinpath(REPO, "viewer", f) for f in readdir(joinpath(REPO, "viewer")) if endswith(f, ".jl")],
+                    [joinpath(REPO, "export_vti.jl")])
+let
+    control = _scan_text([("fake.jl", "title = \"Radiotrophic biofilm, MCS \$mcs\"\n")], r"radiotroph"i)
+    @test length(control) == 1
+    @test length(VIEWER_FILES) >= 2
+    real = _scan(VIEWER_FILES, r"radiotroph"i)
+    @test isempty(real)
+    isempty(real) || foreach(h -> println("retracted word in viewer scope: ", h), real)
+end
+
 let
     control = _scan_text([("fake.R", "momentum <- p * v\n")], r"\bmomentum\b"i)
     @test length(control) == 1
