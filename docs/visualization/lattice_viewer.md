@@ -220,18 +220,27 @@ exporter output is exploratory.
 
 ## ParaView workflow
 
-ParaView is not installed on the machine this was built on (the scope searched was `which paraview
-pvpython` and `/opt`, 2026-09-07), so the steps below are from the ParaView documentation and
-were not exercised, and no ParaView page was consulted for them, so the filter names and the
-Calculator syntax below are a recipe to try, not a sourced claim. Open the `.vti`, or the `.pvd` for a series. Threshold on `species` to
-drop 0 (air). Colour by `species` with "Interpret Values As Categories" and one name per id.
-Clip or slice through the cylinder axis for a radial section. A Calculator expression
-`sqrt((coordsX - x0)^2 + (coordsY - y0)^2)` gives a radial coordinate in sites. Colour by
-`dose_rate_mean_Gy_s` or `accumulated_dose_Gy` for the dose, keeping the unit strings from
-the field data in any caption. The Python side can read the same file with `pyvista.read`
-(https://docs.pyvista.org/api/utilities/_autosummary/pyvista.read.html, consulted for the draft;
-the URL carries no version); pyvista 0.48.4, vtk and h5py are in the coupling venv here, none
-of them in CI's tier, and the read was not exercised.
+ParaView 6.2.0 (the Kitware `ParaView-6.2.0-RC1-MPI-Linux-Python3.12-x86_64` binary in
+Hunter's Downloads; nothing is installed system-wide) read a six-snapshot `.pvd` from this
+exporter on 2026-09-07, through its bundled `pvpython`. It reported timesteps 5, 10, 15, 20,
+25 and 30, a 20-site lattice as 8000 cells, the eight cell arrays by name with `species` in
+0 to 7, and all twelve field-data entries including the string ones (`units`,
+`species_zero`, `accumulated_dose_Gy_units`, the axis-order and `git_sha` strings). The GUI
+opened the same file on a Wayland session; the "Could not find the Qt platform plugin
+wayland" line is Qt trying the session's compositor first, finding only `libqxcb.so` in the
+bundle, and falling back to XWayland on the X display.
+
+The interactive steps below were not exercised and no ParaView page was consulted for them,
+so the filter names and the Calculator syntax are a recipe to try, not a sourced claim. Open
+the `.vti`, or the `.pvd` for a series, and Apply; the time toolbar scrubs MCS. Threshold on
+`species` to drop 0 (air). Colour by `species` with "Interpret Values As Categories" and one
+name per id. Clip or slice through the cylinder axis for a radial section. A Calculator
+expression `sqrt((coordsX - x0)^2 + (coordsY - y0)^2)` gives a radial coordinate in sites.
+Colour by `dose_rate_mean_Gy_s` or `accumulated_dose_Gy` for the dose, keeping the unit
+strings from the field data in any caption. The Python side can read the same file with
+`pyvista.read` (https://docs.pyvista.org/api/utilities/_autosummary/pyvista.read.html,
+consulted for the draft; the URL carries no version); pyvista 0.48.4, vtk and h5py are in the
+coupling venv here, none of them in CI's tier, and the read was not exercised.
 
 ## Open decisions
 
@@ -243,5 +252,5 @@ of them in CI's tier, and the read was not exercised.
   the snapshot is a schema change with its own hash implications (`label_state_hash` excludes
   fields, so it may be safe; not checked).
 - WGLMakie for a browser viewer was not tried.
-- ParaView version to pin. None is installed; the draft's 6.1.0 (release notes,
-  https://www.kitware.com/paraview-6-1-0-release-notes/) is unconfirmed here.
+- ParaView version to pin. The 6.2.0 release candidate read the files; pin the release when
+  it ships, and re-read one `.pvd` then.
