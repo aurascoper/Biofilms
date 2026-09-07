@@ -77,3 +77,5 @@ include("rad_proposals_tests.jl")
 # Table 4 was published from a configuration nothing shipped could reproduce.
 # decided_moves.jl is that entry point; this runs it.
 include("decided_moves_tests.jl")
+
+include("lattice_evidence_tests.jl")
