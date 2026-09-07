@@ -1,24 +1,25 @@
 # Note to Caixia Wan — the v1.2 correction
 
-**Status 2026-09-06: still drafted in Gmail, not sent.** Checked against the mailbox on
-2026-09-06: no message to Caixia Wan has been sent since the October 2024 thread, and the draft
-stands with subject "Preprint v1.2.1, correcting the 29 August v1.1 you have" and the text in the
-next section. The copy she holds is the v1.1 build of 29 August 2026, 08:40 CDT, the working tree
-of `d404438` (bound −5×10⁻⁵, Table 4 with "none of 206 042", "several orders" in §7.1, figures
-already corrected). The attachment is the CI build of the commit tagged `preprint-v1.2.1`
-(3081a58, 37 pages), added by hand because no tool here attaches a file of that size. When it
-goes, replace this block with the sent date: a sent email is a claim sink and belongs in the
-dependents enumeration (AGENTS.md, "Correcting a published number"). No mailbox identifiers or
-addresses are recorded here; the mailbox holds them.
+**Status 2026-09-07: sent, twice.** The correction email went to Caixia Wan on **2026-09-05 at 3:33 PM
+CDT**, with the text in the next section and the **v1.2 build attached** (tag `preprint-v1.2`, commit
+4bf1ba9, 36 pages, 593,010 bytes). A follow-up went on the same thread on **2026-09-06, in the evening
+before about 10:50 PM CDT**, with the **v1.2.1 build attached** (tag `preprint-v1.2.1`, commit 3081a58,
+37 pages, 593,979 bytes), replacing the file she was told to forward. A separate short message about an
+unrelated matter went to her the same evening at about 10:50 PM and carries no preprint content. Both
+sends are claim sinks outside this repository: `data/claims_ledger.csv` row `WAN-EMAIL-01` names them,
+and any later correction of a number in the sent text must reach her (AGENTS.md, "Correcting a published
+number"). The copy she held before was the v1.1 build of 29 August 2026, 08:40 CDT, the working tree of
+`d404438`. The 2026-09-06 block that stood here, "still drafted, not sent", was wrong: the mailbox it was
+checked against was not the one that sent. No mailbox identifiers or addresses are recorded here.
 
-## Final text (v1.2.1 form, the draft as it stands)
+## Text as sent on 2026-09-05
 
-Written against her pinned build rather than "v1.1", which is nine commits. Every number in it
-was read back from the manuscript diff d404438..3081a58: the bound and both moved counts sit in
-§6.2 and Table 4 of her copy, the three changes that matter to a reader are §3.10, §§2.5 and 3.8,
-and the three replaced references, and the phase-locking row's citations were theory sources.
-Gated through copydesk (discipline check all zeros, no hard fails) and prose-craft-2; the one
-accepted advisory unpacked "in and beneath Table 4" into "one in Table 4 and one beneath it".
+Hunter's paste from the sent message is the record; the paste ends at the closing line. It is the
+copydesk-gated text written against her pinned build (every number read back from the manuscript diff
+d404438..3081a58; discipline check all zeros, no hard fails, one accepted advisory) with one
+difference from the final draft: the closing line names v1.2, which is what was attached.
+
+
 
 ```
 Hi Ellen,
@@ -33,10 +34,35 @@ Smaller ones you may notice. Section 2.1 adds Robertson 2012, whose growth resul
 
 I have a short memo on the FeCrAl question if that's useful for the MURR conversation.
 
-v1.2.1 is attached; it's the one to forward if things move.
+v1.2 is attached; it's the one to forward if things move.
 
 Hunter
 ```
+
+## Follow-up as sent on 2026-09-06
+
+Gated the same way (discipline check all zeros; craft review clean; prose review clean with two style
+advisories left unapplied). The date is absolute so this note can quote it in any year.
+
+```
+Hi Ellen,
+
+v1.2.1 supersedes the 5 September attachment, with five small corrections and none to the numbers. Please forward this one if things move.
+
+Hunter
+```
+
+## What v1.2.1 contains, read from the tagged artifact against the v1.2 build she holds
+
+Corrections, five, none to a reported number: the byline "Hunter Kinder, B.A." (v1.2: "M.A.T.L.");
+§6.2's pointer "Software and Data Availability section" (v1.2: "Data and Code Availability"); the Table 4
+caption's command printed with two dashes (v1.2: ligated); "the three runs of Table 4" replaced by
+"seeds 42, 43 and 44 at 400 MCS (53 603, 68 465 and 83 974 accepted moves respectively; Table 4 shows
+seed 42)", which states the per-seed counts for the first time (the phrase survives once in the §8
+correction passage); and the abstract's "7.505×10⁻² in ΔH (a 1.5% acceptance bias)". Additions, not
+corrections: three Frontiers DOIs on references 51 to 53, and "including as metaphor" dropped from the
+Introduction. So "none to the numbers" is true of the build: no number she has was changed; the
+per-seed counts and the 1.5% figure were added.
 
 ---
 
@@ -46,7 +72,7 @@ Kept as the record; do not send. It failed review on eight points: "v1.1" is nin
 one; "both numbers" named neither; "cannot recur silently" claimed more than the test does;
 "automated review" where the manuscript says Codex on the pull request; "four smaller things"
 undercounted; "wrong DOIs" understated three replaced papers; the Table 2 row did have citations;
-and the attachment named v1.2 when the tagged build is v1.2.1.
+and the attachment line, which in this text meant the untagged build of the day; the sent email also said v1.2, and attached the tagged v1.2 build.
 
 ### As it read
 
