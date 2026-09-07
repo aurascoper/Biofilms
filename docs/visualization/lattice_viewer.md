@@ -75,7 +75,7 @@ Claims from the documentation, as consulted for the draft of this note (2026-09-
 running the viewer here established. The rows cite the `dev` and v0.21 pages that were consulted.
 The last column says whether one manual run on the pinned GLMakie 0.13.14 / Makie 0.24.14 on
 2026-09-07 confirmed the row; the viewer is out of CI by design, so that run is the evidence. The
-call that ran, verbatim from `viewer/visualize_lattice.jl`:
+call that ran, verbatim from `viewer/visualize_lattice.jl`, was
 `voxels!(ax, 0 .. N[1], 0 .. N[2], 0 .. N[3], grid; color = parse.(Makie.Colorant, COLORS),
 is_air = ==(0x00))` with `grid::Array{UInt8,3}`, on an `Axis3` with `aspect = :data` and
 `limits = (0, N[1], 0, N[2], 0, N[3])`; it rendered a still (`save`) and a 12-frame orbit
@@ -147,8 +147,8 @@ back in the tests. ReadVTK reads numeric arrays only, and its own documentation 
 incomplete (https://juliavtk.github.io/ReadVTK.jl/stable/). WriteVTK sources:
 https://juliavtk.github.io/WriteVTK.jl/stable/ and
 https://juliavtk.github.io/WriteVTK.jl/stable/grids/datasets/, consulted 2026-09-07 at
-whatever tag `stable` resolved to that day. Per call, what the 51 assertions exercise at the
-pinned WriteVTK 1.22.0 and ReadVTK 0.2.6, in CI: `vtk_grid` with three ranges writes ImageData
+whatever tag `stable` resolved to that day. Per call, the 51 assertions exercise the following at the
+pinned WriteVTK 1.22.0 and ReadVTK 0.2.6, in CI. `vtk_grid` with three ranges writes ImageData
 that ReadVTK reads back with spacing 1.0 and the cell count of the lattice; `VTKCellData()`
 places an (N,N,N) array as cell data that reads back element for element; `VTKFieldData()`
 with a Float64 reads back through ReadVTK, and with a String is written appended and read back
