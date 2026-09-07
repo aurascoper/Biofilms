@@ -17,13 +17,16 @@ function show_signal(parent,derived)
     # Cell-centred samples align with the 0..40 voxel-face extent and VTI cell data.
     fieldplot=volume!(ax,0.5..39.5,0.5..39.5,0.5..39.5,signal;algorithm=:absorption,
                      colormap=transfer,colorrange=(0,10))
-    Colorbar(fig[1,2],fieldplot;label="A (declared arbitrary units)")
+    bar=Colorbar(fig[1,2],fieldplot;label="A (declared arbitrary units)")
+    legend=Legend(fig[1,2],[PolyElement(color=c) for c in COLORS],LABELS;visible=false,framevisible=false)
     slider=Slider(fig[2,1:2];range=0:100,startvalue=0)
     menu=Menu(fig[3,1];options=["Signal volume","Species labels"],default="Signal volume")
     labelplot.visible[]=false
     on(menu.selection) do value
         labelplot.visible[]=value=="Species labels"
         fieldplot.visible[]=value=="Signal volume"
+        bar.visible[]=value=="Signal volume"
+        legend.visible[]=value=="Species labels"
     end
     on(slider.value) do t
         species[]=frames[t+1][1];signal[]=Float32.(frames[t+1][2])
