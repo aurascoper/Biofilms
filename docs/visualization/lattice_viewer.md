@@ -38,8 +38,9 @@ root, and titled every frame with the first word of `RETRACTED_IN_FIGURES`
 (`calibration/tests/test_claims_ledger.py`). Its Project.toml deps were AMDGPU, CairoMakie and
 JACC; it had no Manifest and no test. Nothing on it is a base. Two things were salvaged, the
 seven-entry palette and labels (the serial script's `FIG_COLORS` / `FIG_LABELS`) and the shape
-of the frame loop. Retiring the remote branch is Hunter's call; this note records the
-decision when it is made.
+of the frame loop. Its commit is reachable at the tag `archive/visualize-3d` (pushed 2026-09-07, read back
+from `git ls-remote --tags origin`); the branch is to be deleted after #25 merges, and this line
+takes the deletion date then.
 
 ## The snapshot both tools read
 
@@ -71,28 +72,31 @@ labels the dose array by that dataset name.
 ## GLMakie `voxels`
 
 Claims from the documentation, as consulted for the draft of this note (2026-09-07), then what
-running the viewer here established. The rows cite the `dev` and v0.21 pages that were consulted;
-they were not reconciled against the pinned Makie 0.24.14, so a row is a claim about those pages,
-not about the pinned release, unless the paragraph after the table confirms it by running.
+running the viewer here established. The rows cite the `dev` and v0.21 pages that were consulted.
+The last column says whether one manual run on the pinned GLMakie 0.13.14 / Makie 0.24.14 on
+2026-09-07 confirmed the row; the viewer is out of CI by design, so that run is the evidence. The
+call that ran, verbatim from `viewer/visualize_lattice.jl`:
+`voxels!(ax, 0 .. N[1], 0 .. N[2], 0 .. N[3], grid; color = parse.(Makie.Colorant, COLORS),
+is_air = ==(0x00))` with `grid::Array{UInt8,3}`, on an `Axis3` with `aspect = :data` and
+`limits = (0, N[1], 0, N[2], 0, N[3])`; it rendered a still (`save`) and a 12-frame orbit
+(`record`, azimuth swept) from a 20-site snapshot at MCS 20.
 
-| Item | Value | Source | Version |
-|---|---|---|---|
-| `voxels` introduced | Makie v0.21, PR #3527 | https://makie.org/website/blogposts/v0.21/ ; https://docs.makie.org/v0.21/changelog | v0.21 |
-| Signature | `voxels(chunk::Array{<:Real,3})`, `voxels(x, y, z, chunk)`; only the extrema of x, y, z are used | https://docs.makie.org/dev/reference/plots/voxels | dev |
-| Representation | `Array{UInt8,3}`; `0x00` is always invisible air; ids 1 to 255 visible | same | dev |
-| `color` per id | `color = [c1, c2, ...]` indexed by voxel id, skipping `0x00`; the page says `colorrange` is ignored for UInt8 input, which was not exercised here | same | dev |
-| `is_air` | a predicate selecting values drawn as air | same | dev |
-| Status | "experimental and may still see breaking changes in patch releases"; not re-checked at the pinned 0.24.14, hence the exact pin | same | dev |
-| Backends | dedicated implementation in GLMakie and WGLMakie; CairoMakie projects 3-D flat with no z-clipping | https://makie.org/website/blogposts/v0.21/ ; https://docs.makie.org/v0.21/explanations/backends/cairomakie | v0.21 |
-| GPU | OpenGL 3.3 or higher | https://docs.makie.org/stable/explanations/backends/glmakie.html | stable |
-| Headless | xvfb software rendering is how GLMakie's own tests run | https://docs.makie.org/dev/explanations/headless | dev |
+| Item | Value | Source | Version | At the pin, 2026-09-07 |
+|---|---|---|---|---|
+| `voxels` introduced | Makie v0.21, PR #3527 | https://makie.org/website/blogposts/v0.21/ ; https://docs.makie.org/v0.21/changelog | v0.21 | present at 0.24.14 (the call ran) |
+| Signature | `voxels(chunk::Array{<:Real,3})`, `voxels(x, y, z, chunk)`; only the extrema of x, y, z are used | https://docs.makie.org/dev/reference/plots/voxels | dev | the `x, y, z, chunk` form with interval arguments ran; the one-argument form was not tried |
+| Representation | `Array{UInt8,3}`; `0x00` is always invisible air; ids 1 to 255 visible | same | dev | a UInt8 grid with `0x00` for medium and wall ran, and no air site was drawn |
+| `color` per id | `color = [c1, c2, ...]` indexed by voxel id, skipping `0x00`; the page says `colorrange` is ignored for UInt8 input | same | dev | seven colours by id ran and matched the legend; `colorrange` was not passed, so that clause is unconfirmed |
+| `is_air` | a predicate selecting values drawn as air | same | dev | `is_air = ==(0x00)` ran |
+| Status | "experimental and may still see breaking changes in patch releases" | same | dev | not a runnable claim; the exact pin in `viewer/Manifest.toml` is the response to it |
+| Backends | dedicated implementation in GLMakie and WGLMakie; CairoMakie projects 3-D flat with no z-clipping | https://makie.org/website/blogposts/v0.21/ ; https://docs.makie.org/v0.21/explanations/backends/cairomakie | v0.21 | GLMakie ran; WGLMakie and CairoMakie were not tried |
+| GPU | OpenGL 3.3 or higher | https://docs.makie.org/stable/explanations/backends/glmakie.html | stable | ran on a Radeon 890M reporting OpenGL 4.6 (Mesa 26.0.8) |
+| Headless | xvfb software rendering is how GLMakie's own tests run | https://docs.makie.org/dev/explanations/headless | dev | not tried; the run had a display |
 
-Established by running `viewer/visualize_lattice.jl` on 2026-09-07 with the versions pinned
-in `viewer/Manifest.toml` (GLMakie 0.13.14, Makie 0.24.14, HDF5 0.17.3), on a Radeon 890M at
-OpenGL 4.6 with a display. A UInt8 grid with `0x00` for medium and wall, `color` as the
-seven palette entries and `is_air = ==(0x00)` renders every occupied site of a 20-site
-snapshot at MCS 20, with the legend built from the species present. A still and a
-12-frame orbit were written to the scratch directory and not committed. `attributes` is
+That run used the versions pinned in `viewer/Manifest.toml` (GLMakie 0.13.14, Makie 0.24.14,
+HDF5 0.17.3), on a Radeon 890M at OpenGL 4.6 with a display, and rendered every occupied site
+of the snapshot with the legend built from the species present. The still and the orbit went
+to the scratch directory and were not committed. `attributes` is
 exported by both HDF5 and Makie, so the viewer qualifies it as `HDF5.attributes`.
 
 The viewer's grid is a property of the file's own sentinels. A site is air when its
@@ -142,10 +146,15 @@ The file is written uncompressed (`compress = false`) so its string field data c
 back in the tests. ReadVTK reads numeric arrays only, and its own documentation calls it
 incomplete (https://juliavtk.github.io/ReadVTK.jl/stable/). WriteVTK sources:
 https://juliavtk.github.io/WriteVTK.jl/stable/ and
-https://juliavtk.github.io/WriteVTK.jl/stable/grids/datasets/ (ImageData from ranges, cell
-versus point placement, `VTKFieldData`, `paraview_collection`), consulted 2026-09-07 at
-whatever tag `stable` resolved to that day, not confirmed against the pinned 1.22.0 and 0.2.6
-except where the tests exercise the call, which they do for each of those four.
+https://juliavtk.github.io/WriteVTK.jl/stable/grids/datasets/, consulted 2026-09-07 at
+whatever tag `stable` resolved to that day. Per call, what the 51 assertions exercise at the
+pinned WriteVTK 1.22.0 and ReadVTK 0.2.6, in CI: `vtk_grid` with three ranges writes ImageData
+that ReadVTK reads back with spacing 1.0 and the cell count of the lattice; `VTKCellData()`
+places an (N,N,N) array as cell data that reads back element for element; `VTKFieldData()`
+with a Float64 reads back through ReadVTK, and with a String is written appended and read back
+by hand; `paraview_collection` writes a `.pvd` whose timesteps are the `mcs` keys; a float
+range writes the declared spacing. What no test exercises is compression, since every file is
+written with `compress = false`.
 
 ## Tests and their controls (`tests/vti_export_tests.jl`, 51 assertions)
 
@@ -214,7 +223,8 @@ of them in CI's tier, and the read was not exercised.
 
 ## Open decisions
 
-- Retiring `feat/visualize-3d` on origin is Hunter's call, recorded here when made.
+- `feat/visualize-3d` on origin: to be deleted after #25 merges; its commit stays reachable at
+  `archive/visualize-3d`.
 - Per-source-particle dose. It never reaches a file at the transport stage, so the exporter
   cannot offer it. If it should, the writer in `drivers.py` is where it would be added.
 - Nutrient in the transport snapshot. The exporter takes it from a restart file; adding it to
