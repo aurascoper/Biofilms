@@ -160,3 +160,17 @@ end
     cp(snap, joinpath(d, "c.h5"))   # a second snapshot at mcs 2
     @test_throws ArgumentError export_series(d, joinpath(tmp, "dup"))
 end
+
+@testset "one run, a snapshot every k MCS, keyed for the series" begin
+    sim3 = SR.init_coupled_simulation(p, rp; seed = 9)
+    d = joinpath(tmp, "every")
+    paths = export_transport_series(SR, sim3, d; every = 2, n_mcs = 7)
+    @test basename.(paths) == ["snap_mcs000002.h5", "snap_mcs000004.h5", "snap_mcs000006.h5", "snap_mcs000007.h5"]
+    @test [h5open(g -> Int(read(attributes(g)["mcs"])), q, "r") for q in paths] == [2, 4, 6, 7]
+    written = export_series(d, joinpath(tmp, "every_run"))
+    @test length(written) == 4
+    pvd = read(joinpath(tmp, "every_run.pvd"), String)
+    @test all(occursin("timestep=\"$t\"", pvd) for t in ("2.0", "4.0", "6.0", "7.0"))
+    @test_throws ArgumentError export_transport_series(SR, sim3, d; every = 0, n_mcs = 4)
+    @test_throws ArgumentError export_transport_series(SR, sim3, d; every = 5, n_mcs = 4)
+end

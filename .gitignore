@@ -403,3 +403,7 @@ geolocator/data/market_bars.sqlite
 # Large binary reference data gets an explicit distribution decision, not a
 # silent commit.
 geolocator/cache/
+
+# Rendered lattice exports (export_vti.jl); regenerate from snapshots, never commit
+*.vti
+*.pvd

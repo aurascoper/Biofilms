@@ -346,9 +346,34 @@ end
 
 # ---- CLI (demo export from a small fresh run) ----------------
 
+"""
+    export_transport_series(SR, sim, dir; every, n_mcs, config_toml_path=nothing)
+
+One run, a transport snapshot every `every` MCS up to `n_mcs` (and at `n_mcs` itself
+if it is not a multiple), written as `dir/snap_mcsNNNNNN.h5`. The files carry their
+own `mcs` attribute, which is what `export_vti.jl` keys a `.pvd` on. Returns the paths.
+"""
+function export_transport_series(SR, sim, dir; every::Int, n_mcs::Int, config_toml_path = nothing)
+    every >= 1 || throw(ArgumentError("every must be >= 1, got $every"))
+    n_mcs >= every || throw(ArgumentError("n_mcs=$n_mcs is below every=$every; nothing would be written"))
+    mkpath(dir)
+    paths = String[]
+    done = 0
+    while done < n_mcs
+        step = min(every, n_mcs - done)
+        SR.advance_window!(sim, step)
+        done += step
+        path = joinpath(dir, "snap_mcs$(lpad(done, 6, '0')).h5")
+        export_transport_snapshot(SR, sim, path; config_toml_path)
+        push!(paths, path)
+    end
+    return paths
+end
+
 function _cli(args)
     length(args) >= 2 || begin
         println("usage: export_checkpoint.jl <transport|restart> <out.h5> [--config cfg.toml] [--seed N] [--mcs N]")
+        println("       export_checkpoint.jl transport <out_dir> --every K [--mcs N] [--seed N] [--config cfg.toml]")
         exit(1)
     end
     mode, out = args[1], args[2]
@@ -359,12 +384,14 @@ function _cli(args)
     seed = parse(Int, getopt("--seed", "42"))
     n_mcs = parse(Int, getopt("--mcs", "20"))
     cfg = getopt("--config", nothing)
+    every = getopt("--every", nothing)
 
     SR = load_serial()
-    Base.invokelatest(_cli_export, SR, mode, out, cfg, seed, n_mcs)
+    Base.invokelatest(_cli_export, SR, mode, out, cfg, seed, n_mcs,
+                      every === nothing ? nothing : parse(Int, every))
 end
 
-function _cli_export(SR, mode, out, cfg, seed, n_mcs)
+function _cli_export(SR, mode, out, cfg, seed, n_mcs, every = nothing)
     sim = SR.init_coupled_simulation(
         SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100),
         # basis_gate_ack: this CLI exports an interchange artifact rather than
@@ -374,6 +401,13 @@ function _cli_export(SR, mode, out, cfg, seed, n_mcs)
         # tests/radiodialysis_basis_gate.jl.
         SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
                             basis_gate_ack = true); seed)
+    if every !== nothing
+        mode == "transport" || error("--every writes transport snapshots only")
+        paths = export_transport_series(SR, sim, out; every, n_mcs, config_toml_path = cfg)
+        @printf("wrote %d transport snapshots to %s (every %d MCS to %d, seed=%d)\n",
+                length(paths), out, every, n_mcs, seed)
+        return
+    end
     SR.advance_window!(sim, n_mcs)
     if mode == "transport"
         export_transport_snapshot(SR, sim, out; config_toml_path = cfg)

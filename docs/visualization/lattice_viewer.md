@@ -108,9 +108,16 @@ species id otherwise. That is rule 4 of AGENTS.md applied to a plot.
 `export_vti.jl`, functions plus a CLI guard, the `export_checkpoint.jl` pattern.
 
 ```
+julia --project=. export_checkpoint.jl transport <snapshot_dir> --every K [--mcs N] [--seed N]
 julia --project=. export_vti.jl <snapshot.h5> <out_stem> [--restart r.h5] [--dose d.h5]
 julia --project=. export_vti.jl <snapshot_dir> <out_stem> [--restart-dir d] [--dose-dir d]
 ```
+
+The first line is one run writing a transport snapshot every K MCS (and at N if N is not
+a multiple) as `snap_mcsNNNNNN.h5`, through `export_transport_series` in
+`export_checkpoint.jl`; the third turns that directory into one `.vti` per snapshot and a
+`.pvd` keyed by each file's `mcs` attribute, which ParaView's time toolbar scrubs. Rendered
+exports (`*.vti`, `*.pvd`) are ignored by git.
 
 The grid is `vtk_grid(stem, 0:N, 0:N, 0:N; compress = false)`, which WriteVTK writes as ImageData
 (`.vti`) with N cells per axis and spacing 1.0. A CPM label is a property of a site, so every
@@ -158,7 +165,7 @@ range writes the declared spacing. The exporter's only output form is uncompress
 compressor, so the path the tests read is the path a user gets; WriteVTK's compressed form is
 not offered and not tested.
 
-## Tests and their controls (`tests/vti_export_tests.jl`, 52 assertions)
+## Tests and their controls (`tests/vti_export_tests.jl`, 58 assertions)
 
 The fixture is an N = 12 snapshot with two cells per species written by `export_transport_snapshot`
 after two MCS (N = 8 cannot be initialised; N = 10 places five of seven species). The
@@ -176,6 +183,9 @@ fixture's `basis_gate_ack` is enumerated in the census in `tests/radiodialysis_b
   "synthetic source rate, not a physical target" and the source rate; one with the attribute
   missing is refused and nothing is written; a mesh that is not the lattice is refused.
 - Series. One `.vti` per snapshot, `.pvd` timesteps 2.0 and 5.0, a duplicate `mcs` refused.
+- Every k. One run with `every = 2, n_mcs = 7` writes files at 2, 4, 6 and 7 whose `mcs`
+  attributes say so, and the `.pvd` built from them carries those four timesteps; `every = 0`
+  and `every > n_mcs` are refused.
 
 Controls, each planted on committed state d49aac0, run through a narrow driver that includes
 the test file alone, restored from a scratch copy and confirmed byte-identical, tree clean:
