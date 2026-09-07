@@ -15,10 +15,13 @@ python tools/render_label_trajectory.py out/lattice_evidence/manuscript42_seed42
 
 The first command performs both the exact production export and its postflight.
 The second is a separate verification entrypoint. The renderer requires numpy,
-matplotlib, h5py, latexmk and Poppler. It stages the manuscript within the run
-directory; `--install` copies only the new Figure 5 and generated numerical
+matplotlib, h5py, latexmk and Poppler. It stages the manuscript outside the
+checkout, retaining the PDF and an archive of the exact build tree within the
+run directory, with an independently verified hash for every archive member.
+This avoids duplicating live source documents inside the source census.
+`--install` copies only the new Figure 5 and generated numerical
 fragment into `preprint`. The manuscript PDF is an isolated build artifact.
-The renderer refuses an existing manuscript staging directory. Use a new run
+The renderer refuses an existing manuscript output directory. Use a new run
 ID for a fresh execution; existing run directories are always refused by the
 producer. No open `snap.h5`, `snaps/`, PVD or ParaView state is touched.
 

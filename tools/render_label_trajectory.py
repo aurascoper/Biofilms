@@ -14,6 +14,8 @@ import json
 import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
 from pathlib import Path
 
 import h5py
@@ -213,13 +215,21 @@ def results_tex(run: Path, manifest: dict) -> str:
 
 
 def stage_and_build(run: Path, manifest: dict, base: Path, *, install: bool) -> None:
-    staging = run / "manuscript"
-    if staging.exists():
-        raise FileExistsError("refusing existing manuscript staging directory")
-    staging.mkdir()
+    output = run / "manuscript"
+    if output.exists():
+        raise FileExistsError("refusing existing manuscript output directory")
+    # Live-source censuses walk the checkout. A temporary compilation must not
+    # create extra live copies there. Retain the exact build tree as an archive
+    # plus member hashes; its PDF remains directly available in the run folder.
+    with tempfile.TemporaryDirectory(prefix="biofilms-manuscript-") as tmp:
+        staging = Path(tmp)
+        _compile_staged(run, manifest, base, staging, output, install=install)
+
+
+def _compile_staged(run: Path, manifest: dict, base: Path, staging: Path,
+                    output: Path, *, install: bool) -> None:
     shutil.copytree(ROOT / "preprint" / "figures", staging / "figures")
-    for tex in (ROOT / "preprint").glob("*.tex"):
-        shutil.copy2(tex, staging / tex.name)
+    shutil.copy2(ROOT / "preprint" / MANUSCRIPT, staging / MANUSCRIPT)
     snippet = results_tex(run, manifest)
     (staging / "label_trajectory_results.tex").write_text(snippet)
     for suffix in (".pdf", ".png", ".txt", ".sha256"):
@@ -248,6 +258,22 @@ def stage_and_build(run: Path, manifest: dict, base: Path, *, install: bool) -> 
                                "figure_pdf_sha256": sha(base.with_suffix(".pdf")),
                                "pdf_sha256": sha(pdf), "build_log_sha256": sha(logpath),
                                "visual_inspection": "pending"}
+    output.mkdir()
+    shutil.copy2(pdf, output / pdf.name)
+    members = {str(p.relative_to(staging)): sha(p) for p in sorted(staging.rglob("*")) if p.is_file()}
+    archive_path = output / "build_inputs_and_outputs.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        for rel in members:
+            archive.add(staging / rel, arcname=rel, recursive=False)
+    # Verify the persisted archive through its own reader, including every
+    # member rather than just the tar container checksum.
+    with tarfile.open(archive_path) as archive:
+        actual = {member.name: hashlib.sha256(archive.extractfile(member).read()).hexdigest()
+                  for member in archive.getmembers() if member.isfile()}
+    if actual != members:
+        raise ValueError("staged build archive failed member verification")
+    manifest["manuscript"]["archive_members_sha256"] = members
+    manifest["manuscript"]["build_script_sha256"] = sha(Path(__file__))
     if install:
         # Explicit --install copies only the new figure and its generated
         # fragment. Existing figure bytes are checked again after the copy.
