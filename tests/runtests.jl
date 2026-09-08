@@ -24,6 +24,8 @@ const SR = load_serial()
 # exporter, which takes SR. test_numerics and the census do not care where this sits.
 include("signal_field_tests.jl")
 
+include("hamiltonian_scale_invariance.jl")
+
 @testset "Biofilms serial contract" begin
     include("contract_csv.jl")
 end

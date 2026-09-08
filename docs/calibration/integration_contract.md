@@ -185,6 +185,65 @@ This one was measured here rather than awaiting a sweep.
 It also cannot be fitted alone. Only the product `α_M · k` reaches the dynamics, so
 `cpm.melanin_coupling` and `response.melanin` are jointly identifiable at best.
 
+### And the coefficient vector is identifiable only up to a common scale
+
+That is the second of three degeneracies, not the last. The Metropolis rule
+(`biofilms_potts.jl:806`) reads only `ΔH/T`, and each active term is linear in exactly one
+coefficient — `ΔH_adh` in `J`, `ΔH_vol` in `λ_V`, `ΔH_rad` in `β_ion`. So scaling every
+coefficient *and* `T_cpm` by a common `c > 0` leaves every acceptance decision unchanged,
+including which branch of the `ΔH <= 0` ternary is taken, so the generator is consulted at the
+same proposals and the random stream is untouched. **The shipped `T_cpm = 5.0` is one redundant
+degree of freedom**, and no fit against a trajectory can recover the scale of the coefficient
+vector: a fit must fix one coefficient by independent measurement, or report the ratio and say
+so. Ledgered as `SCALE-01`.
+
+With `c` a power of two this is bit-exact rather than statistical — scaling by a power of two is
+exact in IEEE-754 and commutes with rounding through the sums and the division, so `(2ΔH)/(2T)`
+is exactly `ΔH/T`. `tests/hamiltonian_scale_invariance.jl` asserts lattice, registry and volume
+equality after 30 MCS, having first asserted `f(2θ) == 2·f(θ)` per term so that the premise is
+tested before the conclusion.
+
+Two consequences worth stating. `biofilms_potts.jl:81` calls `T_cpm` a *"CPM Boltzmann
+temperature"*, which is wrong rather than incomplete: a quantity fixed only up to a shared scale
+has no absolute units to be measured in, and the repository denies exactly this reading for `H`
+in four other places (`SCALE-02`). And the melanin term is linear in a hard-coded `0.5`
+(`:593`, `:596`) rather than in a parameter, so the scaling cannot reach it — with a non-zero
+melanin field the symmetry provably breaks. That is asserted as a control, which makes the test
+a standing detector for **any** future coefficient in `H` placed outside the parameter
+interface (`SCALE-03`, rediscovering `PP-T2-29` from the opposite direction).
+
+The third degeneracy is spatial: `V_physical = V_sites · a³` fixes only a product, so the
+lattice pitch is not identifiable from a cell volume — `docs/calibration/cpm_spatial_calibration.md`.
+
+#### The reporting convention, and why the shipped constants are not changed
+
+Because only ratios reach the dynamics, **every coefficient is quoted in units of `T`**.
+`T_cpm = 5.0` is a choice of scale, not a measurement; only `J/T`, `λ_V/T` and `β_ion/T` have
+content, and the melanin statement above is cleanest read the same way — the product `α_M · k`
+in units of `T`. Any future fit should work in that gauge, pinning `T = 1` as a *fitting
+coordinate* and optimising `ln(J/T)`, `ln(λ_V/T)`, `ln(β_ion/T)`, so that estimator variance is
+never injected into a direction the data cannot constrain.
+
+**That gauge is a coordinate choice, not an edit to `biofilms_potts.jl`, and the distinction is
+numerical rather than pedantic.** Setting the shipped `T_cpm` to 1.0 and dividing the
+coefficients by 5 is free algebraically and is *not* free in floating point:
+
+| rescaling | `ΔH/T` unchanged | trajectory after 30 MCS, N=12 |
+|---|---|---|
+| × 2 (a power of two) | **7659 / 7659** | bit-identical |
+| × 1/5 (to reach `T = 1`) | **1957 / 7659 — 74.45% differ** | **365 sites differ** |
+
+Every shipped constant survives the round trip `(x/5)·5 == x`, and no proposal changes the sign
+of `ΔH`, so the `ΔH <= 0` branch is untouched. The divergence is entirely in the last bits of
+the comparison: `ΔH` is a **sum**, and `Σ fl(x_i/5) ≠ fl(Σ x_i)/5`. `1/5` is not a power of two,
+so there is no exact route from `T_cpm = 5` to `T_cpm = 1`.
+
+Changing the constants would therefore break the source→snapshot chain for
+`manuscript42_seed42_8cbb8ee`, whose manifest pins `cpm_parameters.T_cpm = 5`, `λ_V = 10` and
+`β_ion` alongside 122 hashed artifacts, and with it Figure 5, every `label_state_hash` and the
+derived inert-signal run. The convention is documentary; the constants stay. Ledgered as
+`SCALE-04`.
+
 ## What this branch merged
 
 Both branch-local source registries are folded into `data/sources.csv` (only `SPATIAL_DECL_2026`
