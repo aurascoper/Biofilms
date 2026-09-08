@@ -22,8 +22,36 @@ separate convention and is not used for the delivered figure.
 
 The native GLMakie window has not been executed here. Its reader and transfer
 map resolve, but OpenGL rendering still needs a target Mac/Linux check. The
-ParaView files were read back numerically; no local ParaView application was
-available for a GUI test. The browser raster view was executed and inspected.
+browser raster view was executed and inspected.
+
+ParaView 6.2.0-RC1, 2026-09-07: the ParaView files were read back numerically,
+and the 101-frame `signal_trajectory.pvd` written by `run.jl` was also opened in
+the GUI and rendered. A `Threshold` on `occupied_above_threshold` draws the
+voxels as cubes, the seven-species categorical colouring matches the figure
+palette, and the timeline scrubs across MCS 0-100. The files opened were a local
+reproduction of the derived run, not `inert_signal_seed42_v2`, which is not
+present on that machine -- so this establishes that the exporter's output loads
+and renders, not that the delivered archive's files do. A manual observation,
+not a test; `test_viewer.jl` remains unrun.
+
+The receipt is the reproduction, not a screenshot: the renders are not
+reproducible from this repository and are not offered as evidence. Re-running
+
+```sh
+julia --project=diagnostics/inert_signal diagnostics/inert_signal/run.jl \
+  <PARENT_RUN> <NEW_OUTPUT> \
+  f00e470afd982620a15def3a2e0624eb50f1ad7c09b3ef063b219c185d91c7fe \
+  diagnostics/inert_signal/demo.toml
+```
+
+at commit `8ea6405` takes about 40 s and reports `field_digest`
+`a8b1aa6e6eb283a275ddb27d9de3fdc3ca65195e22057a1c6107f4811bb5af37`. The
+`signal_trajectory.pvd` and the `.vti` frames at MCS 0, 10, 50 and 100 from that
+run are byte-identical to the files the GUI opened, so the observation above is
+about output this command regenerates rather than about one machine's leftovers.
+`field_digest` is the receipt that can match across machines:
+`derived_manifest.json`'s own hash embeds `created_utc`,
+`julia_executable_sha256` and `source_commit`, so it cannot.
 
 ## What re-runs, and what does not
 
