@@ -78,7 +78,12 @@ Base.@kwdef struct CPMParams
     N::Int = 60                          # grid dimension (N×N×N)
 
     # --- CPM dynamics ---
-    T_cpm::Float64 = 5.0                 # CPM Boltzmann temperature (acceptance)
+    # Fluctuation amplitude, NOT a temperature: the scale dH is compared against in the
+    # Metropolis rule. It carries no thermodynamic content and no absolute units, because
+    # it is identifiable only jointly with the coefficients it divides -- scaling J, lambda_V,
+    # beta_ion and this together leaves every acceptance decision unchanged (SCALE-01,
+    # tests/hamiltonian_scale_invariance.jl). Quote coefficients in units of T (SCALE-04).
+    T_cpm::Float64 = 5.0
     λ_V::Float64 = 10.0                  # volume constraint strength (H_volume)
     V_target::Int = 120                  # target volume per cell (sites)
 

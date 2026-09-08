@@ -447,7 +447,7 @@ is therefore a literature-anchored prior, and a literature prior is not a calibr
 \textbf{Symbol} & \textbf{Description} \\
 \midrule
 $F_s(t,\mathbf{x})$ & Fitness function of species $s$, evolving over time $t$ and space $\mathbf{x}$ \\
-$H(p,q)$            & Hamiltonian function defining total system energy \\
+$H(p,q)$            & Hamiltonian function of this specification framework, defining total system energy. Distinct from the implemented $H_{\mathrm{CPM}}$ (Section~\ref{sec:cpm_term_magnitudes}), which is a Metropolis acceptance functional in arbitrary units carrying no absolute scale \\
 $p,\,q$             & Phase-space variables (generalised momentum and position) \\
 $\eta_s(t,\mathbf{x}) = \sigma_s\xi(t,\mathbf{x})$ & Stochastic noise: $\sigma_s$ intensity; $\xi$ spatiotemporal white noise \\
 $D_s$               & Species-specific passive diffusion coefficient \\
@@ -505,7 +505,9 @@ $N \equiv N(t,\mathbf{x})$.  The nine terms encode:
   \item \textbf{Non-ionising effect}: $-\alpha_{s,\mathrm{nir}}\,N(t,\mathbf{x})\,F_s$,
         UV/heat-driven fitness coupling.
   \item \textbf{Hamiltonian interaction}: $\theta_s H_s(t,\mathbf{x})$, energy-conserving
-        inter-species force from the Hamiltonian (Section~\ref{sec:hamiltonian}).
+        inter-species force from the specification Hamiltonian
+        (Section~\ref{sec:hamiltonian}); the implemented $H_{\mathrm{CPM}}$ conserves nothing
+        and is dissipated toward a minimum in the acceptance path.
   \item \textbf{External forcing}: $C_s(t,\mathbf{x})$, environmental control inputs.
 \end{itemize}
 
@@ -748,6 +750,27 @@ or continuum viscoelastic model --- a different model class from the one this wo
 This is recorded so that the specification is not read as a plan the present code could
 absorb by fitting coefficients. Corrects \texttt{claims\_ledger} row \texttt{PP-310-01},
 which recommended labelling this subsection as proposed rather than implemented.
+
+\emph{That last clause is now a theorem rather than a caution.} The Metropolis rule reads only
+$\Delta H/T$, and each active term is linear in exactly one coefficient, so scaling every
+coefficient \emph{and} $T_{\mathrm{CPM}}$ by a common factor leaves every acceptance decision
+unchanged --- bit for bit, when the factor is a power of two. The coefficients and the
+temperature are therefore identifiable only up to a common scale; no trajectory determines that
+scale; and there is consequently no exchange rate between $J$ and Pascals for any fit to find.
+That, rather than an appeal to model class, is why a bench modulus cannot be absorbed by fitting
+coefficients. Ledgered as \texttt{SCALE-01} and asserted, with its inverted controls, in
+\texttt{tests/hamiltonian\_scale\_invariance.jl}.
+
+\emph{A tension, however, is not a modulus.} A contact energy per unit interfacial area is a
+surface tension, so one measured tension together with a measured lattice pitch fixes the scale
+and converts every coefficient of $H_{\mathrm{CPM}}$ (Section~\ref{sec:cpm_term_magnitudes}) to
+absolute units at once. It is the one mechanical measurement this Hamiltonian as written can
+absorb, and it fixes the scale \emph{only}: the self-adhesion diagonal is zero by construction,
+so the differential-adhesion relation $\gamma_{ab}=J_{ab}-(J_{aa}+J_{bb})/2$ reduces to
+$\gamma_{ab}=J_{ab}$, and a single cell--medium measurement sets the multiplier on the matrix
+while determining none of its ratios. Registered as \texttt{D-TENSION} in
+\texttt{data/calibration/reference\_d\_requirements.csv} --- \texttt{supplied\_by = measured},
+\texttt{status = awaiting\_measurement} --- beside \texttt{D-PITCH} on the spatial gate.
 
 \subsection{Membrane Transport Under Radiation-Driven Permeability Change}
 \label{sec:radiodialysis}

@@ -41,7 +41,12 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 
 # 571-584 until 2026-09-01, when four \label lines were inserted above and the anchor
 # assertion below refused the stale window rather than silently reading two wrong lines.
-FIRST_LINE, LAST_LINE = 593, 606
+# Re-anchored 2026-09-08: 593,606 -> 595,608. A two-line insertion at line 508, in a
+# different section entirely, shifted this paragraph and turned three assertions red.
+# That is the defect SCALE-05 names -- a guard that locates by printed position - and
+# this is the live instance of it. The anchors below are what makes the shift loud
+# rather than silent; keep them, and prefer anchoring to counting if this moves again.
+FIRST_LINE, LAST_LINE = 595, 608
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the
