@@ -25,6 +25,55 @@ map resolve, but OpenGL rendering still needs a target Mac/Linux check. The
 ParaView files were read back numerically; no local ParaView application was
 available for a GUI test. The browser raster view was executed and inspected.
 
+## What re-runs, and what does not
+
+Every count above was produced by hand once. `tests/signal_field_tests.jl` is the only
+bridge into `tests/runtests.jl`, which is what `.github/workflows/coupling-tests.yml`
+runs, so until now it carried `test_numerics.jl` alone and the other three checks could
+not fire again. Two are now wired in; two stay manual, and that is a declared uncovered
+surface rather than a gap nobody noticed.
+
+| Check | Runs in the suite | Why |
+|---|---|---|
+| `diagnostics/inert_signal/test_numerics.jl` | yes | no data or backend needed |
+| `diagnostics/inert_signal/guard.jl` | yes, with a planted control | regex over the root sources |
+| `diagnostics/inert_signal/test_native_layout.jl` | yes, on a synthetic fixture | CairoMakie is a root dependency |
+| `diagnostics/inert_signal/test_pipeline.jl` | **no — manual** | needs the real parent run |
+| `diagnostics/inert_signal/test_viewer.jl` | **no — manual** | needs the real 101 derived frames, and asserts field values at MCS 0 |
+
+```sh
+julia --project=. diagnostics/inert_signal/test_pipeline.jl <PARENT_RUN>
+julia --project=. diagnostics/inert_signal/test_viewer.jl  <PARENT_RUN> <DERIVED_RUN>
+julia diagnostics/inert_signal/guard.jl              # censuses the root sources standalone
+```
+
+Three limits are worth stating plainly, because each is a claim the apparatus does not
+support and would otherwise look supported.
+
+**The census is a name list, not a reader.** It certifies five spellings, in the
+root-level executable sources, outside `#` comments. Section 6.7 claims more than that --
+no signal quantity enters the CPM state, Hamiltonian or RNG -- and a lexical scan cannot
+establish it: a renamed import, a `const` alias, or entry through an unnamed struct field
+all pass. The structural form would assert the quantity set `compute_delta_H_terms` and
+`mcs_step!` read, failing on a new coupling however it is spelled. Not built. What does
+not depend on spelling is the parent-hash check in `run.jl`, which is why both exist.
+
+**The census has three measured blind spots**, pinned as characterisations in
+`tests/signal_field_tests.jl` so that closing one is a visible edit rather than a silent
+behaviour change: a `#` inside a string literal truncates the line and hides a call after
+it; a one-line `#= ref =#` is missed; and an interior line of a multi-line `#= ... =#`
+block *is* reported, since only `#` is split on. The first is a false negative in the
+load-bearing direction; the third is a false positive.
+
+**The layout fixture restates a contract instead of calling it.** Its parent snapshots
+come from the real `export_transport_snapshot`, so a snapshot-schema change reaches it
+automatically. Its companions do not: `run.jl`'s writer needs a verified parent run and
+cannot be called from the suite, so the six attributes `signal_grid` reads are written
+out a second time in the test. If `run.jl`'s companion format drifts, the layout check
+keeps passing against the old shape and only the manual `test_viewer.jl` against the real
+run will notice. That is the specific reason `test_viewer.jl` being manual costs
+something, beyond its own coverage.
+
 ## Pinned files
 
 | Artifact | SHA-256 |
