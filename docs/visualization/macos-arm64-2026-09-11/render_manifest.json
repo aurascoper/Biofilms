@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-09-11T09:11:25+00:00",
+  "purpose": "Frozen expected-hash receipt for the ParaView macOS/arm64 render. verify_artifacts.py --receipt pins against THIS file, not against the mutable manifest beside the data.",
+  "scope": "Registers artifacts and rendering settings. Confers NO evidential status on any binding or sorbate assumption, and verifies a view of a declared model -- nothing biological and nothing isotope-specific. The .pvd time key is `mcs`, a step count, not seconds; spacing is 1.0 lattice units/site and the D-PITCH refusal is intact.",
+  "evidence_root": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal",
+  "pinned": {
+    "derived_manifest_sha256": "9768e0a9f4f6387315ccd863a75d198216c01458f546fa5b11c6ece81bac90c3",
+    "derived_manifest_receipt_text": "9768e0a9f4f6387315ccd863a75d198216c01458f546fa5b11c6ece81bac90c3  derived_manifest.json",
+    "parent_manifest_sha256": "f00e470afd982620a15def3a2e0624eb50f1ad7c09b3ef063b219c185d91c7fe",
+    "pvd_sha256": "f1a0472535953bcae686f60e7b363833525e803ce55952a3d56ec80f3f401c75",
+    "artifact_count": 209,
+    "expected_timesteps": 101
+  },
+  "parent": {
+    "run_id": "inert_signal_seed42_v2",
+    "parent_run_id": "manuscript42_seed42_8cbb8ee",
+    "source_commit": "f75b3bfafc93854a9b417aab681945c2b228e852",
+    "julia_version": "1.12.6",
+    "julia_executable_sha256": "fd670aabc838e93f178cbcf7304c5e9c50aadcce3735e86d5e3218b1bb04e602",
+    "hash_contract": "all output files except derived_manifest.json and its sha256 receipt",
+    "created_utc": "2026-09-07T19:21:33.773",
+    "configuration": {
+      "decay": 0.1,
+      "molecule": "unassigned generic signal",
+      "production": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "diffusion": 0.2,
+      "max_dt": 0.5,
+      "basis": "declared",
+      "spacing": 1.0,
+      "acceptance_coupling": false,
+      "source_timing": "occupancy at MCS k held over [k,k+1)",
+      "threshold": 5.0,
+      "schema_version": 1,
+      "physical_conversion": "blocked: D-PITCH and D-TIMESERIES"
+    },
+    "scope": "inert generic signal on a fixed CPM trajectory; no biological QS response or physical calibration"
+  },
+  "environment": {
+    "paraview": "6.1.1",
+    "paraview_app": "/Applications/ParaView-6.1.1.app",
+    "paraview_arch": "native arm64 (brew --cask)",
+    "python": "3.14.6",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "note": "libopenvkl_module_cpu_device.dylib is absent from the macOS bundle; every pvpython run prints [openvkl] INITIALIZATION ERROR. That is the OSPRay volume path, unused here."
+  },
+  "renderer_sources": {
+    "build_views.py": "c241a3f8473ba30f6a1b8120c93ef6e211f5e88f929db808829021cbc3a482f1",
+    "animate_4d.py": "a441a33995cce80aa12ac9a004f9abf13969a2d4e2a7db5fdfdf8ac169090af8",
+    "verify_state.py": "338de7087827dce7fa3e8524b30e8e0253cff4e5fbfca22b555b8d3b5e9a1a90",
+    "verify_artifacts.py": "1f3b1958cb44193fdbe38e8950cac39759d48c296248d21f405cb5d55a2b9967",
+    "controls.py": "a62fb200d12ae2334d2d95dc04c47ce46fbcd2ea1b71c74386befc01ece4dc02",
+    "encode_movies.sh": "82b185e883312d35bdfeeae142d3c934c9d38f2c0ae09df8f1b1a7c672652370",
+    "make_render_manifest.py": "6d258ef4e5ef2a379162f1dd6b3be542322f7f808ad6c3984a5afc44f0324080"
+  },
+  "exporter_sources": {
+    "export_vti.jl": "d3c03f94b09e8e8402b9f38ca82c42dec929bc794d8eb0ffe47498683bceecea",
+    "viewer/paraview_species.py": "bfd520494c5d350f8e71f7c98f59d477a9d3cb52769514a63ed06c6a4670f4b9"
+  },
+  "rendering": {
+    "camera": "ResetCamera, then Azimuth 35, Elevation 25, ResetCamera (build_views.py:66)",
+    "slice_plane_origin": [
+      20.0,
+      20.0,
+      28.5
+    ],
+    "slice_plane_normal": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "slice_note": "z=28.5 is the CENTRE of zero-based cell layer 28. Cells span [k,k+1], so an integer z is a face, not a layer. Chosen after inspecting the trajectory because it carries the MCS 8 onset and the MCS 100 peak; NOT canonical, and NOT every frame's maximum (MCS 30 peaks at z=29).",
+    "species_threshold": "CELLS/species in [1,7] inclusive",
+    "signal_view_threshold": "CELLS/interior_mask in [1,1]",
+    "quorum_threshold_predicate": "occupied_above_threshold != 0, i.e. (occupied & signal >= 5.0). Thresholding `signal >= 5.0` alone disagrees with metrics.json on 16 of 101 frames because it also catches UNOCCUPIED interior voxels.",
+    "adjacency_rule": "Connectivity filter = 26-connectivity (point-sharing). Face-sharing (6-connectivity) gives 7 at MCS 8 and 19 at the MCS 11 peak, not 6 and 18. Every connectivity number must carry its adjacency rule.",
+    "signal_lut": {
+      "preset": "Viridis",
+      "range": [
+        0.0,
+        9.0
+      ],
+      "AutomaticRescaleRangeMode": "Never"
+    },
+    "species_lut": "categorical, 7 annotated categories, palette verbatim from viewer/paraview_species.py",
+    "raytracing": "off at render time in both views; see build_report.json.raytracing_props_zeroed. NOTE: ParaView 6.1.1 does not serialise EnableRayTracing into a .pvsm at all, so the reloaded-state assertion documents an invariant and is NOT a control.",
+    "movie": "ffmpeg, 12 fps, fixed camera and fixed 0-9 scale across all 101 frames; see encode_movies.sh"
+  },
+  "outputs": {
+    "biofilm_signal_views.pvsm": "dce0133eabdb5a3f71e3a0b403de3cec2c55592427424be0f74f806b3156f007",
+    "signal_z20_mcs000.png": "753223585f168b5b626a92e008f63d07701299ca156f1df750966f9699c9844c",
+    "signal_z20_mcs007.png": "8eb44a868a8b19991a5a53b49652799fd851713666a8c97987b23a03d5060c88",
+    "signal_z20_mcs008.png": "8653556d498d83199cccc7e059b1b4fcb79bdf88d6fefe0b01058af9ceee491d",
+    "signal_z20_mcs030.png": "f432b9b6c3abd4984b4f6aef161812379be9cfd95037f052edcfe939550796d9",
+    "signal_z20_mcs100.png": "7ed304b546ebe53cd62728f9b04ee15cc8850c855d0769cbb82ba861833faede",
+    "signal_z28_mcs000.png": "44ea017b258be66513db6f6379f463a24d3ef0b26b5b95a662ea3f4481d858a5",
+    "signal_z28_mcs007.png": "0101e5f5efadbec483a26775cc5530c00495ca237f95332cea8aff530751974c",
+    "signal_z28_mcs008.png": "501ac1bea2d9b3304924c1032b877fd5ca6622d52a9beed8376135459f727f39",
+    "signal_z28_mcs030.png": "23f6df54f9f9887cfd872445d33992b7af244e6d0290fdfe26f1161e312c802c",
+    "signal_z28_mcs100.png": "ad504c0644042db36d26410a7daaf3c9a683e53119b96ea8561293767b9f0e3e",
+    "species_mcs000.png": "18310ef536cf444b166753ace5994bb606978571e00d59e5d38f092fa3763ef0",
+    "species_mcs007.png": "656c07b1c1ce6a3e173402c754834935c88b9563d6631eaf8929d2d0d1b68b47",
+    "species_mcs008.png": "d5e945b2d163e50f627ca454a2ed652d3b3e08c45d5a3e403100dd69d62cfeef",
+    "species_mcs030.png": "ba67e017941013a0e90e5df975a84a093a48f1f1c645ef3725105cd2818d3b61",
+    "species_mcs100.png": "9c94c9a3b3c35262fa1e41e1965d8f66dc05cc80c4471274bacc3fa4dbdf0e4c",
+    "voxels_4d_parcels.mp4": "92cb18f802ca4ae7f5d1c689c001bf86ccc753e52dd1ea0e9a361028c135355d",
+    "voxels_4d_quorum.mp4": "b7a9aa065d383b52bb9987adbb35d7d2f95c6e2b688347e8e361560be80a9e1b"
+  },
+  "protected_csv": {
+    "data/claims_ledger.csv": {
+      "sha256": "9628a5ccd42db038f1258134a1974d35a38dd5fd3b7f4bfe92e38f892c7a8cf9",
+      "git_blob_worktree": "4a280dd93275b29843ad54257ac996c045f7a7ec",
+      "git_blob_HEAD": "4a280dd93275b29843ad54257ac996c045f7a7ec",
+      "unmodified_vs_HEAD": true
+    },
+    "data/parameter_provenance.csv": {
+      "sha256": "e88f952e9d202c1f17c78fb519c7440df37dfd02118232260b4821aafc8c7285",
+      "git_blob_worktree": "5a93fd3a1351d56ff9068174395b1ee3075a1b54",
+      "git_blob_HEAD": "5a93fd3a1351d56ff9068174395b1ee3075a1b54",
+      "unmodified_vs_HEAD": true
+    }
+  }
+}

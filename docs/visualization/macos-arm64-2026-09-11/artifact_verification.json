@@ -1,0 +1,91 @@
+{
+  "root": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal",
+  "pinned_by": "render_manifest.json",
+  "receipt_policy": {
+    "severity": "ok",
+    "note": "pinned against frozen receipt"
+  },
+  "checks": [
+    {
+      "check": "pvd exists",
+      "pass": true,
+      "observed": "../evidence/biofilm-signal-evidence/inert_signal/paraview/signal_trajectory.pvd"
+    },
+    {
+      "check": "pvd has a <Collection> element",
+      "pass": true,
+      "observed": "True"
+    },
+    {
+      "check": "101 DataSet entries",
+      "pass": true,
+      "observed": "101"
+    },
+    {
+      "check": "timesteps unique",
+      "pass": true,
+      "observed": "101 unique of 101"
+    },
+    {
+      "check": "timesteps ascending",
+      "pass": true,
+      "observed": "ascending"
+    },
+    {
+      "check": "timesteps are 0..100 complete",
+      "pass": true,
+      "observed": "0.0..100.0"
+    },
+    {
+      "check": "every referenced file exists",
+      "pass": true,
+      "observed": "0 missing"
+    },
+    {
+      "check": "derived manifest exists",
+      "pass": true,
+      "observed": "../evidence/biofilm-signal-evidence/inert_signal/derived_manifest.json"
+    },
+    {
+      "check": "receipt file exists and is non-empty",
+      "pass": true,
+      "observed": "ok"
+    },
+    {
+      "check": "manifest matches its own local receipt (self-consistency)",
+      "pass": true,
+      "observed": "9768e0a9f4f63873..."
+    },
+    {
+      "check": "derived manifest matches FROZEN receipt hash",
+      "pass": true,
+      "observed": "pinned 9768e0a9f4f63873 / got 9768e0a9f4f63873"
+    },
+    {
+      "check": "parent manifest hash matches FROZEN receipt",
+      "pass": true,
+      "observed": "pinned f00e470afd982620 / got f00e470afd982620"
+    },
+    {
+      "check": "pvd matches FROZEN receipt hash",
+      "pass": true,
+      "observed": "pinned f1a0472535953bca / got f1a0472535953bca"
+    },
+    {
+      "check": "artifact count matches FROZEN receipt",
+      "pass": true,
+      "observed": "pinned 209 / got 209"
+    },
+    {
+      "check": "all 209 artifact hashes match",
+      "pass": true,
+      "observed": "209/209 ok, 0 altered, 0 missing"
+    },
+    {
+      "check": "every pvd-referenced vti is registered in the manifest",
+      "pass": true,
+      "observed": "0 unregistered"
+    }
+  ],
+  "failures": []
+}
