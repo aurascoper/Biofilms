@@ -205,17 +205,55 @@ draft of this file said "five separate clusters" at MCS 8 and that the region "n
 The first half was **wrong** — counted off a single camera angle where one cluster occluded
 another. The corrected trajectory is more interesting than the claim it replaces:
 
-| MCS | connected regions |
-|---|---|
-| 7 | 0 |
-| 8 | **6** |
-| 9 | 13 |
-| 11 | **18** (peak) |
-| 15 → 100 | **10**, flat |
+| MCS | 26-conn (point-sharing) | 6-conn (face-sharing) |
+|---|---|---|
+| 7 | 0 | 0 |
+| 8 | **6** | **7** |
+| 9 | 13 | 14 |
+| 11 | **18** (peak) | **19** (peak) |
+| 15 | 10 | 13 |
+| 16 | 10 | 12 |
+| 17 → 100 | **10** | **10** |
 
-The region **fragments** first — 6 at onset, peaking at 18 by MCS 11 — then **consolidates**
-to 10 and holds there for the remaining 85 frames. The "never merges into one body" half does
-survive: the count never reaches 1 at any frame.
+The region **fragments** first — peaking at MCS 11 — then **consolidates** to 10 and holds
+for the rest of the record. The "never merges into one body" half survives: the count never
+reaches 1 at any frame.
+
+Every number in that table carries its adjacency rule, because the two columns differ.
+ParaView's `Connectivity` filter joins voxels touching at a corner; `scipy.ndimage.label`'s
+default structure joins only faces. **The count stabilises permanently at MCS 15 under
+point-sharing and MCS 17 under face-sharing** — an earlier revision of this file gave only
+the point-sharing column and wrote "15 → 100: 10, flat", which is false under the other
+convention.
+
+### A flat count is not a stable set — so this was measured
+
+`component_overlap.py` answers the question the counts cannot. Ten regions every frame is
+equally consistent with ten *stable* regions and with regions being born and dying every
+frame while the total happens to stay 10. It intersects each component's voxel set with
+every component's voxel set in the next frame, inherits lineage by largest shared volume,
+and records births, deaths, merges and splits.
+
+| | 26-connectivity | 6-connectivity |
+|---|---|---|
+| distinct lineages ever | 21 | 24 |
+| alive at MCS 100 | 10 | 10 |
+| of those, born before MCS 15 | **10** | **10** |
+| births after MCS 15 | **0** | **0** |
+| deaths after MCS 15 | **0** | **0** |
+| splits after MCS 15 | **0** | **0** |
+| merges after MCS 15 | 2 (at MCS 15) | 3 (at MCS 16, 17) |
+
+**The set is stable, not merely the count.** The same ten regions persist to the end of the
+record under both conventions, and the consolidation that produces them is **monotone by
+merge** — no region ever dies, and none ever splits, after MCS 15. The final state is
+adjacency-independent; only the frame at which it is reached is not.
+
+`vti_read.py` is a read-only `.vti` reader in numpy alone — the exporter writes uncompressed
+appended binary, so no VTK is needed. That is deliberate: an audit of the renderer's output
+should not require the renderer's toolchain. It is validated against the run's own endpoint
+before being trusted for anything new — summing `occupied_above_threshold` reproduces
+`metrics.json` on **101/101 frames, zero mismatches**.
 
 ### The array to threshold on is `occupied_above_threshold`, not `signal`
 
