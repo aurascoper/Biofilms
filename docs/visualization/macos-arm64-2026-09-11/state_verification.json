@@ -1,5 +1,6 @@
 {
-  "state": "biofilm_signal_views.pvsm",
+  "state": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/viewing/biofilm_signal_views.pvsm",
+  "mode": "pinned",
   "checks": [
     {
       "check": "reader points at a signal_trajectory.pvd",
@@ -42,6 +43,16 @@
       "observed": "True"
     },
     {
+      "check": "Interior_mask_1 filter present",
+      "pass": true,
+      "observed": "True"
+    },
+    {
+      "check": "Signal_slice filter present",
+      "pass": true,
+      "observed": "True"
+    },
+    {
       "check": "species threshold 1..7",
       "pass": true,
       "observed": "1.0..7.0"
@@ -52,19 +63,9 @@
       "observed": "['CELLS', 'species']"
     },
     {
-      "check": "Interior_mask_1 filter present",
-      "pass": true,
-      "observed": "True"
-    },
-    {
       "check": "interior_mask threshold 1..1",
       "pass": true,
       "observed": "1.0..1.0"
-    },
-    {
-      "check": "Signal_slice filter present",
-      "pass": true,
-      "observed": "True"
     },
     {
       "check": "slice plane at z=28.5",

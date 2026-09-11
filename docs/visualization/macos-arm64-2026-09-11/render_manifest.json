@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "created_utc": "2026-09-11T09:11:25+00:00",
+  "created_utc": "2026-09-11T10:48:40+00:00",
   "purpose": "Frozen expected-hash receipt for the ParaView macOS/arm64 render. verify_artifacts.py --receipt pins against THIS file, not against the mutable manifest beside the data.",
   "scope": "Registers artifacts and rendering settings. Confers NO evidential status on any binding or sorbate assumption, and verifies a view of a declared model -- nothing biological and nothing isotope-specific. The .pvd time key is `mcs`, a step count, not seconds; spacing is 1.0 lattice units/site and the D-PITCH refusal is intact.",
   "evidence_root": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal",
@@ -55,10 +55,10 @@
   },
   "renderer_sources": {
     "build_views.py": "c241a3f8473ba30f6a1b8120c93ef6e211f5e88f929db808829021cbc3a482f1",
-    "animate_4d.py": "a441a33995cce80aa12ac9a004f9abf13969a2d4e2a7db5fdfdf8ac169090af8",
-    "verify_state.py": "338de7087827dce7fa3e8524b30e8e0253cff4e5fbfca22b555b8d3b5e9a1a90",
+    "animate_4d.py": "c6f305fc952019c30900dab24a0e6b380936a5b43fe6022e0793fcdbec3f6eb0",
+    "verify_state.py": "da13dbca85fd6e99a4b401c295e4b31f7ae4a3def16873dcb17b2a4025b9d6e4",
     "verify_artifacts.py": "1f3b1958cb44193fdbe38e8950cac39759d48c296248d21f405cb5d55a2b9967",
-    "controls.py": "a62fb200d12ae2334d2d95dc04c47ce46fbcd2ea1b71c74386befc01ece4dc02",
+    "controls.py": "5cde3a28ee03e8f8a2f115ad844c9194a208418921213fe039d5c5362fa60287",
     "encode_movies.sh": "82b185e883312d35bdfeeae142d3c934c9d38f2c0ae09df8f1b1a7c672652370",
     "make_render_manifest.py": "6d258ef4e5ef2a379162f1dd6b3be542322f7f808ad6c3984a5afc44f0324080"
   },
@@ -95,26 +95,7 @@
     "raytracing": "off at render time in both views; see build_report.json.raytracing_props_zeroed. NOTE: ParaView 6.1.1 does not serialise EnableRayTracing into a .pvsm at all, so the reloaded-state assertion documents an invariant and is NOT a control.",
     "movie": "ffmpeg, 12 fps, fixed camera and fixed 0-9 scale across all 101 frames; see encode_movies.sh"
   },
-  "outputs": {
-    "biofilm_signal_views.pvsm": "dce0133eabdb5a3f71e3a0b403de3cec2c55592427424be0f74f806b3156f007",
-    "signal_z20_mcs000.png": "753223585f168b5b626a92e008f63d07701299ca156f1df750966f9699c9844c",
-    "signal_z20_mcs007.png": "8eb44a868a8b19991a5a53b49652799fd851713666a8c97987b23a03d5060c88",
-    "signal_z20_mcs008.png": "8653556d498d83199cccc7e059b1b4fcb79bdf88d6fefe0b01058af9ceee491d",
-    "signal_z20_mcs030.png": "f432b9b6c3abd4984b4f6aef161812379be9cfd95037f052edcfe939550796d9",
-    "signal_z20_mcs100.png": "7ed304b546ebe53cd62728f9b04ee15cc8850c855d0769cbb82ba861833faede",
-    "signal_z28_mcs000.png": "44ea017b258be66513db6f6379f463a24d3ef0b26b5b95a662ea3f4481d858a5",
-    "signal_z28_mcs007.png": "0101e5f5efadbec483a26775cc5530c00495ca237f95332cea8aff530751974c",
-    "signal_z28_mcs008.png": "501ac1bea2d9b3304924c1032b877fd5ca6622d52a9beed8376135459f727f39",
-    "signal_z28_mcs030.png": "23f6df54f9f9887cfd872445d33992b7af244e6d0290fdfe26f1161e312c802c",
-    "signal_z28_mcs100.png": "ad504c0644042db36d26410a7daaf3c9a683e53119b96ea8561293767b9f0e3e",
-    "species_mcs000.png": "18310ef536cf444b166753ace5994bb606978571e00d59e5d38f092fa3763ef0",
-    "species_mcs007.png": "656c07b1c1ce6a3e173402c754834935c88b9563d6631eaf8929d2d0d1b68b47",
-    "species_mcs008.png": "d5e945b2d163e50f627ca454a2ed652d3b3e08c45d5a3e403100dd69d62cfeef",
-    "species_mcs030.png": "ba67e017941013a0e90e5df975a84a093a48f1f1c645ef3725105cd2818d3b61",
-    "species_mcs100.png": "9c94c9a3b3c35262fa1e41e1965d8f66dc05cc80c4471274bacc3fa4dbdf0e4c",
-    "voxels_4d_parcels.mp4": "92cb18f802ca4ae7f5d1c689c001bf86ccc753e52dd1ea0e9a361028c135355d",
-    "voxels_4d_quorum.mp4": "b7a9aa065d383b52bb9987adbb35d7d2f95c6e2b688347e8e361560be80a9e1b"
-  },
+  "outputs": {},
   "protected_csv": {
     "data/claims_ledger.csv": {
       "sha256": "9628a5ccd42db038f1258134a1974d35a38dd5fd3b7f4bfe92e38f892c7a8cf9",

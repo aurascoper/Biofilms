@@ -39,14 +39,41 @@ for need in ("species", "occupied_above_threshold", "signal"):
 # from the data's own occupied_above_threshold array. A mismatch would mislabel every frame
 # while the receipt stayed self-consistent, so reconcile against the run's config.
 cfg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(pvd))), "provenance", "config.toml")
-if os.path.exists(cfg):
-    import re as _re
-    m = _re.search(r"^threshold\s*=\s*([0-9.]+)", open(cfg).read(), _re.M)
-    if m and abs(float(m.group(1)) - THRESHOLD) > 1e-12:
-        raise SystemExit("FATAL: THRESHOLD=%s but %s declares %s" % (THRESHOLD, cfg, m.group(1)))
-    print("threshold reconciled against", cfg)
-else:
-    print("WARNING: no config.toml beside the data; THRESHOLD=%s is unreconciled" % THRESHOLD)
+# Parse TOML as TOML, and refuse rather than claim. The previous form was
+#     if m and abs(float(m.group(1)) - THRESHOLD) > 1e-12: raise ...
+#     print("threshold reconciled against", cfg)
+# so a regex that failed to match left `m` None, skipped the comparison, and printed
+# "threshold reconciled" having reconciled nothing -- the worst of the three outcomes,
+# because it is indistinguishable in the log from a real reconciliation.
+if not os.path.exists(cfg):
+    raise SystemExit("FATAL: no config.toml at %s; THRESHOLD=%s cannot be reconciled. "
+                     "Pass a bundle carrying provenance/config.toml." % (cfg, THRESHOLD))
+try:
+    import tomllib as _toml
+except ImportError:                       # py<3.11
+    import tomli as _toml
+with open(cfg, "rb") as _f:
+    _cfgd = _toml.load(_f)
+
+
+def _find_threshold(d):
+    if "threshold" in d:
+        return d["threshold"]
+    for v in d.values():
+        if isinstance(v, dict):
+            r = _find_threshold(v)
+            if r is not None:
+                return r
+    return None
+
+
+_declared = _find_threshold(_cfgd)
+if _declared is None:
+    raise SystemExit("FATAL: %s parsed but declares no `threshold`; refusing to claim "
+                     "reconciliation of THRESHOLD=%s" % (cfg, THRESHOLD))
+if abs(float(_declared) - THRESHOLD) > 1e-12:
+    raise SystemExit("FATAL: THRESHOLD=%s but %s declares %s" % (THRESHOLD, cfg, _declared))
+print("threshold reconciled against %s (declares %s)" % (cfg, _declared))
 
 LoadPalette(paletteName='WhiteBackground')
 
