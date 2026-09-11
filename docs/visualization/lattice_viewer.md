@@ -288,13 +288,39 @@ figure while waiting on a different `GLMakie.Screen()` — bites hardest on macO
 screen and is unaffected.
 
 **ParaView 6.1.1 arm64** (`brew install --cask paraview`), not the 6.2.0-RC1 Linux binary.
-Four macOS-specific `pvpython` issues and the absent `libopenvkl_module_cpu_device.dylib` are
-recorded in `docs/visualization/macos-arm64-2026-09-11/README.md` rather than repeated here.
+Four macOS-specific `pvpython` issues, each of which cost a run:
+
+1. `GetLayout()` raises `No active view was found` in batch `pvpython` -- no implicit layout
+   exists. Use `CreateLayout()`.
+2. `hasattr(view, "EnableOSPRay")` **raises** `NotSupportedException` rather than returning
+   `False`; the back-compat helper intercepts the 5.7-era name. Probe only `EnableRayTracing`.
+3. The preset is `Viridis`, not `Viridis (matplotlib)`.
+4. Setting `Background` alone leaves scalar-bar and axis text on the previous palette --
+   white on white. Use `LoadPalette(paletteName='WhiteBackground')`.
+
+Also: `libopenvkl_module_cpu_device.dylib` is **absent from the macOS bundle**, so every run
+prints `[openvkl] INITIALIZATION ERROR`. That is the OSPRay volume path, unused here -- ray
+tracing is off and the views are surface renders -- but it is noise on every invocation and
+means the macOS build cannot do OSPRay volume rendering as shipped.
+
+These were previously cited to a file that does not exist in this tree; they are stated here
+so this record stands alone.
 
 Steps 0 to 2 of this pipeline (removing `AMDGPU`, `Pkg.instantiate()`, the full suite) were
-also run on this machine; `AMDGPU` is declared in `Project.toml`, used by no code path, and
-has no darwin artifacts, so it must be removed locally before `instantiate` will complete. It
-is required upstream for the Linux JACC tier and must be restored before committing.
+also run on this machine. `AMDGPU` is declared in `Project.toml` and has no darwin artifacts,
+so it must be removed locally before `instantiate` will complete, and restored before
+committing.
+
+**It is not an unused dependency, and an earlier revision of this paragraph said it was.**
+That claim came from grepping for `using AMDGPU` / `import AMDGPU`, which returns zero hits --
+but `biofilms_potts_jacc.jl:25` calls `JACC.@init_backend`, which loads whichever backend
+`LocalPreferences.toml` names, and `:13` documents `JACC.set_backend("amdgpu"; storage=:host)`
+as a supported configuration. AMDGPU is therefore an **indirect runtime dependency of the
+amdgpu backend path**, not a declaration nothing reaches. A grep for direct imports cannot see
+a dependency loaded through a macro, and reporting that absence as general was wrong.
+
+The practical consequence: removing it locally unblocks `instantiate` on Apple Silicon **and
+disables the AMDGPU backend**. That is fine for a macOS run and is not a safe permanent edit.
 
 ## Open decisions
 
