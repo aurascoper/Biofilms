@@ -1,0 +1,10 @@
+# Byte-exact storage for retrieved reference data.
+#
+# Lu-177.lara.txt arrives from LNHB with CRLF terminators and is pinned by sha256 in
+# decay_reference.py and PROVENANCE.md. Git's default text handling normalised CRLF to LF
+# on commit, so the stored blob hashed to 09c78fdf... while the pin said 5e68ccb0... -- the
+# working copy matched and every clone did not. A content pin that the VCS silently rewrites
+# is worse than no pin, because it fails only for the people checking it.
+#
+# -text disables end-of-line conversion in both directions. The file stays diffable.
+* -text

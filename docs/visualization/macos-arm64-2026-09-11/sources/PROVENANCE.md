@@ -7,6 +7,13 @@
 sha256  5e68ccb03fedb7087677594bcc2ecc15d89fb285947f314bad4c467af27e45a8
 ```
 
+**The file has CRLF terminators and `sources/.gitattributes` sets `* -text` to preserve
+them.** Without it git normalised CRLF to LF on commit, so the stored blob hashed to
+`09c78fdf...` while this document and `decay_reference.py` both said `5e68ccb0...` — the
+working copy matched the pin and **every clone did not**. A content pin the VCS silently
+rewrites is worse than no pin, because it fails only for the people who check it. Verify with
+`git show HEAD:<path> | shasum -a 256`, not just against the working copy.
+
 The companion `Lu-177_com.pdf` (Comments on evaluation, sha256
 `4b7d9bc8364bad00b9f3f1d12d85cab1dfb979a99cb93952b54d2a7e525c6c0f`) is **not** committed —
 it is 385 KB and adds attribution rather than data.
