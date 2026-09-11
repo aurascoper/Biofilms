@@ -262,6 +262,43 @@ half, a seed or an ordering requires replicates that have not been run.
 while individual half-windows reached 0.03228. That much survives -- but it is a statement
 about what the pooled statistic can see, not a measured time trend.
 
+### Replicates per configuration: the direction survives, the attribution does not
+
+5 replicates of each of the 9 (seed, ordering) configurations, 45 runs per backend.
+
+| | Metal | threads |
+|---|---|---|
+| `s1.V >= V_MAX` | **1 of 45** (2.2%) | 0 of 45 |
+| `s2.V >= V_MAX` | **13 of 45** (28.9%) | 0 of 45 |
+| `s2.V > s1.V` | **38 of 45** (84.4%) | 6 of 9 distinct |
+| exact two-sided sign test | **p = 3.1e-06** | p = 0.508 |
+| configurations with s2>s1 in **all** replicates | 4 of 9 | – |
+| configurations with s2>s1 in **no** replicate | 0 of 9 | – |
+| rate, within-configuration sd | 0.002 - 0.005 | **0.00000** |
+
+**The threads 30-of-45 figure and the p it would give are not valid**, and the table says
+6 of 9 for that reason: the five threads replicates are byte-identical, so the effective n is
+9, not 45. Only Metal replicates carry independent information. Counting identical copies as
+draws is the same error as counting one draw per configuration and calling it nine.
+
+**The directional effect is real and now properly supported.** 38 of 45 independent draws at
+p = 3.1e-06, with no configuration failing to show it at least once. The earlier "9 of 9,
+p = 0.002" reached the right conclusion on inadequate evidence -- nine configurations observed
+once each on a non-reproducible backend. The replicates vindicate the direction and correct
+the basis for it.
+
+**The second-half excursion is Metal-specific and asymmetric**: 13 of 45 against 1 of 45 in
+the first half, a 13:1 ratio, where threads never crosses at all. But which *particular*
+run exceeds threshold is not stable -- 42/identity gives 3 of 5, 44/identity 0 of 5 -- so
+"all three failures were the second half" remains withdrawn as an attribution. The tendency
+is measurable; the individual assignment is a draw.
+
+**The acceptance rate is the reproducible failure.** Within-configuration sd is 0.002-0.005
+against a mean displacement of ~0.17 from the band. It also varies systematically by *seed*
+(42 ~ 0.365, 43 ~ 0.342, 44 ~ 0.337) and barely by ordering, which is consistent with the
+permutations doing their job: they control the sequence-position confound, and what is left
+is not a sequence effect.
+
 ### A note on what the class index means here
 
 `jacc_parity_tests.jl:26-35` records that `c` indexes both spatial class and sequence
