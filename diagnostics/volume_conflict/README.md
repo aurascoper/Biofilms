@@ -228,28 +228,39 @@ its value. `parity_halves.jl` reports both, reusing the shipped `run_tables` / `
 **Rate outside band 9 of 9. Pooled V or maxdev over: 0 of 9. First half over: 0 of 9. Second
 half over: 3 of 9.** That reconciles the log exactly: 9 failures at line 200 and 3 at line 209.
 
-### The effect is directional, not scattered
+### Repeatability first -- and it fails
 
-| backend | s2.V > s1.V | mean s1.V | mean s2.V | mean ratio |
+**Metal is not reproducible on identical input.** Same seed, same ordering, three replicates:
+
+| replicate | rate | pooled V | s1.V | s2.V |
 |---|---|---|---|---|
-| metal | **9 of 9** | 0.01508 | 0.02364 | **1.620** |
-| threads | 6 of 9 | 0.01106 | 0.01242 | 1.223 |
+| 1 | 0.37143 | 0.00729 | 0.01125 | 0.00986 |
+| 2 | 0.36655 | 0.01049 | 0.01127 | 0.01477 |
+| 3 | 0.37040 | 0.01421 | 0.01805 | 0.01941 |
 
-Nine of nine in one direction is a sign test at p = 2^-9 ≈ 0.002. Threads at 6 of 9 is what
-noise looks like. **The parity association grows over the run on Metal and does not on
-threads**, which fits the compounding mechanism: as the film densifies, contention rises,
-staleness worsens, and the class-correlated component grows with it.
+Accepted-count L1 difference between replicates 1 and 2: **6069**. Threads, the same probe:
+all three replicates **byte-identical**, rate 0.19137 every time.
 
-### Why pooling hid it
+**This had to come first and did not.** Two claims made before it are now withdrawn:
 
-Pooled V on Metal maxes at **0.02313**, under the 0.025 threshold, in all nine runs -- while a
-second-half window reaches **0.03228**. Averaging a growing effect over the whole trajectory
-brings it back under the line.
+1. *"All three half-window failures are the SECOND half."* That was one sample. A later
+   `runtests.jl` run on the same code and seeds gave **1 failure at `s1.V` and 2 at `s2.V`**,
+   and the three replicates above put **none** over threshold. Which half drifts is not a
+   property of the configuration.
+2. *"s2.V > s1.V in 9 of 9 runs, sign test p ≈ 0.002."* Those nine were nine different
+   (seed, ordering) configurations observed **once each**, not nine replicates, and the
+   p-value assumed a stability the backend does not have. Three replicates of one
+   configuration give 2 of 3. The directional claim needs replicates per configuration before
+   it can be made at all.
 
-An earlier revision of `docs/metal_feasibility_macos_arm64.md` read the passing pooled V and
-concluded "the eight colour classes agree with each other, so this is not a decomposition
-artifact". **Withdrawn.** They agree in the first half and drift apart in the second, and the
-statistic that was quoted is precisely the one that cannot see it.
+What **is** reproducible is the rate: 0.366-0.371 across replicates, always far outside the
+(0.14, 0.23) band, 9 of 9 configurations in every run observed. The acceptance-rate failure is
+a property of the backend. The half-window excursions are sporadic, and attributing them to a
+half, a seed or an ordering requires replicates that have not been run.
+
+**Pooling still hides something real.** Pooled V stayed under 0.025 in every run observed
+while individual half-windows reached 0.03228. That much survives -- but it is a statement
+about what the pooled statistic can see, not a measured time trend.
 
 ### A note on what the class index means here
 
@@ -259,11 +270,20 @@ the file uses random permutations rather than reversal. That effect is *across* 
 present on both backends. What concurrent execution adds is staleness *within* a pass, and it
 is that addition which the second-half excursion tracks.
 
-### Recommended change to the shipped assertion
+### The shipped assertion is now split
 
-Split `@test s1.V < V_MAX && s2.V < V_MAX` into two assertions. Identical pass/fail semantics,
-but a failure then names the half and prints its value. This is strictly more diagnostic and
-is not a relaxation; it raises the per-run assertion count from 4 to 5.
+`@test s1.V < V_MAX && s2.V < V_MAX` is two assertions in `jacc_parity_tests.jl`. Identical
+pass/fail, but a failure names the half and prints its value:
+
+```
+  Expression: s1.V < V_MAX
+   Evaluated: 0.031991940528837394 < 0.025
+```
+
+Threads stays green at **74/74** (was 65 -- exactly +9, one per run). It is not a relaxation.
+
+It earned its keep immediately: the first Metal run after the split reported a **first**-half
+failure, which is what showed that the earlier second-half attribution was one sample.
 
 `parity_halves.jl` asserts nothing by design -- it reports, so it can be run against a
 failing backend without masking the shipped result.
