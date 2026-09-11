@@ -262,6 +262,40 @@ strings from the field data in any caption. The Python side can read the same fi
 consulted for the draft; the URL carries no version); pyvista 0.48.4, vtk and h5py are in the
 coupling venv here, none of them in CI's tier, and the read was not exercised.
 
+## macOS / Apple Silicon, 2026-09-11
+
+The Linux record above is a read: a `.pvd` produced elsewhere, opened on x86-64. This is a
+**round trip on one machine** — an Apple M4 generated the snapshots, exported the `.vti`
+series, and read its own output back.
+
+| Step | Command | Result |
+|---|---|---|
+| 3 | `export_checkpoint.jl transport <dir> --every 5 --mcs 20` | 4 snapshots, 6.6 s, four distinct sha256 |
+| 4 | `export_vti.jl <dir> <stem>` | 4 `.vti` + `.pvd`, 5.9 s |
+| — | `pvpython` open of that `.pvd` | timesteps 5, 10, 15, 20; extent 0-20; **eight cell arrays**, `species` in 0 to 7; **all twelve field-data entries** |
+| 7 | `visualize_lattice.jl <snap.h5> --still out.png` | 2000x1600 PNG, 19.3 s, 1376 distinct colours |
+
+The twelve field-data entries are the same inventory the Linux RC1 run reported — `units`,
+`species_zero`, `accumulated_dose_Gy_units`, `schema_version`, `coordinate_index_base`,
+`cell_id_background`, `cell_id_wall`, `mcs`, `physical_time_s`, `logical_axis_order`,
+`dataset_axis_order_h5py`, `git_sha`. Spacing stays 1.0 per site and the `D-PITCH` refusal
+survives into the artifact and into the viewer's axis labels, which read "sites".
+
+**Step 7 is the first GLMakie render on Apple Silicon in this repository.** `--still`, not
+interactive: the standing Codex P2 at `viewer/visualize_lattice.jl:53` — `display(fig)` on one
+figure while waiting on a different `GLMakie.Screen()` — bites hardest on macOS, where OpenGL
+4.1 is deprecated and the event loop is main-thread-only. The still path never opens a second
+screen and is unaffected.
+
+**ParaView 6.1.1 arm64** (`brew install --cask paraview`), not the 6.2.0-RC1 Linux binary.
+Four macOS-specific `pvpython` issues and the absent `libopenvkl_module_cpu_device.dylib` are
+recorded in `docs/visualization/macos-arm64-2026-09-11/README.md` rather than repeated here.
+
+Steps 0 to 2 of this pipeline (removing `AMDGPU`, `Pkg.instantiate()`, the full suite) were
+also run on this machine; `AMDGPU` is declared in `Project.toml`, used by no code path, and
+has no darwin artifacts, so it must be removed locally before `instantiate` will complete. It
+is required upstream for the Linux JACC tier and must be restored before committing.
+
 ## Open decisions
 
 - `feat/visualize-3d` on origin: to be deleted after #25 merges; its commit stays reachable at
@@ -272,5 +306,8 @@ coupling venv here, none of them in CI's tier, and the read was not exercised.
   the snapshot is a schema change with its own hash implications (`label_state_hash` excludes
   fields, so it may be safe; not checked).
 - WGLMakie for a browser viewer was not tried.
-- ParaView version to pin. The 6.2.0 release candidate read the files; pin the release when
-  it ships, and re-read one `.pvd` then.
+- ParaView version to pin. **Narrowed, not closed.** The 6.2.0 release candidate read the
+  files on Linux x86-64; ParaView **6.1.1**, a shipped release, read them on macOS arm64 on
+  2026-09-11 with the full inventory intact. 6.1.1 is a release but is *earlier* than the RC
+  that was tested, so this establishes that a shipped build reads the format without
+  establishing which version to pin. Pin 6.2.0 when it ships, and re-read one `.pvd` then.
