@@ -40,6 +40,13 @@ run_file(file,args)=success(pipeline(ignorestatus(
 
 include(joinpath(D,"test_numerics.jl"))
 include(joinpath(D,"test_guard_identifiers.jl"))
+# The viewer's CLI refusals need no trajectory. They used to sit inside test_viewer.jl,
+# which destructures `parent,derived=ARGS` on its third line, so the whole file was gated
+# behind the data and these never ran by default -- 2 of 106 assertions, both negative
+# controls, reported as UNCOVERED when nothing prevented covering them. They cannot be
+# reached by invoking test_viewer.jl argument-less (line 13 would raise BoundsError), so
+# they are extracted rather than called differently.
+include(joinpath(D,"test_viewer_cli.jl"))
 
 @testset "Inert-signal pipeline boundaries and known-bad configs" begin
     # Runs standalone; the parent-manifest defect controls need a verified run.
@@ -53,7 +60,8 @@ end
         @test run_file("test_viewer.jl",[PARENT,DERIVED])
         @test run_file("test_native_layout.jl",[PARENT,DERIVED])
     else
-        push!(UNCOVERED,"test_viewer.jl (101-snapshot reader contract)")
+        push!(UNCOVERED,"test_viewer.jl 101-snapshot reader contract (its CLI refusals "*
+                        "are covered above by test_viewer_cli.jl)")
         push!(UNCOVERED,"test_native_layout.jl (Makie objects and callbacks)")
     end
 end
