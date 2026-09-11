@@ -96,6 +96,42 @@ Euclidean transform is linear per axis and 64,000 sites is nothing.
 the pitch is a declared refusal here, D-PITCH blocked and unmeasured. Blocky voxel rendering
 is honest about a resolution the calibration does not have.
 
+## Does dropping the static arrays make anything faster? No.
+
+`bench_reduction.py` re-emits the trajectory twice through the **same writer**, differing
+only in array inventory, because comparing a reduced form against the original tier would
+confound dropping arrays with swapping writers. The reduced variant reconstructs the full
+ten-array state and is timed with that reconstruction included, since a smaller answer is
+not a faster one.
+
+```
+  full       289.84 MiB   101 files
+  reduced    124.62 MiB   103 files   (57.0% smaller)
+
+timings, 15 samples each, warm cache (the repeat-viewing case)
+  full trajectory, 10 arrays         median   54.7 ms   IQR  53.8- 65.9   min  53.0
+  reduced + reconstruction           median   53.9 ms   IQR  50.7- 58.3   min  49.1
+  median ratio 1.02x, but 7 of 15 reduced samples exceed the full median
+  distributions separate: NO -- the difference is not distinguishable from noise
+
+  reconstruction exact on all 101 frames x 10 arrays: YES
+
+  raw read, uncompressed             median   50.4 ms   IQR  49.8- 60.8   min  48.6
+  gzip decompress on read            median  351.8 ms   IQR 346.8-361.9   min 345.0
+  compression makes a READ 7.0x slower, to save 75% of disk
+```
+
+**The reduction is a storage argument and not a performance one.** 57% fewer bytes, and the
+load time does not separate from noise. Reading 290 MiB from warm cache is 50 ms, so halving
+it saves nothing anyone can perceive.
+
+**Compression inverts.** It is quoted as a 75% saving, and on every read it is a 7x penalty:
+352 ms against 50 ms, with the two distributions cleanly separated where the reduction's are
+not. Write it once at 10.8 s if disk is the constraint; do not pay it per read.
+
+That is the honest ranking at this scale. Dropping the four static arrays is worth doing
+because the bytes are meaningless, not because anything is slow. Nothing here is slow.
+
 ## Where the action lives
 
 The exporter half of this is filed as **issue #34**, not fixed here: the change touches
@@ -135,3 +171,4 @@ that answers "yes" unconditionally passes everything else in the file.
 | `census.py` | per-array bytes, distinct values, constant, static, discovered dependences |
 | `test_census.py` | 9 data-free assertions |
 | `census.json` | receipt of the run above |
+| `bench_reduction.py` | does the reduction make anything faster? (no) |
