@@ -27,9 +27,20 @@ def read_vti(path):
         # VTK writes x fastest; order="F" gives [x, y, z] indexing.
         arrays[name] = buf.reshape((nx, ny, nz), order="F") if buf.size == nx*ny*nz else buf
 
+    # FieldData strings are <Array type="String"> -- NOT <DataArray> -- and in this
+    # exporter they are appended, not inline. Matching only <DataArray> returned {} and
+    # lost every provenance string without saying so.
     fields = {}
     fd = re.search(r"<FieldData>(.*?)</FieldData>", head, re.S)
     if fd:
-        for m in re.finditer(r'<(?:DataArray|Array) type="(\w+)" Name="(\w+)"[^>]*>(.*?)</', fd.group(1), re.S):
-            fields[m.group(2)] = m.group(3).strip()
+        for m in re.finditer(r'<Array type="String" Name="(\w+)"[^>]*offset="(\d+)"', fd.group(1)):
+            off = int(m.group(2))
+            n = int(np.frombuffer(raw, np.uint64, count=1, offset=marker + off)[0])
+            # payload is NUL-terminated and n includes the terminator
+            fields[m.group(1)] = raw[marker + off + 8: marker + off + 8 + n].rstrip(b"\x00").decode("utf-8", "replace")
+        for m in re.finditer(r'<DataArray type="(\w+)" Name="(\w+)"[^>]*offset="(\d+)"', fd.group(1)):
+            dtype, off = _DT[m.group(1)], int(m.group(3))
+            n = int(np.frombuffer(raw, np.uint64, count=1, offset=marker + off)[0])
+            fields[m.group(2)] = np.frombuffer(raw, dtype, count=n // dtype().itemsize,
+                                               offset=marker + off + 8)[0]
     return arrays, fields, (nx, ny, nz)

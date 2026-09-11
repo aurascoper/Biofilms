@@ -1,0 +1,267 @@
+{
+  "frozen_mcs": 100,
+  "source_frame": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal/paraview/signal_mcs000100.vti",
+  "half_life_days": 6.6443,
+  "half_life_uncertainty_days": 0.0009,
+  "lambda_per_s": 1.2074314543347536e-06,
+  "daughter": "stable",
+  "half_life_provenance": "CONFIRM against LNHB/CEA or NNDC/ENSDF. Chosen as the value consistent with the pinned lambda 1.20743e-6 1/s; 6.647 d is inconsistent with it.",
+  "a0": "HYPOTHETICAL INPUT: uniform over 4888 occupied interior voxels, sums to 1",
+  "computes": "decay only",
+  "does_not_compute": [
+    "binding",
+    "dose",
+    "transport"
+  ],
+  "time_axis": "days, independent of MCS",
+  "note": "would be Lu-177 if the evidence audit and the source term land; the material path is elemental, not isotopic, and no isotope identity is established by this file",
+  "frames": 41,
+  "metrics": [
+    {
+      "days": 0.0,
+      "surviving_fraction": 1.0,
+      "total_activity": 1.0,
+      "max_voxel_activity": 0.00020458265139116204
+    },
+    {
+      "days": 0.5,
+      "surviving_fraction": 0.949176000344539,
+      "total_activity": 0.9491760003445391,
+      "max_voxel_activity": 0.0001941849427873443
+    },
+    {
+      "days": 1.0,
+      "surviving_fraction": 0.9009350796300564,
+      "total_activity": 0.9009350796300564,
+      "max_voxel_activity": 0.00018431568732202463
+    },
+    {
+      "days": 1.5,
+      "surviving_fraction": 0.8551459554533456,
+      "total_activity": 0.8551459554533456,
+      "max_voxel_activity": 0.000174948026893074
+    },
+    {
+      "days": 2.0,
+      "surviving_fraction": 0.811684017708016,
+      "total_activity": 0.8116840177080161,
+      "max_voxel_activity": 0.00016605646843453683
+    },
+    {
+      "days": 2.5,
+      "surviving_fraction": 0.7704309894716805,
+      "total_activity": 0.7704309894716806,
+      "max_voxel_activity": 0.00015761681454003285
+    },
+    {
+      "days": 3.0,
+      "surviving_fraction": 0.7312746051282154,
+      "total_activity": 0.7312746051282153,
+      "max_voxel_activity": 0.00014960609761215536
+    },
+    {
+      "days": 3.5,
+      "surviving_fraction": 0.6941083048491317,
+      "total_activity": 0.6941083048491317,
+      "max_voxel_activity": 0.00014200251735866032
+    },
+    {
+      "days": 4.0,
+      "surviving_fraction": 0.6588309446026268,
+      "total_activity": 0.6588309446026268,
+      "max_voxel_activity": 0.0001347853814653492
+    },
+    {
+      "days": 4.5,
+      "surviving_fraction": 0.6253465209011358,
+      "total_activity": 0.6253465209011358,
+      "max_voxel_activity": 0.0001279350492841931
+    },
+    {
+      "days": 5.0,
+      "surviving_fraction": 0.5935639095383128,
+      "total_activity": 0.593563909538313,
+      "max_voxel_activity": 0.0001214328783834519
+    },
+    {
+      "days": 5.5,
+      "surviving_fraction": 0.5633966176044435,
+      "total_activity": 0.5633966176044435,
+      "max_voxel_activity": 0.00011526117381432969
+    },
+    {
+      "days": 6.0,
+      "surviving_fraction": 0.5347625481054273,
+      "total_activity": 0.5347625481054274,
+      "max_voxel_activity": 0.00010940313995610216
+    },
+    {
+      "days": 6.5,
+      "surviving_fraction": 0.5075837765447637,
+      "total_activity": 0.5075837765447636,
+      "max_voxel_activity": 0.00010384283480866688
+    },
+    {
+      "days": 7.0,
+      "surviving_fraction": 0.48178633886053507,
+      "total_activity": 0.4817863388605351,
+      "max_voxel_activity": 9.856512660812911e-05
+    },
+    {
+      "days": 7.5,
+      "surviving_fraction": 0.4573000301402814,
+      "total_activity": 0.4573000301402814,
+      "max_voxel_activity": 9.355565264735709e-05
+    },
+    {
+      "days": 8.0,
+      "surviving_fraction": 0.43405821356598945,
+      "total_activity": 0.43405821356598945,
+      "max_voxel_activity": 8.880078018944138e-05
+    },
+    {
+      "days": 8.5,
+      "surviving_fraction": 0.4119976390692616,
+      "total_activity": 0.4119976390692617,
+      "max_voxel_activity": 8.428756936768855e-05
+    },
+    {
+      "days": 9.0,
+      "surviving_fraction": 0.3910582712031548,
+      "total_activity": 0.39105827120315484,
+      "max_voxel_activity": 8.000373797118552e-05
+    },
+    {
+      "days": 9.5,
+      "surviving_fraction": 0.3711831257622605,
+      "total_activity": 0.37118312576226054,
+      "max_voxel_activity": 7.59376280201024e-05
+    },
+    {
+      "days": 10.0,
+      "surviving_fraction": 0.3523181147064064,
+      "total_activity": 0.3523181147064064,
+      "max_voxel_activity": 7.207817403977217e-05
+    },
+    {
+      "days": 10.5,
+      "surviving_fraction": 0.3344118989659553,
+      "total_activity": 0.33441189896595536,
+      "max_voxel_activity": 6.841487294720854e-05
+    },
+    {
+      "days": 11.0,
+      "surviving_fraction": 0.31741574872812756,
+      "total_activity": 0.3174157487281276,
+      "max_voxel_activity": 6.493775546811121e-05
+    },
+    {
+      "days": 11.5,
+      "surviving_fraction": 0.3012834108241313,
+      "total_activity": 0.30128341082413135,
+      "max_voxel_activity": 6.163735900657351e-05
+    },
+    {
+      "days": 12.0,
+      "surviving_fraction": 0.28597098285620953,
+      "total_activity": 0.2859709828562096,
+      "max_voxel_activity": 5.8504701893659894e-05
+    },
+    {
+      "days": 12.5,
+      "surviving_fraction": 0.27143679372205376,
+      "total_activity": 0.27143679372205376,
+      "max_voxel_activity": 5.5531258944773685e-05
+    },
+    {
+      "days": 13.0,
+      "surviving_fraction": 0.25764129021144466,
+      "total_activity": 0.25764129021144466,
+      "max_voxel_activity": 5.270893825929719e-05
+    },
+    {
+      "days": 13.5,
+      "surviving_fraction": 0.24454692936650566,
+      "total_activity": 0.24454692936650568,
+      "max_voxel_activity": 5.003005919936695e-05
+    },
+    {
+      "days": 14.0,
+      "surviving_fraction": 0.23211807631263834,
+      "total_activity": 0.23211807631263837,
+      "max_voxel_activity": 4.748733148785564e-05
+    },
+    {
+      "days": 14.5,
+      "surviving_fraction": 0.22032090728209852,
+      "total_activity": 0.22032090728209852,
+      "max_voxel_activity": 4.5073835368678095e-05
+    },
+    {
+      "days": 15.0,
+      "surviving_fraction": 0.2091233175663023,
+      "total_activity": 0.2091233175663023,
+      "max_voxel_activity": 4.27830027754301e-05
+    },
+    {
+      "days": 15.5,
+      "surviving_fraction": 0.1984948341463637,
+      "total_activity": 0.1984948341463637,
+      "max_voxel_activity": 4.060859945711205e-05
+    },
+    {
+      "days": 16.0,
+      "surviving_fraction": 0.1884065327640981,
+      "total_activity": 0.18840653276409813,
+      "max_voxel_activity": 3.8544708012295035e-05
+    },
+    {
+      "days": 16.5,
+      "surviving_fraction": 0.178830959207809,
+      "total_activity": 0.178830959207809,
+      "max_voxel_activity": 3.6585711785558306e-05
+    },
+    {
+      "days": 17.0,
+      "surviving_fraction": 0.16974205459864555,
+      "total_activity": 0.16974205459864555,
+      "max_voxel_activity": 3.4726279582374293e-05
+    },
+    {
+      "days": 17.5,
+      "surviving_fraction": 0.1611150844742068,
+      "total_activity": 0.1611150844742068,
+      "max_voxel_activity": 3.296135116084428e-05
+    },
+    {
+      "days": 18.0,
+      "surviving_fraction": 0.15292657147640015,
+      "total_activity": 0.15292657147640015,
+      "max_voxel_activity": 3.1286123460802e-05
+    },
+    {
+      "days": 18.5,
+      "surviving_fraction": 0.14515423146037276,
+      "total_activity": 0.14515423146037276,
+      "max_voxel_activity": 2.9696037532809487e-05
+    },
+    {
+      "days": 19.0,
+      "surviving_fraction": 0.13777691285064206,
+      "total_activity": 0.13777691285064206,
+      "max_voxel_activity": 2.8186766131473418e-05
+    },
+    {
+      "days": 19.5,
+      "surviving_fraction": 0.13077453907939054,
+      "total_activity": 0.13077453907939054,
+      "max_voxel_activity": 2.6754201939318852e-05
+    },
+    {
+      "days": 20.0,
+      "surviving_fraction": 0.12412805395027653,
+      "total_activity": 0.12412805395027654,
+      "max_voxel_activity": 2.5394446389172775e-05
+    }
+  ]
+}

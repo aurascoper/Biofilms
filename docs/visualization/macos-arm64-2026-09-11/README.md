@@ -274,3 +274,65 @@ thresholds that array and the rendered counts match the run's own endpoint exact
 endpoint can differ by a qualifier that lives only in the producer's docstring. Reproducing a
 published number through a second, independent path is what surfaced it — the agreement check
 was worth more than the render.
+
+
+## Decay reference — the smallest defensible isotope addition
+
+`decay_reference.py` puts species labels beside a **hypothetical** normalized activity
+distribution fading by the documented decay law, on a **frozen** consortium snapshot:
+
+```
+a(x, t) = a0(x) * 2^(-t / t_half),   t in DAYS
+```
+
+**It computes no binding and no dose.** No source term, no dose point kernel, no transport.
+
+**The geometry is frozen on purpose.** There is no established MCS-to-seconds conversion
+here — `seconds_per_mcs` ships `NaN` and the exporter refuses a physical pitch. Advancing
+biological rearrangement alongside isotope decay would introduce that mapping silently as
+an assumption. Freezing the snapshot keeps the isotope clock independent, in days, and
+answerable. The `.pvd` time key is **days**, and it is not MCS.
+
+**`a0(x)` is an input, never a result.** The default is uniform over the 4,888 occupied
+interior voxels of the frozen frame, normalized to sum to 1 — chosen for being obviously
+arbitrary. No measurement supports it, and the receipt says so in the artifact itself.
+
+### The half-life: two values circulate and only one is self-consistent
+
+| t½ | implied λ | matches the pinned λ = 1.20743e-6 /s |
+|---|---|---|
+| **6.6443 d** | 1.207431e-06 /s | **yes, to six figures** |
+| 6.6453 d | 1.207250e-06 /s | no |
+| 6.647 d | 1.206941e-06 /s | no |
+
+`6.6443 d` is used. **This arithmetic is a consistency check, not a source** — confirm
+against LNHB/CEA or NNDC/ENSDF before anything depends on the last digits. Naming the
+isotope is legitimate for this constant and nothing else; the file, fields and receipt say
+*decay reference*, and the repository's source-term gate and elemental material path are
+undisturbed.
+
+Verified: 41 frames, 0 to 20 d in 0.5 d steps; `max |Σa(x,t) − 2^(−t/T)| = 1.1e-16`; total
+activity at t=0 is exactly 1.0; ParaView reads 41 timesteps and all 14 field-data entries.
+
+### Three ways to write a .vti that fails silently
+
+All three were hit writing this, and each produces a file that looks fine and is not.
+
+1. **`<FieldData>` is a sibling of `<Piece>`, not a child.** Inside `<Piece>`, ParaView
+   reports **zero field-data entries** with no error — provenance that simply is not there.
+2. **`NumberOfTuples` is mandatory on `FieldData` and only there.** `CellData` infers its
+   tuple count from the extent; `FieldData` has no extent to infer from, so without it VTK
+   reads zero tuples and drops the array.
+3. **A `String` array's payload is NUL-terminated and the `UInt64` byte count includes the
+   terminator.** Omitting it does not merely lose that string — it desynchronises the whole
+   appended section, and VTK then reads **zero cells from the entire file**, silently.
+   Confirmed against the exporter's own output, where `units` is `b"lattice\x00"` with a
+   declared length of 8.
+
+Trap 3 is why `vti_read.py` now strips the terminator: it had been decoding `units` as
+`"lattice "` and every provenance string with a trailing NUL. The fix does not touch cell
+arrays, and `component_overlap.json` is byte-for-byte unchanged across it — checked, not
+assumed.
+
+The 41 `.vti` frames (25 MB) are regenerable and not committed; `decay_reference_receipt.json`
+carries the per-frame metrics.
