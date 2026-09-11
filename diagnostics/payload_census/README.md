@@ -96,6 +96,14 @@ Euclidean transform is linear per axis and 64,000 sites is nothing.
 the pitch is a declared refusal here, D-PITCH blocked and unmeasured. Blocky voxel rendering
 is honest about a resolution the calibration does not have.
 
+## Where the action lives
+
+The exporter half of this is filed as **issue #34**, not fixed here: the change touches
+`export_vti.jl` on `feat/lattice-viewer` (PR #25, on hold), and this diagnostic is on a
+branch off `master`. The issue ranks three fixes by cost. The free one, with no change to
+what a consumer must do, is to stop writing `generation` and `accumulated_dose_Gy` while
+they are identically zero: 25.5% of every frame carrying no information at all.
+
 ## The constraint on all of it
 
 The existing 101-frame tier **cannot be rewritten**, in either direction. 209 artifact hashes
