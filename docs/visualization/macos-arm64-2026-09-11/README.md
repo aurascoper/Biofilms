@@ -395,5 +395,30 @@ Trap 3 is why `vti_read.py` now strips the terminator: it had been decoding `uni
 arrays, and `component_overlap.json` is byte-for-byte unchanged across it — checked, not
 assumed.
 
-The 41 `.vti` frames (25 MB) are regenerable and not committed; `decay_reference_receipt.json`
-carries the per-frame metrics.
+### Five refusals, each demonstrated
+
+The writer originally had none of these. All were latent on the shipped defaults
+(`--days 20 --step 0.5`, where 20/0.5 is exact), and all are reachable.
+
+| Refusal | What it replaces |
+|---|---|
+| the frame's embedded `mcs` must equal `--mcs` | `fields` was bound to `_`, so the receipt recorded the **command line** rather than a reading of the data |
+| `--days` must be an integer multiple of `--step` | `int(days/step)+1` truncated when the quotient landed just under an integer -- `int(0.3/0.1) == 2` dropped the requested endpoint **while the log printed "0 to 0.3"** |
+| the destination must hold no artifacts for this stem | unconditional truncating writes; a re-run with a shorter `--days` also left the prior run's tail frames on disk under the same glob |
+| declared coordinate conventions must match | origin and spacing were hard-coded with no check |
+| the source frame must exist | implicit |
+
+Filenames are the **frame index** now, not the formatted time. `%07.2f` cannot separate frames
+finer than 0.01 d, so at `--step 0.004` two `.pvd` entries named one file and the later frame
+overwrote the earlier while the `.pvd` still advertised both timesteps.
+
+Demonstrated: a frame named `signal_mcs000050.vti` carrying `mcs = 100.0` is refused; a second
+run onto the same stem exits 1; `--days 1.0 --step 0.3` is refused; `--days 0.3 --step 0.1`
+emits **4** frames including the endpoint (was 3); `--step 0.004` produces 4 **distinct** files.
+
+The receipt binds by content, not by name: sha256 of the source frame, of every `.vti`, and of
+the `.pvd`, plus the source's own `git_sha` and `parent_manifest_sha256` -- all of which the
+reader was already returning and the writer was discarding.
+
+The `.vti` frames are regenerable and not committed; `decay_reference_receipt.json` carries the
+per-frame metrics and the hashes.

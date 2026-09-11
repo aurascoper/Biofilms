@@ -27,7 +27,7 @@ is elemental, not isotopic; this file does not disturb that.
 
 usage: decay_reference.py <inert_signal_dir> <out_stem> [--mcs N] [--days D] [--step S]
 """
-import sys, os, json, math
+import sys, os, json, math, hashlib
 import numpy as np
 from vti_read import read_vti
 
@@ -105,7 +105,27 @@ def main(argv):
     days = float(getopt("--days", "20")); step = float(getopt("--step", "0.5"))
 
     src = os.path.join(root, "paraview", "signal_mcs%06d.vti" % frozen_mcs)
-    a, _, dims = read_vti(src)
+    if not os.path.isfile(src):
+        raise SystemExit("FATAL: no source frame at %s" % src)
+    # `fields` used to be discarded as `_`, so the frame's own mcs, git_sha and
+    # parent_manifest_sha256 were thrown away and the receipt recorded the COMMAND LINE
+    # rather than a reading of the data. A frame misnamed by the exporter, or --mcs aimed
+    # at a relabelled copy, propagated into every output without a murmur.
+    a, fields, dims = read_vti(src)
+    embedded = fields.get("mcs")
+    if embedded is None:
+        raise SystemExit("FATAL: %s declares no `mcs` field; refusing to assert a frozen "
+                         "MCS the artifact does not state" % src)
+    if int(round(float(embedded))) != frozen_mcs:
+        raise SystemExit("FATAL: --mcs %d but %s declares mcs=%s"
+                         % (frozen_mcs, src, embedded))
+    # Geometry is read, not assumed. The writer emits Origin 0 / Spacing 1 per site;
+    # anything else must be propagated or refused rather than silently overwritten.
+    for key, want in (("coordinate_index_base", 0.0),):
+        got = fields.get(key)
+        if got is not None and abs(float(got) - want) > 1e-12:
+            raise SystemExit("FATAL: %s declares %s=%s; this writer emits %s and will not "
+                             "silently relabel it" % (src, key, got, want))
     species, mask = a["species"], a["interior_mask"]
     occupied = (species > 0) & (mask == 1)
     n_occ = int(occupied.sum())
@@ -117,13 +137,41 @@ def main(argv):
     a0 = np.zeros(dims, dtype=np.float64)
     a0[occupied] = 1.0 / n_occ
 
-    os.makedirs(os.path.dirname(stem) or ".", exist_ok=True)
-    times = [round(i * step, 6) for i in range(int(days / step) + 1)]
+    outdir = os.path.dirname(stem) or "."
+    # Refuse any existing run destination BEFORE writing a byte -- the same render-then-check
+    # inversion that is a standing P2 at tools/render_label_trajectory.py:297. Checking only
+    # for a non-empty directory would still let a re-run with a shorter --days leave the
+    # previous run's tail frames on disk, unreferenced by the new .pvd but matching its glob.
+    prior = ([] if not os.path.isdir(outdir) else
+             [f for f in os.listdir(outdir)
+              if f.startswith(os.path.basename(stem)) and
+              (f.endswith(".vti") or f.endswith(".pvd") or f.endswith("_receipt.json"))])
+    if prior:
+        raise SystemExit("FATAL: %d artifact(s) for stem '%s' already exist in %s "
+                         "(e.g. %s). Refusing to overwrite a previous run; choose a new "
+                         "stem or remove them deliberately."
+                         % (len(prior), os.path.basename(stem), outdir, sorted(prior)[0]))
+    os.makedirs(outdir, exist_ok=True)
+
+    # Integer frame count. `int(days/step)+1` truncated whenever the quotient landed just
+    # under an integer in binary -- int(0.3/0.1) == 2, so --days 0.3 --step 0.1 emitted
+    # 0, 0.1, 0.2 and dropped the requested endpoint while printing "0 to 0.3".
+    n_steps = int(round(days / step))
+    if abs(n_steps * step - days) > 1e-9:
+        raise SystemExit("FATAL: --days %g is not an integer multiple of --step %g "
+                         "(nearest is %g); declare an endpoint the series can reach."
+                         % (days, step, n_steps * step))
+    times = [round(i * step, 6) for i in range(n_steps + 1)]
+    assert abs(times[-1] - days) < 1e-9, "endpoint %g not included" % days
+
     entries, metrics = [], []
-    for t in times:
+    for idx, t in enumerate(times):
         surviving = 2.0 ** (-t / T_HALF_DAYS)
         act = a0 * surviving
-        name = "%s_d%07.2f.vti" % (os.path.basename(stem), t)
+        # Frame INDEX, not the formatted time. "%07.2f" cannot separate frames finer than
+        # 0.01 d, so two .pvd entries named one file and the later frame overwrote the
+        # earlier while the .pvd still advertised both timesteps.
+        name = "%s_f%05d.vti" % (os.path.basename(stem), idx)
         open(os.path.join(os.path.dirname(stem), name), "wb").write(_vti_bytes(
             dims,
             {"species": species, "interior_mask": mask,
@@ -154,7 +202,25 @@ def main(argv):
             f.write('    <DataSet timestep="%s" group="" part="0" file="%s"/>\n' % (t, name))
         f.write("  </Collection>\n</VTKFile>\n")
 
+    # Bind source, every output and the .pvd by CONTENT. Recording a mutable source path
+    # and a git_sha string ties the receipt to a name, not to bytes.
+    def _sha(path):
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    out_hashes = {name: _sha(os.path.join(outdir, name)) for _, name in entries}
+    out_hashes[os.path.basename(stem) + ".pvd"] = _sha(stem + ".pvd")
+
     json.dump({"frozen_mcs": frozen_mcs, "source_frame": src,
+               "source_frame_sha256": _sha(src),
+               "source_declared_mcs": float(embedded),
+               "source_git_sha": fields.get("git_sha"),
+               "source_parent_manifest_sha256": fields.get("parent_manifest_sha256"),
+               "output_sha256": out_hashes,
+               "days": days, "step": step, "endpoint_included": True,
                "half_life_days": T_HALF_DAYS,
                "half_life_uncertainty_days": T_HALF_UNCERTAINTY_DAYS,
                "lambda_per_s": LAMBDA_PER_S, "daughter": DAUGHTER,
