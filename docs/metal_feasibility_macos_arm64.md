@@ -6,9 +6,15 @@ device `AGXG16GDevice`. The companion result for AMD is
 [`jacc_coupling_port.md`](jacc_coupling_port.md); this file is deliberately its sibling
 and reaches a compatible conclusion by a different route.
 
-**Verdict: do not port.** Metal runs the port correctly and is 2.3x slower than the
-CPU threads backend at saturation. That confirms what the ROCm measurement already
-said — the near-term work is kernel structure, not more FLOPs.
+**Verdict: do not port — and the reason is correctness, not speed.** The CPM kernel executes
+on device, but the port does **not reproduce the CPU's acceptance statistics**: the Metropolis
+acceptance rate is **1.94x** the threads-backend rate, uniformly across all eight parity
+classes. Timing is the lesser finding.
+
+An earlier revision of this file said "Metal runs the port correctly and is 2.3x slower."
+That was measured over **two field kernels** (`melanin_k!`, `nutrient_k!`) and a host-side
+`delta_H`; `selftest` never launches `cpm_color!`, so it could not and did not establish
+whole-port correctness. Running the parity tier on device is what found the defect.
 
 `Metal` was added to `Project.toml` and `AMDGPU` removed for the duration of these
 runs; both are local and uncommitted, and `Project.toml` is byte-identical to HEAD in
@@ -89,6 +95,77 @@ JACC port kernels versus the serial reference |    9      9  13.9s
 
 **Real Gate 3: PASS, 9/9 under `MetalBackend`.**
 
+## The CPM kernel on device: 51 pass, 14 fail
+
+`tests/jacc_parity_tests.jl` is the tier that drives `run_coupled -> cpm_color!`, including
+the `JACC.@atomic` volume updates at `biofilms_potts_jacc.jl:217-218`. Run through
+`tests/runtests.jl` with `backend = metal`:
+
+| Testset | Metal |
+|---|---|
+| the class encode/decode pair agrees with the kernel | **16/16 pass** |
+| `color_order` must be a permutation of 0:7 | 3/3 pass (host-side) |
+| per-sweep reset, discriminator, all eight classes | **2/2 pass** — `nonfinite == 0` |
+| the guard can fire | **2/2 pass** |
+| no decomposition artifact across seeds and orderings | 24 pass, **12 fail** |
+| the exemption's claim (byte-identical tables) | 4 pass, **2 fail** |
+
+Same code, same `Project.toml`, only `LocalPreferences.toml` changed:
+
+| | acceptance rate over 3 seeds x 3 orderings | band (0.14, 0.23) |
+|---|---|---|
+| `threads` | 0.17061 .. 0.19137, mean **0.17933** | all inside; 65/65 pass |
+| `metal` | 0.33121 .. 0.36889, mean **0.34870** | all outside |
+
+**1.944x.** Not a marginal band excursion.
+
+### It is not a decomposition artifact, and that is the informative part
+
+Every failure in that testset is the **rate**. The two statistics that actually measure a
+checkerboard artifact both pass on Metal, across all nine runs:
+
+- Cramer's V (association between parity class and acceptance): **0.00873 .. 0.02382**, against
+  `V_MAX = 0.025`
+- max per-class deviation: **0.0223 .. 0.0503**, against `MAXDEV_MAX = 0.12`
+
+So the eight colour classes agree with **each other**. What differs is the global acceptance
+rate, inflated uniformly. That is the signature of a race, not of a broken decomposition.
+
+### The mechanism, stated as a reading of the source
+
+`cpm_color!` is order-independent in three of its four state interactions. The RNG is
+counter-based on `(seed, step, linear index)`, so draws do not depend on execution order. The
+checkerboard makes concurrently-updated sites spatially non-adjacent, so `lat` reads are
+race-free — the kernel's own comment says so. `dh` and `st` are per-site write-only.
+
+**`vols` is the exception.** `delta_H` *reads* `vols` for the volume-constraint term while
+`JACC.@atomic vols[sigma] -= 1` / `+= 1` mutate it. Two sites in one colour class are
+guaranteed spatially non-adjacent but **not** guaranteed to belong to different cell labels, so
+whether one site's ΔH sees another's volume update depends on interleaving. Atomic addition
+commutes for the final total; it does not make the intermediate reads deterministic. A ΔH
+computed against an under-counted volume is biased low, and a low ΔH is accepted more often —
+which is the direction observed.
+
+This is a reading of the source consistent with the measurement. It is **not** a proof that the
+`vols` read is the only contributor, and no attempt was made here to isolate it.
+
+### Testset 6 was declared uninterpretable before the run, and is
+
+`jacc_parity_tests.jl:235` asserts `Threads.nthreads() == 1` because its byte-identical table
+comparison "is interpretable only on the single-thread configuration it was measured on". That
+assertion **passes on Metal** — there is one Julia host thread — while thousands of work-items
+execute concurrently. One host thread does not serialize GPU execution.
+
+Its 2 failures are tables differing in single counts (76 vs 75, 117 vs 116). That is
+non-determinism, and it says nothing either way about the testset's actual claim — that
+acceptance does not read the gated biomass basis. **The result is recorded and is not evidence
+about the exemption.** The claim remains established on the CPU tier, which is unchanged.
+
+### What this does not establish
+
+No full-workload timing was produced. The CPU tests are unrelaxed and still pass 65/65. This
+says nothing about ROCm, where the decomposition was separately measured.
+
 ## Timing, and the comparison that is honest
 
 Both `parallel_for` kernels (`melanin_k!`, `nutrient_k!`) at N = 40, 200 iterations,
@@ -124,6 +201,16 @@ it costs 63x throughput in the JACC threads path. Worth knowing before anyone re
 JACC threads timing taken at the default and concludes the CPU path is slow.
 `JULIA_NUM_THREADS` is not exported anywhere in this environment, so 1 is what any
 unconfigured invocation gets.
+
+## The Float64 inventory is wider than previously recorded
+
+`docs/jacc_coupling_port.md:133-139` concedes a Float64 parameter side but names only
+`CPMParams`. Two more live in **the port's own file**: `RadiolysisParams`
+(`biofilms_potts_jacc.jl:266-288`, 12 of 14 fields `Float64`) and `RadiolysisState`
+(`:290-304`, every numeric field `Float64`, including three `Vector{Float64}`), stepped on host
+every MCS from `run_coupled`. "The JACC port is Float32 throughout" is wrong; the device-facing
+arrays are Float32 and the host radiolysis integrator is not. Metal's `Float64` refusal does
+not force their conversion unless they move to the device.
 
 ## The ANE
 
