@@ -306,7 +306,10 @@ were never wrong; only the lineage accounting was.
 
 `test_component_overlap.py` holds the accounting fixtures — single-frame lifespan, all-vanish
 frame, two- and three-into-one merges, split, competing overlap, and a transition mixing
-disappearance with merge. **26 checks.** Against the pre-repair implementation they report
+disappearance with merge. **22 checks across 7 scenarios** — counted by the harness, not
+hand-summed; an earlier footer asserted 26 from a mistyped block total. The closure assertions
+inside `overlap_history` also run on every fixture and raise rather than being counted.
+Against the pre-repair implementation they report
 `frames_seen == 1 -> 2`, `deaths == 1 -> 0`, and then a `KeyError` for a retirement counter
 that did not exist.
 
