@@ -234,20 +234,47 @@ frame while the total happens to stay 10. It intersects each component's voxel s
 every component's voxel set in the next frame, inherits lineage by largest shared volume,
 and records births, deaths, merges and splits.
 
-| | 26-connectivity | 6-connectivity |
+| over the whole record | 26-connectivity | 6-connectivity |
 |---|---|---|
 | distinct lineages ever | 21 | 24 |
+| births | 21 | 24 |
+| **disappeared** (no overlapping successor) | **0** | **0** |
+| **retired by merge** (overlapped, lost the claim) | **11** | **14** |
+| merges | 10 | 13 |
+| splits | 0 | 0 |
 | alive at MCS 100 | 10 | 10 |
 | of those, born before MCS 15 | **10** | **10** |
-| births after MCS 15 | **0** | **0** |
-| deaths after MCS 15 | **0** | **0** |
-| splits after MCS 15 | **0** | **0** |
-| merges after MCS 15 | 2 (at MCS 15) | 3 (at MCS 16, 17) |
+| churn within frames 16..100 | **0** | 3 |
 
-**The set is stable, not merely the count.** The same ten regions persist to the end of the
-record under both conventions, and the consolidation that produces them is **monotone by
-merge** — no region ever dies, and none ever splits, after MCS 15. The final state is
-adjacency-independent; only the frame at which it is reached is not.
+**A correction, and it matters.** An earlier revision of this table reported "deaths after
+MCS 15: 0" and the prose read "no region ever dies". `deaths` counted only predecessors with
+**no overlapping successor**. In a merge both predecessors overlap, so neither was a death —
+but only the largest claim is inherited, so the rest stopped existing and were counted
+nowhere. **11 of 11 retirements (26-conn) and 14 of 14 (6-conn) were invisible.** The
+conclusion survives and is now measured rather than inferred: nothing ever *disappears*, and
+every lineage that stops does so by merge.
+
+**The set is stable, not merely the count.** The same ten regions persist to the end under
+both conventions, and consolidation is **monotone by merge** — nothing disappears, nothing
+splits. The final state is adjacency-independent; the frame at which it is reached is not.
+Under 26-connectivity the transition **into** frame 15 retires 3 lineages (13 → 10) and
+nothing changes thereafter; under 6-connectivity the consolidation completes at frame 17,
+which is the churn of 3 within frames 16..100.
+
+**What this measures.** Persistence under **largest-overlap greedy inheritance** — not
+material identity. Lineage integers from the two adjacency analyses are **not** the same
+histories: with an identical final mask 6-connectivity refines 26-connectivity, so equal final
+counts imply the same final partition, but say nothing about prior lineage assignments.
+
+`component_overlap_v1_superseded.json` is retained as historical evidence of what was
+published. Its `counts_by_mcs` are **identical** to the corrected run — the component counts
+were never wrong; only the lineage accounting was.
+
+`test_component_overlap.py` holds the accounting fixtures — single-frame lifespan, all-vanish
+frame, two- and three-into-one merges, split, competing overlap, and a transition mixing
+disappearance with merge. **26 checks.** Against the pre-repair implementation they report
+`frames_seen == 1 -> 2`, `deaths == 1 -> 0`, and then a `KeyError` for a retirement counter
+that did not exist.
 
 `vti_read.py` is a read-only `.vti` reader in numpy alone — the exporter writes uncompressed
 appended binary, so no VTK is needed. That is deliberate: an audit of the renderer's output
