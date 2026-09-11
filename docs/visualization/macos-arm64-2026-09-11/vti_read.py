@@ -19,6 +19,15 @@ def read_vti(path):
     nx, ny, nz = ext[1] - ext[0], ext[3] - ext[2], ext[5] - ext[4]   # CELL counts
     marker = raw.index(b"_", raw.index(b"<AppendedData")) + 1
 
+    # Geometry attributes. These were parsed by nobody, so a caller could not compare a
+    # source frame's declared Origin/Spacing against what it was about to write -- and a
+    # writer that hard-codes 0/1 would silently relabel a frame declaring anything else.
+    # Returned under reserved `_vti_*` keys: they come from the reader, not from the
+    # file's own <FieldData>.
+    def _triple(name, default):
+        m = re.search(name + r'="([^"]+)"', head)
+        return tuple(float(v) for v in m.group(1).split()) if m else default
+
     arrays = {}
     for m in re.finditer(r'<DataArray type="(\w+)" Name="(\w+)"[^>]*offset="(\d+)"', head):
         dtype, name, off = _DT[m.group(1)], m.group(2), int(m.group(3))
@@ -43,4 +52,7 @@ def read_vti(path):
             n = int(np.frombuffer(raw, np.uint64, count=1, offset=marker + off)[0])
             fields[m.group(2)] = np.frombuffer(raw, dtype, count=n // dtype().itemsize,
                                                offset=marker + off + 8)[0]
+    fields["_vti_origin"] = _triple("Origin", None)
+    fields["_vti_spacing"] = _triple("Spacing", None)
+    fields["_vti_whole_extent"] = tuple(ext)
     return arrays, fields, (nx, ny, nz)

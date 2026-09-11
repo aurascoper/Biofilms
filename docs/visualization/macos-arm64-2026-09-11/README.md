@@ -395,30 +395,44 @@ Trap 3 is why `vti_read.py` now strips the terminator: it had been decoding `uni
 arrays, and `component_overlap.json` is byte-for-byte unchanged across it — checked, not
 assumed.
 
-### Five refusals, each demonstrated
+### The refusals, each demonstrated
 
-The writer originally had none of these. All were latent on the shipped defaults
-(`--days 20 --step 0.5`, where 20/0.5 is exact), and all are reachable.
+The writer originally had none of these.
 
 | Refusal | What it replaces |
 |---|---|
-| the frame's embedded `mcs` must equal `--mcs` | `fields` was bound to `_`, so the receipt recorded the **command line** rather than a reading of the data |
-| `--days` must be an integer multiple of `--step` | `int(days/step)+1` truncated when the quotient landed just under an integer -- `int(0.3/0.1) == 2` dropped the requested endpoint **while the log printed "0 to 0.3"** |
-| the destination must hold no artifacts for this stem | unconditional truncating writes; a re-run with a shorter `--days` also left the prior run's tail frames on disk under the same glob |
-| declared coordinate conventions must match | origin and spacing were hard-coded with no check |
-| the source frame must exist | implicit |
+| the frame's embedded `mcs` must equal `--mcs` **exactly and integrally** | `int(round(emb)) != frozen_mcs` accepted a frame declaring `mcs = 0.25` as MCS 0 — `round()` masked the disagreement it existed to detect |
+| declared **Origin and Spacing** must match what the writer emits | only `coordinate_index_base` was compared, which is not geometry; the reader did not return Origin/Spacing at all, so a frame declaring `Origin 10,20,30 / Spacing 2,3,4` was silently relabelled to `0,0,0 / 1,1,1` |
+| the source must be a **registered artifact whose bytes match the manifest** | the receipt recorded the source's own sha256, which captures what was read rather than validating it |
+| with `--receipt`, `derived_manifest.json` must match a **frozen** hash | a manifest beside its own data is not an authority — a consistently tampered clone regenerates it for free |
+| the **output directory must be empty** | an earlier revision refused only artifacts beginning with the stem, while its own comment claimed to refuse any existing run destination; a directory holding a different run was accepted and written into |
+| `--days` an integer multiple of `--step`; `--step` finite and positive; `--days` finite and non-negative | `int(days/step)+1` truncated the requested endpoint, and neither argument was validated |
+| emitted timesteps **unique and strictly increasing** | six-decimal rounding made `--days 0.000002 --step 0.0000004` write six distinct files advertising `[0, 0, 1e-6, 1e-6, 2e-6, 2e-6]` — a `.pvd` with duplicate timesteps and no complaint |
 
-Filenames are the **frame index** now, not the formatted time. `%07.2f` cannot separate frames
-finer than 0.01 d, so at `--step 0.004` two `.pvd` entries named one file and the later frame
-overwrote the earlier while the `.pvd` still advertised both timesteps.
+Filenames are the **frame index**, not the formatted time, so a name can never collide.
 
-Demonstrated: a frame named `signal_mcs000050.vti` carrying `mcs = 100.0` is refused; a second
-run onto the same stem exits 1; `--days 1.0 --step 0.3` is refused; `--days 0.3 --step 0.1`
-emits **4** frames including the endpoint (was 3); `--step 0.004` produces 4 **distinct** files.
+### Demonstrated
 
-The receipt binds by content, not by name: sha256 of the source frame, of every `.vti`, and of
-the `.pvd`, plus the source's own `git_sha` and `parent_manifest_sha256` -- all of which the
-reader was already returning and the writer was discarding.
+| probe | result |
+|---|---|
+| frame declaring `mcs = 0.25`, `--mcs 0` | refused — "must sit at an integer MCS" |
+| frame declaring `Origin 10,20,30 / Spacing 2,3,4` | refused, naming both the declared and emitted values |
+| one bit flipped in the source frame | refused — does not match its manifest hash |
+| **consistent tamper** (bytes *and* manifest regenerated) | **accepted unpinned; refused with `--receipt`** |
+| output directory containing one unrelated file | refused |
+| `--step 0` | refused |
+| `--receipt /nope.json` | refused |
+| `--days 0.3 --step 0.1` | 4 frames, endpoint included (was 3) |
+| `--days 0.000002 --step 0.0000004` | 6 frames, **6 distinct strictly-increasing timesteps** |
+| `--step 1e-15` | refused — finer than the emitted representation |
+
+The consistent-tamper row is the same clone-safe property the verifiers carry, now in the
+writer: an unpinned run trusts the manifest sitting beside the data, and a manifest beside its
+own data is exactly what a tamperer rewrites.
+
+The receipt binds by content, not by name: sha256 of the source frame, of every `.vti` and of
+the `.pvd`, the source's `git_sha` and `parent_manifest_sha256`, the manifest hash it was
+validated against, the receipt that pinned it, and the declared Origin/Spacing.
 
 The `.vti` frames are regenerable and not committed; `decay_reference_receipt.json` carries the
 per-frame metrics and the hashes.
