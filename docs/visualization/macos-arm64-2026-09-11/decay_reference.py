@@ -32,16 +32,27 @@ import sys, os, json, math, hashlib
 import numpy as np
 from vti_read import read_vti
 
-# Pinned constant. The plan carried two values -- 6.6443 d in its sourced-constants
-# section and 6.647 d in the decay equation. They are not interchangeable, and the plan's
-# own decay constant settles it: ln2 / (6.6443 d * 86400 s/d) = 1.207431e-6 1/s, which
-# matches the pinned lambda to six figures, while 6.647 d gives 1.206941e-6 and does not.
-# 6.647 d is a stale figure. CONFIRM against LNHB/CEA or NNDC/ENSDF before any use that
-# depends on the last digits; this arithmetic is a consistency check, not a source.
+# SOURCED. LNHB/DDEP evaluated table, reference "CEA/LNE-LNHB - 2025", evaluators
+# M.A. Kellett and X. Mougeot (LNE-LNHB, Palaiseau). Retrieved 2026-09-11 and committed at
+# sources/Lu-177.lara.txt, sha256
+# 5e68ccb03fedb7087677594bcc2ecc15d89fb285947f314bad4c467af27e45a8. See sources/PROVENANCE.md.
+#
+#   Half-life (d)        ; 6.6443     ; 0.0009
+#   Decay constant (1/s) ; 1.20743E-6 ; 0.00016E-6
+#   Daughter(s) ; (B-) ; Hf-177 ; 100
+#
+# An earlier revision chose 6.6443 d because it was the self-consistent partner of the
+# plan's lambda, and carried a standing confirmation requirement saying so -- the plan gave
+# 6.647 d in its decay equation, which is NOT the evaluated value. Both figures are now
+# taken from the table rather than inferred, and lambda is the table's value rather than
+# recomputed from the half-life.
 T_HALF_DAYS = 6.6443
 T_HALF_UNCERTAINTY_DAYS = 0.0009
-LAMBDA_PER_S = math.log(2) / (T_HALF_DAYS * 86400.0)
-DAUGHTER = "stable"
+LAMBDA_PER_S = 1.20743e-6
+LAMBDA_UNCERTAINTY_PER_S = 0.00016e-6
+SOURCE = "LNHB/DDEP CEA/LNE-LNHB - 2025 (Kellett & Mougeot); sources/Lu-177.lara.txt"
+SOURCE_SHA256 = "5e68ccb03fedb7087677594bcc2ecc15d89fb285947f314bad4c467af27e45a8"
+DAUGHTER = "Hf-177, stable (B- 100%)"
 
 NOTE = ("would be Lu-177 if the evidence audit and the source term land; "
         "the material path is elemental, not isotopic, and no isotope identity "
@@ -310,9 +321,12 @@ def main(argv):
                "half_life_days": T_HALF_DAYS,
                "half_life_uncertainty_days": T_HALF_UNCERTAINTY_DAYS,
                "lambda_per_s": LAMBDA_PER_S, "daughter": DAUGHTER,
-               "half_life_provenance": "CONFIRM against LNHB/CEA or NNDC/ENSDF. Chosen as "
-                                       "the value consistent with the pinned lambda "
-                                       "1.20743e-6 1/s; 6.647 d is inconsistent with it.",
+               "lambda_uncertainty_per_s": LAMBDA_UNCERTAINTY_PER_S,
+               "half_life_source": SOURCE,
+               "half_life_source_sha256": SOURCE_SHA256,
+               "half_life_provenance": "SOURCED, audit closed 2026-09-11. Half-life and "
+                                       "decay constant are both taken from the evaluated "
+                                       "table, not inferred from each other.",
                "a0": "HYPOTHETICAL INPUT: uniform over %d occupied interior voxels, sums to 1"
                      % n_occ,
                "computes": "decay only", "does_not_compute": ["binding", "dose", "transport"],

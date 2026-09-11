@@ -358,19 +358,34 @@ answerable. The `.pvd` time key is **days**, and it is not MCS.
 interior voxels of the frozen frame, normalized to sum to 1 — chosen for being obviously
 arbitrary. No measurement supports it, and the receipt says so in the artifact itself.
 
-### The half-life: two values circulate and only one is self-consistent
+### The half-life: audit closed, sourced
 
-| t½ | implied λ | matches the pinned λ = 1.20743e-6 /s |
-|---|---|---|
-| **6.6443 d** | 1.207431e-06 /s | **yes, to six figures** |
-| 6.6453 d | 1.207250e-06 /s | no |
-| 6.647 d | 1.206941e-06 /s | no |
+`sources/Lu-177.lara.txt` is the LNHB/DDEP evaluated table, retrieved 2026-09-11, committed,
+and pinned by sha256 in both the code and `sources/PROVENANCE.md`. Verbatim:
 
-`6.6443 d` is used. **This arithmetic is a consistency check, not a source** — confirm
-against LNHB/CEA or NNDC/ENSDF before anything depends on the last digits. Naming the
-isotope is legitimate for this constant and nothing else; the file, fields and receipt say
-*decay reference*, and the repository's source-term gate and elemental material path are
-undisturbed.
+```
+Half-life (d)        ; 6.6443     ; 0.0009
+Decay constant (1/s) ; 1.20743E-6 ; 0.00016E-6
+Daughter(s) ; (B-) ; Hf-177 ; 100
+Reference ; CEA/LNE-LNHB - 2025
+```
+
+Version **CEA/LNE-LNHB - 2025**, evaluators M.A. Kellett and X. Mougeot (LNE-LNHB, Palaiseau).
+
+An earlier revision used 6.6443 d because it was the self-consistent partner of the plan's
+decay constant — the plan gave **6.647 d** in its decay equation, and only 6.6443 d reproduces
+the stated λ. That was arithmetic, and the code carried a standing confirmation requirement
+saying so. **Both values are now read from the table rather than inferred**, λ is the table's
+figure rather than recomputed, and the uncertainties (±0.0009 d, ±0.00016e-6 /s) are carried
+for the first time. **6.647 d is not the evaluated value.**
+
+The audit also confirmed the plan's Phase 1b constants, which had been pinned from memory:
+γ 112.95005 keV at 6.223 ± 0.032 % and 208.3661 keV at 10.425 ± 0.035 %; `Q- ; 496.8` against
+a stated β⁻ Emax of 497 keV; and the daughter, Hf-177, stable.
+
+**A sourced constant is not an isotope identity.** The source-term gate stands, the material
+path is still elemental rather than isotopic, and this file still computes no binding and no
+dose. `a0(x)` remains a declared hypothetical.
 
 Verified: 41 frames, 0 to 20 d in 0.5 d steps; `max |Σa(x,t) − 2^(−t/T)| = 1.1e-16`; total
 activity at t=0 is exactly 1.0; ParaView reads 41 timesteps and all 14 field-data entries.
