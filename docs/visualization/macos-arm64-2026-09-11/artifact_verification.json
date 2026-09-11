@@ -9,7 +9,7 @@
     {
       "check": "pvd exists",
       "pass": true,
-      "observed": "../evidence/biofilm-signal-evidence/inert_signal/paraview/signal_trajectory.pvd"
+      "observed": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal/paraview/signal_trajectory.pvd"
     },
     {
       "check": "pvd has a <Collection> element",
@@ -44,7 +44,7 @@
     {
       "check": "derived manifest exists",
       "pass": true,
-      "observed": "../evidence/biofilm-signal-evidence/inert_signal/derived_manifest.json"
+      "observed": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal/derived_manifest.json"
     },
     {
       "check": "receipt file exists and is non-empty",

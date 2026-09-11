@@ -132,6 +132,21 @@ bundle and run anywhere.
 `verify_artifacts.py` checks the **data**; `verify_state.py` checks the **saved state**.
 Pinned baselines against the real evidence: **16** and **20** checks, 0 failures.
 
+Both now share one receipt contract: a supplied `--receipt` must load **and** carry the four
+required pinned keys, or the run exits 2. `verify_state.py` previously loaded the receipt only
+`if os.path.isfile(...)` with no `else`, and printed nothing about pinning — so a typo'd path
+ran unpinned and produced output byte-identical to a deliberate unpinned run. Each run now
+declares its mode: `pinned` (trusted-identity) or `self-consistency`, in the log and in
+`state_verification.json`. Unpinned is 18 checks; pinned is 20.
+
+Two adjacent repairs in the same pass: `verify_state.py` establishes every proxy's presence
+**before** reading any property on it (it used to read `thr_sp.LowerThreshold` immediately
+after the presence check and abort only later, turning a missing filter into an
+`AttributeError` instead of a reported failure); and `animate_4d.py` now parses `config.toml`
+as TOML and **refuses** a missing or undeclared threshold. Its regex form did
+`if m and abs(...) > tol: raise` and then printed "threshold reconciled" unconditionally — so
+a non-matching regex claimed a reconciliation it had not performed.
+
 | # | Control | Result |
 |---|---|---|
 | — | baseline: unmutated clone | **0 failures** — the controls below are measured against this |
@@ -139,7 +154,7 @@ Pinned baselines against the real evidence: **16** and **20** checks, 0 failures
 | 1 | timestep 50.0 removed from the `.pvd` | **fires** — 4 failures (100 entries, incomplete 0..100, self-consistency, frozen pvd hash) |
 | 2 | timestep 50.0 duplicated | **fires** — 4 failures (102 entries, 101 unique of 102, self-consistency, frozen pvd hash) |
 | 3 | one bit flipped in `signal_mcs000050.vti` | **fires** — 1 failure (208/209 hashes, names the altered file) |
-| 4a | signal LUT narrowed 0–9 → 0–5 without re-render | **fires** — 1 failure (`signal LUT range 0..9 -> 0.0..5.0`) |
+| 4a | signal LUT narrowed 0–9 → 0–5 without re-render | **fires** — 1 failure (`signal LUT range 0..9 -> 0.0..5.0`) — see the correction below |
 | 4b | ray tracing switched on without re-rendering | **not implementable against the state** — see below |
 | 5 | **consistent tamper**: data + manifest + receipt all regenerated | **fires only when pinned** — unpinned **0 failures** (the hole), pinned **1 failure** (the fix) |
 
@@ -149,6 +164,25 @@ result includes a pass: unpinned it must pass, or the hole it documents is not r
 Controls 0, 1 and 2 report **4** failures where an earlier revision said 3. Not drift — the
 pinned `.pvd` hash is a new failure mode catching the same tamper by a second, independent
 route.
+
+**A third, found later, and the most instructive: the LUT control fired without ever
+performing its mutation.** It used a regex over the serialized state,
+`(<Property name="RGBPoints".*?)(9)(\b)` with `re.S`. That is leftmost-first and lazy, so in a
+1024-element Viridis table it matched the `9` in `<Element index="9" .../>` — an **index
+attribute**, eight elements in — and rewrote it to `index="5"`, producing a duplicate index
+and destroying index 9. The array was mangled, the verifier reported
+`signal LUT range 0..9 -> 0.0..0.004874`, and the control counted one failure and looked
+healthy. An earlier revision of the table above printed `0.0..5.0`, **a value no stored run
+produced**; the committed receipt said `0.004874` the whole time.
+
+The control now mutates through the parsed document, asserts the element it changed was at
+`x = 9.0` before and `x = 5.0` after, and produces the `0.0..5.0` the label always claimed.
+`sub_once` asserts a *count*; a count cannot tell you the edit landed on the right element.
+
+**Control 5 also asserted only half its contract.** Its expectation is "unpinned PASSES, pinned
+FAILS", but the verdict read `"FIRES" if nf_p else …` — the unpinned result fed a display
+string and nothing else. A regression that broke the unpinned tier, or closed the hole the
+control exists to document, would have left it green. It now requires `nf_u == 0 and nf_p`.
 
 **Two harness bugs caught while building these, both worth recording.**
 

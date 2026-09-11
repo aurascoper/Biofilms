@@ -25,6 +25,7 @@ usage: controls.py <inert_signal_dir> [--receipt <render_manifest.json>]
                    [--with-state] [--state <pvsm>] [--out <dir>]
 """
 import sys, os, json, shutil, hashlib, subprocess, tempfile, re
+import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PVPYTHON = "/Applications/ParaView-6.1.1.app/Contents/bin/pvpython"
@@ -161,7 +162,10 @@ def control_consistent_tamper(root, receipt, wd):
     regenerate_manifest(c)
     rc_u, nf_u, log_u = run_artifacts(c, None, wd)          # unpinned: expected to PASS
     rc_p, nf_p, log_p = run_artifacts(c, receipt, wd)       # pinned:   must FAIL
-    verdict = "FIRES" if nf_p else "DID-NOT-FIRE"
+    # Both halves of the stated contract, not one. nf_u used to feed only the display
+    # string, so a regression that broke the unpinned tier -- or closed the hole this
+    # control exists to document -- would have left the control green.
+    verdict = "FIRES" if (nf_u == 0 and nf_p) else "DID-NOT-FIRE"
     return ("5: consistent tamper (data + manifest + receipt all regenerated)",
             "unpinned PASSES (the hole), pinned FAILS (the fix)",
             "unpinned %s failures / pinned %s failures" % (nf_u, nf_p),
@@ -187,12 +191,43 @@ def control_state_lut(root, receipt, wd):
     if not (STATE and os.path.isfile(STATE)):
         raise FileNotFoundError("no .pvsm: pass --state <biofilm_signal_views.pvsm>")
     shutil.copy(STATE, state)
-    # Narrow the signal LUT 0..9 -> 0..5 without re-rendering. The rendered frames
-    # would then no longer correspond to the state that claims to have produced them.
-    text = open(state).read()
-    m = re.search(r'(<Property name="RGBPoints".*?)(9)(\b)', text, re.S)
-    assert m, "control could not locate the signal LUT upper bound in the state"
-    sub_once(state, re.escape(m.group(0)), (m.group(1) + "5" + m.group(3)).replace("\\", "\\\\"), expect=1)
+    # Narrow the signal LUT 0..9 -> 0..5 without re-rendering. The rendered frames would
+    # then no longer correspond to the state that claims to have produced them.
+    #
+    # This used to be a regex over the serialized XML:
+    #     re.search(r'(<Property name="RGBPoints".*?)(9)(\b)', text, re.S)
+    # which is leftmost-first and lazy, so it matched the `9` in `<Element index="9"/>` --
+    # an INDEX ATTRIBUTE, eight elements into a 1024-element Viridis table. Rewriting it to
+    # index="5" produced a duplicate index and no index 9, mangling the array. The control
+    # fired (the verifier read 0.0..0.004874) and so looked healthy, but it never performed
+    # the mutation its label claims, and README.md reported a 0.0..5.0 that no run produced.
+    #
+    # Mutate through the parsed document and assert WHERE the change landed. sub_once
+    # asserts a count; a count cannot tell you the edit hit the right element.
+    tree = ET.parse(state)
+    target, before = None, None
+    for prop in tree.iter("Property"):
+        if prop.get("name") != "RGBPoints":
+            continue
+        els = prop.findall("Element")
+        if len(els) < 8 or len(els) % 4:
+            continue
+        x_last = els[-4]                      # points are (x, r, g, b); -4 is the last x
+        if abs(float(x_last.get("value")) - 9.0) < 1e-9:
+            target, before = x_last, float(x_last.get("value"))
+            break
+    assert target is not None, ("control could not locate a RGBPoints property whose last "
+                                "point sits at x=9.0 -- the signal LUT upper bound")
+    target.set("value", "5")
+    tree.write(state)
+
+    # Re-read from disk and confirm the intended element, and only it, changed.
+    check = ET.parse(state)
+    hits = [e for pr in check.iter("Property") if pr.get("name") == "RGBPoints"
+            for e in [pr.findall("Element")] if len(e) >= 8 and len(e) % 4 == 0
+            for e in [e[-4]] if abs(float(e.get("value")) - 5.0) < 1e-9]
+    assert hits, "LUT mutation did not land on a last-x element"
+    assert before == 9.0, "control mutated an element that was not at x=9.0"
     rc, nf, log = run_state(state, receipt, wd)
     return ("4a: signal LUT narrowed 0..9 -> 0..5 without re-render", ">=1 failure",
             "%s failures" % nf,
