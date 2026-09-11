@@ -1,0 +1,231 @@
+{
+    "configuration_file": "benchmark.toml",
+    "julia_version": "1.12.6",
+    "controls": [
+        {
+            "question": "at equal integrated capacity at every comparison time, does the spatial arrangement of capacity change the trajectory?",
+            "detail": {
+                "max_abs_dissolved_difference": 49.19002695092786,
+                "comparison_times": [
+                    0,
+                    5,
+                    10,
+                    15,
+                    20,
+                    25,
+                    30,
+                    35,
+                    40,
+                    45,
+                    50
+                ],
+                "max_relative_bound_difference": 0.018898053243576844,
+                "bound_and_dissolved_differences_mirror": true,
+                "uniform_capacity": 2.310055496143838,
+                "note": "capacity integrals agree at every comparison time, so the difference below is attributable to arrangement, not amount",
+                "max_abs_bound_difference": 49.19002695073959,
+                "capacity_integral_uniform": 7017.9485972849625,
+                "capacity_integral_local": 7017.948597284981,
+                "max_relative_capacity_mismatch": 2.591910411326702e-15,
+                "max_abs_total_inventory_difference": 1.2223608791828156e-9
+            },
+            "verdict": "MEASURED",
+            "control": "K1 matched total capacity"
+        },
+        {
+            "question": "with the modulation switched off, do the local and uniform runs coincide exactly rather than approximately?",
+            "detail": {
+                "dissolved_identical": true,
+                "capacity_fields_identical": true,
+                "bound_identical": true,
+                "final_bound": 1377.2558676091016
+            },
+            "verdict": "PASS",
+            "control": "K2 dB = 0 reduction"
+        },
+        {
+            "question": "does the integrated bound pool approach b_eq + (b0 - b_eq) exp(-q_bind t) at first order in dt?",
+            "detail": {
+                "exact_at_T": 0.6135527256945411,
+                "observed_order": [
+                    0.9899880611582667,
+                    0.995093691332785
+                ],
+                "scheme_note": "clamp_dissolved = true is an open system; the production run never uses it",
+                "b_eq": 0.625,
+                "dt": [
+                    0.5,
+                    0.25,
+                    0.125
+                ],
+                "q_bind": 0.08,
+                "abs_error": [
+                    0.0009033247061779326,
+                    0.0004548076768828846,
+                    0.0002281785085553878
+                ]
+            },
+            "verdict": "PASS",
+            "control": "K3 analytical binding limit"
+        },
+        {
+            "question": "with every reaction and loss rate zero, is the dissolved inventory conserved and does the discrete maximum principle hold?",
+            "detail": {
+                "relative_change": 1.3022718738354964e-14,
+                "final_inventory": 3038.0000000000396,
+                "maximum_principle_held": true,
+                "spread_initial": 1,
+                "spread_final": 0.40311252585667356,
+                "initial_inventory": 3038,
+                "transport_residual": -7.647892704806704e-14,
+                "closure_residual": 3.956301952712238e-11,
+                "interior_mean": 0.06051792828685338,
+                "bound_inventory": 0
+            },
+            "verdict": "PASS",
+            "control": "K4 pure diffusion limit"
+        },
+        {
+            "question": "with transport and binding off, does the field follow the exact discrete sequence c0 (1 - lambda dt)^n, and is that the same thing as being accurate?",
+            "detail": {
+                "discretisation_error_vs_continuum": 0.0007602232219054983,
+                "note": "dt <= 1/lambda is a positivity condition. At dt = 1/lambda the scheme returns exactly zero against a continuum value of 1/e.",
+                "continuum": 0.6065306597126334,
+                "max_abs_deviation_from_discrete": 1.1102230246251565e-16,
+                "predicted_discrete": 0.6057704364907279
+            },
+            "verdict": "PASS",
+            "control": "K5 pure decay limit"
+        },
+        {
+            "question": "over the production run, does either pool go negative, and does the bound pool ever exceed the local capacity?",
+            "detail": {
+                "max_b_minus_B_final": 0,
+                "min_bound": 0,
+                "min_dissolved": 0.19989537372670685,
+                "max_overshoot_before_release": 0
+            },
+            "verdict": "PASS",
+            "control": "K6 positivity and 0 <= b <= B"
+        },
+        {
+            "question": "when capacity is cut mid-run, is the overflow moved to the dissolved pool rather than created or destroyed?",
+            "detail": {
+                "dropped": 0,
+                "max_b_minus_B_final": 0,
+                "closure_residual_relative": 1.0145757629339439e-15,
+                "closure_residual": 5.093170329928398e-11,
+                "capacity_factor": 0.25,
+                "step_of_decrease": 50,
+                "released": 639.5826181412945
+            },
+            "verdict": "FIRES",
+            "control": "K7 conservative release under a forced capacity decrease"
+        },
+        {
+            "question": "with the release credited nowhere, does the ledger report the loss instead of absorbing it?",
+            "detail": {
+                "dropped": 639.5826181412945,
+                "residual_plus_dropped": -5.95719029661268e-11,
+                "expected": "closure_residual == -dropped",
+                "note": "this is the red case. A PASS here would mean the identity had been written to include the term that records the defect.",
+                "closure_residual_relative": -0.012740689604409442,
+                "closure_residual": -639.582618141354,
+                "released": 0
+            },
+            "verdict": "FIRES",
+            "control": "K8 the same transfer, deliberately omitted"
+        },
+        {
+            "question": "does the bound inventory at T converge, and at what observed order?",
+            "detail": {
+                "observed_order": 1.001290460139438,
+                "differences": [
+                    3.196333106278871,
+                    1.5967376661769777
+                ],
+                "dt": [
+                    0.5,
+                    0.25,
+                    0.125
+                ],
+                "final_bound": [
+                    2593.6632659603665,
+                    2590.4669328540876,
+                    2588.8701951879107
+                ]
+            },
+            "verdict": "PASS",
+            "control": "K9 timestep refinement"
+        },
+        {
+            "question": "reported apart, because one number cannot answer both questions",
+            "detail": {
+                "of_inventory_denominator": 30409.675911834533,
+                "of_capacity_denominator": 7017.948597284981,
+                "ratio": 4.333128903736778,
+                "bound_fraction_of_inventory": 0.0852907236986038,
+                "bound_fraction_of_capacity": 0.36957570007904755
+            },
+            "verdict": "MEASURED",
+            "control": "K10 both bound-fraction denominators"
+        },
+        {
+            "question": "does the inventory read off the fields agree with the inventory the step terms booked, with nothing obtained by differencing?",
+            "detail": {
+                "initial_bound": 0,
+                "external_input": 0,
+                "bound_pool_identity": "I_b = I_b(0) + bound_transfer - decayed_from_bound - released - dropped",
+                "transport_residual": -1.4936593927309335e-12,
+                "chemostat_input": 0,
+                "decayed_from_bound": 1070.0551002920852,
+                "initial_dissolved": 50200,
+                "final_bound": 2593.6632659603665,
+                "final_dissolved": 27816.012645874165,
+                "dropped": 0,
+                "decayed_from_dissolved": 18720.268987873354,
+                "closure_residual_relative": -5.797575788193965e-16,
+                "closure_residual": -2.9103830456733704e-11,
+                "bound_transfer": 3663.7183662524576,
+                "released": 0,
+                "bound_pool_residual": -5.9117155615240335e-12
+            },
+            "verdict": "PASS",
+            "control": "K11 ledger closure from independent accumulators"
+        },
+        {
+            "question": "is the bound enforced on the frozen geometry, or only documented?",
+            "detail": {
+                "declared_dt": 0.5,
+                "attempted_dt": 1.3514864864864864,
+                "rate": 0.7400000000000001,
+                "bound": 1.351351351351351,
+                "refused": true,
+                "declared_margin": 0.37000000000000005
+            },
+            "verdict": "FIRES",
+            "control": "K12 the derived restriction refuses a step above the bound"
+        }
+    ],
+    "diagnostic": "closed diffusion-and-binding benchmark, control set",
+    "code_sha256": {
+        "test_numerics.jl": "d8e8f487756751dd6d30d02b06a826d32cdd0aaf325bff9611d55d3266c661bf",
+        "mutation_controls.jl": "2ef54b87d121726712b56b94602bf80eeec91f2e51c71cdafdd2994464b241db",
+        "BindingBenchmark.jl": "fc78bdfb3eea457004ec6f7aeb70b2c469898307ab91bbe1134a8bf37ba077d0",
+        "setup.jl": "49a8adf520b4e2353b9e99251755dc7fef00dd63c4b23ddefd78f22753c26509",
+        "run.jl": "dfe89be4dbed038626c33294ec725c00ebf91bd879aac58ff772e0efc24a18b5",
+        "benchmark.toml": "b66ac8be5c68552594d5b7201b1f7d06448be3b1da3491c5c213cd817073718e",
+        "controls.jl": "7cf17ad4535ee6894beb576a1ae3e77822bbbf77189cc93ae04be60677fb82f5"
+    },
+    "created_utc": "2026-09-11T15:07:25.406Z",
+    "parent": {
+        "snapshot_sha256": "bff6f61d5345fb82f863cdde8d8397e2d15e39d12b17012bb08821fd2fa42d9b",
+        "run_id": "manuscript42_seed42_8cbb8ee",
+        "mcs": 0,
+        "manifest_sha256": "f00e470afd982620a15def3a2e0624eb50f1ad7c09b3ef063b219c185d91c7fe",
+        "snapshot": "snapshots/snap_mcs000000.h5"
+    },
+    "expected_red": [
+        "K8 the same transfer, deliberately omitted"
+    ]
+}
