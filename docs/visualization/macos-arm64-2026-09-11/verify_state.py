@@ -7,11 +7,34 @@ state = sys.argv[1]
 # it bound the .pvd to "the manifest that governs the bundle it sits in", which a
 # consistently tampered clone rewrites for free. --receipt pins to render_manifest.json,
 # which lives beside the renderers, not beside the data.
+# Same contract as verify_artifacts.py:receipt_policy -- fail-closed on a BAD --receipt.
+# This used to be `if os.path.isfile(_rp): RECEIPT = ...` with no else, so a typo'd path
+# silently ran UNPINNED and, because nothing was printed, produced output byte-identical
+# to a deliberate unpinned run. A typo that downgrades the trust model is the exact bug
+# class the pinning exists to close.
+_REQUIRED = ("derived_manifest_sha256", "parent_manifest_sha256", "pvd_sha256", "artifact_count")
 RECEIPT = None
 if "--receipt" in sys.argv:
     _rp = sys.argv[sys.argv.index("--receipt") + 1]
-    if os.path.isfile(_rp):
-        RECEIPT = json.load(open(_rp))["pinned"]
+    if not os.path.isfile(_rp):
+        print("receipt policy: [fail] --receipt given but not readable: %s" % _rp)
+        print("  refusing to fall back to the manifest beside the data")
+        sys.exit(2)
+    try:
+        _pin = json.load(open(_rp))["pinned"]
+    except Exception as _e:
+        print("receipt policy: [fail] --receipt could not be parsed: %s: %s"
+              % (type(_e).__name__, _e))
+        sys.exit(2)
+    _missing = [k for k in _REQUIRED if k not in _pin]
+    if _missing:
+        print("receipt policy: [fail] receipt is missing required keys: %s" % _missing)
+        sys.exit(2)
+    RECEIPT = _pin
+    print("receipt policy: [ok] pinned against frozen receipt (trusted-identity mode)")
+else:
+    print("receipt policy: [warn] UNPINNED (self-consistency mode): the .pvd is checked "
+          "against the manifest beside the data, which a consistently tampered clone rewrites")
 LoadState(state)
 fails, checks = [], []
 def ck(name, cond, got):
@@ -50,23 +73,28 @@ ck("101 timesteps", len(ts) == 101, len(ts))
 ck("timesteps are exactly {0..100}", set(ts) == set(float(i) for i in range(101)),
    f"{min(ts) if ts else 'EMPTY'}..{max(ts) if ts else ''}, {len(set(ts))} unique")
 
+# Presence of every proxy is established BEFORE any property on it is read. The checks
+# used to read thr_sp.LowerThreshold immediately after the presence check and only abort
+# further down, so a missing filter raised AttributeError instead of reporting a failure.
 thr_sp = by_kind.get("Species_1to7")
+thr_in = by_kind.get("Interior_mask_1")
+sl = by_kind.get("Signal_slice")
 ck("Species_1to7 filter present", thr_sp is not None, thr_sp is not None)
+ck("Interior_mask_1 filter present", thr_in is not None, thr_in is not None)
+ck("Signal_slice filter present", sl is not None, sl is not None)
+if None in (thr_sp, thr_in, sl):
+    json.dump({"state": state, "mode": "pinned" if RECEIPT else "self-consistency",
+               "checks": checks, "failures": fails},
+              open(os.path.join(os.path.dirname(state) or ".", "state_verification.json"), "w"), indent=2)
+    print("\n%d checks, %d failures (aborted: a required filter is missing)" % (len(checks), len(fails)))
+    sys.exit(1)
+
 ck("species threshold 1..7", thr_sp.LowerThreshold == 1 and thr_sp.UpperThreshold == 7,
    f"{thr_sp.LowerThreshold}..{thr_sp.UpperThreshold}")
 ck("species threshold on CELLS/species", list(thr_sp.Scalars) == ["CELLS", "species"], list(thr_sp.Scalars))
 
-thr_in = by_kind.get("Interior_mask_1")
-ck("Interior_mask_1 filter present", thr_in is not None, thr_in is not None)
 ck("interior_mask threshold 1..1", thr_in.LowerThreshold == 1 and thr_in.UpperThreshold == 1,
    f"{thr_in.LowerThreshold}..{thr_in.UpperThreshold}")
-sl = by_kind.get("Signal_slice")
-ck("Signal_slice filter present", sl is not None, sl is not None)
-if None in (thr_sp, thr_in, sl):
-    json.dump({"state": state, "checks": checks, "failures": fails},
-              open(os.path.join(os.path.dirname(state), "state_verification.json"), "w"), indent=2)
-    print("\n%d checks, %d failures (aborted: a required filter is missing)" % (len(checks), len(fails)))
-    sys.exit(1)
 ck("slice plane at z=28.5", abs(sl.SliceType.Origin[2] - 28.5) < 1e-9, list(sl.SliceType.Origin))
 
 lut_sp = GetColorTransferFunction("species")
@@ -89,7 +117,8 @@ for i, v in enumerate(GetRenderViews()):
     ck(f"view {i+1} reports ray tracing off on reload (invariant, not a control)",
        v.EnableRayTracing == 0, v.EnableRayTracing)
 
-json.dump({"state": state, "checks": checks, "failures": fails},
-          open(os.path.join(os.path.dirname(state), "state_verification.json"), "w"), indent=2)
+json.dump({"state": state, "mode": "pinned" if RECEIPT else "self-consistency",
+           "checks": checks, "failures": fails},
+          open(os.path.join(os.path.dirname(state) or ".", "state_verification.json"), "w"), indent=2)
 print("\n%d checks, %d failures" % (len(checks), len(fails)))
 sys.exit(1 if fails else 0)

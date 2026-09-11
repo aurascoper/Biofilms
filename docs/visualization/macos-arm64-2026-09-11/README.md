@@ -132,6 +132,21 @@ bundle and run anywhere.
 `verify_artifacts.py` checks the **data**; `verify_state.py` checks the **saved state**.
 Pinned baselines against the real evidence: **16** and **20** checks, 0 failures.
 
+Both now share one receipt contract: a supplied `--receipt` must load **and** carry the four
+required pinned keys, or the run exits 2. `verify_state.py` previously loaded the receipt only
+`if os.path.isfile(...)` with no `else`, and printed nothing about pinning — so a typo'd path
+ran unpinned and produced output byte-identical to a deliberate unpinned run. Each run now
+declares its mode: `pinned` (trusted-identity) or `self-consistency`, in the log and in
+`state_verification.json`. Unpinned is 18 checks; pinned is 20.
+
+Two adjacent repairs in the same pass: `verify_state.py` establishes every proxy's presence
+**before** reading any property on it (it used to read `thr_sp.LowerThreshold` immediately
+after the presence check and abort only later, turning a missing filter into an
+`AttributeError` instead of a reported failure); and `animate_4d.py` now parses `config.toml`
+as TOML and **refuses** a missing or undeclared threshold. Its regex form did
+`if m and abs(...) > tol: raise` and then printed "threshold reconciled" unconditionally — so
+a non-matching regex claimed a reconciliation it had not performed.
+
 | # | Control | Result |
 |---|---|---|
 | — | baseline: unmutated clone | **0 failures** — the controls below are measured against this |
@@ -139,7 +154,7 @@ Pinned baselines against the real evidence: **16** and **20** checks, 0 failures
 | 1 | timestep 50.0 removed from the `.pvd` | **fires** — 4 failures (100 entries, incomplete 0..100, self-consistency, frozen pvd hash) |
 | 2 | timestep 50.0 duplicated | **fires** — 4 failures (102 entries, 101 unique of 102, self-consistency, frozen pvd hash) |
 | 3 | one bit flipped in `signal_mcs000050.vti` | **fires** — 1 failure (208/209 hashes, names the altered file) |
-| 4a | signal LUT narrowed 0–9 → 0–5 without re-render | **fires** — 1 failure (`signal LUT range 0..9 -> 0.0..5.0`) |
+| 4a | signal LUT narrowed 0–9 → 0–5 without re-render | **fires** — 1 failure (`signal LUT range 0..9 -> 0.0..5.0`) — see the correction below |
 | 4b | ray tracing switched on without re-rendering | **not implementable against the state** — see below |
 | 5 | **consistent tamper**: data + manifest + receipt all regenerated | **fires only when pinned** — unpinned **0 failures** (the hole), pinned **1 failure** (the fix) |
 
@@ -149,6 +164,25 @@ result includes a pass: unpinned it must pass, or the hole it documents is not r
 Controls 0, 1 and 2 report **4** failures where an earlier revision said 3. Not drift — the
 pinned `.pvd` hash is a new failure mode catching the same tamper by a second, independent
 route.
+
+**A third, found later, and the most instructive: the LUT control fired without ever
+performing its mutation.** It used a regex over the serialized state,
+`(<Property name="RGBPoints".*?)(9)(\b)` with `re.S`. That is leftmost-first and lazy, so in a
+1024-element Viridis table it matched the `9` in `<Element index="9" .../>` — an **index
+attribute**, eight elements in — and rewrote it to `index="5"`, producing a duplicate index
+and destroying index 9. The array was mangled, the verifier reported
+`signal LUT range 0..9 -> 0.0..0.004874`, and the control counted one failure and looked
+healthy. An earlier revision of the table above printed `0.0..5.0`, **a value no stored run
+produced**; the committed receipt said `0.004874` the whole time.
+
+The control now mutates through the parsed document, asserts the element it changed was at
+`x = 9.0` before and `x = 5.0` after, and produces the `0.0..5.0` the label always claimed.
+`sub_once` asserts a *count*; a count cannot tell you the edit landed on the right element.
+
+**Control 5 also asserted only half its contract.** Its expectation is "unpinned PASSES, pinned
+FAILS", but the verdict read `"FIRES" if nf_p else …` — the unpinned result fed a display
+string and nothing else. A regression that broke the unpinned tier, or closed the hole the
+control exists to document, would have left it green. It now requires `nf_u == 0 and nf_p`.
 
 **Two harness bugs caught while building these, both worth recording.**
 
@@ -234,20 +268,47 @@ frame while the total happens to stay 10. It intersects each component's voxel s
 every component's voxel set in the next frame, inherits lineage by largest shared volume,
 and records births, deaths, merges and splits.
 
-| | 26-connectivity | 6-connectivity |
+| over the whole record | 26-connectivity | 6-connectivity |
 |---|---|---|
 | distinct lineages ever | 21 | 24 |
+| births | 21 | 24 |
+| **disappeared** (no overlapping successor) | **0** | **0** |
+| **retired by merge** (overlapped, lost the claim) | **11** | **14** |
+| merges | 10 | 13 |
+| splits | 0 | 0 |
 | alive at MCS 100 | 10 | 10 |
 | of those, born before MCS 15 | **10** | **10** |
-| births after MCS 15 | **0** | **0** |
-| deaths after MCS 15 | **0** | **0** |
-| splits after MCS 15 | **0** | **0** |
-| merges after MCS 15 | 2 (at MCS 15) | 3 (at MCS 16, 17) |
+| churn within frames 16..100 | **0** | 3 |
 
-**The set is stable, not merely the count.** The same ten regions persist to the end of the
-record under both conventions, and the consolidation that produces them is **monotone by
-merge** — no region ever dies, and none ever splits, after MCS 15. The final state is
-adjacency-independent; only the frame at which it is reached is not.
+**A correction, and it matters.** An earlier revision of this table reported "deaths after
+MCS 15: 0" and the prose read "no region ever dies". `deaths` counted only predecessors with
+**no overlapping successor**. In a merge both predecessors overlap, so neither was a death —
+but only the largest claim is inherited, so the rest stopped existing and were counted
+nowhere. **11 of 11 retirements (26-conn) and 14 of 14 (6-conn) were invisible.** The
+conclusion survives and is now measured rather than inferred: nothing ever *disappears*, and
+every lineage that stops does so by merge.
+
+**The set is stable, not merely the count.** The same ten regions persist to the end under
+both conventions, and consolidation is **monotone by merge** — nothing disappears, nothing
+splits. The final state is adjacency-independent; the frame at which it is reached is not.
+Under 26-connectivity the transition **into** frame 15 retires 3 lineages (13 → 10) and
+nothing changes thereafter; under 6-connectivity the consolidation completes at frame 17,
+which is the churn of 3 within frames 16..100.
+
+**What this measures.** Persistence under **largest-overlap greedy inheritance** — not
+material identity. Lineage integers from the two adjacency analyses are **not** the same
+histories: with an identical final mask 6-connectivity refines 26-connectivity, so equal final
+counts imply the same final partition, but say nothing about prior lineage assignments.
+
+`component_overlap_v1_superseded.json` is retained as historical evidence of what was
+published. Its `counts_by_mcs` are **identical** to the corrected run — the component counts
+were never wrong; only the lineage accounting was.
+
+`test_component_overlap.py` holds the accounting fixtures — single-frame lifespan, all-vanish
+frame, two- and three-into-one merges, split, competing overlap, and a transition mixing
+disappearance with merge. **26 checks.** Against the pre-repair implementation they report
+`frames_seen == 1 -> 2`, `deaths == 1 -> 0`, and then a `KeyError` for a retirement counter
+that did not exist.
 
 `vti_read.py` is a read-only `.vti` reader in numpy alone — the exporter writes uncompressed
 appended binary, so no VTK is needed. That is deliberate: an audit of the renderer's output
