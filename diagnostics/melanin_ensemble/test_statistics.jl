@@ -78,6 +78,17 @@ end
     @test r3.k == 2 && r3.p ≈ 1.0
     @test r3.mean ≈ 0.0 atol = 1e-12
 
+    # The correlation is what drives the paired/independent gap, and its sign says which
+    # way a pooled statistic errs. Perfectly correlated -> +1; anticorrelated -> -1.
+    @test r.r ≈ 1.0 atol = 1e-12
+    @test r2.r ≈ -1.0 atol = 1e-12
+    @test r.sd_paired < r.sd_indep      # positive r: pooling overstates
+    @test r2.sd_paired > r2.sd_indep    # negative r: pooling understates
+    # var(hi - lo) = var(hi) + var(lo) - 2 cov, the identity the report rests on.
+    let a2 = [1.0,2,3,4,5], b2 = [0.5,1.5,2.5,3.5,4.5]
+        @test var(a2 .- b2) ≈ var(a2) + var(b2) - 2*cov(a2, b2) atol = 1e-12
+    end
+
     # The separation is the mean over the POOLED sd, which is the statistic the paired
     # one replaces. Asserted so a change to either cannot silently swap them.
     @test r.separation ≈ r.mean / r.pooled

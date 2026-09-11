@@ -40,8 +40,12 @@ function paired_stats(rows, seeds, hi::AbstractString, lo::AbstractString)
     xh = [rows[s][hi] for s in seeds]
     xl = [rows[s][lo] for s in seeds]
     pooled = sqrt((var(xh) + var(xl)) / 2)
+    # The within-run correlation is what makes the paired and independent spreads differ:
+    # var(hi - lo) = var(hi) + var(lo) - 2 cov(hi, lo). Reported because the sign of it
+    # says which way a pooled statistic is wrong.
+    r = cor(xh, xl)
     (mean = mean(d), sd_paired = std(d), sd_indep = sqrt(var(xh) + var(xl)),
-     pooled = pooled, separation = mean(d) / pooled,
+     pooled = pooled, separation = mean(d) / pooled, r = r,
      k = count(>(0), d), n = length(seeds), p = binom_two_sided(count(>(0), d), length(seeds)))
 end
 
@@ -101,6 +105,8 @@ function main(args)
         @printf("      paired sd of the difference   %.3f   <- needs no independence assumption\n", r.sd_paired)
         @printf("      if the two were independent   %.3f   (pooled sd %.3f, separation %.2f)\n",
                 r.sd_indep, r.pooled, r.separation)
+        @printf("      within-run correlation        %+.3f   -> pooling %s the uncertainty\n",
+                r.r, r.sd_paired > r.sd_indep ? "UNDERSTATES" : "overstates")
         @printf("      %d of %d seeds in the alpha_M direction, exact two-sided sign test p = %.4g\n",
                 r.k, r.n, r.p)
     end

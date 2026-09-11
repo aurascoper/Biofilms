@@ -29,10 +29,12 @@ pairwise, paired within seed:
   CS - CN   mean +0.544
       paired sd of the difference   0.380   <- needs no independence assumption
       if the two were independent   0.403   (pooled sd 0.285, separation 1.91)
+      within-run correlation        +0.111   -> pooling overstates the uncertainty
       15 of 16 seeds in the alpha_M direction, exact two-sided sign test p = 0.0005188
   CN - AN   mean +0.373
       paired sd of the difference   0.412   <- needs no independence assumption
       if the two were independent   0.337   (pooled sd 0.238, separation 1.57)
+      within-run correlation        -0.585   -> pooling UNDERSTATES the uncertainty
       12 of 16 seeds in the alpha_M direction, exact two-sided sign test p = 0.07681
 
 The ordering is an input. These numbers describe how reliably one trajectory

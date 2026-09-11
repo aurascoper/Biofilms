@@ -46,10 +46,10 @@ The three producers share one lattice in every run. A pooled standard deviation 
 species therefore treats 16 runs as 32 independent draws. `analyse.jl` reports the paired
 statistic, the independence-assuming one, and the assumption-free count side by side:
 
-| pair | mean | paired sd | if independent | seeds in the alpha_M direction | sign test |
-|---|---|---|---|---|---|
-| CS − CN | +0.544 | 0.380 | 0.403 | 15 of 16 | p = 0.00052 |
-| CN − AN | +0.373 | 0.412 | 0.337 | 12 of 16 | p = 0.077 |
+| pair | mean | paired sd | if independent | within-run r | seeds in the alpha_M direction | sign test |
+|---|---|---|---|---|---|---|
+| CS − CN | +0.544 | 0.380 | 0.403 | +0.111 | 15 of 16 | p = 0.00052 |
+| CN − AN | +0.373 | 0.412 | 0.337 | **−0.585** | 12 of 16 | p = 0.077 |
 
 **The two pairs are not alike, and a single "11 of 16" hides that.** *C. sphaerospermum*
 above *C. neoformans* is reliable. *C. neoformans* above *A. niger* is not: at 12 of 16 the
