@@ -37,10 +37,15 @@ limit**, and it should not be expected to.
 **This blocks nothing, and the reason corrects a standing assumption.** The framing
 this gate was written against was: the CPM is `Float64` throughout, so a Metal port
 *would become* a `Float32` model and could not be bit-identical. The conclusion is
-right and the tense is wrong. The **serial** CPM is `Float64`. The **JACC port never
-was** — `biofilms_potts_jacc.jl` is `Float32` end to end (`build_J_matrix` returns
-`J32`, the kernels take `0.5f0`/`0.1f0`/`Float32(0.9)`, the selftest allocates
-`zeros(Float32, N, N, N)` and compares against serial at `rtol = atol = 1e-4`).
+right and the tense is wrong. The **serial** CPM is `Float64`; the port's **device-facing
+CPM and field arrays never were** (`build_J_matrix` returns `J32`, the kernels take
+`0.5f0`/`0.1f0`/`Float32(0.9)`, the selftest allocates `zeros(Float32, N, N, N)` and compares
+against serial at `rtol = atol = 1e-4`).
+
+**"`Float32` end to end" is wrong and an earlier revision of this paragraph said it.** The
+same file's host radiolysis is `Float64` — see the inventory below. The accurate statement is
+that the *device-resident arrays* are `Float32`, which is why Metal's refusal blocks nothing;
+it is not a claim about the file.
 
 That decision was made when the port was written, not deferred to this gate. It is
 also already reflected in the suite: `tests/jacc_port_tests.jl` carries `Float32`
@@ -119,17 +124,34 @@ Same code, same `Project.toml`, only `LocalPreferences.toml` changed:
 
 **1.944x.** Not a marginal band excursion.
 
-### It is not a decomposition artifact, and that is the informative part
+### The failure breakdown, from the raw log
 
-Every failure in that testset is the **rate**. The two statistics that actually measure a
-checkerboard artifact both pass on Metal, across all nine runs:
+An earlier revision of this file said "every failure in that testset is the rate". **That was
+wrong**, and the arithmetic was checkable without the log: nine runs carry four assertions
+each, so 24 passes and 12 failures cannot be nine rate failures alone. Counting only the
+`Test Failed at` lines in the run:
 
-- Cramer's V (association between parity class and acceptance): **0.00873 .. 0.02382**, against
-  `V_MAX = 0.025`
-- max per-class deviation: **0.0223 .. 0.0503**, against `MAXDEV_MAX = 0.12`
+| assertion | line | failures |
+|---|---|---|
+| `RATE_BAND[1] < s.rate < RATE_BAND[2]` | 200 | **9** of 9 |
+| `s.V < V_MAX` (pooled) | 201 | 0 |
+| `s.maxdev < MAXDEV_MAX` (pooled) | 202 | 0 |
+| `s1.V < V_MAX && s2.V < V_MAX` (half-windows) | 209 | **3** of 9 |
+| testset 6 table comparisons | 250, 251 | 1 each |
+| `Threads.nthreads() == 1` | 235 | **0** — passed, as predicted |
 
-So the eight colour classes agree with **each other**. What differs is the global acceptance
-rate, inflated uniformly. That is the signature of a race, not of a broken decomposition.
+**So a time-dependent parity effect is present and was wrongly excluded.** The pooled
+statistics do pass everywhere — Cramer's V 0.00873..0.02382 against `V_MAX = 0.025`, max
+per-class deviation 0.0223..0.0503 against `MAXDEV_MAX = 0.12`. But in **3 of 9 runs** a
+half-window V exceeds `V_MAX`: within a time window the colour classes do **not** agree, and
+pooling over the full run averages that away.
+
+Julia prints no operand values for a `&&` compound, so the specific seeds, orderings and
+halves are not recoverable from this log. Re-running with the two halves asserted separately
+is required before any statement about which window drifts.
+
+The global rate inflation is real and large. It is **not** established that it is uniform
+across classes, and "not a decomposition artifact" is not supported by this run.
 
 ### The mechanism, stated as a reading of the source
 
@@ -142,12 +164,20 @@ race-free — the kernel's own comment says so. `dh` and `st` are per-site write
 `JACC.@atomic vols[sigma] -= 1` / `+= 1` mutate it. Two sites in one colour class are
 guaranteed spatially non-adjacent but **not** guaranteed to belong to different cell labels, so
 whether one site's ΔH sees another's volume update depends on interleaving. Atomic addition
-commutes for the final total; it does not make the intermediate reads deterministic. A ΔH
-computed against an under-counted volume is biased low, and a low ΔH is accepted more often —
-which is the direction observed.
+commutes for the final total; it does not make the intermediate reads deterministic. **The direction of the bias is not determined by undercounting alone.** For a copy from
+positive label s into positive label t the volume contribution is
+
+    ΔH_V = λ_V[2(V_s − V_target) + 1] + λ_V[−2(V_t − V_target) + 1]
+
+so with read errors e_s and e_t relative to a sequential reference the energy error is
+**2λ_V(e_s − e_t)**. Underestimating the **donor** volume lowers ΔH; underestimating the
+**recipient** volume raises it. An earlier revision of this file asserted that undercounting
+lowers ΔH and therefore accepts more often. That is false as stated — the two terms carry
+opposite signs, and the net sign must be **measured**, not inferred.
 
 This is a reading of the source consistent with the measurement. It is **not** a proof that the
-`vols` read is the only contributor, and no attempt was made here to isolate it.
+`vols` read is the only contributor, nor that it accounts for the factor 1.944, and no attempt
+was made here to isolate it.
 
 ### Testset 6 was declared uninterpretable before the run, and is
 
