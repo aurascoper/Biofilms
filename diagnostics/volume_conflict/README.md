@@ -121,3 +121,87 @@ Also withdrawn: "under-counted volume lowers ΔH". The volume contribution is
 | `contention_test.jl` | the three measurements above |
 
 Run: `julia --project=. diagnostics/volume_conflict/contention_test.jl`
+
+## A conflict-serializing scheduler, verified against the oracle
+
+`scheduler.jl` layers each colour class's proposals by the conflict DAG, in reference order:
+
+```
+batch(i) = 1 + max{ batch(j) : j < i, ids(j) ∩ ids(i) ≠ ∅ }      (max over ∅ = 0)
+```
+
+`ids(p)` is **both** positive endpoints. A growth of parcel A and a shrinkage of parcel A
+conflict exactly as two growths do, and the contention survey shows mixed-role pairs are
+roughly a third of all conflicts, so a one-sided rule misses them.
+
+**The enabling property** is that a colour class's proposal *set* is fully determined by the
+pass-start lattice, independently of any acceptance in that pass. The RNG is counter-based on
+`(seed, step, linear index)`; two distinct class members differ by ≥ 2 in some axis while a
+site's source is within ±1 of itself, so one member's source can never *be* another member,
+and the only lattice write a proposal makes is to its own target. So `(donor, recipient)` is
+knowable up front and the schedule can be built before evaluating anything. Only `vols` is
+contended.
+
+### It reproduces the oracle exactly
+
+50 MCS x 8 colours, N=20, 2 cells/species:
+
+| | |
+|---|---|
+| proposals compared | **47442** |
+| proposals differing | **0** |
+| final lattice identical | **yes** |
+| final volumes identical | **yes** |
+
+Within a batch no two proposals share a parcel id, so evaluating them all against one common
+`vols` is identical to evaluating them one at a time. That is the correctness argument, and
+it is what a concurrent launch of a batch would actually do.
+
+### Order preservation is load-bearing, and the control shows it
+
+Reversing the within-class enumeration and re-layering produces batches that are **still
+conflict-free** — and the trajectory does **not** match the oracle, in either the lattice or
+the volumes. **Conflict-freedom alone is insufficient.** Being concurrency-safe is not the
+same as being semantics-preserving, and an arbitrary safe partition can reorder conflicting
+pairs and change the dynamics.
+
+### The cost: parallelism collapses
+
+The batch count is the critical path of the conflict DAG, and that is what bounds available
+concurrency. Measured at the initial state:
+
+| N | cells/species | parcels | proposals/pass | batches | parallelism |
+|---|---|---|---|---|---|
+| 20 | 2 | 14 | 92.4 | 20.9 | 4.43 |
+| 20 | 6 | 42 | 160.9 | 36.6 | 4.39 |
+| 40 | 2 | 14 | 117.8 | 14.6 | 8.05 |
+| 40 | 6 | 42 | 284.0 | 22.1 | **12.84** |
+| 60 | 6 | 42 | 305.8 | 17.5 | 17.47 |
+| 40 | 12 | 84 | 527.0 | 26.0 | 20.27 |
+
+It improves with parcel count, and it **degrades as the film densifies**: the same N=20/2
+configuration averages **2.61** over 50 MCS against 4.43 at MCS 0, because sites per parcel
+rise as the consortium grows.
+
+**The current kernel launches every proposal in a class concurrently** — 92 to 527 of them.
+Correct serialization admits 2.6 to 20. That is roughly a **10x to 45x** reduction in
+available parallelism, on top of a backend already measured 2.3x slower than saturated CPU
+threads on the two field kernels.
+
+### What this settles
+
+A correct concurrent CPM on this kernel is not a scheduling optimisation away. The conflict
+structure — many proposals contending over few parcels, worsening as the biofilm grows — does
+not admit the parallelism the current launch assumes. **Do not port**, and the reason is now
+structural rather than a benchmark result.
+
+The scheduler is not proposed as production code. It is the reference implementation any
+candidate concurrent scheme must be checked against, and the answer it gives is that the
+speedup such a scheme could earn is small.
+
+### Files
+
+| | |
+|---|---|
+| `scheduler.jl` | `propose` (geometry only), `schedule` (DAG layering), `scheduled_pass!` |
+| `scheduler_test.jl` | exactness against the oracle, plus the reversed-order control |
