@@ -7,7 +7,7 @@ const N   = 20
 const SEED = UInt64(42)
 const λV  = 10.0f0
 const Vt  = Int32(120)
-const T   = 10.0f0
+const T   = 5.0f0      # production default is T_cpm = 5.0f0; an earlier revision used 10.0f0
 
 function fresh()
     lat, spec, vols, rad, mel, nut = init_host(N, 2, 42, 1.0, 2.0, 1.0)

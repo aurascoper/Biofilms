@@ -25,41 +25,72 @@ Measured on a 20^3 lattice, 2 cells per species, one colour pass each:
 the largest categories. Any conflict detection that looks at one side only misses roughly a
 third of them.
 
-## The isolation test, and what it refutes
+## The isolation test
 
-Two arms, identical proposal streams, differing only in when `vols` is read:
+Two arms, identical proposal streams, differing only in when `vols` is read. Both run the
+**full 50-MCS trajectory** the parity tier runs.
 
-| | accepted over 8 colours |
+| arm | proposed | accepted | rate |
+|---|---|---|---|
+| live `vols` (reference semantics) | 47902 | 4540 | **0.09478** |
+| sweep-start snapshot | 50807 | 10583 | **0.20830** |
+| ratio | | | **2.198x** |
+
+**Measured on Metal vs threads at the same `n_mcs`: 0.34870 / 0.17933 = 1.944x.**
+
+A sweep-start snapshot is the **maximum** staleness achievable within a colour pass -- every
+read as stale as it can be. Live is 1.0x by construction. Concurrent GPU execution carries
+**partial** staleness and lands at 1.944x, between the two. The volume conflict brackets the
+observed effect.
+
+### Why it compounds, and why a single pass does not show it
+
+| MCS | live | snapshot | ratio |
+|---|---|---|---|
+| 10 | 0.22110 | 0.24874 | 1.125 |
+| 20 | 0.15174 | 0.20604 | 1.358 |
+| 30 | 0.12395 | 0.20355 | 1.642 |
+| 40 | 0.10829 | 0.20324 | 1.877 |
+| 50 | 0.09478 | 0.20830 | **2.198** |
+
+The live arm's rate **decays** as the system equilibrates and volumes approach `V_target`,
+so the penalty begins to bite. The snapshot arm stays roughly **flat**, because stale reads
+never see the accumulated volume. The volume penalty's function is to accumulate; staleness
+defeats accumulation, and the gap widens monotonically.
+
+**An earlier revision of this file measured one pass, found ~5%, and concluded the volume
+conflict could not explain a 94% gap. That was wrong, and the reason is instructive:
+a single pass from a common state cannot exhibit a divergence whose entire character is
+compounding.** Measuring an equilibration mechanism at t = 1 understates it by construction.
+
+## What the first pass shows, mechanistically
+
+One colour pass, identical initial state, both backends:
+
+| | |
 |---|---|
-| live `vols` (reference semantics) | **228** |
-| sweep-start snapshot | **239** |
-| ratio | **1.048** |
+| proposal sets | **identical**, 99 = 99 sites -- the counter-based RNG and `nb26` agree |
+| ΔH | **differs on 62 of 99 sites**, max 180, mean 70.3 |
+| decisions differing | 6 |
+| of those, with identical ΔH | **0** -- `exp()` and `u01()` are exonerated |
+| of those, with differing ΔH | **6** -- the `vols` read is implicated |
 
-414 of 715 proposals get a different ΔH; **17 decisions flip**.
+The ΔH gaps quantise. Since the volume error is `2*lambda_V*(e_s - e_t)` with `lambda_V = 10`,
+observed gaps of 120, 80 and 60 mean volume reads off by **6, 4 and 3 voxels**.
 
-**A sweep-start snapshot is the maximum staleness achievable within a colour pass** -- every
-read is as stale as it can be. Concurrent GPU execution is bounded by that. So 4.8% is an
-**upper bound** on the within-pass volume-read contribution, against an observed gap of 94.4%.
+## Atomics are not dropping updates
 
-**That is 5.1% of the effect. The volume conflict does not explain the Metal result.**
+`vols` is maintained incrementally by `JACC.@atomic` while `lat` carries the labels; the two
+are redundant, so a positive-id histogram of `lat` must reproduce `vols` after any
+synchronized pass. Run on device:
 
-The direction is right -- staler reads accept more, matching Metal's sign -- which is exactly
-how a wrong mechanism looks if you stop at the sign. An earlier revision of
-`docs/metal_feasibility_macos_arm64.md` attributed the gap to this race. **Withdrawn.**
+| backend | passes checked | mismatched |
+|---|---|---|
+| threads | 40 | **0** |
+| **metal** | 40 | **0** |
 
-## What this does not show
-
-It does not identify what does explain the gap. The leading untested candidate is the
-`JACC.@atomic` updates themselves: if increments are lost on device, volumes stay near
-`V_target`, the penalty stays small and acceptance stays high, which would be large rather
-than marginal. `id_histogram` exists for exactly that test -- recompute a positive-id
-histogram from the lattice after each synchronized colour pass and compare every entry with
-`vols`. On this host oracle it matches after all eight colours. **It has not been run on
-Metal, and that is the decisive next measurement.**
-
-Other untested contributors: the device `exp` and `u01` implementations, and whether the
-counter-based RNG produces identical words on both backends. Compare generated words and
-draws before attributing anything to dynamics.
+So lost increments are **refuted**. Atomic addition is doing its job; the defect is that the
+read-evaluate-decide-update sequence is not one transaction.
 
 ## Snapshot freezing is not a candidate fix
 
