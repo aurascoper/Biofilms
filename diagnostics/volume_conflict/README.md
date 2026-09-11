@@ -205,3 +205,65 @@ speedup such a scheme could earn is small.
 |---|---|
 | `scheduler.jl` | `propose` (geometry only), `schedule` (DAG layering), `scheduled_pass!` |
 | `scheduler_test.jl` | exactness against the oracle, plus the reversed-order control |
+
+## The half-window parity effect, attributed
+
+`jacc_parity_tests.jl:209` asserts `s1.V < V_MAX && s2.V < V_MAX`. Julia prints no operand
+values for a `&&` compound, so the three Metal failures named neither the offending half nor
+its value. `parity_halves.jl` reports both, reusing the shipped `run_tables` / `pooled` /
+`parity_stats` / `PERMS` so the statistics are the file's own.
+
+| seed / ordering | rate | pooled V | maxdev | s1.V | s2.V | over |
+|---|---|---|---|---|---|---|
+| 42 / identity | 0.37039 | 0.01036 | 0.0269 | 0.01564 | 0.02101 | – |
+| 42 / perm1 | 0.36775 | 0.02313 | 0.0637 | 0.01351 | **0.03228** | second |
+| 42 / perm2 | 0.36665 | 0.01844 | 0.0317 | 0.01597 | 0.02458 | – |
+| 43 / identity | 0.34360 | 0.01243 | 0.0423 | 0.01141 | 0.01915 | – |
+| 43 / perm1 | 0.34617 | 0.01893 | 0.0405 | 0.01226 | **0.02883** | second |
+| 43 / perm2 | 0.34094 | 0.02078 | 0.0551 | 0.01803 | **0.02517** | second |
+| 44 / identity | 0.33830 | 0.01453 | 0.0266 | 0.01232 | 0.01921 | – |
+| 44 / perm1 | 0.34302 | 0.01761 | 0.0448 | 0.01945 | 0.02300 | – |
+| 44 / perm2 | 0.32617 | 0.01442 | 0.0367 | 0.01717 | 0.01954 | – |
+
+**Rate outside band 9 of 9. Pooled V or maxdev over: 0 of 9. First half over: 0 of 9. Second
+half over: 3 of 9.** That reconciles the log exactly: 9 failures at line 200 and 3 at line 209.
+
+### The effect is directional, not scattered
+
+| backend | s2.V > s1.V | mean s1.V | mean s2.V | mean ratio |
+|---|---|---|---|---|
+| metal | **9 of 9** | 0.01508 | 0.02364 | **1.620** |
+| threads | 6 of 9 | 0.01106 | 0.01242 | 1.223 |
+
+Nine of nine in one direction is a sign test at p = 2^-9 ≈ 0.002. Threads at 6 of 9 is what
+noise looks like. **The parity association grows over the run on Metal and does not on
+threads**, which fits the compounding mechanism: as the film densifies, contention rises,
+staleness worsens, and the class-correlated component grows with it.
+
+### Why pooling hid it
+
+Pooled V on Metal maxes at **0.02313**, under the 0.025 threshold, in all nine runs -- while a
+second-half window reaches **0.03228**. Averaging a growing effect over the whole trajectory
+brings it back under the line.
+
+An earlier revision of `docs/metal_feasibility_macos_arm64.md` read the passing pooled V and
+concluded "the eight colour classes agree with each other, so this is not a decomposition
+artifact". **Withdrawn.** They agree in the first half and drift apart in the second, and the
+statistic that was quoted is precisely the one that cannot see it.
+
+### A note on what the class index means here
+
+`jacc_parity_tests.jl:26-35` records that `c` indexes both spatial class and sequence
+position, and that `vols` accumulating across passes is a documented staleness -- which is why
+the file uses random permutations rather than reversal. That effect is *across* passes and is
+present on both backends. What concurrent execution adds is staleness *within* a pass, and it
+is that addition which the second-half excursion tracks.
+
+### Recommended change to the shipped assertion
+
+Split `@test s1.V < V_MAX && s2.V < V_MAX` into two assertions. Identical pass/fail semantics,
+but a failure then names the half and prints its value. This is strictly more diagnostic and
+is not a relaxation; it raises the per-run assertion count from 4 to 5.
+
+`parity_halves.jl` asserts nothing by design -- it reports, so it can be run against a
+failing backend without masking the shipped result.
