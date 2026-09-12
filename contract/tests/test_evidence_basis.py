@@ -6,7 +6,10 @@ evidence vocabulary. These tests pin the two sets in physical_contract, read
 every file that carries an evidence_basis column (the parameter ledger, the
 species table, which had ZERO consumers, and the claims ledger, whose column no
 test read), and hold the claims ledger's legacy spellings to an allowlist that
-may shrink and may not grow.
+may not grow. It does not shrink when a row is superseded either, which this
+said until 2026-09-12: legacy_pairs() reads every row and the ledger is
+additive, so a superseding row leaves the old pair in place. An entry goes only
+when its stored pair leaves the ledger.
 
 CONTROLS. Each guard below has a planted failure that must fire and a clean
 case that must pass. The relation control is over CONSUMERS as well as sets:

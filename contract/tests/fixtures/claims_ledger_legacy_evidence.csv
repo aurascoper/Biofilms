@@ -1,8 +1,38 @@
 # Rows of data/claims_ledger.csv that still store a pre-2026-09-06 evidence_basis
 # value. Keyed by (claim_id, stored_value). Generated from
 # physical_contract.LEGACY_CLAIM_EVIDENCE; test_evidence_basis.py asserts the
-# ledger's legacy rows equal this list in both directions, so it may shrink when a
-# row is superseded and may never grow.
+# ledger's legacy rows equal this list in both directions. IT MAY NOT GROW.
+#
+# IT DOES NOT SHRINK WHEN A ROW IS SUPERSEDED, which is what this said until
+# 2026-09-12 and is not what the test does. legacy_pairs() reads EVERY ledger
+# row, superseded ones included, and the ledger's convention is additive -- a
+# superseding row is a NEW row, so the old row and its pair both remain. An
+# entry may be removed only when the corresponding stored pair is no longer
+# present in the ledger at all.
+#
+# ONE ENTRY WAS ADMITTED AFTER GENERATION, and it is named here rather than
+# folded in silently. GATE-06,code. The rule above is unchanged and this is not
+# a precedent for a legacy spelling written today: admission attached to this
+# exact (claim_id, stored_value) and to the date of the commit that introduced
+# it, not to the value having been found somewhere.
+#   introduced   3daef5f, 2026-08-29, "Ledger what the merge gate cannot tell
+#                apart, and stop sharing checkouts" -- EIGHT DAYS BEFORE the
+#                2026-09-06 cutoff, so the stored value is pre-cutoff and meets
+#                the membership criterion in the first paragraph.
+#   invisible    3daef5f is not an ancestor of 4f51fc4, where this file was
+#                generated. At 4f51fc4 the ledger held ZERO GATE-06 rows. The
+#                snapshot was taken from one branch's ledger; the ledger is a
+#                shared file.
+#   arrived      merge 9708a52, 2026-09-12, six days after generation.
+#
+# CENSUS, AND WHAT IT DOES AND DOES NOT SUPPORT. Taken 2026-09-12T20:07:22Z over
+# the 20 heads of refs/remotes/origin listed in the commit that added this
+# block, each at the SHA recorded there: the union of legacy pairs over those
+# heads is 174, this file is 174, and no entry here is carried by no head. That
+# supports "no further omissions among those heads at that time". It does NOT
+# support "none will appear": a head not enumerated, or a commit pushed after
+# that time, is outside it. There is no generator in the tree, so re-running it
+# is manual.
 claim_id,stored_value
 RM-E05-01,simulation_output
 RM-E04-01,simulation_output
@@ -109,6 +139,7 @@ REFINE-10,code
 GATE-04,code
 REFD-08,code
 GATE-05,code
+GATE-06,code
 REFD-09,code
 REFD-10,code
 PILOT-11,code

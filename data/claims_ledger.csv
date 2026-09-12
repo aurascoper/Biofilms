@@ -79,9 +79,14 @@
 #                         axis (simulation_output | code | code_inspection |
 #                         repository_policy) and earlier rows stored it IN THIS COLUMN,
 #                         with `literature` for primary_literature and `none` for absent.
-#                         Those 173 rows keep their stored value under the additive
+#                         Those 174 rows keep their stored value under the additive
 #                         convention; the allowlist in contract/tests/fixtures pins them
-#                         and a new row may not add to it. `derived` is a source with an
+#                         and a new row may not add to it. The allowlist does NOT shrink
+#                         when a row is superseded -- a superseding row is a new row and
+#                         the old pair stays -- only when the stored pair leaves the
+#                         ledger. This count read 173 until 2026-09-12: the allowlist was
+#                         generated from one branch's ledger and GATE-06, stored
+#                         2026-08-29, was on a lineage it could not see. `derived` is a source with an
 #                         unresolved basis (a derived parameter inherits the weakest
 #                         basis it was built from) and is kept until a depends_on column
 #                         exists. absent = audited, nothing supports it; blank = not
