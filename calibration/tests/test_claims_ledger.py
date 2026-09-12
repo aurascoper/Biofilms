@@ -222,6 +222,29 @@ def distinguishing_phrase(claim: str) -> str:
     return best
 
 
+# A `delete` verdict on a GENERATED artifact is not a sentence someone took out
+# of prose — it is a FIELD that stopped being emitted, and prose matching cannot
+# see one. `distinguishing_phrase` returns the longest unelided run of
+# `claim_text`, which for PILOT-LEV-01 is "emitted into the budget artifact.":
+# ledger wording that the producer never wrote into the JSON. The guard below
+# therefore passed on that artifact whether or not the six hardcoded
+# sensitivities had come back.
+#
+# The ledger already says which field, and says it in the column meant for it: a
+# `location` of `<name> (removed)` is the row DECLARING that its fingerprint is
+# structural rather than textual. `omega_b` (GATE-ROI-01) and
+# `quantitative_layers` (VIEWER-04) are not written that way and must not be —
+# both are live functions at the location their row is about, and their `delete`
+# verdict is on a claim made there, not on the symbol.
+REMOVED_FIELD = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\(removed\)\s*$")
+
+
+def deleted_field(row) -> str:
+    """The emitted field a `delete` row says was removed, or "" if it names none."""
+    match = REMOVED_FIELD.match(row["location"] or "")
+    return match.group(1) if match else ""
+
+
 @pytest.fixture(scope="module")
 def rows():
     return _rows()
@@ -239,7 +262,10 @@ def test_no_deleted_claim_survives_in_the_document_it_names(rows):
     quantum-mechanical noise mechanism that is a Gaussian keyed to a diffusion
     coefficient. They must not come back.
 
-    Each row is searched in the document it names, not in the manuscript alone.
+    Each row is searched in the document it names, not in the manuscript alone,
+    and by TWO fingerprints: the claim's prose, and — for a row whose `location`
+    declares `<name> (removed)` — the emitted field itself. A generated artifact
+    republishes a withdrawn claim as a key, which prose matching cannot see.
     """
     cache: dict[Path, str] = {}
     survivors = []
@@ -252,6 +278,12 @@ def test_no_deleted_claim_survives_in_the_document_it_names(rows):
         phrase = distinguishing_phrase(row["claim_text"])
         if phrase and phrase.lower() in cache[path]:
             survivors.append(f"{row['claim_id']} in {row['document']}: {phrase[:90]}")
+        # Structured outputs carry a withdrawn claim as a key, not as a
+        # sentence. Both sides are normalised, so `_` becoming a space cancels.
+        field = deleted_field(row)
+        if field and normalise_markup(field) in cache[path]:
+            survivors.append(
+                f"{row['claim_id']} in {row['document']}: field `{field}`")
     assert not survivors, (
         "claims marked `delete` in the ledger are present in the document that "
         "carried them:\n  " + "\n  ".join(survivors))
