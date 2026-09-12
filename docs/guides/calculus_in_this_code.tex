@@ -213,13 +213,13 @@ the solver states the cylindrical operator
   & biofilms\us radiodialysis.R:9
   & (1/r) ∂/∂r (r D\_eff ∂c/∂r) \\[0.35em]
 face weights are area-over-volume at the half-indices
-  & biofilms\us radiodialysis.R:223
+  & biofilms\us radiodialysis.R:250
   & w\_plus  <- (r\_grid + 0.5 * dr) / r\_grid \\[0.35em]
 and the inward face likewise
-  & biofilms\us radiodialysis.R:224
+  & biofilms\us radiodialysis.R:251
   & w\_minus <- (r\_grid - 0.5 * dr) / r\_grid \\[0.35em]
 geometry enters the stencil only through those weights
-  & biofilms\us radiodialysis.R:120
+  & biofilms\us radiodialysis.R:147
   & (w\_plus[i]  * (c\_vec[i + 1] - c\_vec[i]) - \\
 \bottomrule
 \end{longtable}
@@ -262,10 +262,10 @@ consequence rather than a mechanism.
 \checkhead
 \endhead
 the axis limit is named as L'Hôpital
-  & biofilms\us radiodialysis.R:106
+  & biofilms\us radiodialysis.R:133
   & L'Hôpital limit \\[0.35em]
 and implemented with the factor of 2
-  & biofilms\us radiodialysis.R:110
+  & biofilms\us radiodialysis.R:137
   & dc\_dt[1] <- D\_eff * 2.0 * (c\_vec[2] - c\_vec[1]) / dr\^{}2 \\[0.35em]
 the manuscript calls it symmetry, not a wall
   & preprint/modeling\us radioresistance\us and\us radiotropic\us fitness.tex:781
@@ -346,10 +346,10 @@ from.
 \checkhead
 \endhead
 the axis node's face weights are deliberately unusable
-  & biofilms\us radiodialysis.R:226
+  & biofilms\us radiodialysis.R:253
   & w\_plus[1] <- NA\_real\_; w\_minus[1] <- NA\_real\_ \\[0.35em]
 the wall uses a ghost node, not a set face flux
-  & biofilms\us radiodialysis.R:132
+  & biofilms\us radiodialysis.R:159
   & c\_ghost <- c\_vec[Nr - 1] - \\[0.35em]
 the scheme is named finite-volume method of lines
   & biofilms\us radiodialysis.R:32
@@ -420,7 +420,7 @@ the condition as stated
   & biofilms\us radiodialysis.R:20
   & -D\_eff ∂c/∂r|\_\{r=R\} = P\_eff(t) · (c(R,t) − c\_ext) \\[0.35em]
 the ghost substitution, second line
-  & biofilms\us radiodialysis.R:133
+  & biofilms\us radiodialysis.R:160
   & 2.0 * dr * bc\_coef * (c\_vec[Nr] - c\_ext) / D\_eff \\
 \bottomrule
 \end{longtable}
@@ -485,13 +485,13 @@ saying the coupled path is sound.
 \checkhead
 \endhead
 forty cells by default
-  & biofilms\us radiodialysis.R:230
+  & biofilms\us radiodialysis.R:257
   & default\_parms <- function(Nr = 40, R = 1.0) \\[0.35em]
 the state vector packs c, s and m
   & biofilms\us radiodialysis.R:50
   & y[1 .. Nr]        = c\_i \\[0.35em]
 LSODA is the integrator
-  & biofilms\us radiodialysis.R:400
+  & biofilms\us radiodialysis.R:427
   & method = "lsoda" \\[0.35em]
 the Julia port substeps against the diffusion bound
   & biofilms\us potts.jl:1453

@@ -306,25 +306,25 @@ suite, and the failure message distinguishes "the code moved" from "the code cha
 | claim | source | must contain |
 |---|---|---|
 | the solver states the cylindrical operator | `biofilms_radiodialysis.R:9` | `(1/r) ∂/∂r (r D_eff ∂c/∂r)` |
-| face weights are area-over-volume at the half-indices | `biofilms_radiodialysis.R:223` | `w_plus  <- (r_grid + 0.5 * dr) / r_grid` |
-| and the inward face likewise | `biofilms_radiodialysis.R:224` | `w_minus <- (r_grid - 0.5 * dr) / r_grid` |
-| geometry enters the stencil only through those weights | `biofilms_radiodialysis.R:120` | `(w_plus[i]  * (c_vec[i + 1] - c_vec[i]) -` |
+| face weights are area-over-volume at the half-indices | `biofilms_radiodialysis.R:250` | `w_plus  <- (r_grid + 0.5 * dr) / r_grid` |
+| and the inward face likewise | `biofilms_radiodialysis.R:251` | `w_minus <- (r_grid - 0.5 * dr) / r_grid` |
+| geometry enters the stencil only through those weights | `biofilms_radiodialysis.R:147` | `(w_plus[i]  * (c_vec[i + 1] - c_vec[i]) -` |
 
 ### Part 2 — the axis
 
 | claim | source | must contain |
 |---|---|---|
-| the axis limit is named as L'Hôpital | `biofilms_radiodialysis.R:106` | `L'Hôpital limit` |
-| and implemented with the factor of 2 | `biofilms_radiodialysis.R:110` | `dc_dt[1] <- D_eff * 2.0 * (c_vec[2] - c_vec[1]) / dr^2` |
+| the axis limit is named as L'Hôpital | `biofilms_radiodialysis.R:133` | `L'Hôpital limit` |
+| and implemented with the factor of 2 | `biofilms_radiodialysis.R:137` | `dc_dt[1] <- D_eff * 2.0 * (c_vec[2] - c_vec[1]) / dr^2` |
 | the manuscript calls it symmetry, not a wall | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:781` | `Zero-flux symmetry is imposed at $r = 0$.` |
 
 ### Part 3 — three treatments
 
 | claim | source | must contain |
 |---|---|---|
-| the axis is special-cased, not zero-area | `biofilms_radiodialysis.R:110` | `dc_dt[1] <- D_eff * 2.0` |
-| its face weights are deliberately unusable | `biofilms_radiodialysis.R:226` | `w_plus[1] <- NA_real_; w_minus[1] <- NA_real_` |
-| the wall uses a ghost node, not a set face flux | `biofilms_radiodialysis.R:132` | `c_ghost <- c_vec[Nr - 1] -` |
+| the axis is special-cased, not zero-area | `biofilms_radiodialysis.R:137` | `dc_dt[1] <- D_eff * 2.0` |
+| its face weights are deliberately unusable | `biofilms_radiodialysis.R:253` | `w_plus[1] <- NA_real_; w_minus[1] <- NA_real_` |
+| the wall uses a ghost node, not a set face flux | `biofilms_radiodialysis.R:159` | `c_ghost <- c_vec[Nr - 1] -` |
 | the scheme is named finite-volume method of lines | `biofilms_radiodialysis.R:32` | `finite-volume method of lines` |
 | the manuscript claims both ends are in the operator | `preprint/modeling_radioresistance_and_radiotropic_fitness.tex:1045` | `represented explicitly in the semi-discrete operator` |
 
@@ -333,14 +333,14 @@ suite, and the failure message distinguishes "the code moved" from "the code cha
 | claim | source | must contain |
 |---|---|---|
 | the condition as stated | `biofilms_radiodialysis.R:20` | `-D_eff ∂c/∂r\|_{r=R} = P_eff(t) · (c(R,t) − c_ext)` |
-| the ghost substitution, second line | `biofilms_radiodialysis.R:133` | `2.0 * dr * bc_coef * (c_vec[Nr] - c_ext) / D_eff` |
+| the ghost substitution, second line | `biofilms_radiodialysis.R:160` | `2.0 * dr * bc_coef * (c_vec[Nr] - c_ext) / D_eff` |
 
 ### Part 5 — method of lines and LSODA
 
 | claim | source | must contain |
 |---|---|---|
-| forty cells by default | `biofilms_radiodialysis.R:230` | `default_parms <- function(Nr = 40, R = 1.0)` |
+| forty cells by default | `biofilms_radiodialysis.R:257` | `default_parms <- function(Nr = 40, R = 1.0)` |
 | the state vector packs c, s and m | `biofilms_radiodialysis.R:50` | `y[1 .. Nr]        = c_i` |
-| LSODA is the integrator | `biofilms_radiodialysis.R:400` | `method = "lsoda"` |
+| LSODA is the integrator | `biofilms_radiodialysis.R:427` | `method = "lsoda"` |
 | the Julia port substeps against the diffusion bound | `biofilms_potts.jl:1453` | `dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)` |
 | the explicit-Euler limit is computed, not asserted | `analysis/verify_radiodialysis_stability.py:153` | `conservative_real_axis_limit` |
