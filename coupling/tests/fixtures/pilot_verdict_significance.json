@@ -1,0 +1,85 @@
+{
+ "description": "The 11 scenarios of the canonical nested pilot, reduced to the five fields the publication_block predicate reads. Extracted from artifacts/pilot/openmc_nested_pilot_verdict.json, which is GITIGNORED -- a test reading that file directly would skip silently on a fresh clone, which is the empty-suite failure mode this repo has already been bitten by. Committed so the check runs everywhere.",
+ "source_git_commit": "9987a75a6a2451661bd4c583344ad6ff414b29c9-dirty",
+ "threshold_policy_id": "synthetic_gate_contract_v1",
+ "purpose": "Assert publication_block() refuses NOTHING this repo has already published. A guard that would have blocked existing evidence is a different proposal from the one that was reviewed.",
+ "scenarios": {
+  "clearly_detectable": {
+   "verdict": "PASS_SYNTHETIC_GATE",
+   "distinguishable_from_zero": true,
+   "t_versus_zero": 83.99900950923055,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_Fe_5pct": {
+   "verdict": "EFFECT_BELOW_THRESHOLD",
+   "distinguishable_from_zero": true,
+   "t_versus_zero": 10.331277795085196,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_Fe_5pct_unpaired": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": false,
+   "t_versus_zero": 0.47007534211913116,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_Gd_5pct": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": true,
+   "t_versus_zero": 39.87389164736885,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_Gd_5pct_unpaired": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": false,
+   "t_versus_zero": 4.397070961547678,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_dehydration_H_0.06": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": true,
+   "t_versus_zero": 15.743207174673548,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_dehydration_H_0.06_unpaired": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": false,
+   "t_versus_zero": 4.269461230728785,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_density_x1.35": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": false,
+   "t_versus_zero": 1.8401273483827265,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "lever_density_x1.35_unpaired": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": false,
+   "t_versus_zero": 0.6162750134018444,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "near_threshold": {
+   "verdict": "INDETERMINATE_NUMERICS",
+   "distinguishable_from_zero": true,
+   "t_versus_zero": 81.00252866331607,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  },
+  "noise_floor": {
+   "verdict": "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT",
+   "distinguishable_from_zero": false,
+   "t_versus_zero": 0.369359443326811,
+   "t_critical_0.999": 10.21,
+   "n_outer_draws": 4
+  }
+ }
+}

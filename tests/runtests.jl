@@ -28,6 +28,8 @@ end
     include("deterministic_radiation.jl")
 end
 
+include("radiodialysis_basis_gate.jl")
+
 @testset "Lifecycle, dose contract, windowed API" begin
     include("genealogy_tests.jl")
 end
@@ -41,4 +43,12 @@ end
 # a CI runner sees — so the portability layer's portability is itself tested.
 @testset "JACC port kernels versus the serial reference" begin
     include("jacc_port_tests.jl")
+end
+
+@testset "Console report honesty" begin
+    include("console_report_tests.jl")
+end
+
+@testset "Manuscript claims" begin
+    include("manuscript_claims_tests.jl")
 end

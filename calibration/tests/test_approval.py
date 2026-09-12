@@ -41,7 +41,11 @@ def row(**overrides) -> dict:
     r = dict(
         growth_condition_id="GC1",
         strain_identities="D. radiodurans R1; C. neoformans H99",
-        biosafety_level_by_strain="DR:BSL1;CN:BSL2",
+        # Keyed by the identifiers VERBATIM. This fixture read `DR:BSL1;CN:BSL2`
+        # while the check was structural, which is exactly the shape that
+        # cleared the gate naming no declared organism.
+        biosafety_level_by_strain=(
+            "D. radiodurans R1:BSL1; C. neoformans H99:BSL2"),
         containment_facility="Building 4, BSL-2 suite",
         risk_assessment_reference="RA-2026-0031",
         is_target_system="true",
@@ -225,3 +229,143 @@ def test_the_gate_reads_only_the_authoritative_table(tmp_path):
     assert "baseline_condition.csv" in src
     assert "proposal" not in src, (
         "the gate must not read the non-authoritative proposal table")
+
+
+def test_an_approval_without_a_protocol_version_is_refused():
+    """`approved_protocol_version` is one of the SCOPE_COLUMNS, so a blank value
+    hashes as blank and the digest still matches. An approval could be recorded
+    without identifying WHICH protocol the institution reviewed — which is the
+    binding the digest exists to create."""
+    found = problems(row(approved_protocol_version=""))
+    assert any("approved_protocol_version" in p for p in found), found
+    assert any("names nothing" in p for p in found)
+
+
+def test_every_refusal_states_its_own_subject():
+    """WHAT MAKES THE CHECKLIST UNPARSEABLE-BY-DESIGN.
+
+    `problems()` is prose for humans; `classified()` carries the column each
+    refusal is about. The institutional checklist consumes the latter, so no
+    condition id, identifier or other field value can influence which criterion
+    a refusal lands on — a defect that survived four narrowing fixes while it
+    was recovered by parsing the message.
+
+    Every subject must be a real column (or None, for the sentences relating
+    two dates), or the checklist's lookup silently gains an unmapped case.
+    """
+    known = set(approval.SCOPE_COLUMNS) | {
+        "approval_source_id", "approval_scope_hash", "approval_scope_hash:mismatch",
+        "institutional_approval_id", "institutional_approval_authority",
+        "approval_effective_date", "approval_expiration_date",
+        "culturing_start_date", "is_target_system", "strain_identities",
+        "biosafety_level_by_strain", "containment_facility",
+        "risk_assessment_reference", "approved_protocol_version", None}
+
+    broken = dict(row(), growth_condition_id='O\'Brien "lab"',
+                  approval_source_id="", strain_identities="unknown",
+                  containment_facility="TBD", approval_effective_date="")
+    seen = approval.classified([broken], SOURCES, today=TODAY)
+    assert seen, "the fixture stopped refusing; this test proves nothing"
+    for refusal in seen:
+        assert refusal.subject in known, refusal
+        assert refusal.text, refusal
+
+    # and prose is derived from the same list, so the two cannot disagree
+    assert approval.problems([broken], SOURCES, today=TODAY) == \
+        [r.text for r in seen]
+
+
+# ------------------------------------------- the mapping must BE a mapping
+
+_DR, _CN = "D. radiodurans R1", "C. neoformans H99"
+
+
+@pytest.mark.parametrize("value,refuses,why", [
+    (f"{_DR}:BSL1;{_CN}:BSL2", False, "the complete, well-formed mapping"),
+    # Typography is not identity: case and whitespace runs are how two cells
+    # meaning the same organism differ, so matching ignores them and nothing
+    # else.
+    (f"d. radiodurans  r1:BSL1;  C. Neoformans H99 :BSL2", False,
+     "the same two strains, differently typed"),
+    # THE PRECISE ERROR THE SCHEMA WARNS ABOUT: acquisition.py documents this
+    # field as "per-strain ... never a single level".
+    ("BSL2", True, "one level for a mixed-BSL consortium"),
+    # Covers one of two declared strains. The omitted organism is not approved,
+    # and the omission must not read as coverage.
+    (f"{_DR}:BSL1", True, "fewer entries than declared strains"),
+    ("all strains are safe", True, "prose, not a mapping"),
+    (f"{_DR}:BSL1;{_DR}:BSL2", True,
+     "a repeated key silently overrides a level"),
+    (f"{_DR}:BSL9;{_CN}:BSL2", True, "BSL9 is not a containment level"),
+    (f"{_DR}:;{_CN}:BSL2", True, "an empty level is not a level"),
+    (f":BSL1;{_CN}:BSL2", True, "an empty strain key names no organism"),
+    # THE TWO THAT USED TO PASS. Both have the right shape, the right count and
+    # distinct keys; neither names an organism this row declares.
+    ("DR:BSL1;CN:BSL2", True, "abbreviations declare no relationship to a strain"),
+    ("XX:BSL1;YY:BSL2", True, "keys naming nothing the row declares"),
+])
+def test_the_per_strain_mapping_is_parsed_not_merely_nonempty(value, refuses, why):
+    """ADDING THE FIELD TO THE PLACEHOLDER LIST MADE IT REACHABLE, NOT VALID.
+
+    That fix closed the fail-open on filler text and left a wider one open:
+    any non-filler string cleared the check, so `"BSL2"` -- a single level for
+    a consortium whose strains sit at different levels -- passed, and after
+    recomputing the scope hash all nine authorization criteria reported met.
+
+    Two rounds on the same field is the point: a guard that is reachable is
+    not thereby a guard that discriminates.
+    """
+    found = [p for p in problems(row(biosafety_level_by_strain=value))
+             if "biosafety_level_by_strain" in p]
+    assert bool(found) == refuses, f"{why}: {value!r} -> {found}"
+
+
+def test_the_mapping_keys_are_bound_to_the_declared_strains():
+    """THE COUNT WAS NOT THE BINDING, AND THIS TEST USED TO SAY SO.
+
+    It was `test_the_mapping_check_does_not_claim_to_bind_keys_to_strain_names`
+    and it asserted that `XX:BSL1;YY:BSL2` PASSES -- recording, deliberately, a
+    limit the docstring stated: nothing declared how `DR` related to
+    `D. radiodurans R1`, so binding them would have been the consumer inventing
+    semantics. The reasoning was sound and the conclusion was wrong. A row with
+    the right shape, the right count and distinct keys cleared all nine
+    authorization criteria carrying biosafety evidence for NEITHER declared
+    organism, and a recorded limit is still a fail-open.
+
+    What was missing was a producer declaration, not an inference. acquisition.py
+    now keys the field by the strain identifier verbatim, so there is no
+    convention left to guess, and this asserts the binding in both directions:
+    a strain with no level, and a level for an organism the row never declared.
+    """
+    def refusals(**over):
+        return [p for p in problems(row(**over))
+                if "biosafety_level_by_strain" in p]
+
+    # Codex's case: right shape, right count, neither organism named.
+    found = refusals(biosafety_level_by_strain="XX:BSL1;YY:BSL2")
+    assert found, "keys naming no declared strain must be refused"
+    assert _DR in found[0] and _CN in found[0], (
+        f"the refusal must name the strains left uncovered: {found}")
+
+    # One declared, one invented -- half-coverage reads as coverage otherwise.
+    found = refusals(biosafety_level_by_strain=f"{_DR}:BSL1;YY:BSL2")
+    assert found, "a key naming an undeclared organism must be refused"
+    assert "YY" in found[0] and _CN in found[0], found
+
+    # THE CONTROL FOR THE CONTROL: the same row with correct keys must pass,
+    # or this test proves only that something refuses everything.
+    assert not refusals(), "the well-formed fixture must not be refused"
+
+
+def test_a_strain_identifier_containing_a_colon_is_refused_against_its_own_field():
+    """A DIAGNOSIS POINTED AT THE WRONG FIELD IS A THIRD BUG.
+
+    The key is the identifier verbatim, so an identifier carrying ':' cannot be
+    written as one. Without this the row surfaces below as "not a strain:level
+    pair", sending the reader to fix the mapping -- the only part of the row
+    that is right.
+    """
+    found = [p for p in problems(row(strain_identities="ATCC:12345",
+                                     biosafety_level_by_strain="ATCC:12345:BSL1"))
+             if "strain_identities" in p and "':'" in p]
+    assert found, "an unexpressible strain identifier must be refused by name"

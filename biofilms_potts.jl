@@ -557,10 +557,15 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
     # THE 0.5 BELOW IS THE COEFFICIENT THAT ACTUALLY MOVES THIS MODEL, and it is
     # hard-coded here rather than tabulated. At the shipped I0 = 1.0 and
     # T_cpm = 5.0, the radiation term for a radiotropic species is
-    # β_ion·I = -5e-5, an acceptance bias of 1.000010 — one part in 1e5. This
-    # term at the reported M = 1.44 is -0.72, a bias of 1.155. Four orders of
-    # magnitude. The radial stratification is therefore melanin-mediated, not
-    # β_ion-mediated. Radiation still drives it, but only indirectly:
+    # β_ion·I = -5e-5 for a NEGATIVELY signed species OCCUPYING a site, an
+    # acceptance bias of 1.000010. That is one role of one pair of species and
+    # is NOT the term's reach: signed by role, the extremum over source/target
+    # pairings is 7.505e-2 (see §6.2 and tests/prose_bounds.jl). This term at
+    # the reported M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of
+    # 9.6 in ΔH, NOT by four orders. CORRECTED 2026-08-30: this comment carried
+    # the version-1.1 claim in a file the manuscript sweep never covered, which
+    # is what a sweep bounded to one file cannot find.
+    # The radial stratification is still melanin-mediated, not β_ion-mediated. Radiation still drives it, but only indirectly:
     # melanin_drive is copied from the radiation field, so
     #   radiation -> production (α_M, tabulated) -> M -> here -> tropism.
     # Ledgered as cpm.melanin_coupling in data/parameter_provenance.csv.
@@ -1085,7 +1090,7 @@ function main()
     println("="^72)
     println("  Cellular Potts Model — Radiotropic Biofilm System")
     println("  Based on Kinder & Faulkner (2026)")
-    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("="^72)
     println()
 
@@ -1193,6 +1198,13 @@ Base.@kwdef struct RadiolysisParams
     X_total::Float64 = 1.0     # total dry-mass density (g cm⁻³)
     X_red::Float64 = 0.3       # metal-reducing fraction (Shewanella proxy)
 
+    # Basis gate acknowledgement.  false refuses any X_total != 1.0.
+    # Bool rather than a Symbol because this field is HDF5-serialised by
+    # export_checkpoint.jl and must survive a restart; the exemption is binary
+    # anyway, and WHICH sites hold it is pinned by the census test rather than
+    # by a symbol name.  See _assert_basis_gate.
+    basis_gate_ack::Bool = false
+
     # Membrane (Nafion / Donnan — Fox et al. 2009, Lara et al. 2023)
     P0::Float64 = 0.01         # baseline permeability (cm s⁻¹)
     alpha_P::Float64 = 0.02    # radiation-damage coefficient (Gy⁻¹)
@@ -1217,7 +1229,19 @@ mutable struct RadiolysisState
     m::Float64                # membrane integrity  m ∈ [0,1]
     t::Float64                # simulation time
     params::RadiolysisParams
+    # Sticky basis provenance.  NOT inferred from X_total: a coupled state can
+    # legitimately produce mean(X_tot) == 1.0 (every sampled interior site
+    # occupied), which would collide with the standalone default and slip the
+    # gate; and c/s are PATH-dependent, so once a step has run on an occupancy
+    # basis they stay gated even if X_total later returns to 1.0.  Rule 4: the
+    # producer that installs the basis declares it, and the flag never clears.
+    basis_from_occupancy::Bool
 end
+
+# Six-argument form: provenance defaults to false, so a standalone state is
+# unmarked and only the coupled installers set it.
+RadiolysisState(r_grid, c, s, m, t, params) =
+    RadiolysisState(r_grid, c, s, m, t, params, false)
 
 """
 Initialise RadiolysisState: clean interior, intact membrane.
@@ -1252,6 +1276,8 @@ R = 1.0 cm makes dt_rd = 0.5 genuinely unstable, and this guard is what absorbs
 it. `biofilms_potts_jacc.jl` carries the identical wrapper for the same reason.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
+    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack,
+                       rd.basis_from_occupancy)
     dr = rd.r_grid[2] - rd.r_grid[1]
     dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
     n_sub = max(1, ceil(Int, dt / dt_stable))
@@ -1259,6 +1285,68 @@ function step_radiolysis!(rd::RadiolysisState, dt::Float64)
     for _ in 1:n_sub
         _step_radiolysis_euler!(rd, dt_sub)
     end
+end
+
+"""
+    _assert_basis_gate(X_total)
+
+Refuse to integrate on a coupled biomass basis, EXPLICITLY.
+
+RADIODIALYSIS: BLOCKED gates the biomass basis fed into this coupling, and
+until now nothing here enforced it. The block was being done by an accident:
+`uptake = k_ads*X_total + k_red*X_red` is the pre-fraction additive form, which
+happens to misbehave at non-unit `X_total`, and that side effect was standing in
+for a guard. An accidental tripwire is not a gate -- it can be removed by
+someone tidying the arithmetic, leaving nothing to say the basis was blocked.
+
+So the refusal is stated. `X_total == 1.0` is the standalone default and stays
+allowed; anything else means a real basis was supplied, which is what the gate
+covers.
+
+WHY THE ARITHMETIC IS NOT ALSO FIXED. `biofilms_radiodialysis.R` now derives
+`X_red = f_red_active * X_total` (`uptake_rate_of()`), and mirroring that here
+would make this path *conformant*. It would not make it *correct*: the `X_red`
+reaching it is `red_cells[i] / counts[i]` (`compute_radial_biomass`), one
+species' occupied sites over ALL interior sites, which README.md:344 records as
+"neither a biomass fraction nor a reducer fraction". Conformant arithmetic over
+a quantity the repository has already refused is worse than visibly
+non-conformant arithmetic over the same one: the defect would stop being visible
+while staying just as gated. The arithmetic stays as a marker that this
+reconciliation is unfinished.
+
+Nor can the fraction be derived from parcel counts. Counts give a TAXONOMIC
+fraction, and `active_from_taxonomic()` refuses converting one to an
+active-reducer fraction without a measured activity fraction; `D-XRED` in
+`data/calibration/reference_d_requirements.csv` records that as blocked by this
+units error rather than by missing data.
+"""
+function _assert_basis_gate(X_total::Float64, ack::Bool = false,
+                            from_occupancy::Bool = false)
+    (X_total == 1.0 && !from_occupancy) && return nothing
+    # THE ONE EXEMPTION.  validate_serial.jl steps this path only to reproduce a
+    # bit-for-bit CPM trajectory, and records no radiodialysis quantity: its CSV
+    # carries CPM columns plus rd.m, whose ODE (dm/dt = -k_dam*Ddot_R*m) has no
+    # X_total or X_red in it.  That independence is not taken on trust -- it is
+    # asserted in tests/radiodialysis_basis_gate.jl by running the harness at
+    # two different gated bases and requiring byte-identical CSV.  Widen this
+    # exemption and that test is what should stop you.
+    ack && return nothing
+    error("""
+        RADIODIALYSIS: BLOCKED -- refusing to integrate at X_total = $X_total.
+
+        Only the standalone default X_total == 1.0 is allowed here.
+
+        A coupled basis reaches this path as mean(compute_radial_biomass(...)):
+        one species' occupied sites over all interior sites, which is
+        neither a biomass fraction nor a reducer fraction
+        (README.md:344). The uptake arithmetic here is also still the
+        pre-fraction additive form, unlike biofilms_radiodialysis.R's
+        uptake_rate_of().
+
+        This refusal is deliberate and is asserted by
+        tests/radiodialysis_basis_gate.jl. Removing it to let a coupled run
+        proceed re-opens the defect the gate names; repair the quantity first.
+        """)
 end
 
 """
@@ -1466,8 +1554,11 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                            rd.c[end])
     push!(trajectory, cs0)
     print_snapshot(snap0)
-    @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
-            rd.t, rd.m, rp.P0 * exp(rp.alpha_P * rd.t * rp.Ddot_R),
+    # RATIO, NOT AN ABSOLUTE. P0 is an uncalibrated placeholder, so
+    # `P0 * exp(...)` carries its arbitrariness into a number that looks
+    # measured. P_eff/P0 is dimensionless and is what the manuscript reports.
+    @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
+            rd.t, rd.m, exp(rp.alpha_P * rd.t * rp.Ddot_R),
             rd.c[end], mean(rd.c))
 
     for mcs in 1:n_mcs
@@ -1487,6 +1578,7 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                 k_loss  = rp.k_loss,
                 X_total = mean(X_tot),
                 X_red   = mean(X_rd),
+                basis_gate_ack = rp.basis_gate_ack,
                 P0      = rp.P0,
                 alpha_P = rp.alpha_P,
                 k_dam   = rp.k_dam,
@@ -1494,6 +1586,10 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                 c_ext   = rp.c_ext,
                 dt_rd   = rp.dt_rd
             )
+            # Declared where the occupancy basis is INSTALLED, and never
+            # cleared: c and s are path-dependent from here on, so provenance
+            # cannot be re-derived from the current X_total (rule 4).
+            rd.basis_from_occupancy = true
         end
         step_radiolysis!(rd, rp.dt_rd)
 
@@ -1517,8 +1613,8 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                                   mean(rd.c), mean(rd.s), rd.c[end])
             push!(trajectory, cs)
             print_snapshot(snap)
-            @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
-                    rd.t, rd.m, P_eff_now, rd.c[end], mean(rd.c), mean(rd.s))
+            @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
+                    rd.t, rd.m, P_eff_now / rp.P0, rd.c[end], mean(rd.c), mean(rd.s))
         end
     end
 
@@ -1526,6 +1622,23 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
 end
 
 # ---- Radiodialysis-coupled main -----------------------------
+
+"""
+    print_membrane_report(rp, rd, n_mcs)
+
+Print the membrane-integrity/permeability/dose summary. Split out of
+`main_coupled()` so it's testable without a full simulation run, and so a
+negative control can capture exactly what it prints: no fabricated physical
+units (Gy, cm/s) attached to a quantity this repository cannot calibrate —
+see docs/research/session_claims_2026-08-24_redteam.md and PR #12.
+"""
+function print_membrane_report(rp::RadiolysisParams, rd::RadiolysisState, n_mcs::Int)
+    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
+    @printf("  Final P_eff / P0 = %.4f  (dimensionless ratio, exact by construction from alpha_P·Ddot_R·dt_rd·n_MCS — not a measurement)\n",
+            exp(rp.alpha_P * rp.Ddot_R * rd.t))
+    @printf("  Final P_eff, absolute: not computed in this work (P0 = %.3g cm/s is a Nafion-117 literature prior, not a calibration)\n", rp.P0)
+    @printf("  D_cum (dimensionless placeholder) after %d MCS: %.1f  (no seconds_per_mcs conversion exists — not Gy)\n", n_mcs, rp.Ddot_R * rd.t)
+end
 
 """
     main_coupled()
@@ -1537,7 +1650,7 @@ function main_coupled()
     println("="^72)
     println("  CPM + Radiodialysis Membrane Transport (Coupled)")
     println("  Kinder & Faulkner (2026) — Equations (1)–(3)")
-    println("  H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("  PDE: ∂c/∂t = ∇·(D ∇c) - uptake·c + k_des·s (cylindrical)")
     println("="^72)
     println()
@@ -1549,7 +1662,7 @@ function main_coupled()
             params.N, N_SPECIES, params.n_cells_per_species)
     @printf("  Radiolysis:   Nr=%d  D_eff=%.3g  P₀=%.3g  α=%.3g\n",
             rp.Nr, rp.D_eff, rp.P0, rp.alpha_P)
-    @printf("  Membrane:     Ḋ(R)=%.1f Gy/s  c_ext=%.2f  k_dam=%.3g\n\n",
+    @printf("  Membrane:     Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)  c_ext=%.2f  k_dam=%.3g\n\n",
             rp.Ddot_R, rp.c_ext, rp.k_dam)
 
     n_mcs = 100
@@ -1561,11 +1674,7 @@ function main_coupled()
 
     @printf("\n  Simulation completed in %.1f seconds.\n", elapsed)
     @printf("  Surviving cells: %d\n", length(state.cells))
-    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
-    @printf("  Final P_eff = %.5f cm/s  (×%.1f baseline)\n",
-            rp.P0 * exp(rp.alpha_P * rp.Ddot_R * rd.t),
-            exp(rp.alpha_P * rp.Ddot_R * rd.t))
-    @printf("  Cumulative dose at membrane: %.1f Gy\n", rp.Ddot_R * rd.t)
+    print_membrane_report(rp, rd, n_mcs)
 
     # Contaminant uptake summary
     println("\n  CONTAMINANT UPTAKE SUMMARY")
@@ -1838,8 +1947,13 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int)
                 Nr = rp.Nr, D_eff = rp.D_eff, k_ads = rp.k_ads,
                 k_red = rp.k_red, k_des = rp.k_des, k_loss = rp.k_loss,
                 X_total = mean(X_tot), X_red = mean(X_rd),
+                basis_gate_ack = rp.basis_gate_ack,
                 P0 = rp.P0, alpha_P = rp.alpha_P, k_dam = rp.k_dam,
                 Ddot_R = rp.Ddot_R, c_ext = rp.c_ext, dt_rd = rp.dt_rd)
+            # Declared where the occupancy basis is INSTALLED, and never
+            # cleared: c and s are path-dependent from here on, so provenance
+            # cannot be re-derived from the current X_total (rule 4).
+            rd.basis_from_occupancy = true
         end
         step_radiolysis!(rd, rd.params.dt_rd)
         radial_to_3d!(sim.contaminant, rd.c, rd.r_grid, state.interior, N)

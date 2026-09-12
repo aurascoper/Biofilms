@@ -21,6 +21,17 @@ sys.path.insert(0, str(REPO / "calibration" / "scripts"))
 
 import reference_d_status as status  # noqa: E402
 
+DATA = REPO / "data" / "calibration"
+REQUIREMENTS_PATH = DATA / "reference_d_requirements.csv"
+ISOTHERM_PATH = DATA / "suspended_isotherm_proposal.csv"
+
+# Words the preamble once documented that `load_requirements` never accepted.
+# Named so the vocabulary check can tell "a status I do not recognise" from
+# "ordinary English in a comment" -- without this the scan would find nothing
+# and pass vacuously against any text at all.
+_RETIRED_STATUS_WORDS = frozenset(
+    {"not_started", "blocked_on_model", "awaits_upstream"})
+
 
 @pytest.fixture(scope="module")
 def requirements():
@@ -181,6 +192,65 @@ def test_authorization_cannot_be_reached_without_a_baseline_row():
     assert all(not met for _, met in status.authorization_criteria([]))
 
 
+def test_a_valid_approval_meets_every_criterion():
+    """The suite would be worthless if the milestone could not be reached. It
+    could not, for a while: `authorization_criteria` was called without
+    `sources`, so criterion 8 was unmeetable by any input — indistinguishable
+    from a correctly withheld authorization, because "not authorized" is the
+    expected state."""
+    from test_approval import SOURCES, TODAY, row
+
+    unmet = [c for c, ok in status.authorization_criteria(
+        [row()], SOURCES, today=TODAY) if not ok]
+    assert unmet == [], unmet
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("strain_identities", "unknown"),
+    ("biosafety_level_by_strain", "unknown"),
+    ("containment_facility", "TBD"),
+    ("risk_assessment_reference", "pending"),
+    ("institutional_approval_id", "d approved"),
+    ("institutional_approval_authority", "n/a"),
+    ("approved_protocol_version", ""),
+    ("approval_source_id", "IBC_NOPE"),
+    ("approval_effective_date", "June 2026"),
+    ("approval_expiration_date", "2026-08-01"),
+    ("culturing_start_date", "2026-05-01"),
+    ("is_target_system", "false"),
+    ("scope_hash", " "),
+])
+def test_every_refusal_reaches_a_criterion(field, bad):
+    """THE NEGATIVE CONTROL THE MAPPING NEVER HAD.
+
+    `authorization_criteria` translates `approval.problems` into nine criteria
+    by substring. Any refusal matching no pattern used to be read as evidence
+    for nothing, and so defaulted to MET — a false positive on an institutional
+    biosafety milestone.
+
+    That is exactly what happened: adding the `approved_protocol_version` check
+    to the gate produced a refusal the milestone could not see. The gate said
+    no; all nine criteria said yes. Nothing failed, because nothing compared
+    them.
+
+    So break one field at a time and require the milestone to notice every
+    single one. A new check in `approval.problems` that lands nowhere now fails
+    here instead of silently widening the gap.
+    """
+    from biofilm_calibration import approval
+    from test_approval import SOURCES, TODAY, row
+
+    r = row(**{field: bad})
+    assert approval.problems([r], SOURCES, today=TODAY), (
+        "the fixture is stale: this input no longer refuses at the gate, so "
+        "the test proves nothing about the criteria")
+    unmet = [c for c, ok in status.authorization_criteria(
+        [r], SOURCES, today=TODAY) if not ok]
+    assert unmet, (
+        f"breaking {field!r} refuses at the gate but leaves all criteria met. "
+        "The milestone reads AUTHORIZED over a live refusal.")
+
+
 def test_criteria_with_no_consumer_are_named(requirements):
     """A gate must not close on a threshold nobody compares against."""
     report = status.enforcement_report()
@@ -190,3 +260,190 @@ def test_criteria_with_no_consumer_are_named(requirements):
     assert "spatial:require_independent_validation_sample" in decorative
     assert "spatial:maximum_biovolume_fraction_error" in set(report["hard"])
     assert "spatial:maximum_porosity_error" in set(report["derived"])
+
+
+@pytest.mark.parametrize("kwargs,expect_number,must_stay_met", [
+    ({"approval_source_id": ""},          8, (7,)),  # provenance, NOT dates
+    ({"scope_hash": " "},                 2, (7,)),  # binding, NOT dates
+    ({"approval_effective_date": ""},     7, (8,)),  # an actual date
+    ({"approval_expiration_date": ""},    7, (8,)),
+    ({"culturing_start_date": ""},        7, (8,)),
+    # AN IDENTIFIER MUST NOT BE ABLE TO MANUFACTURE A DATE BLOCKER. These
+    # values are unresolvable source ids and nothing more; the refusal echoes
+    # them, and a substring match on the concatenated text made criterion 7
+    # fire on the word inside somebody's identifier.
+    ({"approval_source_id": "expired"},   8, (7,)),
+    ({"approval_source_id": "not-an-ISO-date"}, 8, (7,)),
+    # AND NO VALUE MAY IMPERSONATE A CROSS-FIELD SENTENCE. The relation
+    # phrases are checked only AFTER the field is identified, so an identifier
+    # spelling one out is still just an unresolvable identifier.
+    ({"approval_source_id": "does not match the conditions"}, 8, (6, 7)),
+    ({"approval_source_id": "is not the target system"}, 8, (9, 7)),
+    ({"strain_identities": "unknown"},    1, (7, 8)),
+    ({"containment_facility": "TBD"},     3, (7, 8)),
+    ({"is_target_system": "false"},       9, (7, 8)),
+])
+def test_an_unset_field_blames_the_criterion_it_actually_belongs_to(
+        kwargs, expect_number, must_stay_met):
+    """BEING TOLD THE WRONG THING IS WRONG IS WORSE THAN BEING TOLD NOTHING.
+
+    Criterion 7 matched a bare `"is unset"`, and `approval.problems` emits that
+    phrase for the three dates AND for `approval_source_id` and
+    `approval_scope_hash`. So an approval with no registered document reported
+    criterion 7 — about dates — as its blocker, while criterion 8, about
+    provenance, stayed green. Whoever read that milestone would have gone to
+    fix a date that was never the problem.
+
+    The blocker list is the whole output of this function. If it names the
+    wrong criterion it is not a partial answer, it is a misdirection.
+    """
+    from test_approval import SOURCES, TODAY, row
+
+    unmet = [c for c, ok in status.authorization_criteria(
+        [row(**kwargs)], SOURCES, today=TODAY) if not ok]
+    assert any(c.startswith(f"{expect_number}.") for c in unmet), (
+        f"expected criterion {expect_number} to be the blocker, got: {unmet}")
+    # and nothing fell through to the unmapped catch, which would mean the
+    # criteria still cannot see this refusal at all
+    assert not any(c.startswith("UNMAPPED") for c in unmet), unmet
+
+    # THE HALF THAT ACTUALLY CATCHES THE BUG. Asserting the right criterion is
+    # present does NOT detect a misdirection -- with the bare `"is unset"`
+    # pattern restored, criterion 8 still fires for an unset source id and this
+    # test passed while criterion 7 was also, wrongly, being reported. A blocker
+    # list that names an extra criterion sends someone to fix a field that was
+    # never the problem, so the criteria that are NOT implicated must stay met.
+    for number in must_stay_met:
+        assert not any(c.startswith(f"{number}.") for c in unmet), (
+            f"criterion {number} is reported unmet, but {kwargs} has nothing to "
+            f"do with it; blockers were: {unmet}")
+
+
+def test_the_two_ways_a_scope_hash_can_fail_are_different_criteria():
+    """ONE FIELD, TWO FAILURES, and they are not the same problem.
+
+    An UNSET `approval_scope_hash` means nothing binds the approval to this row
+    — the conditions are not frozen, criterion 2. A hash that DOES NOT MATCH
+    means someone edited a growth condition after approval, so the approval no
+    longer describes what it covers — criterion 6. Reporting either as the
+    other sends a reader to the wrong remedy.
+    """
+    from test_approval import SOURCES, TODAY, row
+
+    def blockers(r):
+        return [c.split(".")[0] for c, ok in status.authorization_criteria(
+            [r], SOURCES, today=TODAY) if not ok]
+
+    edited = row()
+    edited["temperature_C"] = "37"          # approved at 30
+    assert blockers(edited) == ["6"]
+    assert blockers(row(scope_hash=" ")) == ["2"]
+
+
+@pytest.mark.parametrize("gid", [
+    "GC1", "O'Brien-1", 'a"b', "GC 1", "R2A/30C",
+    # THE ONE NO DELIMITER PAIR CAN BRACKET: repr must escape one of the two
+    # quote characters, so every "strip the quoted prefix" regex stops early.
+    'O\'Brien "lab"',
+    'both \' and " and: a colon',
+])
+def test_the_condition_id_cannot_change_which_criterion_is_blamed(gid):
+    """THE IDENTIFIER IS DATA. It must not steer the checklist.
+
+    `approval.problems` formats the id with `!r`, and Python switches to double
+    quotes when the value contains an apostrophe — so an ordinary condition id
+    like `O'Brien-1` produced a prefix the classifier's regex could not strip.
+    The head became the word "condition", nothing matched, and an unset source
+    id was reported as a scope failure plus an UNMAPPED refusal.
+
+    Four fixes narrowed that defect without closing it, because the defect was
+    never the regex — it was asking a sentence built from unrestricted CSV data
+    to say which field it was about. `approval.classified` now carries the
+    subject, so these ids cannot reach the decision at all.
+
+    Whether a growth condition happens to be named after someone Irish is not a
+    fact about its biosafety approval.
+    """
+    from test_approval import SOURCES, TODAY, row
+
+    def blockers(**kw):
+        return [c.split(".")[0] for c, ok in status.authorization_criteria(
+            [row(growth_condition_id=gid, **kw)], SOURCES, today=TODAY)
+            if not ok]
+
+    assert blockers(approval_source_id="") == ["8"]
+    assert blockers(approval_effective_date="") == ["7"]
+    assert blockers(strain_identities="unknown") == ["1"]
+    assert blockers() == []
+
+
+# ------------------------------------------- the preamble is part of the table
+
+def test_the_documented_status_vocabulary_is_the_enforced_one():
+    """A TABLE THAT MISDOCUMENTS ITSELF IS A TRAP, and this one did.
+
+    The preamble named `not_started`, `blocked_on_model` and `awaits_upstream`;
+    `load_requirements` accepts none of them. Anyone adding a row by following
+    the file's own instructions wrote something that could not load, and the
+    drift was invisible for exactly as long as nobody added a row -- the same
+    shape as a guard nothing exercises.
+
+    The code is the contract, so the prose was corrected to it rather than the
+    reverse. Note the two repairs look identical and mean opposite things: if
+    those three words had been a design somebody intended, deleting them would
+    have discarded it. `unsupported_by_current_model` already covers what
+    `blocked_on_model` described, so at most `awaits_upstream` was lost.
+    """
+    preamble = [l for l in REQUIREMENTS_PATH.read_text().splitlines()
+                if l.startswith("#")]
+    documented = {w for line in preamble for w in line.replace("#", "").split()
+                  if w in status.STATUSES or w in _RETIRED_STATUS_WORDS}
+
+    assert documented, "the preamble documents no status values at all"
+    assert documented <= set(status.STATUSES), (
+        f"the preamble documents {sorted(documented - set(status.STATUSES))}, "
+        "which load_requirements() refuses")
+    # And every enforced value is documented, or the table under-describes
+    # itself in the other direction.
+    assert set(status.STATUSES) <= documented, (
+        f"STATUSES has {sorted(set(status.STATUSES) - documented)} that the "
+        "preamble never mentions")
+
+
+def test_the_status_vocabulary_check_catches_a_reintroduced_stale_word():
+    """The negative control: the assertion above must fail on the text it
+    replaced, not merely pass on the text that replaced it."""
+    stale = "#   blocked_on_model       awaits a model change, not a measurement"
+    documented = {w for w in stale.replace("#", "").split()
+                  if w in status.STATUSES or w in _RETIRED_STATUS_WORDS}
+    assert documented == {"blocked_on_model"}
+    assert not documented <= set(status.STATUSES)
+
+
+# ------------------------------------------- the non-authoritative side tables
+
+def test_no_gate_reads_the_suspended_isotherm_proposal():
+    """SAME ISOLATION reference_d_condition_proposal.csv HAS, and for the same
+    reason: a planning worksheet must never become a second, softer path to a
+    verdict.
+
+    `suspended_isotherm_proposal.csv` records a phase-one measurement that
+    cannot satisfy D-RHOWET (no coupon) and cannot enter the solver (no units:
+    biofilms_radiodialysis.R normalises c_ext to 1.0). Both blockers are
+    written down before the measurement exists, which is the whole point -- the
+    alternative is discovering them after there is a number to defend.
+    """
+    import inspect
+
+    from biofilm_calibration.spatial import report
+
+    src = inspect.getsource(report.evaluate)
+    assert "suspended_isotherm" not in src, (
+        "the gate must not read the non-authoritative isotherm proposal")
+
+    rows = [l for l in ISOTHERM_PATH.read_text().splitlines()
+            if l and not l.startswith("#")][1:]
+    assert rows, "the proposal table is empty"
+    for row in rows:
+        assert ",false," in row or row.rstrip().endswith(",false"), (
+            f"every row must carry authoritative_for_campaign = false: {row[:60]}")

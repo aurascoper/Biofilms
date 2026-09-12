@@ -29,8 +29,23 @@ amendment 9): one `index_base` must never describe both.
 Coordinate mapping to OpenMC (Python side, commit 5): after recovering logical (x,y,z),
 `RectLattice.universes` ordering is (z, y, x) **with increasing y-index at decreasing
 physical y**, i.e. `arr.transpose(2,1,0)[:, ::-1, :]`. That mapping lives in exactly one
-Python function and is pinned by the orientation probes end to end (Julia write → h5py →
-RectLattice lookup → dose write → Julia read).
+Python function — `snapshot.to_openmc_lattice_order`, called once, from `model.py` — and is
+pinned by the orientation probes end to end (Julia write → h5py → RectLattice lookup → dose
+write → Julia read).
+
+**There are two transforms here, not one, and only the first is probed.** This section
+previously stopped at the sentence above, which reads as though it covered the whole
+coordinate story. It does not. Data coming *back* out of OpenMC — the mesh tally in
+`dose.extract_heating`, and the raytraced volumes in `materials.mesh_material_masses_kg` —
+uses `reshape(dim[::-1]).transpose(2,1,0)` with **no y-inversion**, because `RegularMesh`
+bins ravel x-fastest and never pass through a `RectLattice`. The comments at both sites say
+"the same convention"; the convention is *related*, not the same, and the two are separate
+implementations that share no code with `to_openmc_lattice_order` or with each other.
+
+Nothing asserted that a voxel hot in the tally is the voxel holding biomass in the lattice
+until `coupling/tests/test_grid_coregistration.py`, which checks located world coordinates at
+asymmetric probes rather than index arithmetic — index agreement being what the probe tests
+already cover, and world registration being what they do not.
 
 ## `transport_snapshot.h5`
 

@@ -5,6 +5,7 @@ on:
     branches: [master, "feat/**", "ci/**", "research/**"]
     paths:
       - "analysis/**"
+      - "scripts/**"
       - "*.R"
       - "*.jl"
       - "preprint/**"
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - "analysis/**"
+      - "scripts/**"
       - "*.R"
       - "*.jl"
       - "preprint/**"
@@ -51,6 +53,25 @@ jobs:
           fi
           python analysis/verify_radiodialysis_stability.py \
             --output artifacts/radiodialysis-stability.json $extra
+      # The numpy re-coding ran nowhere (Codex P2 on #19), so it and its
+      # negative controls could regress without failing any check -- while the
+      # PR claimed cross-implementation agreement on its strength.  It lives
+      # here because this job already installs numpy.  Receipt-asserted for the
+      # same reason as the R one: exit status alone cannot tell a full run from
+      # a run that quietly lost a case.
+      - name: Verify the biofilm depth stencil (numpy re-coding)
+        run: python analysis/verify_biofilm_depth_profile.py --report py-verify.json
+
+      # The gate proves itself first (Codex P2 on #19): counting three cases
+      # accepted three copies of one, and a case whose checks were deleted has
+      # `all([]) == True` -- the can't-fail shape one level down.  --self-test
+      # runs it against six doctored receipts and requires each rejected.
+      - name: Prove the numpy receipt gate rejects drift
+        run: python scripts/assert_numpy_receipt.py --self-test
+
+      - name: Assert the numpy verifier covered every case
+        run: python scripts/assert_numpy_receipt.py py-verify.json
+
       - name: Summarize the time-step diagnostic
         if: always()
         run: |
@@ -87,6 +108,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "release"
+          use-public-rspm: true
       - name: Parse all top-level R models without executing Shiny apps
         shell: Rscript {0}
         run: |
@@ -96,6 +118,74 @@ jobs:
             parse(file = f)
             cat("PARSE_OK", f, "\n")
           }
+
+      # parse() is not execution.  It passes on a file whose every numerical
+      # result is wrong, so this job was green over code that ran nowhere.
+      # Install through R, not apt.  setup-r@v2 provides its own R build and
+      # reads R_LIBS_USER; r-cran-desolve installs into the DISTRO R's
+      # site-library, which that R never looks at.  So the apt step exited 0
+      # with deSolve still missing, and the verifier correctly refused to pass
+      # over the resulting skip.  stopifnot() because install.packages() only
+      # WARNS on an unavailable package (rule 3: refuse, do not default to pass).
+      - name: Install deSolve
+        shell: Rscript {0}
+        run: |
+          install.packages(c("deSolve", "jsonlite"))
+          for (pkg in c("deSolve", "jsonlite")) {
+            stopifnot(requireNamespace(pkg, quietly = TRUE))
+            cat(pkg, as.character(packageVersion(pkg)), "\n")
+          }
+
+      - name: Run the radiodialysis depth-geometry verifier
+        run: Rscript analysis/verify_biofilm_depth_profile.R --report r-verify.json
+
+      # Assert on the RECEIPT, not on the exit status.  If the setup step above
+      # fails or is dropped, the verifier reports its deSolve check as SKIPPED;
+      # a job that exits 0 having skipped is the ALL-PASS-over-skip bug moved
+      # from R into YAML.  EXPECTED_CHECKS must be bumped deliberately when
+      # checks are added, so silently losing one fails the build.
+      #
+      # Parsed as JSON, and `complete` is REQUIRED (Codex P1 on #19).  The
+      # previous version regex-scraped the three counters and never read the
+      # producer's own completeness declaration, so a receipt reading
+      # {"checks_run":14,...,"complete":false} satisfied every assertion --
+      # a gate accepting a self-declared incomplete run is rule 3 in the one
+      # place whose entire job is to refuse that.
+      - name: Assert the verifier actually ran everything
+        shell: Rscript {0}
+        run: |
+          EXPECTED_CHECKS <- 16L
+          if (!file.exists("r-verify.json"))
+            stop("no receipt: the verifier did not run to completion")
+          r <- jsonlite::fromJSON("r-verify.json", simplifyVector = TRUE)
+          for (k in c("checks_run", "failures", "skipped", "complete"))
+            if (is.null(r[[k]])) stop("receipt is missing '", k, "'")
+          if (!isTRUE(r$complete))
+            stop("receipt does not declare itself complete: complete=",
+                 format(r$complete))
+          # VALIDATE, do not coerce (Codex P2 on #19).  as.integer() is happy
+          # to turn "14" into 14 and FALSE into 0, so a broken producer emitting
+          # {"checks_run":"14","failures":false} certified as complete, and a
+          # negative counter passed every `> 0L` comparison.
+          int1 <- function(k) {
+            v <- r[[k]]
+            if (!is.numeric(v) || length(v) != 1L || is.na(v) ||
+                v < 0 || v != trunc(v))
+              stop("receipt field '", k, "' is not a non-negative integer ",
+                   "scalar: ", paste(format(v), collapse = ", "))
+            as.integer(v)
+          }
+          ran <- int1("checks_run"); fail <- int1("failures"); skip <- int1("skipped")
+          cat(sprintf("receipt: %d run, %d failed, %d skipped, complete=%s\n",
+                      ran, fail, skip, r$complete))
+          if (skip > 0L)
+            stop("verifier skipped ", skip, " check(s): ",
+                 paste(unlist(r$skips), collapse = "; "))
+          if (fail > 0L) stop("verifier reported ", fail, " failure(s)")
+          if (ran != EXPECTED_CHECKS)
+            stop("expected ", EXPECTED_CHECKS, " checks, receipt says ", ran,
+                 " -- a check was added or silently lost; update EXPECTED_CHECKS")
+          cat("R verifier ran complete.\n")
 
   manuscript-build:
     runs-on: ubuntu-latest

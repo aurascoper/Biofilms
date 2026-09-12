@@ -6,11 +6,19 @@ seed/particles/batches, and the nuclear-data identity used.
 
 ## Environment
 
-Created with micromamba (conda-forge):
+Created with micromamba from the repository's single spec:
 
 ```
-micromamba create -n openmc-biofilms -c conda-forge "openmc=0.15.3" h5py numpy pytest
+micromamba create -f environment.yml
 ```
+
+`environment.yml` is the only place the package list lives. It used to be
+restated here and inline in the `create-args` of both workflows — three
+hand-maintained copies, which is how this workflow's `/root` cross-sections
+path and its incomplete `paths:` filter both happened. The dependency list is
+deliberately **not** repeated in this document; read the file. A test asserts
+this section names it rather than quoting it, because a quotation is a fourth
+copy.
 
 Resolved on the development machine (2026-08-13):
 
@@ -80,3 +88,26 @@ micromamba run -n openmc-biofilms pip install -e contract -e "coupling[dev]"
 
 Accounting is always passed / failed / SKIPPED — no `-m` deselection, so
 nothing hides from the report.
+
+## Golden-tally fixture
+
+`coupling/tests/fixtures/golden_tally_water_phantom.json` pins 12 REAL OpenMC
+runs (2 outer draws x 3 replicates x {baseline, feedback}, water-phantom
+geometry, feedback density x1.35 — the same `DENSITY_SCALE` lever
+`openmc_nested_pilot.py` already uses) — the raw per-source heating tally,
+not anything derived from it. `coupling/tests/test_gate_composition.py`
+replays the pin through the real `specific_energy_per_source ->
+debiased_squared_effect -> decide()` chain in the ordinary (no-OpenMC) test
+tier, closing the one seam nothing else in this repo tests: a gate decision
+made from something a tally actually produced, not from hand-fabricated
+`numpy` arrays.
+
+Regenerate with `coupling/scripts/regenerate_golden_tally.py` under this
+env (needs `OPENMC_CROSS_SECTIONS`, same as everything else here). It
+refuses to overwrite the committed fixture unless all 12 runs complete,
+matching `openmc_nested_pilot.py`'s `writes_canonical_tables` /
+`refuse_partial_publish` guard. Legitimately changes only if OpenMC or the
+nuclear-data library changes — the fixture header records both — which is
+what `.github/workflows/golden-tally-verification.yml` regenerates and
+diffs against on exactly that trigger, same compare-only-in-CI discipline
+as `tests/contract_csv.jl` for the serial fixture.

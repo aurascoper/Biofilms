@@ -31,7 +31,8 @@ REFINED = Grid("dose_refinement_4", (16, 16, 16), (0.0, 0.0, 0.0),
 
 def _labels(shape=(4, 4, 4)):
     return Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
-                 np.arange(int(np.prod(shape)), dtype=np.int32).reshape(shape))
+                 np.arange(int(np.prod(shape)), dtype=np.int32).reshape(shape),
+                 background=0)
 
 
 def _dose(grid="dose_refinement_4", shape=(16, 16, 16)):

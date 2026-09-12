@@ -31,7 +31,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .viewer import read_layer, read_manifest
+from .viewer import (BOOLEAN, CATEGORICAL, OUT_OF_DOMAIN, UNDECLARED,
+                     is_undeclared, read_layer, read_manifest)
 
 # Same palette and labels as the serial model's figure section, carried across
 # from the CairoMakie prototype on `feat/visualize-3d`. That branch is otherwise
@@ -47,7 +48,7 @@ SPECIES_LABELS = ("C. neoformans", "D. radiodurans", "C. sphaerospermum",
 DEFAULT_CAMERA = {"azimuth": 0.4, "elevation": 0.5}
 
 BACKGROUND = 0          # cell_id background, per the exchange schema
-WALL = -1               # outside the biological domain; NOT a membrane material
+WALL = OUT_OF_DOMAIN    # outside the biological domain; NOT a membrane material
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,8 @@ class DisplayLayer:
     banner: str             # empty when quotable; REQUIRED on screen otherwise
     derivation_note: str    # how a derived layer was made; may be quotable
     colour_by: str          # "species" | "scalar" | "mask"
+    background: float | None | str = UNDECLARED   # producer's, not renderer's
+    occupancy_from: str | None = None  # the layer that says where biomass is
 
     def as_dict(self) -> dict:
         return {"name": self.name, "grid_id": self.grid_id, "unit": self.unit,
@@ -123,7 +126,12 @@ def display_plan(manifest: dict) -> list[DisplayLayer]:
         semantic_kind=l["semantic_kind"],
         quotable=bool(l["authoritative_for_quantitation"]),
         banner=_banner(l), derivation_note=_derivation_note(l),
-        colour_by=_colour_by(l)) for l in manifest["layers"]]
+        colour_by=_colour_by(l),
+        background=(l.get("background", UNDECLARED)
+                    if l.get("background", UNDECLARED) is None
+                    or is_undeclared(l.get("background", UNDECLARED))
+                    else float(l["background"])),
+        occupancy_from=l.get("occupancy_from")) for l in manifest["layers"]]
 
 
 def grid_geometry(manifest: dict, grid_id: str) -> dict:
@@ -182,6 +190,34 @@ def species_legend(present_ids=None) -> list[tuple]:
     return [(i, SPECIES_LABELS[i - 1], SPECIES_COLOURS[i - 1]) for i in ids]
 
 
+def species_palette(legend) -> tuple[list[str], tuple[float, float]]:
+    """Colormap and colour limits giving each species id its OWN palette slot.
+
+    ONE SLOT PER ID ACROSS THE SPANNED RANGE, not one per species present.
+    Handing a renderer the three colours of {1, 2, 7} with limits spanning 1..7
+    makes it distribute three colours over six units, so species 2 draws in
+    whatever colour falls at that fraction while the legend labels it with the
+    second palette entry. The picture and its key then disagree -- which is
+    precisely the failure a fixed palette exists to prevent, arriving through
+    the code that implements the fixed palette.
+
+    Half-unit padding puts each integer id in the middle of its own band, so a
+    species keeps its colour no matter which others are present.
+    """
+    if not legend:
+        # AN EMPTY SNAPSHOT IS A LEGITIMATE FIELD, not a broken one: a species
+        # layer of pure background has no ids present, `species_legend` returns
+        # nothing, and min() over nothing raised ValueError before the layer
+        # could draw. Hand back the full fixed palette -- there is nothing to
+        # colour, so nothing can be miscoloured, and the caller stays on one
+        # code path.
+        return (list(SPECIES_COLOURS), (0.5, len(SPECIES_COLOURS) + 0.5))
+    lo = min(i for i, _, _ in legend)
+    hi = max(i for i, _, _ in legend)
+    return ([SPECIES_COLOURS[i - 1] for i in range(lo, hi + 1)],
+            (lo - 0.5, hi + 0.5))
+
+
 def occupied_mask(cell_id) -> np.ndarray:
     """Voxels holding biomass.
 
@@ -217,12 +253,37 @@ def to_image_data(path, layer_name, manifest=None):
 
 def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
                manifest=None):
-    """Draw one layer. Refuses to hide a non-quotable layer's banner.
+    """Draw one layer so its INTERIOR is visible, with its declared colour rule.
 
-    `show_banner=False` on a derived layer raises rather than warns: the banner
-    is the only thing distinguishing a real 4x dose field from a coarse field
-    broadcast to look like one, and a caller who suppresses it has removed the
-    distinction from the screen.
+    `add_mesh` on an `ImageData` renders only the exterior surface of the block.
+    For every bundle this repository produces that surface is background — the
+    cube circumscribing the cylinder is 21.5% corner void — so a naive call
+    yields an opaque shell with the biofilm hidden inside it. Two paths, chosen
+    by the layer's own semantic kind:
+
+    - CATEGORICAL and BOOLEAN layers are drawn as a surface, hiding what the
+      PRODUCER declared to be absent — never what this function guessed. Three
+      cases, because a value does not always know its own meaning: a layer that
+      names an `occupancy_from` layer is masked by THAT field, one that declares
+      a `background` value hides exactly that value, and one that declares
+      neither is drawn in full.
+
+      `generation` is why. It is 0 for a founder and 0 for empty lattice sites,
+      since `export_checkpoint.jl` zero-fills and skips unoccupied voxels — so
+      thresholding at 0.5 deleted the founding cohort, and drawing everything
+      rendered the void as generation-0 biomass. Neither is a background value;
+      the answer is `cell_id`. A species layer gets the seven fixed colours
+      rather than a continuous colormap, which is the whole point of having a
+      palette: the same organism must not change colour because a different
+      subset is present.
+    - INTENSIVE and EXTENSIVE layers are volume-rendered, because thresholding a
+      dose field at an arbitrary value would hide exactly the structure the
+      viewer exists to show.
+
+    Refuses to suppress a non-quotable layer's banner, and shows the neutral
+    derivation note for a layer that is derived but still quotable — otherwise
+    an exact reduction is indistinguishable on screen from a native measurement
+    and silently loses its source grid.
     """
     import pyvista as pv
 
@@ -238,8 +299,154 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
 
     image = to_image_data(path, layer_name, manifest=doc)
     p = plotter or pv.Plotter()
-    p.add_mesh(image, scalars=layer_name,
-               scalar_bar_args={"title": f"{layer_name} [{layer.unit}]"})
+    title = f"{layer_name} [{layer.unit}]"
+
+    if layer.semantic_kind in (CATEGORICAL, BOOLEAN):
+        if layer.occupancy_from:
+            # THE VALUE CANNOT DISAMBIGUATE ITSELF, so do not ask it to.
+            # `generation` is 0 for a founder AND for empty space, so mask by
+            # the layer the producer named as occupancy instead of by value.
+            occ, _ = read_layer(path, layer.occupancy_from)
+            # `occupied_mask`, not `!= 0`: the schema uses -1 for outside the
+            # biological domain, so a truthiness test draws the wall as biomass.
+            image.cell_data["_occupied"] = (
+                occupied_mask(occ).ravel(order="F")).astype(np.uint8)
+            occupied = image.threshold(0.5, scalars="_occupied")
+            occupied.set_active_scalars(layer_name)
+        elif layer.background is None:
+            occupied = image.threshold(scalars=layer_name)   # keeps everything
+        elif is_undeclared(layer.background):
+            # write_bundle refuses this, so a bundle in hand cannot reach here.
+            raise ValueError(
+                f"layer {layer_name!r} declares no absence semantics")
+        else:
+            # ONE BRANCH FOR EVERY DECLARED BACKGROUND. This was split by
+            # `background == 0` and the two halves disagreed about the
+            # sentinel: the zero half excluded OUT_OF_DOMAIN, the other
+            # dropped only the declared background via an inverted equality
+            # band, so a layer declaring background 5 and carrying -1 drew
+            # the out-of-domain wall as label data. Nothing refuses that
+            # encoding either -- `_has_unknown_sentinel` runs in
+            # `bundle_problems` ONLY under `if layer.occupancy_from is not
+            # None`, so a directly-rendered layer is never validated against
+            # the domain contract at all.
+            #
+            # NOT `occupied_mask` (`> 0`): that assumes the same contract,
+            # and would silently discard a legitimate negative label (a real
+            # -7, not a sentinel) on a layer nothing validated. Exclude ONLY
+            # the two values that ARE sentinels, by equality -- the declared
+            # background and the schema's reserved OUT_OF_DOMAIN. Anything
+            # else, negative or not, is data. Background -1 collapses the two
+            # terms, which is correct: it is one value either way.
+            raw = np.asarray(image.cell_data[layer_name])
+            keep = (raw != layer.background) & (raw != OUT_OF_DOMAIN)
+            image.cell_data["_occupied"] = keep.astype(np.uint8)
+            occupied = image.threshold(0.5, scalars="_occupied")
+            occupied.set_active_scalars(layer_name)
+        if occupied.n_cells == 0:
+            # AN EMPTY FIELD MUST STILL DRAW, because "nothing is here" is a
+            # result a reader needs to see. Thresholding an all-background
+            # layer leaves a dataset with no cells and `add_mesh` rejects it,
+            # so making `species_palette` empty-safe only moved the crash one
+            # line down -- the bare-tier test exercised the palette, not this.
+            # Say so on the canvas and fall through to the banner.
+            p.add_text(f"{layer_name}: no occupied cells",
+                       position="lower_left", font_size=9)
+        elif layer.colour_by == "species":
+            # THE LEGEND IS BUILT FROM THE CELLS THAT SURVIVE, not from the raw
+            # field. Reading the array again gave two independent derivations
+            # of one fact, and they disagreed the moment a producer declared an
+            # in-range background: with values {1, 9} and background 1, the raw
+            # field still offered species 1 to the legend while `occupied` had
+            # already dropped it, so the bounds selected nothing and `add_mesh`
+            # was handed an empty dataset. With {1, 2} and background 1 the
+            # same gap instead LISTED species 1 in a picture that does not
+            # contain it.
+            #
+            # One source. Whatever is in `occupied` is what gets named.
+            present = np.asarray(occupied.cell_data[layer_name])
+            legend = species_legend(present)
+            if not legend:
+                # Occupied cells, none of them a species this palette names.
+                p.add_text(f"{layer_name}: no valid species ids",
+                           position="lower_left", font_size=9)
+            else:
+                # WHAT IS DRAWN MUST BE WHAT THE LEGEND DESCRIBES.
+                # `species_legend` drops an out-of-range label -- 9, when there
+                # are seven species -- but the occupied dataset still held that
+                # cell, so it rendered in whatever colour its value landed on
+                # with nothing in the key to explain it. A viewer showing an
+                # organism it cannot name is worse than one showing fewer
+                # cells: the reader counts it.
+                #
+                # The legend's own span is the valid range by construction, so
+                # thresholding to it drops exactly the labels the legend
+                # dropped, and nothing else.
+                lo = min(i for i, _, _ in legend)
+                hi = max(i for i, _, _ in legend)
+                drawn = occupied.threshold((lo, hi), scalars=layer_name)
+                cmap, clim = species_palette(legend)
+                p.add_mesh(drawn, scalars=layer_name, show_scalar_bar=False,
+                           cmap=cmap, clim=clim)
+                p.add_legend([(label, colour) for _, label, colour in legend])
+        else:
+            p.add_mesh(occupied, scalars=layer_name,
+                       scalar_bar_args={"title": title})
+    else:
+        p.add_volume(image, scalars=layer_name,
+                     scalar_bar_args={"title": title})
+
     if layer.banner and show_banner:
         p.add_text(layer.banner, position="upper_edge", font_size=8)
+    elif layer.derivation_note:
+        p.add_text(layer.derivation_note, position="upper_edge", font_size=7)
+    return p
+
+
+def plot_overlay(path, label_layer, dose_layer, *, plotter=None,
+                 cylinder=None, manifest=None):
+    """Draw a label layer and a dose layer in ONE scene, in physical space.
+
+    THIS IS THE DIAGNOSTIC, NOT THE CHECK. `tests/test_grid_coregistration.py`
+    is what fails when the two grids disagree; this is what a reader opens
+    afterwards to see HOW they disagree. A picture nobody is obliged to look at
+    cannot be a gate, and pretending otherwise would be the
+    check-that-cannot-fail this repository keeps finding.
+
+    It composes rather than reimplements: `plot_layer` already accepts a
+    `plotter`, and both layers are positioned by `to_image_data` from their own
+    grid's declared `origin_cm`/`spacing_cm`. So the two grids land in the same
+    world frame BECAUSE the bundle says where they are -- if one is offset, the
+    picture shows it offset, which is the entire point. Nothing here recomputes
+    a coordinate.
+
+    The dose layer keeps whatever banner `display_plan` gives it. An upsampled
+    dose field drawn over labels is exactly the case `_banner` exists for, and
+    `plot_layer` refuses to suppress it.
+
+    `cylinder`, when given, is `(x0, y0, r, z_lo, z_hi)` in cm -- the CSG
+    boundary the rectilinear lattice sits inside. Voxels at the curved wall are
+    partially inside, which is why `mesh_material_volumes` raytraces them
+    instead of counting bins; drawing the surface beside the lattice is how a
+    reader sees which voxels those are. It is wireframe and unlit on purpose:
+    it is geometry being quoted, not a field being read.
+    """
+    import pyvista as pv
+
+    doc = manifest or read_manifest(path)
+    p = plotter or pv.Plotter()
+
+    plot_layer(path, label_layer, plotter=p, manifest=doc)
+    plot_layer(path, dose_layer, plotter=p, manifest=doc)
+
+    if cylinder is not None:
+        x0, y0, r, z_lo, z_hi = (float(v) for v in cylinder)
+        surface = pv.Cylinder(center=(x0, y0, 0.5 * (z_lo + z_hi)),
+                              direction=(0.0, 0.0, 1.0),
+                              radius=r, height=(z_hi - z_lo),
+                              resolution=64, capping=False)
+        p.add_mesh(surface, style="wireframe", opacity=0.35,
+                   lighting=False, color="grey")
+        p.add_text("grey wireframe: CSG boundary, not data",
+                   position="lower_right", font_size=7)
     return p

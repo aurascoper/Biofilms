@@ -49,7 +49,7 @@ tolerance applied:
 
 | pitch (µm) | biovolume | porosity | **interface area** | component size |
 |---|---|---|---|---|
-| 3.2 | 1.20e-01 ✗ | 1.12e-02 ✗ | **4.06e-01 ✗** | 6.13e-02 ✓ |
+| 3.2 | **SKIPPED — does not tile the 24 µm axis (7.5 voxels); see below** | | | |
 | 1.6 | 6.39e-02 ✗ | 5.95e-03 ✗ | **4.99e-01 ✗** | 6.39e-02 ✓ |
 | 0.8 | 4.04e-02 ✓ | 3.77e-03 ✗ | **4.67e-01 ✗** | 4.04e-02 ✓ |
 | 0.4 | 4.55e-03 ✓ | 4.24e-04 ✓ | **4.79e-01 ✗** | 4.55e-03 ✓ |
@@ -59,10 +59,50 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 
 | observable | coarsest passing pitch |
 |---|---|
-| component size (q50) | 3.2 µm |
+| component size (q50) | 1.6 µm |
 | biovolume fraction | 0.8 µm |
 | porosity | 0.4 µm |
 | **specific interface area** | **never, at any pitch** |
+
+> **Correction — the 3.2 µm row was contaminated and is withdrawn.** An external
+> review caught it: 3.2 does not tile the spheres' 24 µm axis (7.5 voxels), and
+> `_grid_shape` rounded to 8, so that row rasterised a **25.6 µm box** while the
+> closed-form truth kept dividing by the declared 24 µm. A 6.7% denominator
+> shift was being reported as rasterisation error — in the one study whose
+> entire purpose is to hold the object fixed and move only the sampling.
+>
+> A non-tiling pitch is now **refused** rather than rounded, and the ladder names
+> the pitch it skipped instead of dropping the row silently. Two published
+> numbers move: component size from 3.2 to **1.6 µm**, which was passing at a
+> pitch that never validly ran, and the interface-area range, recorded two
+> paragraphs below. No blanket claim about how far this correction reaches
+> belongs here — the first version made one, and the interface range is the
+> counterexample that took two further rounds of review to surface.
+>
+> **The first attempt at this correction was itself wrong**, and the same review
+> caught that too. It removed 3.2 from the ladder's default pitches, which is not
+> the same thing as refusing it. Two losses followed: 3.2 tiles the *slab* — the
+> axis-aligned control above — and that valid row disappeared with it; and
+> `run_ladder` only emits its `skipped` row for a pitch it is actually handed, so
+> the promise in the paragraph above went unreachable in the same commit that
+> made it. **A pitch absent from the list is indistinguishable from a pitch
+> nobody tried.** The default is `3.2,1.6,0.8,0.4,0.2` again; the slab evaluates
+> it, and the spheres refuse it by name:
+>
+> ```json
+> {"pitch_um": 3.2, "skipped": "pitch 3.2 does not tile axis 2 of extent 24.0:
+>  7.5 voxels. Rounding would resize the box to 25.6 um while the analytic truth
+>  still uses the declared extent"}
+> ```
+>
+> **A second published number moves with it, and I missed it twice.** The
+> interface-area finding was stated as *0.41–0.51 across a 16× range*. Both
+> halves came from the withdrawn row: 0.41 is its error and 16× is 3.2 → 0.2.
+> Over the pitches that actually tile it is **0.467–0.510 across 8×** — a
+> *narrower* spread over a *shorter* range, so the conclusion is unchanged and
+> in fact slightly stronger, since the error moves less than was reported while
+> still refusing to fall. Withdrawing a row means auditing everything computed
+> from it, not only the row's own headline.
 
 Porosity needing a 2× finer pitch than biovolume is not a surprise — it is the
 `derived` tolerance doing its job. Porosity is `1 − biovolume`, so an equal
@@ -71,8 +111,8 @@ derived 0.0025 for exactly that reason.
 
 ## The finding: `specific_interface_area` is not an area
 
-Its error does not fall with pitch. It sits at 0.41–0.51 across a 16× range and
-is slightly *worse* at the finest pitch. That is not slow convergence; it is a
+Its error does not fall with pitch. It sits at **0.467–0.510 across an 8× range**
+and is slightly *worse* at the finest pitch. That is not slow convergence; it is a
 systematic factor, and the mechanism is exact.
 
 **Counting axis-aligned faces measures ∫|n|₁ dA, not ∫|n|₂ dA.** The ratio to

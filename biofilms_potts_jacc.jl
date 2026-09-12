@@ -260,6 +260,13 @@ Base.@kwdef struct RadiolysisParams
     k_loss::Float64 = 0.001
     X_total::Float64 = 1.0
     X_red::Float64 = 0.3
+
+    # Basis gate acknowledgement.  false refuses any X_total != 1.0.
+    # Bool rather than a Symbol because this field is HDF5-serialised by
+    # export_checkpoint.jl and must survive a restart; the exemption is binary
+    # anyway, and WHICH sites hold it is pinned by the census test rather than
+    # by a symbol name.  See _assert_basis_gate.
+    basis_gate_ack::Bool = false
     P0::Float64 = 0.01
     alpha_P::Float64 = 0.02
     k_dam::Float64 = 0.005
@@ -275,7 +282,19 @@ mutable struct RadiolysisState
     m::Float64
     t::Float64
     params::RadiolysisParams
+    # Sticky basis provenance.  NOT inferred from X_total: a coupled state can
+    # legitimately produce mean(X_tot) == 1.0 (every sampled interior site
+    # occupied), which would collide with the standalone default and slip the
+    # gate; and c/s are PATH-dependent, so once a step has run on an occupancy
+    # basis they stay gated even if X_total later returns to 1.0.  Rule 4: the
+    # producer that installs the basis declares it, and the flag never clears.
+    basis_from_occupancy::Bool
 end
+
+# Six-argument form: provenance defaults to false, so a standalone state is
+# unmarked and only the coupled installers set it.
+RadiolysisState(r_grid, c, s, m, t, params) =
+    RadiolysisState(r_grid, c, s, m, t, params, false)
 
 function init_radiolysis(rp::RadiolysisParams; R::Float64 = 1.0)
     r_grid = collect(range(0.0, R, length = rp.Nr))
@@ -299,6 +318,8 @@ small. Correct the units to R = 1.0 cm and dt_stable becomes 0.132, n_sub = 4 â€
 at which point a port without this guard diverges.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
+    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack,
+                       rd.basis_from_occupancy)
     dr = rd.r_grid[2] - rd.r_grid[1]
     dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
     n_sub = max(1, ceil(Int, dt / dt_stable))
@@ -306,6 +327,68 @@ function step_radiolysis!(rd::RadiolysisState, dt::Float64)
     for _ in 1:n_sub
         _step_radiolysis_euler!(rd, dt_sub)
     end
+end
+
+"""
+    _assert_basis_gate(X_total)
+
+Refuse to integrate on a coupled biomass basis, EXPLICITLY.
+
+RADIODIALYSIS: BLOCKED gates the biomass basis fed into this coupling, and
+until now nothing here enforced it. The block was being done by an accident:
+`uptake = k_ads*X_total + k_red*X_red` is the pre-fraction additive form, which
+happens to misbehave at non-unit `X_total`, and that side effect was standing in
+for a guard. An accidental tripwire is not a gate -- it can be removed by
+someone tidying the arithmetic, leaving nothing to say the basis was blocked.
+
+So the refusal is stated. `X_total == 1.0` is the standalone default and stays
+allowed; anything else means a real basis was supplied, which is what the gate
+covers.
+
+WHY THE ARITHMETIC IS NOT ALSO FIXED. `biofilms_radiodialysis.R` now derives
+`X_red = f_red_active * X_total` (`uptake_rate_of()`), and mirroring that here
+would make this path *conformant*. It would not make it *correct*: the `X_red`
+reaching it is `red_cells[i] / counts[i]` (`compute_radial_biomass`), one
+species' occupied sites over ALL interior sites, which README.md:344 records as
+"neither a biomass fraction nor a reducer fraction". Conformant arithmetic over
+a quantity the repository has already refused is worse than visibly
+non-conformant arithmetic over the same one: the defect would stop being visible
+while staying just as gated. The arithmetic stays as a marker that this
+reconciliation is unfinished.
+
+Nor can the fraction be derived from parcel counts. Counts give a TAXONOMIC
+fraction, and `active_from_taxonomic()` refuses converting one to an
+active-reducer fraction without a measured activity fraction; `D-XRED` in
+`data/calibration/reference_d_requirements.csv` records that as blocked by this
+units error rather than by missing data.
+"""
+function _assert_basis_gate(X_total::Float64, ack::Bool = false,
+                            from_occupancy::Bool = false)
+    (X_total == 1.0 && !from_occupancy) && return nothing
+    # THE ONE EXEMPTION.  validate_serial.jl steps this path only to reproduce a
+    # bit-for-bit CPM trajectory, and records no radiodialysis quantity: its CSV
+    # carries CPM columns plus rd.m, whose ODE (dm/dt = -k_dam*Ddot_R*m) has no
+    # X_total or X_red in it.  That independence is not taken on trust -- it is
+    # asserted in tests/radiodialysis_basis_gate.jl by running the harness at
+    # two different gated bases and requiring byte-identical CSV.  Widen this
+    # exemption and that test is what should stop you.
+    ack && return nothing
+    error("""
+        RADIODIALYSIS: BLOCKED -- refusing to integrate at X_total = $X_total.
+
+        Only the standalone default X_total == 1.0 is allowed here.
+
+        A coupled basis reaches this path as mean(compute_radial_biomass(...)):
+        one species' occupied sites over all interior sites, which is
+        neither a biomass fraction nor a reducer fraction
+        (README.md:344). The uptake arithmetic here is also still the
+        pre-fraction additive form, unlike biofilms_radiodialysis.R's
+        uptake_rate_of().
+
+        This refusal is deliberate and is asserted by
+        tests/radiodialysis_basis_gate.jl. Removing it to let a coupled run
+        proceed re-opens the defect the gate names; repair the quantity first.
+        """)
 end
 
 """One forward-Euler step; the guard lives in step_radiolysis! above."""
@@ -426,9 +509,16 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
         if mcs % 10 == 1
             X_tot, X_red = radial_biomass(JACC.to_host(lat), spec_h, N, rd.params.Nr)
             rp0 = rd.params
-            rd.params = RadiolysisParams(rp0.Nr, rp0.D_eff, rp0.k_ads, rp0.k_red,
-                rp0.k_des, rp0.k_loss, mean(X_tot), mean(X_red), rp0.P0,
-                rp0.alpha_P, rp0.k_dam, rp0.Ddot_R, rp0.c_ext, rp0.dt_rd)
+            # Keyword form deliberately: this was positional, so adding a
+            # field silently shifted every argument past it by one.
+            rd.params = RadiolysisParams(
+                Nr = rp0.Nr, D_eff = rp0.D_eff, k_ads = rp0.k_ads,
+                k_red = rp0.k_red, k_des = rp0.k_des, k_loss = rp0.k_loss,
+                X_total = mean(X_tot), X_red = mean(X_red),
+                basis_gate_ack = rp0.basis_gate_ack,
+                P0 = rp0.P0, alpha_P = rp0.alpha_P, k_dam = rp0.k_dam,
+                Ddot_R = rp0.Ddot_R, c_ext = rp0.c_ext, dt_rd = rp0.dt_rd)
+            rd.basis_from_occupancy = true   # see biofilms_potts.jl
         end
         step_radiolysis!(rd, rd.params.dt_rd)
 

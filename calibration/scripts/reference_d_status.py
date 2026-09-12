@@ -159,32 +159,83 @@ def authorization_criteria(baseline, sources=None, *, today=None):
     Derived from `approval.problems` rather than restated, so the criteria and
     the gate cannot drift apart: a criterion is unmet exactly when the gate has
     something to say about it.
+
+    THAT SENTENCE USED TO BE FALSE, in the direction that reads AUTHORIZED. The
+    mapping below is by substring, and an earlier version treated a problem that
+    matched no pattern as evidence for nothing — so it defaulted to met. Adding
+    the `approved_protocol_version` check to `approval.problems` therefore
+    produced a refusal this function could not see: the gate said no while all
+    nine criteria said yes, on an institutional biosafety milestone.
+
+    An unmapped refusal is now a failure of THIS function, not a pass for the
+    campaign. `test_every_refusal_reaches_a_criterion` breaks each field in turn
+    and requires every one to land somewhere.
     """
     from biofilm_calibration import approval
 
     if not baseline:
         return [(c, False) for c in AUTHORIZATION_CRITERIA]
-    found = approval.problems(baseline, sources or [], today=today)
-    text = " ".join(found)
-    met = {
-        1: "strain_identities" not in text,
-        2: "approval_scope_hash is unset" not in text,
-        3: "containment_facility" not in text,
-        4: "risk_assessment_reference" not in text,
-        5: ("institutional_approval_id" not in text
-            and "institutional_approval_authority" not in text),
-        6: "does not match the conditions" not in text,
-        7: not any(k in text for k in ("must precede culturing", "expired",
-                                       "is not an ISO date", "is unset")),
-        8: not any(k in text for k in ("does not resolve", "not an approval",
-                                       "neither a locator nor a digest")),
-        9: "is not the target system" not in text,
+    found = approval.classified(baseline, sources or [], today=today)
+
+    # THE REFUSAL CARRIES ITS OWN SUBJECT. Nothing here parses prose.
+    #
+    # The previous arrangement recovered the field by stripping a "growth
+    # condition <id>" prefix and taking the first token, and it failed four
+    # times in a row -- an echoed field value matching a criterion pattern, a
+    # longer echoed value impersonating a relation phrase, an apostrophe
+    # flipping repr to double quotes, and an id containing BOTH quote
+    # characters, which repr must escape and no delimiter pair can bracket.
+    # Each fix was correct and each left the shape intact one size smaller,
+    # because the defect was never the regex: it was asking a sentence built
+    # from unrestricted CSV data to say which field it was about.
+    #
+    # `approval.classified` now states the subject, so a condition id is data
+    # again and cannot reach this decision at all.
+    criterion_of = {
+        "strain_identities": 1,
+        "biosafety_level_by_strain": 1,
+        "approval_scope_hash": 2,            # unset: nothing binds the row
+        "containment_facility": 3,
+        "risk_assessment_reference": 4,
+        "institutional_approval_id": 5,
+        "institutional_approval_authority": 5,
+        "approved_protocol_version": 6,
+        "approval_scope_hash:mismatch": 6,   # edited: scope no longer covers it
+        "approval_effective_date": 7,
+        "approval_expiration_date": 7,
+        "culturing_start_date": 7,
+        None: 7,                             # relations between dates
+        "approval_source_id": 8,
+        "is_target_system": 9,
     }
-    return [(c, met[i + 1]) for i, c in enumerate(AUTHORIZATION_CRITERIA)]
+
+    unmet_numbers, unmapped = set(), []
+    for refusal in found:
+        number = criterion_of.get(refusal.subject, "missing")
+        if number == "missing":
+            unmapped.append(refusal.text)
+        else:
+            unmet_numbers.add(number)
+
+    met = {i: i not in unmet_numbers
+           for i in range(1, len(AUTHORIZATION_CRITERIA) + 1)}
+
+    # A refusal nobody classified is not an absence of refusal. It fails
+    # criterion 6 -- the scope criterion, because an unrecognised problem means
+    # the approval's scope is not established -- and is NAMED, so the gap gets
+    # closed rather than absorbed.
+    if unmapped:
+        met[6] = False
+
+    out = [(c, met[i + 1]) for i, c in enumerate(AUTHORIZATION_CRITERIA)]
+    if unmapped:
+        out.append((f"UNMAPPED REFUSAL, criteria are incomplete: "
+                    f"{'; '.join(unmapped)}", False))
+    return out
 
 
 def readiness(requirements, spatial_verdict, material_verdict,
-              binding, baseline=()) -> dict[str, tuple[bool, list[str]]]:
+              binding, baseline=(), sources=()) -> dict[str, tuple[bool, list[str]]]:
     """The four thresholds, which gate different things and must not be one
     flag. Institutional authorization gates culturing; a campaign can be ready
     while a config is not; a config can be ready while the sweep has not run."""
@@ -199,12 +250,15 @@ def readiness(requirements, spatial_verdict, material_verdict,
     # people ask for -- "reference_d_status reports CAMPAIGN_READY" -- is this
     # verdict's own consequence, so making it a criterion would be circular.
     # CAMPAIGN_READY requires this, so the two cannot disagree.
-    authorized_blockers = [c for c, ok in authorization_criteria(baseline)
-                           if not ok]
+    # Count against what was actually judged, not against the constant: an
+    # unmapped refusal appends a row, and "10 of 9 unmet" would read as a bug in
+    # the reporter rather than as the gap in the criteria that it is.
+    judged = authorization_criteria(baseline, sources)
+    authorized_blockers = [c for c, ok in judged if not ok]
     if authorized_blockers:
         campaign_blockers.append(
             f"institutional authorization: {len(authorized_blockers)} of "
-            f"{len(AUTHORIZATION_CRITERIA)} criteria unmet")
+            f"{len(judged)} criteria unmet")
 
     config_blockers = []
     unsatisfied = [r["requirement_id"] for r in requirements
@@ -393,18 +447,29 @@ def main(argv=None) -> int:
         baseline = _read(REPO / "data" / "calibration" / "baseline_condition.csv", _BC)
     except Exception:
         baseline = []
+    # WITHOUT THIS THE MILESTONE CAN NEVER PASS. `approval.problems` resolves
+    # approval_source_id against this registry, so omitting it reports every
+    # approval as unregistered and criterion 8 stays unmet for a perfectly valid
+    # approval -- a gate that cannot be satisfied, which is the exact mirror of
+    # one that cannot fail and rather worse, since it blocks a legitimate
+    # campaign with no way to tell why.
+    from biofilm_calibration.spatial.schema import SOURCES as _SRC
+    try:
+        sources = _read(REPO / "data" / "calibration" / "spatial" / "sources.csv", _SRC)
+    except Exception:
+        sources = []
 
     # AN APPROVAL EXPIRES, so this verdict depends on when it is asked. That is
     # correct and it must be visible: printing the date makes a verdict that
     # changes without a code or data change explainable instead of alarming.
     today = date.today()
     print(f"\n  institutional authorization, judged {today}:")
-    for criterion, met in authorization_criteria(baseline, today=today):
+    for criterion, met in authorization_criteria(baseline, sources, today=today):
         print(f"      [{'x' if met else ' '}] {criterion}")
 
     for verdict, (reached, blockers) in readiness(
             requirements, spatial.verdict, material.openmc, binding,
-            baseline).items():
+            baseline, sources).items():
         print(f"  {verdict:<46} {'YES' if reached else 'no'}")
         for b in blockers:
             print(f"      - {b}")

@@ -19,7 +19,15 @@ end
 function run(SerialRef::Module, seeds::Vector{Int})
     params = SerialRef.CPMParams(N = 40, n_cells_per_species = 6,
         snapshot_interval = 20)
-    rp = SerialRef.RadiolysisParams(Nr = 40, Ddot_R = 1.0, c_ext = 1.0)
+    # basis_gate_ack: this harness reproduces a bit-for-bit CPM trajectory and
+    # records NO radiodialysis quantity -- its CSV is CPM columns plus rd.m,
+    # whose ODE has no X_total or X_red in it. The coupled loop reconstructs
+    # RadiolysisParams with X_total = mean(compute_radial_biomass(...)), which
+    # RADIODIALYSIS: BLOCKED gates, so stepping it needs this explicit
+    # acknowledgement. It is not a claim that the basis is valid. Nothing here
+    # may report c or s. tests/radiodialysis_basis_gate.jl holds this to it.
+    rp = SerialRef.RadiolysisParams(Nr = 40, Ddot_R = 1.0, c_ext = 1.0,
+                                    basis_gate_ack = true)
     for seed in seeds
         t0 = time()
         state, rd, _, _ = SerialRef.run_simulation_coupled(params, rp, 100; seed)
