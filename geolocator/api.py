@@ -36,6 +36,7 @@ Run:
 from __future__ import annotations
 
 import csv
+import hashlib
 import importlib.util
 import json
 import os
@@ -61,6 +62,14 @@ ENERGY_WORLD_JSON = Path(
     os.environ.get(
         "ENERGY_WORLD_JSON",
         str(Path.home() / "Developer/live_trading/research/lattice_board/data/energy_world.json"),
+    )
+)
+# Rev 6A physical-state overlay -- a symlink agri_yield_pipeline's export script retargets to
+# its latest dated, content-hashed export each run. Read-only; never imported as code.
+AGRI_OVERLAY_JSON = Path(
+    os.environ.get(
+        "AGRI_OVERLAY_JSON",
+        str(Path.home() / "Developer/agri_yield_pipeline/data/overlay/latest.json"),
     )
 )
 
@@ -158,6 +167,14 @@ LAYER_COLORS: dict[str, dict[str, str]] = {
         "stellar_lens": "#6BCB77",
         "gridcoin_relay": "#4D96FF",
         "radio_silent": "#9AA7C0",
+    },
+    "agri_overlay": {
+        # Same severity naming as agri_yield_pipeline's own field-stress seam
+        # (src/stress_alerts.py:_severity -- "stress"/"warn"/"info").
+        "Stress": "#C0392B",
+        "Warn": "#E07B39",
+        "Normal": "#27AE60",
+        "No data": "#9AA7C0",
     },
 }
 
@@ -267,6 +284,107 @@ def _load_worldgrid(path: Path) -> dict:
     return {"items": out, "meta": {"provenance": d.get("provenance") or {}}}
 
 
+def _agri_stress_class(cell: dict) -> str:
+    """Same info/warn/stress convention agri_yield_pipeline's own field-stress seam already
+    uses (src/stress_alerts.py:_severity), applied to the county-level NDVI z here."""
+    z = (cell.get("ndvi") or {}).get("z")
+    if z is None:
+        return "No data"
+    az = abs(z)
+    if az >= 2.0:
+        return "Stress"
+    if az >= 1.5:
+        return "Warn"
+    return "Normal"
+
+
+def _load_agri_overlay(path: Path) -> dict:
+    """Rev 6A agri_yield_pipeline physical-state overlay (see that repo's
+    scripts/export_physical_overlay.py). An untrusted cross-repo file read -- hash-verifies the
+    export before accepting it, same discipline as the corruption check in live_trading's
+    energy_market_bridge_probe*.py snapshot loaders. Never imports agri_yield_pipeline's code,
+    only reads its frozen JSON export.
+
+    Verifies `payload_sha256` (schema_version>=2) over the whole payload minus that key itself --
+    not just `cells`. A cells-only hash (schema_version 1's `cells_sha256`, kept here only for
+    backward compatibility with exports written before this fix) would let a corrupted or
+    hand-edited `generated_at`/`source_git_sha`/`provenance` pass untouched, since none of those
+    live inside `cells`."""
+    d = json.loads(path.read_text())
+    cells = d.get("cells") or []
+
+    payload_expected = d.get("payload_sha256")
+    if payload_expected is not None:
+        unhashed = {k: v for k, v in d.items() if k != "payload_sha256"}
+        actual = hashlib.sha256(
+            json.dumps(unhashed, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        if actual != payload_expected:
+            raise ValueError(
+                f"agri overlay corruption: payload hash mismatch "
+                f"(recorded {payload_expected[:12]}..., actual {actual[:12]}...)"
+            )
+    else:
+        # schema_version 1 fallback: only cells were ever hashed.
+        cells_expected = d.get("cells_sha256")
+        if cells_expected is not None:
+            actual = hashlib.sha256(
+                json.dumps(cells, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            if actual != cells_expected:
+                raise ValueError(
+                    f"agri overlay corruption: cells hash mismatch "
+                    f"(recorded {cells_expected[:12]}..., actual {actual[:12]}...)"
+                )
+
+    items: list[dict] = []
+    for cell in cells:
+        lat, lon = cell.get("lat"), cell.get("lon")
+        if lat is None or lon is None or not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            continue
+        ndvi = cell.get("ndvi") or {}
+        z = ndvi.get("z")
+        items.append(
+            {
+                "name": cell.get("name") or "",
+                "country": cell.get("state") or "",
+                "latitude": lat,
+                "longitude": lon,
+                "color_key": _agri_stress_class(cell),
+                # Reused as a numeric marker-size magnitude, not a true capacity -- this layer
+                # has no MW figure. |NDVI z| keeps larger markers on the more anomalous
+                # counties. None (not 0.0) when no NDVI baseline exists -- "unknown" and "zero
+                # magnitude" are different claims, and /api/stats + /api/plants are the ones
+                # responsible for handling an unknown capacity_mw correctly, not this loader
+                # papering over it by picking a number.
+                "capacity_mw": abs(z) if z is not None else None,
+                "status": cell.get("kind") or "county",
+                "source": "agri_yield_pipeline",
+                "note": f"NDVI z={z:.2f}" if z is not None else "no NDVI baseline for this county",
+                "extra": {
+                    "ndvi": cell.get("ndvi"),
+                    "ndvi_unavailable_reason": cell.get("ndvi_unavailable_reason"),
+                    "weather": cell.get("weather"),
+                    "yield_sensitivity": cell.get("yield_sensitivity"),
+                    "sar_vv_db": cell.get("sar_vv_db"),
+                },
+            }
+        )
+    return {
+        "items": items,
+        "meta": {
+            "provenance": d.get("provenance") or {},
+            "source_git_sha": d.get("source_git_sha"),
+            "generated_at": d.get("generated_at"),
+            "county_set_note": d.get("county_set_note"),
+        },
+    }
+
+
+def _agri_vintage(payload) -> str | None:
+    return ((payload or {}).get("meta") or {}).get("generated_at")
+
+
 # ── Layer registry ────────────────────────────────────────────────────────────
 LAYER_FILES = {
     "nuclear": DATA_DIR / "nuclear_fuel_cycle.csv",
@@ -337,6 +455,15 @@ SOURCES: dict[str, TrackedSource] = {
     "stars": TrackedSource(
         id="stars", path=LAYER_FILES["stars"], layer_class=AUTHORED,
         loader=_load_layer_csv, empty=_EMPTY_LAYER, count_of=_layer_count,
+    ),
+    "agri_overlay": TrackedSource(
+        # Rev 6A: county-level NDVI/weather/yield-sensitivity physical-state overlay from
+        # agri_yield_pipeline. No trading claim; see that repo's plan for scope. REFERENCE, not
+        # LIVE -- the vintage is the export's generated_at, never today's clock.
+        id="agri_overlay", path=AGRI_OVERLAY_JSON, layer_class=REFERENCE,
+        loader=_load_agri_overlay, empty=_EMPTY_LAYER, count_of=_layer_count,
+        vintage_of=_agri_vintage,
+        retrieved_of=_agri_vintage,
     ),
 }
 LAYER_IDS = tuple(SOURCES.keys())
@@ -499,9 +626,12 @@ def layers():
             {
                 "id": k,
                 "count": states[k].get("count") or 0,
-                # worldgrid is coloured by fuel, not by stage -- it aliases
-                # FUEL_COLORS. The old ternary told the legend otherwise.
-                "color_field": "primary_fuel" if k in ("power", "worldgrid") else "stage",
+                # worldgrid is coloured by fuel, not by stage -- it aliases FUEL_COLORS.
+                # agri_overlay is coloured by NDVI stress class, not a fuel/stage/cycle
+                # concept at all. A two-way ternary here has already once told the legend
+                # something false for one layer; a dict keeps each layer's own answer.
+                "color_field": {"power": "primary_fuel", "worldgrid": "primary_fuel",
+                                 "agri_overlay": "stress_class"}.get(k, "stage"),
                 "colors": LAYER_COLORS.get(k, {}),
                 "layer_class": states[k].get("layer_class"),
                 "status": states[k].get("status"),
@@ -534,17 +664,24 @@ def fuels(layer: str = Query("power")):
 @app.get("/api/stats")
 def stats(layer: str = Query("power")):
     items = layer_items(layer)
-    total_cap = sum(p["capacity_mw"] for p in items)
+    # capacity_mw is None for a legitimately-unknown value (e.g. agri_overlay counties with no
+    # NDVI baseline) -- excluded from the sum rather than coerced to 0.0, which would make
+    # "unknown" indistinguishable from "measured zero" in any total or average. The exclusion
+    # count is always reported, not just implied by a total that's quietly smaller than count.
+    known = [p for p in items if p["capacity_mw"] is not None]
+    total_cap = sum(p["capacity_mw"] for p in known)
     by_fuel: dict[str, float] = {}
     by_country: dict[str, int] = {}
-    for p in items:
+    for p in known:
         by_fuel[p["color_key"]] = by_fuel.get(p["color_key"], 0.0) + p["capacity_mw"]
+    for p in items:
         by_country[p["country"]] = by_country.get(p["country"], 0) + 1
     return {
         "layer": layer,
         "source": SOURCE,
         "count": len(items),
         "total_capacity_mw": round(total_cap, 1),
+        "unknown_capacity_count": len(items) - len(known),
         "capacity_by_fuel": {
             k: round(v, 1) for k, v in sorted(by_fuel.items(), key=lambda x: -x[1])
         },
@@ -563,19 +700,34 @@ def plants(
 ):
     items = layer_items(layer)
     out = []
+    excluded_unknown_capacity = 0
     for p in items:
         if fuel and p["color_key"] != fuel:
             continue
-        if p["capacity_mw"] < min_capacity:
+        cap = p["capacity_mw"]
+        # An explicit min_capacity floor can't be verified against an unknown value, so it
+        # excludes it -- conservative: don't claim something unproven clears a floor. The
+        # *default* min_capacity=0.0 must not filter out unknowns just because 0.0 is a
+        # technically-passable floor when cap happens to be known.
+        if min_capacity > 0.0 and (cap is None or cap < min_capacity):
+            if cap is None:
+                excluded_unknown_capacity += 1
             continue
-        if max_capacity is not None and p["capacity_mw"] > max_capacity:
+        if max_capacity is not None and (cap is None or cap > max_capacity):
+            if cap is None:
+                excluded_unknown_capacity += 1
             continue
         if country and country.lower() not in p["country"].lower():
             continue
         out.append(p)
         if len(out) >= limit:
             break
-    return _to_geojson(out, layer)
+    geojson = _to_geojson(out, layer)
+    # Always present, defaulting to 0 -- matching /api/stats's unknown_capacity_count, so a
+    # consumer can tell "no filter active" apart from "filter active, nothing excluded" instead
+    # of the two endpoints answering the same question in different shapes.
+    geojson["excluded_unknown_capacity"] = excluded_unknown_capacity
+    return geojson
 
 
 # ── Correlation bands (links) ─────────────────────────────────────────────────
