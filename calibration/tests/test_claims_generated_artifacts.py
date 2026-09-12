@@ -45,16 +45,63 @@ def test_only_declared_pilot_outputs_may_be_absent(tmp_path, monkeypatch, capsys
 
 
 def test_present_generated_output_still_rejects_a_withdrawn_claim(tmp_path, monkeypatch):
+    """THE CONTROL IS THE ARTIFACT'S REAL DELETED FIELD, NOT LEDGER PROSE.
+
+    This test used to write `{"claim": <the ledger's claim_text>}` and pass. It
+    proved that substring matching works, which was never in doubt, and it could
+    not prove the thing it exists for. The producer never wrote that sentence:
+    `coupling/scripts/openmc_nested_pilot.py` emitted
+    `material_lever_sensitivity_rel_l2` into `budget_doc` as six hardcoded
+    numbers, and the regression this guards against is a regenerated pilot
+    putting them back. So rebuild THAT shape and run the guard on it.
+    """
     row = next(r for r in ledger._rows() if r["claim_id"] == "PILOT-LEV-01")
     assert row["document"] in ledger.GENERATED_ARTIFACTS
-    phrase = ledger.distinguishing_phrase(row["claim_text"])
-    assert phrase, "the selected ledger claim must be detectable"
+    field = ledger.deleted_field(row)
+    assert field == "material_lever_sensitivity_rel_l2", (
+        "the ledger row no longer declares the removed field in `location`; "
+        "without it this control is back to matching prose")
+
     monkeypatch.setattr(ledger, "REPO", tmp_path)
     path = ledger.document_path(row["document"])
     path.parent.mkdir(parents=True)
-    path.write_text(json.dumps({"claim": row["claim_text"]}), encoding="utf-8")
-    assert phrase.lower() in ledger.normalise_markup(path.read_text())
+
+    # `budget_doc` as the producer wrote it before the field was dropped. The
+    # six values are PILOT-LEV-01's own `reported_value`; the key is what the
+    # guard keys on, and the values are here so the fixture is a real artifact
+    # rather than a stub carrying one string.
+    regressed = {
+        "schema_version": 1, "tier": "S0", "target_calibration": False,
+        "openmc_runs": 12, "histories": 200000,
+        field: {"density_x1.35": 0.0137, "Fe_5pct": 0.0033, "Gd_5pct": 0.0376,
+                "dehydration": 0.0459, "Gd_20pct": 0.1241, "Gd_40pct": 0.2242},
+        "noise_floor_basis": "decorrelated_seeds_identical_material",
+    }
+    path.write_text(json.dumps(regressed, indent=2), encoding="utf-8")
     with pytest.raises(AssertionError, match=row["claim_id"]):
         ledger.test_no_deleted_claim_survives_in_the_document_it_names([row])
-    path.write_text(json.dumps({"claim": "withdrawn; see ledger"}), encoding="utf-8")
+
+    # The same artifact as the producer writes it now: every other field intact,
+    # so a pass here means the field was detected and not the whole document.
+    del regressed[field]
+    path.write_text(json.dumps(regressed, indent=2), encoding="utf-8")
     ledger.test_no_deleted_claim_survives_in_the_document_it_names([row])
+
+
+def test_prose_matching_alone_could_not_see_that_regression(tmp_path, monkeypatch):
+    """WHY THE FIXTURE ABOVE STOPPED USING `claim_text`.
+
+    Pinned rather than described: the phrase the prose guard would search for is
+    ledger wording, and it does not occur in the artifact the producer writes.
+    If phrase extraction ever changes so that it does, this test says so instead
+    of the coverage quietly moving.
+    """
+    row = next(r for r in ledger._rows() if r["claim_id"] == "PILOT-LEV-01")
+    phrase = ledger.distinguishing_phrase(row["claim_text"])
+    assert phrase == "emitted into the budget artifact."
+
+    artifact = json.dumps({"schema_version": 1,
+                           ledger.deleted_field(row): {"Gd_40pct": 0.2242}})
+    assert phrase.lower() not in ledger.normalise_markup(artifact)
+    assert ledger.normalise_markup(ledger.deleted_field(row)) in \
+        ledger.normalise_markup(artifact)
