@@ -1,0 +1,88 @@
+{
+    "baseline_suite_green": true,
+    "julia_version": "1.12.6",
+    "question": "can test_numerics.jl fail?",
+    "mutations": [
+        {
+            "failing_assertions": 6,
+            "mutation": "laplacian loses flux form",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "flux-form Laplacian conserves on a ragged mask: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_rxGmvt/test_numerics.jl:88",
+                "discrete Neumann eigenmode is reproduced exactly: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_rxGmvt/test_numerics.jl:109",
+                "discrete Neumann eigenmode is reproduced exactly: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_rxGmvt/test_numerics.jl:111"
+            ],
+            "defect": "the neighbour's half of each face flux is not applied, so transport creates material at every interior face"
+        },
+        {
+            "failing_assertions": 11,
+            "mutation": "one-dimensional diffusion bound",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "discrete Neumann eigenmode is reproduced exactly: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_L85RMZ/test_numerics.jl:109",
+                "the timestep bound is the 3-D one, and it is enforced: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_L85RMZ/test_numerics.jl:119",
+                "the timestep bound is the 3-D one, and it is enforced: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_L85RMZ/test_numerics.jl:129"
+            ],
+            "defect": "the stencil's diagonal is halved, admitting the timestep that sends a unit centre to -0.5"
+        },
+        {
+            "failing_assertions": 2,
+            "mutation": "stability ignores the binding term",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "the timestep bound is the 3-D one, and it is enforced: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_hQNUwi/test_numerics.jl:147",
+                "the timestep bound is the 3-D one, and it is enforced: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_hQNUwi/test_numerics.jl:149"
+            ],
+            "defect": "reaction is treated as if it were split off, so the unsplit scheme is run outside its own restriction"
+        },
+        {
+            "failing_assertions": 1,
+            "mutation": "stability ignores decay",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "the timestep bound is the 3-D one, and it is enforced: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_O1njVh/test_numerics.jl:152"
+            ],
+            "defect": "the loss term is dropped from the diagonal"
+        },
+        {
+            "failing_assertions": 2,
+            "mutation": "capacity overflow is destroyed, not transferred",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "capacity overflow is a transfer, and omitting it is visible: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_tiarL1/test_numerics.jl:231",
+                "capacity overflow is a transfer, and omitting it is visible: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_tiarL1/test_numerics.jl:232"
+            ],
+            "defect": "material above capacity leaves the bound pool and is credited nowhere, which is the defect K8 exists to expose"
+        },
+        {
+            "failing_assertions": 1,
+            "mutation": "the closure identity books the dropped material",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "capacity overflow is a transfer, and omitting it is visible: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_MFT2bY/test_numerics.jl:243"
+            ],
+            "defect": "the ledger absorbs the loss it exists to report, so the red control turns green"
+        },
+        {
+            "failing_assertions": 2,
+            "mutation": "the degenerate-modulator guard is removed",
+            "match_count": 1,
+            "verdict": "CAUGHT",
+            "first_failures": [
+                "capacity modulator and Hill response: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_FlOQA6/test_numerics.jl:59",
+                "matched uniform capacity carries the same integral: Test Failed at /var/folders/5w/757c1yp15rs0p2pkp6cqbt2m0000gn/T/jl_FlOQA6/test_numerics.jl:68"
+            ],
+            "defect": "a constant modulator is accepted, making the matched-capacity control a comparison of a field with itself"
+        }
+    ],
+    "diagnostic": "mutation controls for the binding-benchmark numerics suite",
+    "created_utc": "2026-09-11T15:08:07.158Z",
+    "module_sha256": "fc78bdfb3eea457004ec6f7aeb70b2c469898307ab91bbe1134a8bf37ba077d0",
+    "suite_sha256": "d8e8f487756751dd6d30d02b06a826d32cdd0aaf325bff9611d55d3266c661bf"
+}

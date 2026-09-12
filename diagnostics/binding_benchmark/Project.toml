@@ -1,0 +1,17 @@
+# This diagnostic carries its own environment on purpose. The repository's root
+# `Project.toml` lists AMDGPU, which cannot instantiate on darwin, so a benchmark that
+# shared it could not be run on the machine it was written on. Nothing here is added to
+# the root project: `Project.toml` at the repository root is untouched by this branch.
+[deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+
+[compat]
+HDF5 = "0.17"
+JSON3 = "1"
+julia = "1.12"
