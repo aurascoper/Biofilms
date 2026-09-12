@@ -556,16 +556,16 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
     M_local = state.melanin[tx, ty, tz]
     # THE 0.5 BELOW IS THE COEFFICIENT THAT ACTUALLY MOVES THIS MODEL, and it is
     # hard-coded here rather than tabulated. At the shipped I0 = 1.0 and
-    # T_cpm = 5.0, the radiation term reaches β_ion·I = 7.5e-2 for the most
-    # radiosensitive species in Table 2, an acceptance bias of 1.0151. This term
-    # at the reported M = 1.44 is -0.72, a bias of 1.155: about an order of
-    # magnitude more — 9.6 in ΔH, 10.2 as a ratio of excesses. The radial
-    # stratification is therefore melanin-mediated, not β_ion-mediated.
-    # Comparing 1.155 against the radiotropic species' 1.000010 instead, and
-    # calling the gap four orders of magnitude, is the WITHDRAWN comparison:
-    # 1.000010 is one role of one pair of species occupying a site, not the
-    # term's reach. See PP-62-13. Radiation still drives it, but only
-    # indirectly:
+    # T_cpm = 5.0, the radiation term for a radiotropic species is
+    # β_ion·I = -5e-5 for a NEGATIVELY signed species OCCUPYING a site, an
+    # acceptance bias of 1.000010. That is one role of one pair of species and
+    # is NOT the term's reach: signed by role, the extremum over source/target
+    # pairings is 7.505e-2 (see §6.2 and tests/prose_bounds.jl). This term at
+    # the reported M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of
+    # 9.6 in ΔH, NOT by four orders. CORRECTED 2026-08-30: this comment carried
+    # the version-1.1 claim in a file the manuscript sweep never covered, which
+    # is what a sweep bounded to one file cannot find.
+    # The radial stratification is still melanin-mediated, not β_ion-mediated. Radiation still drives it, but only indirectly:
     # melanin_drive is copied from the radiation field, so
     #   radiation -> production (α_M, tabulated) -> M -> here -> tropism.
     # Ledgered as cpm.melanin_coupling in data/parameter_provenance.csv.
