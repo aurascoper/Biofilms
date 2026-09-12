@@ -15,8 +15,8 @@ So: normalise whitespace before looking, and look in every tracked text file.
 
 WHAT THIS GUARD CONSIDERS A DEFECT, and it is narrower than the phrase. "Four
 orders of magnitude" is legitimate prose in this repository -- REFINE-08 uses it
-for sub-voxel tally drift, and the radiotrophic dose audits use it for Bland
-2022 sitting that far below every other ionizing record. The withdrawn claim is
+for sub-voxel tally drift, and the dose audits in docs/research use it for
+Bland 2022 sitting that far below every other ionizing record. The withdrawn claim is
 the COMPARISON: the melanin acceptance bias set against the radiation term and
 the gap called four orders. An occurrence counts only when both subjects are in
 the window, and it is forgiven when the window also says the comparison is
