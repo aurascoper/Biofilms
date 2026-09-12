@@ -11,9 +11,15 @@ import numpy as np
 from component_overlap import overlap_history
 
 FAILS = []
+RUN = []
 
 
 def check(name, cond, got):
+    """Every call is counted. The footer used to hard-code a hand-summed total, and the
+    sum was wrong -- it said 26 for 22 calls, because one scenario's count was mistyped.
+    A test harness that asserts its own size from memory is the same class of error the
+    fixtures below exist to catch."""
+    RUN.append(name)
     print(("  PASS  " if cond else "  FAIL  ") + name + "  ->  " + str(got))
     if not cond:
         FAILS.append(name)
@@ -83,5 +89,7 @@ check("deaths == 1 (C disappeared)", e["deaths"] == 1, e["deaths"])
 check("retired_by_merge == 1 (B lost)", e["retired_by_merge"] == 1, e["retired_by_merge"])
 check("carried == 1", e["carried"] == 1, e["carried"])
 
-print("\n%d checks, %d failures" % (7 + 2 + 5 + 4 + 3 + 2 + 3 - len(FAILS) + len(FAILS), len(FAILS)))
+print("\n%d checks, %d failures" % (len(RUN), len(FAILS)))
+print("(the closure assertions inside overlap_history also run on every fixture; they "
+      "raise rather than being counted here)")
 sys.exit(1 if FAILS else 0)
