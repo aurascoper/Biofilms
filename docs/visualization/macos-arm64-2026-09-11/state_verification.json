@@ -1,0 +1,107 @@
+{
+  "state": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/viewing/biofilm_signal_views.pvsm",
+  "mode": "pinned",
+  "checks": [
+    {
+      "check": "reader points at a signal_trajectory.pvd",
+      "pass": true,
+      "observed": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal/paraview/signal_trajectory.pvd"
+    },
+    {
+      "check": "referenced .pvd exists on disk",
+      "pass": true,
+      "observed": "True"
+    },
+    {
+      "check": "the .pvd content matches its manifest hash (self-consistency)",
+      "pass": true,
+      "observed": "f1a0472535953bca..."
+    },
+    {
+      "check": "the .pvd matches the FROZEN receipt hash",
+      "pass": true,
+      "observed": "pinned f1a0472535953bca / got f1a0472535953bca"
+    },
+    {
+      "check": "derived manifest matches the FROZEN receipt hash",
+      "pass": true,
+      "observed": "pinned 9768e0a9f4f63873 / got 9768e0a9f4f63873"
+    },
+    {
+      "check": "101 timesteps",
+      "pass": true,
+      "observed": "101"
+    },
+    {
+      "check": "timesteps are exactly {0..100}",
+      "pass": true,
+      "observed": "0.0..100.0, 101 unique"
+    },
+    {
+      "check": "Species_1to7 filter present",
+      "pass": true,
+      "observed": "True"
+    },
+    {
+      "check": "Interior_mask_1 filter present",
+      "pass": true,
+      "observed": "True"
+    },
+    {
+      "check": "Signal_slice filter present",
+      "pass": true,
+      "observed": "True"
+    },
+    {
+      "check": "species threshold 1..7",
+      "pass": true,
+      "observed": "1.0..7.0"
+    },
+    {
+      "check": "species threshold on CELLS/species",
+      "pass": true,
+      "observed": "['CELLS', 'species']"
+    },
+    {
+      "check": "interior_mask threshold 1..1",
+      "pass": true,
+      "observed": "1.0..1.0"
+    },
+    {
+      "check": "slice plane at z=28.5",
+      "pass": true,
+      "observed": "[20.0, 20.0, 28.5]"
+    },
+    {
+      "check": "species LUT categorical",
+      "pass": true,
+      "observed": "1"
+    },
+    {
+      "check": "species LUT has 7 annotated categories",
+      "pass": true,
+      "observed": "7"
+    },
+    {
+      "check": "signal LUT range 0..9",
+      "pass": true,
+      "observed": "0.0..9.0"
+    },
+    {
+      "check": "signal LUT rescale locked (Never)",
+      "pass": true,
+      "observed": "'Never'"
+    },
+    {
+      "check": "view 1 reports ray tracing off on reload (invariant, not a control)",
+      "pass": true,
+      "observed": "0"
+    },
+    {
+      "check": "view 2 reports ray tracing off on reload (invariant, not a control)",
+      "pass": true,
+      "observed": "0"
+    }
+  ],
+  "failures": []
+}
