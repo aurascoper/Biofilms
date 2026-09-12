@@ -55,7 +55,7 @@
 
 % ---- right: the solver
 \node[sol] (grid) at (12.2,0) {\textbf{Finite-volume grid}\\mobile $c(\mathbf{r},t)$, sorbed $s(\mathbf{r},t)$};
-\node[sol,below=7mm of grid] (sink) {\textbf{Sorption term}\\[2pt]$k_{\mathrm{ads}}c\,(X_{\max}\!-\!X) - k_{\mathrm{des}}X$};
+\node[sol,below=7mm of grid] (sink) {\textbf{Sorption term}, \emph{as it ships}\\[2pt]$k_{\mathrm{ads}}c - k_{\mathrm{des}}s$\\[1pt]{\scriptsize Henry --- no capacity ceiling}};
 \node[pri,below=7mm of sink] (kads) {$k_{\mathrm{ads}}$ is \textbf{not} supplied by an
   isotherm --- timed run, or a declared prior};
 
@@ -63,6 +63,7 @@
 \draw[ar] (iso.east) .. controls +(2.6,0.2) and +(-2.6,0.2) .. (sink.west);
 \node[font=\scriptsize,align=center,text width=44mm,fill=white,inner sep=2pt] at (6.1,-3.15)
   {$q_{\max}\!\cdot\!\rho_{\mathrm{dry}}\ \Rightarrow\ X_{\max}$\\[1pt]
+   {\itshape needs a ceiling term the solver does not have}\\[1pt]
    $b = k_{\mathrm{ads}}/k_{\mathrm{des}}$ (a \emph{ratio})};
 \draw[ar,solver] (grid) -- (sink);
 
@@ -106,8 +107,8 @@ effect --- an equilibrium capacity.}
   \item Whatever biomass your lab already grows in excess --- I am not asking you to
         establish a new culture.
   \item \textbf{Inactivated.} Biosorption is metabolically independent, so dead or
-        heat/azide-killed biomass is standard in this literature. That removes viability
-        maintenance from the first experiment.
+        heat-killed biomass is standard in this literature. That removes viability
+        maintenance from the first experiment. Heat, not azide --- see the control below.
   \item Suspended, not a coupon. A coupon measures capacity and diffusion at the same time
         and resolves neither; the suspended assay isolates the thermodynamic limit.
 \end{itemize}
@@ -117,8 +118,9 @@ effect --- an equilibrium capacity.}
 \begin{itemize}
   \item \textbf{Abiotic blank} --- vessel plus solution, no biomass. Wall loss and
         adsorption to glassware are otherwise counted as uptake.
-  \item \textbf{Metabolic control} --- azide or a temperature shift, to demonstrate uptake
-        is passive and not respiration-linked.
+  \item \textbf{Metabolic control} --- a temperature shift, \emph{not} sodium azide. Azide
+        is a ligand that complexes transition metals and shifts speciation, confounding the
+        measurement it is meant to control.
   \item \textbf{Blank carried through the identical handling}, including the same
         de-watering and the same delay before weighing.
 \end{itemize}
@@ -164,11 +166,14 @@ question with a house answer.}
 
 \vspace{1mm}
 \begin{minipage}[t]{0.45\linewidth}
-{\large\bfseries\color{solver} The bridge}\\[3pt]
+{\large\bfseries\color{solver} Where the number would land}\\[3pt]
 The isotherm gives capacity per unit \emph{mass}:
 \[ q_e = \frac{q_{\max}\,b\,C_e}{1+b\,C_e}\quad\text{[mg\,g$^{-1}$]} \]
 The solver tracks mass per unit \emph{volume}, so:
 \[ \boxed{\,X_{\max} = q_{\max}\cdot\rho_{\mathrm{dry}}\,} \]
+\emph{This is not yet a bridge.} The sorption term that ships is linear in $c$ with no
+capacity ceiling, so there is no $X_{\max}$ in the code for this number to enter. Adding
+one is a declared model change, not a plug-in.
 
 \vspace{2mm}
 {\large\bfseries\color{prior} Two things this does not give me}\\[3pt]
@@ -181,6 +186,7 @@ is carried as an unmeasured prior and labelled one.
 \textbf{2. A biofilm number.} Suspended and biofilm biomass differ in EPS composition, surface
 charge and accessible sites. This is a \emph{bound and a starting value}, not a transferable
 parameter --- and the gap between them is itself measurable in Phase 2.
+
 \end{minipage}\hfill
 \begin{minipage}[t]{0.51\linewidth}
 {\large\bfseries\color{solver} Epistemic class travels with the number}\\[3pt]
