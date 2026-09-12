@@ -36,9 +36,14 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install pytest
+      # Globbed, not listed. test_claims_generated_artifacts.py exists only on
+      # the branches stacked above this one, and a named file that is absent
+      # fails collection while a named file that is MISSING from the list runs
+      # nothing and says so in neither case.
       - name: Claims-ledger and withdrawn-comparison guards
         working-directory: calibration/tests
-        run: python -m pytest test_claims_ledger.py test_withdrawn_comparisons.py -v
+        shell: bash
+        run: python -m pytest test_claims*.py test_withdrawn_comparisons.py -v
       - name: Assert the deleted-claim guard was calibrated, not skipped
         working-directory: calibration/tests
         run: |
