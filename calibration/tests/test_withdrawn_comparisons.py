@@ -52,10 +52,22 @@ DECLARED = re.compile(r"withdrawn|withdraw|retracted")
 WINDOW = 300
 
 
+# A wrapped phrase inside a comment block does not merely break across a
+# newline -- the next line's COMMENT MARKER lands in the middle of it. The
+# compute_delta_H comment in biofilms_potts.jl read "Four orders of\n# magnitude"
+# and flattening whitespace alone produced "four orders of # magnitude", which
+# matches nothing. Collapsing whitespace was necessary and was not sufficient,
+# and this guard shipped with that hole in it: the first whole-tree scan over
+# every remote branch reported zero for a file that carried the claim on all of
+# them. Strip the marker first.
+COMMENT_PREFIX = re.compile(r"(?m)^[ \t]*(?:#+|//+|%+|;+|--)[ \t]?")
+
+
 def flatten(text: str) -> str:
-    """Whitespace collapsed and lowercased. THE WHOLE POINT: a phrase that wraps
-    at the column is one phrase, and a line-oriented search cannot see it."""
-    return " ".join(text.split()).lower()
+    """Comment markers dropped, whitespace collapsed, lowercased. THE WHOLE
+    POINT: a phrase that wraps at the column is one phrase, and neither a
+    line-oriented search nor a naive whitespace collapse can see it."""
+    return " ".join(COMMENT_PREFIX.sub("", text).split()).lower()
 
 
 def survivors_in(text: str) -> list[str]:
@@ -110,6 +122,29 @@ def test_the_scan_detects_the_instance_the_grep_missed():
     assert not [l for l in as_it_wrapped.splitlines()
                 if "four orders of magnitude" in l], "same, line by line"
     assert len(survivors_in(as_it_wrapped)) == 1
+
+
+def test_the_scan_detects_the_instance_the_comment_marker_hid():
+    """THE SECOND CONTROL, AND THE ONE THIS GUARD FIRST FAILED.
+
+    compute_delta_H in biofilms_potts.jl as it stood on origin/master. The
+    phrase wraps AND the next line opens with a comment marker, so flattening
+    whitespace alone yields "four orders of # magnitude" and matches nothing.
+    The first version of this scan reported this file clean on every remote
+    branch that carried the claim -- a whole-tree walk is not a wider scan if
+    its normaliser is narrower than the text.
+    """
+    as_it_was = (
+        "    # T_cpm = 5.0, the radiation term for a radiotropic species is\n"
+        "    # \u03b2_ion\u00b7I = -5e-5, an acceptance bias of 1.000010 \u2014 one part in 1e5. This\n"
+        "    # term at the reported M = 1.44 is -0.72, a bias of 1.155. Four orders of\n"
+        "    # magnitude. The radial stratification is therefore melanin-mediated, not\n"
+        "    # \u03b2_ion-mediated.\n")
+    assert not [l for l in as_it_was.splitlines()
+                if "four orders of magnitude" in l.lower()], "line by line: invisible"
+    assert "four orders of magnitude" not in " ".join(as_it_was.split()).lower(), (
+        "whitespace collapse alone: still invisible, because the marker is in the way")
+    assert len(survivors_in(as_it_was)) == 1
 
 
 def test_the_scan_passes_the_correction_and_the_unrelated_uses():
