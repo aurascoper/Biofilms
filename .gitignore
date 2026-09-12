@@ -375,6 +375,7 @@ MigrationBackup/
 FodyWeavers.xsd
 # Machine-local Julia state (JACC is dev-pathed; backend is a local preference)
 Manifest.toml
+!viewer/Manifest.toml
 LocalPreferences.toml
 
 # Python coupling env/artifacts
@@ -402,3 +403,8 @@ geolocator/data/market_bars.sqlite
 # Large binary reference data gets an explicit distribution decision, not a
 # silent commit.
 geolocator/cache/
+
+# Rendered lattice exports (export_vti.jl); regenerate from snapshots, never commit
+*.vti
+*.pvd
+*.pvsm

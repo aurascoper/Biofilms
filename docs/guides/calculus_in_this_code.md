@@ -342,5 +342,5 @@ suite, and the failure message distinguishes "the code moved" from "the code cha
 | forty cells by default | `biofilms_radiodialysis.R:257` | `default_parms <- function(Nr = 40, R = 1.0)` |
 | the state vector packs c, s and m | `biofilms_radiodialysis.R:50` | `y[1 .. Nr]        = c_i` |
 | LSODA is the integrator | `biofilms_radiodialysis.R:427` | `method = "lsoda"` |
-| the Julia port substeps against the diffusion bound | `biofilms_potts.jl:1453` | `dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)` |
+| the Julia port substeps against the diffusion bound | `biofilms_potts.jl:1469` | `dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)` |
 | the explicit-Euler limit is computed, not asserted | `analysis/verify_radiodialysis_stability.py:153` | `conservative_real_axis_limit` |

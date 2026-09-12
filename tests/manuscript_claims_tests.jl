@@ -92,6 +92,68 @@ end
 # does not violate the claim; the corrected .tex prose (section 3.4) makes this same
 # distinction explicit. "momentum" has no such false-positive source and is checked directly.
 
+# Retracted figure vocabulary must not enter an image from any source file. The python
+# guard (RETRACTED_IN_FIGURES in calibration/tests/test_claims_ledger.py) reads the figure
+# sidecars under preprint/figures; a title string in a script produces an image no sidecar
+# records. On 2026-09-07 the first term planted in a viewer title stayed green under every
+# suite; a first fix scanned only viewer/, the directory where the plant landed, and a second
+# scanned the whole root for that one term while the vocabulary has four (Codex on #25).
+# The vocabulary is READ from the python file at test time, one source and no mirror; the
+# scope is every .jl, .R and .py under the root minus .git and virtualenvs; and every file
+# carrying a term must be declared for that term. The list is the claim.
+function retracted_figure_terms(root)
+    src = read(joinpath(root, "calibration", "tests", "test_claims_ledger.py"), String)
+    m = match(r"RETRACTED_IN_FIGURES\s*=\s*\(([^)]*)\)", src)
+    m === nothing && error("RETRACTED_IN_FIGURES not found in test_claims_ledger.py")
+    terms = [x.captures[1] for x in eachmatch(r"\"([^\"]+)\"", m.captures[1])]
+    length(terms) >= 4 || error("RETRACTED_IN_FIGURES has $(length(terms)) terms; expected at least four")
+    return terms
+end
+RETRACTED_WORD_ALLOWED = Dict(
+    # comments that deny the property, naming it to deny it; a path to the audit document
+    # whose filename carries the word; the vocabulary itself; this file's own controls
+    "radiotroph" => ["biofilms_3d.R", "biofilms_potts.jl", "biofilms_radiodialysis.R",
+                     "calibration/tests/test_claims_ledger.py", "tests/manuscript_claims_tests.jl"],
+)
+# every other term: only the vocabulary declares it
+retracted_allowed(term) = get(RETRACTED_WORD_ALLOWED, term, ["calibration/tests/test_claims_ledger.py"])
+function _retracted_word_files(root, term)
+    pattern = Regex(escape_string(term) |> x -> replace(x, r"[.*+?^\${}()|\[\]\\]" => s"\\\0"), "i")
+    hits = String[]
+    for (dir, _, files) in walkdir(root)
+        rel_dir = relpath(dir, root)
+        any(part -> part in (".git", ".venv", "node_modules"), splitpath(rel_dir)) && continue
+        for f in files
+            endswith(f, ".jl") || endswith(f, ".R") || endswith(f, ".py") || continue
+            p = joinpath(dir, f)
+            isempty(_scan([p], pattern)) || push!(hits, relpath(p, root))
+        end
+    end
+    return sort(hits)
+end
+let
+    terms = retracted_figure_terms(REPO)
+    @test "radiotroph" in terms
+    control = _scan_text([("fake.jl", "title = \"Radiotrophic biofilm, MCS \$mcs\"\n")], r"radiotroph"i)
+    @test length(control) == 1
+    # The walk reaches a directory that did not exist when it was written, through the same
+    # walker production uses, and for a term other than the first: the term is taken from
+    # the vocabulary at runtime so this file does not carry it.
+    fresh = mktempdir()
+    mkpath(joinpath(fresh, "bench"))
+    write(joinpath(fresh, "bench", "plant.jl"), "ax.title = \"" * uppercasefirst(terms[3]) * "\"\n")
+    write(joinpath(fresh, "bench", "clean.py"), "title = 'MCS 20'\n")
+    @test _retracted_word_files(fresh, terms[3]) == [joinpath("bench", "plant.jl")]
+    @test isempty(_retracted_word_files(fresh, terms[1]))
+    for term in terms
+        found = _retracted_word_files(REPO, term)
+        @test found == sort(retracted_allowed(term))
+        for extra in setdiff(found, retracted_allowed(term))
+            println("retracted term \"$term\" in an undeclared source file: ", extra)
+        end
+    end
+end
+
 let
     control = _scan_text([("fake.R", "momentum <- p * v\n")], r"\bmomentum\b"i)
     @test length(control) == 1
