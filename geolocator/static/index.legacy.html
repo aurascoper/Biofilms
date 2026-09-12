@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Primary Fuel Source Geolocator · 3D Globe</title>
+<style>
+  :root {
+    --bg: #0a0e1a; --panel: rgba(16,22,40,0.85); --ink: #e8ecf4;
+    --ink-soft: #9aa7c0; --line: #1e2a44; --accent: #5d9bff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  #globe { position:fixed; inset:0; }
+  #hud { position:fixed; top:16px; left:16px; z-index:10; max-width:300px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; backdrop-filter:blur(6px); }
+  #hud h1 { font-size:15px; font-weight:600; margin-bottom:2px; }
+  #hud .sub { font-size:11px; color:var(--ink-soft); margin-bottom:10px; }
+  #hud .stat { font-size:12px; color:var(--ink-soft); margin-bottom:8px; }
+  #hud .stat b { color:var(--ink); }
+  #legend { margin-top:6px; max-height:200px; overflow-y:auto; }
+  #legend .row { display:flex; align-items:center; gap:8px; font-size:11px;
+    color:var(--ink-soft); margin-bottom:3px; }
+  #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
+  #legend .row b { color:var(--ink); font-weight:600; }
+  #controls { position:fixed; bottom:16px; left:16px; z-index:10;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  #controls label { font-size:11px; color:var(--ink-soft); }
+  #controls select, #controls input { background:#0d1424; color:var(--ink);
+    border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:11px; }
+  #tooltip { position:fixed; z-index:20; pointer-events:none; background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:11px;
+    color:var(--ink); display:none; max-width:260px; }
+  #tooltip .t-name { font-weight:600; margin-bottom:2px; }
+  #tooltip .t-row { color:var(--ink-soft); }
+  #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); z-index:30; font-size:14px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div id="globe"></div>
+<div id="loading">Loading energy globe…</div>
+<div id="hud">
+  <h1>Primary Fuel Source Geolocator</h1>
+  <div class="sub" id="hud-sub">3D geo-spatial · WRI Global Power Plant Database</div>
+  <div class="stat">Sites: <b id="stat-count">—</b> · Capacity: <b id="stat-cap">—</b> MW</div>
+  <div class="stat" id="stat-trunc" style="display:none;color:#E07B39"></div>
+  <div id="legend"></div>
+  <div id="measured" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"></div>
+</div>
+<div id="controls">
+  <label>Layers</label>
+  <span id="layer-toggles"></span>
+  <label>Fuel/Stage</label>
+  <select id="fuel-filter"><option value="">All</option></select>
+  <label>Min MW</label>
+  <input id="min-cap" type="number" value="0" min="0" style="width:70px">
+  <label>Bands</label>
+  <span id="band-toggles"></span>
+</div>
+<div id="tooltip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const API = '';
+const LAYER_IDS = ['power','nuclear','battery','gridcoin','worldgrid','stars'];
+const LAYER_LABEL = { power:'Power Plants', nuclear:'Nuclear Cycle', battery:'Battery Cycle',
+                      gridcoin:'Gridcoin/BOINC', worldgrid:'World Grid', stars:'Star Systems' };
+// Three epistemic statuses, three deliberately different treatments. A viewer must
+// never mistake a generated arc for a measured one.
+const BAND_STATUS = {
+  structural:  { label:'Supply chain',  hint:'stage adjacency in the data' },
+  measured:    { label:'Measured',      hint:'carries a statistic' },
+  speculative: { label:'Speculative',   hint:'generated, not observed' },
+};
+const PLANT_LIMIT = 5000;
+
+let scene, camera, renderer, controls, raycaster, mouse;
+let earthGroup, markerRoot, bandRoot;
+let layerGroups = {}, layerFeatures = {}, bandGroups = {};
+let markers = [], bandPicks = [], bands = [];
+let activeLayers = new Set(['power']);
+let activeBands = new Set(['structural','measured','speculative']);
+
+init();
+buildToggles();
+refreshLayers();
+loadBands();
+
+function init() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 3.2);
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  document.getElementById('globe').appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  // One envelope. The old code swapped clamps when the stars layer was selected,
+  // which is incoherent once Earth and sky are on screen together.
+  controls.minDistance = 1.15; controls.maxDistance = 12;
+
+  scene.add(new THREE.Points(
+    new THREE.BufferGeometry().setFromPoints(
+      Array.from({length:2000}, () => new THREE.Vector3(
+        (Math.random()-0.5)*200, (Math.random()-0.5)*200, (Math.random()-0.5)*200))),
+    new THREE.PointsMaterial({ color:0xffffff, size:0.15, transparent:true, opacity:0.6 })));
+
+  // Earth is permanent now, never hidden.
+  earthGroup = new THREE.Group();
+  earthGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 64, 64),
+    new THREE.MeshPhongMaterial({ color:0x0d1424, transparent:true, opacity:0.92 })));
+  const lineMat = new THREE.LineBasicMaterial({ color:0x1e2a44, transparent:true, opacity:0.5 });
+  for (let lat=-80; lat<=80; lat+=20) {
+    const pts=[]; for (let lon=-180; lon<=180; lon+=5) pts.push(latLonToVec3(lat,lon,1.001));
+    earthGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+  }
+  for (let lon=-180; lon<180; lon+=20) {
+    const pts=[]; for (let lat=-90; lat<=90; lat+=5) pts.push(latLonToVec3(lat,lon,1.001));
+    earthGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+  }
+  scene.add(earthGroup);
+
+  markerRoot = new THREE.Group(); scene.add(markerRoot);
+  LAYER_IDS.forEach(id => { layerGroups[id] = new THREE.Group(); markerRoot.add(layerGroups[id]); });
+
+  bandRoot = new THREE.Group(); scene.add(bandRoot);
+  Object.keys(BAND_STATUS).forEach(st => { bandGroups[st] = new THREE.Group(); bandRoot.add(bandGroups[st]); });
+
+  scene.add(new THREE.AmbientLight(0x404060, 0.6));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+  dir.position.set(2,1,3); scene.add(dir);
+
+  raycaster = new THREE.Raycaster();
+  raycaster.params.Line = { threshold: 0.01 };
+  mouse = new THREE.Vector2();
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  animate();
+}
+
+function buildToggles() {
+  const lt = document.getElementById('layer-toggles');
+  LAYER_IDS.forEach(id => {
+    const l = document.createElement('label');
+    l.style.marginRight = '8px';
+    l.innerHTML = `<input type="checkbox" data-layer="${id}" ${activeLayers.has(id)?'checked':''}> ${LAYER_LABEL[id]}`;
+    l.querySelector('input').addEventListener('change', e => {
+      e.target.checked ? activeLayers.add(id) : activeLayers.delete(id);
+      refreshLayers();
+    });
+    lt.appendChild(l);
+  });
+  const bt = document.getElementById('band-toggles');
+  Object.entries(BAND_STATUS).forEach(([st, meta]) => {
+    const l = document.createElement('label');
+    l.style.marginRight = '8px'; l.title = meta.hint;
+    l.innerHTML = `<input type="checkbox" data-band="${st}" checked> ${meta.label}`;
+    l.querySelector('input').addEventListener('change', e => {
+      e.target.checked ? activeBands.add(st) : activeBands.delete(st);
+      applyBandVisibility(); renderMeasured();
+    });
+    bt.appendChild(l);
+  });
+  document.getElementById('fuel-filter').addEventListener('change', renderMarkers);
+  document.getElementById('min-cap').addEventListener('change', renderMarkers);
+}
+
+// ── coordinates ───────────────────────────────────────────────────────────────
+function latLonToVec3(lat, lon, r=1.0) {
+  const phi = (90-lat)*Math.PI/180, theta = (lon+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -r*Math.sin(phi)*Math.cos(theta),
+    r*Math.cos(phi),
+    r*Math.sin(phi)*Math.sin(theta));
+}
+
+// RA (degrees) + Dec (degrees) -> celestial shell.
+// Delegating is the fix: the old body multiplied RA by 15, treating degrees as
+// hours, and also flipped handedness relative to the terrestrial frame. Reusing
+// latLonToVec3 corrects both at once and states the convention, which is that the
+// celestial shell shares Earth's frame with RA read as longitude.
+function raDecToVec3(ra, dec, r=2.0) { return latLonToVec3(dec, ra, r); }
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ── layers ────────────────────────────────────────────────────────────────────
+async function refreshLayers() {
+  const wanted = [...activeLayers].filter(id => !(id in layerFeatures));
+  if (wanted.length) {
+    document.getElementById('loading').style.display = 'block';
+    await Promise.all(wanted.map(async id => {
+      const r = await fetch(`${API}/api/plants?layer=${id}&limit=${PLANT_LIMIT}`);
+      layerFeatures[id] = (await r.json()).features;
+    }));
+    document.getElementById('loading').style.display = 'none';
+  }
+  populateFuelFilter();
+  renderMarkers();
+}
+
+function activeFeatures() {
+  return [...activeLayers].flatMap(id => (layerFeatures[id]||[]).map(f => [id, f]));
+}
+
+function populateFuelFilter() {
+  const sel = document.getElementById('fuel-filter'), keep = sel.value;
+  const keys = [...new Set(activeFeatures().map(([,f]) => f.properties.color_key))].sort();
+  sel.innerHTML = '<option value="">All</option>' + keys.map(k => `<option>${k}</option>`).join('');
+  if (keys.includes(keep)) sel.value = keep;
+}
+
+function renderMarkers() {
+  LAYER_IDS.forEach(id => { const g = layerGroups[id]; while (g.children.length) g.remove(g.children[0]); });
+  markers = [];
+  const fuel = document.getElementById('fuel-filter').value;
+  const minCap = parseFloat(document.getElementById('min-cap').value) || 0;
+
+  const shown = activeFeatures().filter(([,f]) =>
+    (!fuel || f.properties.color_key === fuel) && (f.properties.capacity_mw||0) >= minCap);
+
+  // Normalise per layer: a 4-degree grid cell and a single mine are not comparable.
+  const maxCap = {};
+  shown.forEach(([id,f]) => { maxCap[id] = Math.max(maxCap[id]||1, f.properties.capacity_mw||0); });
+
+  shown.forEach(([id, f]) => {
+    const p = f.properties, isStar = id === 'stars';
+    const size = isStar ? 0.05 : (0.004 + 0.03*Math.sqrt((p.capacity_mw||0)/maxCap[id]));
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 8, 8),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(p.color || '#BDC3C7') }));
+    if (isStar) {
+      const e = p.extra || {};
+      mesh.position.copy(raDecToVec3(parseFloat(e.ra)||0, parseFloat(e.dec)||0, 2.0));
+    } else {
+      mesh.position.copy(latLonToVec3(f.geometry.coordinates[1], f.geometry.coordinates[0], 1.01));
+    }
+    mesh.userData = { ...p, _layer: id };
+    layerGroups[id].add(mesh);
+    markers.push(mesh);
+  });
+
+  updateHud(shown);
+  renderLegend(shown);
+}
+
+function updateHud(shown) {
+  const cap = shown.reduce((a,[,f]) => a + (f.properties.capacity_mw||0), 0);
+  document.getElementById('stat-count').textContent = shown.length.toLocaleString();
+  document.getElementById('stat-cap').textContent = Math.round(cap).toLocaleString();
+  // The fetch limit used to truncate power from 34,936 to 5,000 with no notice.
+  const trunc = [...activeLayers].filter(id => (layerFeatures[id]||[]).length >= PLANT_LIMIT);
+  const el = document.getElementById('stat-trunc');
+  if (trunc.length) {
+    el.style.display = 'block';
+    el.textContent = `Showing first ${PLANT_LIMIT.toLocaleString()} of each: ${trunc.join(', ')}`;
+  } else el.style.display = 'none';
+}
+
+function renderLegend(shown) {
+  const by = {};
+  shown.forEach(([,f]) => {
+    const k = f.properties.color_key;
+    (by[k] = by[k] || { n:0, color:f.properties.color })['n']++;
+  });
+  document.getElementById('legend').innerHTML = Object.entries(by)
+    .sort((a,b) => b[1].n - a[1].n)
+    .map(([k,v]) => `<div class="row"><span class="swatch" style="background:${v.color}"></span>${k} <b>${v.n.toLocaleString()}</b></div>`)
+    .join('');
+}
+
+// ── bands ─────────────────────────────────────────────────────────────────────
+async function loadBands() {
+  const r = await fetch(`${API}/api/links`);
+  bands = (await r.json()).features;
+  renderBands();
+  renderMeasured();
+}
+
+function resolveEnd(e) {
+  if (e.frame === 'geo') return latLonToVec3(e.lat, e.lon, 1.01);
+  if (e.frame === 'celestial') return raDecToVec3(e.ra, e.dec, 2.0);
+  return null;   // fuel frame has no position, and must not be given one
+}
+
+function renderBands() {
+  Object.values(bandGroups).forEach(g => { while (g.children.length) g.remove(g.children[0]); });
+  bandPicks = [];
+  bands.forEach(b => {
+    const p = b.properties;
+    const a = resolveEnd(p.a), c = resolveEnd(p.b);
+    if (!a || !c) return;                     // measured bands render in the HUD
+    const spec = p.status === 'speculative';
+    // Bulge past the far endpoint so an Earth-to-sky band reads as an escape
+    // rather than a chord through the planet.
+    const bulge = Math.max(a.length(), c.length()) * (spec ? 1.12 : 1.28);
+    const mid = a.clone().add(c).multiplyScalar(0.5).normalize().multiplyScalar(bulge);
+    const pts = new THREE.QuadraticBezierCurve3(a, mid, c).getPoints(48);
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    let line;
+    if (spec) {
+      // Dashes must be scaled to arc length; these arcs are ~0.3-2.5 world units,
+      // so a dash size of 1 would render solid.
+      line = new THREE.Line(geo, new THREE.LineDashedMaterial({
+        color:p.color, transparent:true, opacity:0.5, dashSize:0.035, gapSize:0.025 }));
+      line.computeLineDistances();
+    } else {
+      line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+        color:p.color, transparent:true, opacity:0.32 }));
+    }
+    line.userData = p;
+    bandGroups[p.status].add(line);
+    bandPicks.push(line);
+  });
+  applyBandVisibility();
+}
+
+function applyBandVisibility() {
+  Object.entries(bandGroups).forEach(([st,g]) => { g.visible = activeBands.has(st); });
+}
+
+function renderMeasured() {
+  const el = document.getElementById('measured');
+  const ms = bands.filter(b => b.properties.status === 'measured');
+  if (!ms.length || !activeBands.has('measured')) { el.style.display='none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div class="stat" style="margin-bottom:4px"><b>Measured relationships</b></div>' +
+    ms.map(b => {
+      const p = b.properties, s = p.stats;
+      return `<div class="row" style="display:block;margin-bottom:6px">
+        <span class="swatch" style="background:${p.color};display:inline-block"></span>
+        <b>${p.a.name} and ${p.b.name}</b><br>
+        r = ${s.r_partial} (raw ${s.r_raw}) · n = ${s.n} · p = ${s.p}<br>
+        ${s.basis}, control ${s.control}</div>`;
+    }).join('') +
+    '<div class="row" style="display:block;color:var(--ink-soft)">No position on the globe: this is a relationship between price series, not places.</div>';
+}
+
+// ── hover ─────────────────────────────────────────────────────────────────────
+function pickTargets() {
+  const t = [];
+  LAYER_IDS.forEach(id => { if (activeLayers.has(id)) t.push(...layerGroups[id].children); });
+  Object.entries(bandGroups).forEach(([st,g]) => { if (activeBands.has(st)) t.push(...g.children); });
+  return t;
+}
+
+function onMouseMove(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(pickTargets());
+  const tip = document.getElementById('tooltip');
+  if (!hits.length) { tip.style.display='none'; return; }
+  const d = hits[0].object.userData;
+  tip.style.display='block';
+  tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+14)+'px';
+  tip.innerHTML = d.band ? bandTip(d) : siteTip(d);
+}
+
+function bandTip(p) {
+  const meta = BAND_STATUS[p.status];
+  let html = `<div class="t-name">${p.a.name} to ${p.b.name}</div>
+    <div class="t-row">${p.label}</div>
+    <div class="t-row"><b>${meta.label}</b> · ${meta.hint}</div>`;
+  if (p.status === 'structural')
+    html += '<div class="t-row">Shows which stages connect, not that these two sites trade.</div>';
+  if (p.status === 'speculative')
+    html += '<div class="t-row">Generated for this layer. Not observed.</div>';
+  return html;
+}
+
+function siteTip(p) {
+  let html = `<div class="t-name">${p.name}</div>
+    <div class="t-row">${p.color_key}${p.country ? ' · '+p.country : ''}</div>`;
+  if (p.capacity_mw) html += `<div class="t-row">${p.capacity_mw.toLocaleString()} MW</div>`;
+  if (p.extra && p.extra.distance_ly)
+    html += `<div class="t-row">${p.extra.distance_ly} ly · ${p.extra.star_type||''}</div>`;
+  if (p.note) html += `<div class="t-row">${p.note}</div>`;
+  return html;
+}
+</script>
+</body>
+</html>

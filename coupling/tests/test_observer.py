@@ -12,6 +12,7 @@ Only the two PyVista entry points are gated, and they are the thin part.
 from __future__ import annotations
 
 import importlib.util
+import sys
 
 import numpy as np
 import pytest
@@ -967,3 +968,156 @@ def test_the_overlay_cannot_hide_a_non_quotable_dose_layer(tmp_path):
     assert plan["dose_on_lattice"].banner, "the upsampled layer lost its banner"
     plotter = observer.plot_overlay(path, "cell_id", "dose_on_lattice")
     assert plotter is not None
+
+
+# ------------------------------------------- two panels, one frame of reference
+
+_PROV = {"reference_system_id": "synthetic", "target_calibration": False,
+         "evidence_policy": "synthetic", "openmc_version": "0.15.3"}
+
+
+def _melanin_bundle(path, values):
+    """One continuous layer, so two panels can be given different ranges."""
+    write_bundle(path, [LATTICE],
+                 [Layer("melanin", "cpm_labels", "dimensionless", "intensive",
+                        np.asarray(values, dtype=float).reshape((4, 4, 4)))],
+                 [], provenance=_PROV)
+    return path
+
+
+def _clims_of(renderer):
+    """Colour ranges of the DATA actors only.
+
+    A renderer also holds a scalar-bar `vtkActor2D` whose mapper reports a
+    fixed (0, 1) whatever the field is. Collecting that alongside the real
+    range makes every comparison here read as "the panels disagree", which
+    would let the control below pass on an artefact of the scalar bar.
+    """
+    return [tuple(np.round(a.mapper.scalar_range, 6))
+            for a in renderer.actors.values()
+            if type(a).__name__ in ("Volume", "Actor")
+            and getattr(a, "mapper", None) is not None
+            and getattr(a.mapper, "scalar_range", None) is not None]
+
+
+@pytest.mark.viewer
+@_needs_pyvista
+def test_panels_share_one_colour_range(tmp_path):
+    """A DEPENDENCY, NOT A FEATURE, AND THAT IS WHY IT IS TESTED.
+
+    `plot_panels` passes no per-panel `clim`. It does not need to: within one
+    `Plotter`, PyVista shares the lookup table per scalar name and takes the
+    union across subplots. An explicit range was written first and deleted,
+    because removing it changed nothing on either render branch in either panel
+    order -- a mechanism whose control cannot fail.
+
+    But the comparison RESTS on that behaviour. If an upgrade stops sharing the
+    table, each panel scales to its own extremes: the null renders in the same
+    colours as the run, full range top to bottom, and the picture says they are
+    alike when their values differ ninefold. Nothing on screen would say so.
+    So the property is asserted here rather than assumed, in both orders,
+    because a union that is really last-write-wins would clip whichever panel
+    went first.
+    """
+    a = _melanin_bundle(tmp_path / "a.h5", np.linspace(0.0, 1.0, 64))
+    b = _melanin_bundle(tmp_path / "b.h5", np.linspace(0.0, 9.0, 64))
+    for order in ([("run", a), ("null", b)], [("null", b), ("run", a)]):
+        p = observer.plot_panels(order, "melanin")
+        ranges = {c for r in p.renderers for c in _clims_of(r)}
+        assert ranges == {(0.0, 9.0)}, (
+            f"panels {[t for t, _ in order]} were coloured on different "
+            f"scales: {ranges}")
+
+
+@pytest.mark.viewer
+@_needs_pyvista
+def test_the_control_separate_plotters_do_not_share_a_range(tmp_path):
+    """THE NEGATIVE CONTROL. The same two fields drawn in SEPARATE plotters must
+    come apart -- otherwise the test above passes on two fields that colour
+    identically anyway, and asserts nothing about sharing."""
+    a = _melanin_bundle(tmp_path / "a.h5", np.linspace(0.0, 1.0, 64))
+    b = _melanin_bundle(tmp_path / "b.h5", np.linspace(0.0, 9.0, 64))
+    apart = {c for path in (a, b)
+             for c in _clims_of(observer.plot_layer(path, "melanin").renderer)}
+    assert apart == {(0.0, 1.0), (0.0, 9.0)}, (
+        "the two fields colour identically even in separate plotters, so the "
+        f"sharing test cannot fail: {apart}")
+
+
+@pytest.mark.viewer
+@_needs_pyvista
+def test_panels_share_one_camera(tmp_path):
+    """A structure must not read as bigger because its panel is closer."""
+    a = _melanin_bundle(tmp_path / "a.h5", np.linspace(0.0, 1.0, 64))
+    b = _melanin_bundle(tmp_path / "b.h5", np.linspace(0.0, 9.0, 64))
+    linked = observer.plot_panels([("run", a), ("null", b)], "melanin")
+    apart = observer.plot_panels([("run", a), ("null", b)], "melanin",
+                                 link_views=False)
+    assert len({id(r.camera) for r in linked.renderers}) == 1
+    assert len({id(r.camera) for r in apart.renderers}) == 2
+
+
+@pytest.mark.viewer
+@_needs_pyvista
+def test_every_panel_is_drawn_and_labelled(tmp_path):
+    """Two panels asked for, two panels rendered. A silently dropped panel in a
+    run-versus-null figure is the null going missing.
+
+    MUTATION CONTROL: removing `p.add_text(title, ...)` from the production
+    renderer leaves both data assertions green and fails the per-renderer title
+    assertion below for both supplied labels.
+    """
+    a = _melanin_bundle(tmp_path / "a.h5", np.linspace(0.0, 1.0, 64))
+    b = _melanin_bundle(tmp_path / "b.h5", np.linspace(0.0, 9.0, 64))
+    panels = [("run", a), ("null", b)]
+    p = observer.plot_panels(panels, "melanin")
+    assert len(p.renderers) == 2
+    assert all(_clims_of(r) for r in p.renderers), "a panel drew no data"
+    for renderer, (title, _) in zip(p.renderers, panels, strict=True):
+        rendered_text = {
+            actor.GetText(i)
+            for actor in renderer.actors.values()
+            if hasattr(actor, "GetText")
+            for i in range(8)
+            if actor.GetText(i) is not None
+        }
+        assert title in rendered_text, (
+            f"panel {title!r} drew data but not its title: {rendered_text}")
+
+
+def test_plot_panels_refuses_an_empty_panel_list():
+    with pytest.raises(ValueError, match="at least one panel"):
+        observer.plot_panels([], "melanin")
+
+
+def test_the_empty_panel_contract_is_reachable_without_pyvista():
+    """THE CONTROL THE TEST ABOVE CANNOT BE. It passes wherever pyvista IS
+    installed no matter which line comes first, so it could not detect the
+    defect it was written for: `import pyvista as pv` sat above the check, and
+    in the bare tier -- which is every environment the suite actually runs in
+    without the `viewer` extra -- `plot_panels([], ...)` raised
+    ModuleNotFoundError instead. Rule 2: the skip was the coverage.
+
+    Blocking the module here rather than relying on the runner's environment
+    means this bites on both tiers. The block is asserted to be in force before
+    anything is tested, because a meta-path hook that silently does nothing
+    reproduces as a clean pass -- which is exactly what a `find_module` hook
+    does on a Python that only calls `find_spec`.
+    """
+    class _NoPyVista:
+        def find_spec(self, name, path=None, target=None):
+            if name == "pyvista" or name.startswith("pyvista."):
+                raise ModuleNotFoundError(f"No module named {name!r}")
+            return None
+
+    blocked = [k for k in sys.modules if k == "pyvista" or k.startswith("pyvista.")]
+    saved = {k: sys.modules.pop(k) for k in blocked}
+    sys.meta_path.insert(0, _NoPyVista())
+    try:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("pyvista")      # the block is real
+        with pytest.raises(ValueError, match="at least one panel"):
+            observer.plot_panels([], "melanin")
+    finally:
+        sys.meta_path.pop(0)
+        sys.modules.update(saved)

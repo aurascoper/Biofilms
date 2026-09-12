@@ -1,0 +1,29 @@
+                                                                Melanin field at occupied sites — dimensionless model units
+                                             1.5
+                                                                                                                                           1.44
+
+
+
+
+Mean melanin field value at occupied sites
+                                             1.0                                                                                           0.97
+                                                                                                                                           0.94
+
+
+                                                                                                                                                  C. neoformans
+
+                                                                                                                                                  C. sphaerospermum
+
+                                                                                                                                                  A. niger
+
+                                             0.5
+
+
+
+
+                                             0.0
+                                                   Ordering follows the hand-specified alpha_M_species scales; not a measured quantity
+
+                                                   0                                                       50                            100
+                                                                                                     Monte Carlo Steps
+

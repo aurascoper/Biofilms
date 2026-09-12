@@ -1,0 +1,27 @@
+                                         Contaminant penetration and biosorption
+
+                               1.0                                                             1.0
+
+                                                             c(R) = 87% c_ext
+
+
+
+
+                                                                                                     Sorbed phase s_mean (×0.0034 c_ext)
+Mobile contaminant c / c_ext
+                                                                                                                                           c(R,t) at wall
+
+                                                                                                                                           c_mean interior
+                               0.5                                                             0.5
+                                                                                                                                           s_mean sorbed
+
+
+
+
+                                                    c_mean = 2.4% c_ext (98% depleted)
+
+
+                               0.0                                                             0.0
+                                     0                      50                           100
+                                                     Monte Carlo Steps
+

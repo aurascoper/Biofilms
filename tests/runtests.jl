@@ -28,6 +28,8 @@ end
     include("deterministic_radiation.jl")
 end
 
+include("delta_h_decomposition.jl")
+
 include("radiodialysis_basis_gate.jl")
 
 @testset "Lifecycle, dose contract, windowed API" begin
@@ -52,3 +54,22 @@ end
 @testset "Manuscript claims" begin
     include("manuscript_claims_tests.jl")
 end
+
+# The checkerboard decomposition had no acceptance measurement on either branch.
+# Per-kernel agreement above passes when both kernels carry the same artifact,
+# and the serial fixture pins a stream with no sublattices, so nothing here
+# would have reported a parity-correlated bias in accepted moves.
+include("jacc_parity_tests.jl")
+
+# A bound stated in the paper must be the bound the coefficients have. §6.2
+# asserted 5e-5 where the model gives 7.505e-2, and nothing here could read a
+# number out of the prose to say so.
+include("prose_bounds.jl")
+
+# §6.2's per-proposal statistics had no producer either: the 26.7% that replaced
+# an unnamed-run 29.8% was measured by an uncommitted rewrite of the stepper.
+include("rad_proposals_tests.jl")
+
+# Table 4 was published from a configuration nothing shipped could reproduce.
+# decided_moves.jl is that entry point; this runs it.
+include("decided_moves_tests.jl")
