@@ -1,0 +1,333 @@
+{
+  "frozen_mcs": 100,
+  "source_frame": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal/paraview/signal_mcs000100.vti",
+  "source_frame_sha256": "3f98fb8ea6114f8d99788546611aeb154ee220c0906357e8c8a4cca475716c2f",
+  "source_verified_against_manifest": "3f98fb8ea6114f8d99788546611aeb154ee220c0906357e8c8a4cca475716c2f",
+  "manifest_pinned_by_receipt": "render_manifest.json",
+  "vti_origin": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "vti_spacing": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "source_declared_mcs": 100.0,
+  "source_git_sha": "8cbb8eee1c224298341a0b93a19ab5e078929b14",
+  "source_parent_manifest_sha256": "f00e470afd982620a15def3a2e0624eb50f1ad7c09b3ef063b219c185d91c7fe",
+  "output_sha256": {
+    "d_f00000.vti": "0839f7a7ca72fe3e671950af47a20cfb11f4c7a5023c77b858a2240e501c77df",
+    "d_f00001.vti": "b25a20bba92a4da35b567cb1d54e7b3c23c8df450802ede385e2011a4ff66a30",
+    "d_f00002.vti": "a32cdccc66c751e8327719b4d47775abbc2195bbb4e99d914d78855d4d12fcd4",
+    "d_f00003.vti": "3ead07ecd1d35fcdd008d0ffac1d496964008f747e8b62585c9372f909d8ba36",
+    "d_f00004.vti": "cfcb461259f59fc4fb9aab26a09cfba8d7a608f8cb5d5e134ab77878529c0865",
+    "d_f00005.vti": "9f64e31d446d889e5cb8f8cc86ff8dc769a2ca6f624b391f9afbb1e2ff85d3fb",
+    "d_f00006.vti": "a3d42c293710e8aba58d7698c52ab0ad13e4c6ac600a07bf1d70504ae86e380a",
+    "d_f00007.vti": "4c0ba572f06a8d0119f4925b208c327838fb0d9c0a265e19d35b246348c61e74",
+    "d_f00008.vti": "9c44a6df170eed6ede029a1a5816263904cdade8d12521e6444869df171c7a8b",
+    "d_f00009.vti": "3486e5795a373f12e9ba288a31bef9e8d8e791e16862ba7c8a4a17be8ac2eb2c",
+    "d_f00010.vti": "5f2b50c8d60857b2b14abb0910732a25eff8e598e3eafbe8af27e3ae7733d988",
+    "d_f00011.vti": "25c153a2f8c908df5a46399ae38f3220f4549e09b80bda9fc234449086791051",
+    "d_f00012.vti": "903ac98ab706e9e1a6b4d966741053edeb73ab201b76799d38bcd82d52207b43",
+    "d_f00013.vti": "28536329177a6cc64d92571144fa893496877a071a580db5ad6aa81a30aa206d",
+    "d_f00014.vti": "0fee7a8b1801c17be0ae500f2771c10f7d372894684db35051995de745ca663a",
+    "d_f00015.vti": "5f40819294f100a1aad57223c480f9350beee2c8f61791156bed1d6ab86ca51d",
+    "d_f00016.vti": "d1d0a77c70962d4f3dc000f48eb8962d1f5e1b5a2f205a59951dc255cee755e0",
+    "d_f00017.vti": "3e8634dd52fe02e8af993c19bb22b092557510222b28d039871916d629673f74",
+    "d_f00018.vti": "bec8d2c25063c5ce8b7ef9abb3df329f8df95efc15ad5f16e0ad35413021e4b1",
+    "d_f00019.vti": "20786c950d1680190a4a824222a5d0babac24cf201180c3fd29d43bfb198c412",
+    "d_f00020.vti": "4282206f2add046a3bf52dffa51b09186829028035520e5ced598900664d1362",
+    "d_f00021.vti": "c004ca114f24be0d77eeff8007074fabb11097a936f8bff6575a884441f8bd2d",
+    "d_f00022.vti": "52783168fc5453b150a58aaafe6d2da59bc58f48fbd822084f46ad4f3889cc05",
+    "d_f00023.vti": "5f44166ecc88f928bc314c917a24aa4a8c7dd9a46dc74bb16f59bd8bfe43a10b",
+    "d_f00024.vti": "1690cc30a879ae8b54021006734aee2e0885c54fa0ff5919babddad92de9681f",
+    "d_f00025.vti": "a50e14aa329b59a2a5f733311a0c492b6beb4672220d08a3d2e0bae169eb210e",
+    "d_f00026.vti": "57c883b2883e21427df939e7083d20f71b5ddf364791e58fcf40bead2a64ed48",
+    "d_f00027.vti": "5876daa722c877e717b38c4ed36b6a1fb34d5363db1e601f77b7d3fefbaa49cc",
+    "d_f00028.vti": "ce524ed5f4be23a559995060d5751bbacebba2c2ac5c5683abba391fc445ab6e",
+    "d_f00029.vti": "a6373ca9d3429212462a6f3213044bbe3275b936abd20eeaaf2a0822616edcb0",
+    "d_f00030.vti": "474c012bb148cfed44f4283ed1efa4a2986a7320b19c15eb10dcfa7f8be7a3d3",
+    "d_f00031.vti": "2870f2462aef3dd0163cf0246bd62a2c259c659c76cfc0f8b75f30354a79d1a3",
+    "d_f00032.vti": "838126641713a12c1cad5ff9fc07cd10889e636254716cf89ea328907e96ed26",
+    "d_f00033.vti": "85f7cc7b77aa86c4f2dd2896001c8d147b7121ae154f8471a3f942f6197a86db",
+    "d_f00034.vti": "4e9654304cfa70b6520ef5899a3b908e643bdb9ad4655bdcf32a0923e0268762",
+    "d_f00035.vti": "249a2b7524ffee5710bfc18f3b821cc62a1b5ebb54bfeb3853baaef5db2cafa0",
+    "d_f00036.vti": "68d8f1bd9695690fd9f63b173fc554a9847b6d4865dd28b6b22c56c645563269",
+    "d_f00037.vti": "f4055d779891d8916eb8ce53ad17db130cc5f8dcdafd5abd148b8e82b08c2119",
+    "d_f00038.vti": "ee31657f5f7b6611ae7640924b5a74f517017dcee39add685e6a82f4ace2bc6c",
+    "d_f00039.vti": "c0895b59515181844c70bf1d9c12056992e84d7675d85ee58b381d371232e38d",
+    "d_f00040.vti": "0b4cb64d7ab42f9072ff989030b96ec05f8599af7628ca14ff78905adfaf2290",
+    "d.pvd": "8fc8d2c03a811b17397d9d941bee9340871d64c0aa04ed5efacd06f8ff253274"
+  },
+  "days": 20.0,
+  "step": 0.5,
+  "endpoint_included": true,
+  "half_life_days": 6.6443,
+  "half_life_uncertainty_days": 0.0009,
+  "lambda_per_s": 1.20743e-06,
+  "daughter": "Hf-177, stable (B- 100%)",
+  "lambda_uncertainty_per_s": 1.6e-10,
+  "half_life_source": "LNHB/DDEP CEA/LNE-LNHB - 2025 (Kellett & Mougeot); sources/Lu-177.lara.txt",
+  "half_life_source_sha256": "5e68ccb03fedb7087677594bcc2ecc15d89fb285947f314bad4c467af27e45a8",
+  "half_life_provenance": "SOURCED, audit closed 2026-09-11. Half-life and decay constant are both taken from the evaluated table, not inferred from each other.",
+  "a0": "HYPOTHETICAL INPUT: uniform over 4888 occupied interior voxels, sums to 1",
+  "computes": "decay only",
+  "does_not_compute": [
+    "binding",
+    "dose",
+    "transport"
+  ],
+  "time_axis": "days, independent of MCS",
+  "note": "would be Lu-177 if the evidence audit and the source term land; the material path is elemental, not isotopic, and no isotope identity is established by this file",
+  "frames": 41,
+  "metrics": [
+    {
+      "days": 0.0,
+      "surviving_fraction": 1.0,
+      "total_activity": 1.0,
+      "max_voxel_activity": 0.00020458265139116204
+    },
+    {
+      "days": 0.5,
+      "surviving_fraction": 0.949176000344539,
+      "total_activity": 0.9491760003445391,
+      "max_voxel_activity": 0.0001941849427873443
+    },
+    {
+      "days": 1.0,
+      "surviving_fraction": 0.9009350796300564,
+      "total_activity": 0.9009350796300564,
+      "max_voxel_activity": 0.00018431568732202463
+    },
+    {
+      "days": 1.5,
+      "surviving_fraction": 0.8551459554533456,
+      "total_activity": 0.8551459554533456,
+      "max_voxel_activity": 0.000174948026893074
+    },
+    {
+      "days": 2.0,
+      "surviving_fraction": 0.811684017708016,
+      "total_activity": 0.8116840177080161,
+      "max_voxel_activity": 0.00016605646843453683
+    },
+    {
+      "days": 2.5,
+      "surviving_fraction": 0.7704309894716805,
+      "total_activity": 0.7704309894716806,
+      "max_voxel_activity": 0.00015761681454003285
+    },
+    {
+      "days": 3.0,
+      "surviving_fraction": 0.7312746051282154,
+      "total_activity": 0.7312746051282153,
+      "max_voxel_activity": 0.00014960609761215536
+    },
+    {
+      "days": 3.5,
+      "surviving_fraction": 0.6941083048491317,
+      "total_activity": 0.6941083048491317,
+      "max_voxel_activity": 0.00014200251735866032
+    },
+    {
+      "days": 4.0,
+      "surviving_fraction": 0.6588309446026268,
+      "total_activity": 0.6588309446026268,
+      "max_voxel_activity": 0.0001347853814653492
+    },
+    {
+      "days": 4.5,
+      "surviving_fraction": 0.6253465209011358,
+      "total_activity": 0.6253465209011358,
+      "max_voxel_activity": 0.0001279350492841931
+    },
+    {
+      "days": 5.0,
+      "surviving_fraction": 0.5935639095383128,
+      "total_activity": 0.593563909538313,
+      "max_voxel_activity": 0.0001214328783834519
+    },
+    {
+      "days": 5.5,
+      "surviving_fraction": 0.5633966176044435,
+      "total_activity": 0.5633966176044435,
+      "max_voxel_activity": 0.00011526117381432969
+    },
+    {
+      "days": 6.0,
+      "surviving_fraction": 0.5347625481054273,
+      "total_activity": 0.5347625481054274,
+      "max_voxel_activity": 0.00010940313995610216
+    },
+    {
+      "days": 6.5,
+      "surviving_fraction": 0.5075837765447637,
+      "total_activity": 0.5075837765447636,
+      "max_voxel_activity": 0.00010384283480866688
+    },
+    {
+      "days": 7.0,
+      "surviving_fraction": 0.48178633886053507,
+      "total_activity": 0.4817863388605351,
+      "max_voxel_activity": 9.856512660812911e-05
+    },
+    {
+      "days": 7.5,
+      "surviving_fraction": 0.4573000301402814,
+      "total_activity": 0.4573000301402814,
+      "max_voxel_activity": 9.355565264735709e-05
+    },
+    {
+      "days": 8.0,
+      "surviving_fraction": 0.43405821356598945,
+      "total_activity": 0.43405821356598945,
+      "max_voxel_activity": 8.880078018944138e-05
+    },
+    {
+      "days": 8.5,
+      "surviving_fraction": 0.4119976390692616,
+      "total_activity": 0.4119976390692617,
+      "max_voxel_activity": 8.428756936768855e-05
+    },
+    {
+      "days": 9.0,
+      "surviving_fraction": 0.3910582712031548,
+      "total_activity": 0.39105827120315484,
+      "max_voxel_activity": 8.000373797118552e-05
+    },
+    {
+      "days": 9.5,
+      "surviving_fraction": 0.3711831257622605,
+      "total_activity": 0.37118312576226054,
+      "max_voxel_activity": 7.59376280201024e-05
+    },
+    {
+      "days": 10.0,
+      "surviving_fraction": 0.3523181147064064,
+      "total_activity": 0.3523181147064064,
+      "max_voxel_activity": 7.207817403977217e-05
+    },
+    {
+      "days": 10.5,
+      "surviving_fraction": 0.3344118989659553,
+      "total_activity": 0.33441189896595536,
+      "max_voxel_activity": 6.841487294720854e-05
+    },
+    {
+      "days": 11.0,
+      "surviving_fraction": 0.31741574872812756,
+      "total_activity": 0.3174157487281276,
+      "max_voxel_activity": 6.493775546811121e-05
+    },
+    {
+      "days": 11.5,
+      "surviving_fraction": 0.3012834108241313,
+      "total_activity": 0.30128341082413135,
+      "max_voxel_activity": 6.163735900657351e-05
+    },
+    {
+      "days": 12.0,
+      "surviving_fraction": 0.28597098285620953,
+      "total_activity": 0.2859709828562096,
+      "max_voxel_activity": 5.8504701893659894e-05
+    },
+    {
+      "days": 12.5,
+      "surviving_fraction": 0.27143679372205376,
+      "total_activity": 0.27143679372205376,
+      "max_voxel_activity": 5.5531258944773685e-05
+    },
+    {
+      "days": 13.0,
+      "surviving_fraction": 0.25764129021144466,
+      "total_activity": 0.25764129021144466,
+      "max_voxel_activity": 5.270893825929719e-05
+    },
+    {
+      "days": 13.5,
+      "surviving_fraction": 0.24454692936650566,
+      "total_activity": 0.24454692936650568,
+      "max_voxel_activity": 5.003005919936695e-05
+    },
+    {
+      "days": 14.0,
+      "surviving_fraction": 0.23211807631263834,
+      "total_activity": 0.23211807631263837,
+      "max_voxel_activity": 4.748733148785564e-05
+    },
+    {
+      "days": 14.5,
+      "surviving_fraction": 0.22032090728209852,
+      "total_activity": 0.22032090728209852,
+      "max_voxel_activity": 4.5073835368678095e-05
+    },
+    {
+      "days": 15.0,
+      "surviving_fraction": 0.2091233175663023,
+      "total_activity": 0.2091233175663023,
+      "max_voxel_activity": 4.27830027754301e-05
+    },
+    {
+      "days": 15.5,
+      "surviving_fraction": 0.1984948341463637,
+      "total_activity": 0.1984948341463637,
+      "max_voxel_activity": 4.060859945711205e-05
+    },
+    {
+      "days": 16.0,
+      "surviving_fraction": 0.1884065327640981,
+      "total_activity": 0.18840653276409813,
+      "max_voxel_activity": 3.8544708012295035e-05
+    },
+    {
+      "days": 16.5,
+      "surviving_fraction": 0.178830959207809,
+      "total_activity": 0.178830959207809,
+      "max_voxel_activity": 3.6585711785558306e-05
+    },
+    {
+      "days": 17.0,
+      "surviving_fraction": 0.16974205459864555,
+      "total_activity": 0.16974205459864555,
+      "max_voxel_activity": 3.4726279582374293e-05
+    },
+    {
+      "days": 17.5,
+      "surviving_fraction": 0.1611150844742068,
+      "total_activity": 0.1611150844742068,
+      "max_voxel_activity": 3.296135116084428e-05
+    },
+    {
+      "days": 18.0,
+      "surviving_fraction": 0.15292657147640015,
+      "total_activity": 0.15292657147640015,
+      "max_voxel_activity": 3.1286123460802e-05
+    },
+    {
+      "days": 18.5,
+      "surviving_fraction": 0.14515423146037276,
+      "total_activity": 0.14515423146037276,
+      "max_voxel_activity": 2.9696037532809487e-05
+    },
+    {
+      "days": 19.0,
+      "surviving_fraction": 0.13777691285064206,
+      "total_activity": 0.13777691285064206,
+      "max_voxel_activity": 2.8186766131473418e-05
+    },
+    {
+      "days": 19.5,
+      "surviving_fraction": 0.13077453907939054,
+      "total_activity": 0.13077453907939054,
+      "max_voxel_activity": 2.6754201939318852e-05
+    },
+    {
+      "days": 20.0,
+      "surviving_fraction": 0.12412805395027653,
+      "total_activity": 0.12412805395027654,
+      "max_voxel_activity": 2.5394446389172775e-05
+    }
+  ]
+}
