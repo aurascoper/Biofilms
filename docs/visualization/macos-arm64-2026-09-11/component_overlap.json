@@ -1,0 +1,2342 @@
+{
+  "evidence_root": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal",
+  "adjacency": {
+    "26-connectivity (point-sharing; ParaView Connectivity)": {
+      "counts_by_mcs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        6,
+        13,
+        12,
+        18,
+        16,
+        15,
+        13,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ],
+      "count_at": {
+        "7": 0,
+        "8": 6,
+        "9": 13,
+        "11": 18,
+        "15": 10,
+        "30": 10,
+        "50": 10,
+        "100": 10
+      },
+      "peak": {
+        "mcs": 11,
+        "count": 18
+      },
+      "flat_from_frame_15_onward": true,
+      "distinct_lineages_ever": 21,
+      "lineages_alive_at_mcs100": 10,
+      "of_those_born_before_mcs15": 10,
+      "totals_over_whole_record": {
+        "births": 21,
+        "deaths": 0,
+        "retired_by_merge": 11,
+        "merges": 10,
+        "splits": 0
+      },
+      "transition_into_frame_15": [
+        {
+          "mcs": 15,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 3,
+          "merges": 2,
+          "splits": 0,
+          "carried": 10
+        }
+      ],
+      "churn_within_frames_16_to_100": 0,
+      "tracking_rule": "largest-overlap greedy inheritance; measures PERSISTENCE under that rule, not material identity. Lineage integers are not comparable across adjacency rules.",
+      "events": [
+        {
+          "mcs": 0,
+          "births": 0,
+          "deaths": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0,
+          "retired_by_merge": 0
+        },
+        {
+          "mcs": 1,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 2,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 3,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 4,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 5,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 6,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 7,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 8,
+          "births": 6,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 9,
+          "births": 8,
+          "deaths": 0,
+          "retired_by_merge": 1,
+          "merges": 1,
+          "splits": 0,
+          "carried": 5
+        },
+        {
+          "mcs": 10,
+          "births": 1,
+          "deaths": 0,
+          "retired_by_merge": 2,
+          "merges": 2,
+          "splits": 0,
+          "carried": 11
+        },
+        {
+          "mcs": 11,
+          "births": 6,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 12
+        },
+        {
+          "mcs": 12,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 2,
+          "merges": 2,
+          "splits": 0,
+          "carried": 16
+        },
+        {
+          "mcs": 13,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 1,
+          "merges": 1,
+          "splits": 0,
+          "carried": 15
+        },
+        {
+          "mcs": 14,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 2,
+          "merges": 2,
+          "splits": 0,
+          "carried": 13
+        },
+        {
+          "mcs": 15,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 3,
+          "merges": 2,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 16,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 17,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 18,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 19,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 20,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 21,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 22,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 23,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 24,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 25,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 26,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 27,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 28,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 29,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 30,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 31,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 32,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 33,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 34,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 35,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 36,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 37,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 38,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 39,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 40,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 41,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 42,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 43,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 44,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 45,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 46,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 47,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 48,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 49,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 50,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 51,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 52,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 53,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 54,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 55,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 56,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 57,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 58,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 59,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 60,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 61,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 62,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 63,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 64,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 65,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 66,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 67,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 68,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 69,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 70,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 71,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 72,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 73,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 74,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 75,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 76,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 77,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 78,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 79,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 80,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 81,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 82,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 83,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 84,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 85,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 86,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 87,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 88,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 89,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 90,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 91,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 92,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 93,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 94,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 95,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 96,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 97,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 98,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 99,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 100,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        }
+      ],
+      "lineage_lifespans": {
+        "0": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "1": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "2": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "3": {
+          "first": 8,
+          "last": 8,
+          "frames": 1
+        },
+        "4": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "5": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "6": {
+          "first": 9,
+          "last": 9,
+          "frames": 1
+        },
+        "7": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "8": {
+          "first": 9,
+          "last": 13,
+          "frames": 5
+        },
+        "9": {
+          "first": 9,
+          "last": 9,
+          "frames": 1
+        },
+        "10": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "11": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "12": {
+          "first": 9,
+          "last": 13,
+          "frames": 5
+        },
+        "13": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "14": {
+          "first": 10,
+          "last": 12,
+          "frames": 3
+        },
+        "15": {
+          "first": 11,
+          "last": 14,
+          "frames": 4
+        },
+        "16": {
+          "first": 11,
+          "last": 14,
+          "frames": 4
+        },
+        "17": {
+          "first": 11,
+          "last": 11,
+          "frames": 1
+        },
+        "18": {
+          "first": 11,
+          "last": 100,
+          "frames": 90
+        },
+        "19": {
+          "first": 11,
+          "last": 14,
+          "frames": 4
+        },
+        "20": {
+          "first": 11,
+          "last": 11,
+          "frames": 1
+        }
+      }
+    },
+    "6-connectivity (face-sharing; scipy default)": {
+      "counts_by_mcs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        14,
+        12,
+        19,
+        16,
+        16,
+        13,
+        13,
+        12,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ],
+      "count_at": {
+        "7": 0,
+        "8": 7,
+        "9": 14,
+        "11": 19,
+        "15": 13,
+        "30": 10,
+        "50": 10,
+        "100": 10
+      },
+      "peak": {
+        "mcs": 11,
+        "count": 19
+      },
+      "flat_from_frame_15_onward": false,
+      "distinct_lineages_ever": 24,
+      "lineages_alive_at_mcs100": 10,
+      "of_those_born_before_mcs15": 10,
+      "totals_over_whole_record": {
+        "births": 24,
+        "deaths": 0,
+        "retired_by_merge": 14,
+        "merges": 13,
+        "splits": 0
+      },
+      "transition_into_frame_15": [
+        {
+          "mcs": 15,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 13
+        }
+      ],
+      "churn_within_frames_16_to_100": 3,
+      "tracking_rule": "largest-overlap greedy inheritance; measures PERSISTENCE under that rule, not material identity. Lineage integers are not comparable across adjacency rules.",
+      "events": [
+        {
+          "mcs": 0,
+          "births": 0,
+          "deaths": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0,
+          "retired_by_merge": 0
+        },
+        {
+          "mcs": 1,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 2,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 3,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 4,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 5,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 6,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 7,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 8,
+          "births": 7,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 0
+        },
+        {
+          "mcs": 9,
+          "births": 9,
+          "deaths": 0,
+          "retired_by_merge": 2,
+          "merges": 2,
+          "splits": 0,
+          "carried": 5
+        },
+        {
+          "mcs": 10,
+          "births": 1,
+          "deaths": 0,
+          "retired_by_merge": 3,
+          "merges": 3,
+          "splits": 0,
+          "carried": 11
+        },
+        {
+          "mcs": 11,
+          "births": 7,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 12
+        },
+        {
+          "mcs": 12,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 3,
+          "merges": 2,
+          "splits": 0,
+          "carried": 16
+        },
+        {
+          "mcs": 13,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 16
+        },
+        {
+          "mcs": 14,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 3,
+          "merges": 3,
+          "splits": 0,
+          "carried": 13
+        },
+        {
+          "mcs": 15,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 13
+        },
+        {
+          "mcs": 16,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 1,
+          "merges": 1,
+          "splits": 0,
+          "carried": 12
+        },
+        {
+          "mcs": 17,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 2,
+          "merges": 2,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 18,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 19,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 20,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 21,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 22,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 23,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 24,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 25,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 26,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 27,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 28,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 29,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 30,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 31,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 32,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 33,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 34,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 35,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 36,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 37,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 38,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 39,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 40,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 41,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 42,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 43,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 44,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 45,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 46,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 47,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 48,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 49,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 50,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 51,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 52,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 53,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 54,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 55,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 56,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 57,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 58,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 59,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 60,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 61,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 62,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 63,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 64,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 65,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 66,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 67,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 68,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 69,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 70,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 71,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 72,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 73,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 74,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 75,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 76,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 77,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 78,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 79,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 80,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 81,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 82,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 83,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 84,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 85,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 86,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 87,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 88,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 89,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 90,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 91,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 92,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 93,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 94,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 95,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 96,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 97,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 98,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 99,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        },
+        {
+          "mcs": 100,
+          "births": 0,
+          "deaths": 0,
+          "retired_by_merge": 0,
+          "merges": 0,
+          "splits": 0,
+          "carried": 10
+        }
+      ],
+      "lineage_lifespans": {
+        "0": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "1": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "2": {
+          "first": 8,
+          "last": 8,
+          "frames": 1
+        },
+        "3": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "4": {
+          "first": 8,
+          "last": 8,
+          "frames": 1
+        },
+        "5": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "6": {
+          "first": 8,
+          "last": 100,
+          "frames": 93
+        },
+        "7": {
+          "first": 9,
+          "last": 9,
+          "frames": 1
+        },
+        "8": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "9": {
+          "first": 9,
+          "last": 13,
+          "frames": 5
+        },
+        "10": {
+          "first": 9,
+          "last": 9,
+          "frames": 1
+        },
+        "11": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "12": {
+          "first": 9,
+          "last": 9,
+          "frames": 1
+        },
+        "13": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "14": {
+          "first": 9,
+          "last": 13,
+          "frames": 5
+        },
+        "15": {
+          "first": 9,
+          "last": 100,
+          "frames": 92
+        },
+        "16": {
+          "first": 10,
+          "last": 13,
+          "frames": 4
+        },
+        "17": {
+          "first": 11,
+          "last": 15,
+          "frames": 5
+        },
+        "18": {
+          "first": 11,
+          "last": 16,
+          "frames": 6
+        },
+        "19": {
+          "first": 11,
+          "last": 11,
+          "frames": 1
+        },
+        "20": {
+          "first": 11,
+          "last": 100,
+          "frames": 90
+        },
+        "21": {
+          "first": 11,
+          "last": 16,
+          "frames": 6
+        },
+        "22": {
+          "first": 11,
+          "last": 11,
+          "frames": 1
+        },
+        "23": {
+          "first": 11,
+          "last": 11,
+          "frames": 1
+        }
+      }
+    }
+  }
+}
