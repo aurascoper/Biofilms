@@ -158,10 +158,13 @@ Naming the radiation term correctly is not the end of it. At the shipped `I0 = 1
 | `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
 
 `β_ion` — the one parameter Table 2 tabulates per species, and the one the sign convention is
-written around — biases acceptance by **one part in 10⁵** for exactly the species whose radial
-stratification is the headline result. The melanin term biases it by 15.5%, four orders of
-magnitude more, through a coefficient of `0.5` hard-coded at its call site and appearing in no
-table and no configuration file.
+written around — biases acceptance by **1.5%** at its reach, the most radiosensitive species in the
+table, and by one part in 10⁵ for the radiotropic species whose radial stratification is the headline
+result. The melanin term biases it by 15.5%, about an order of magnitude more than the term's reach —
+9.6 in ΔH, 10.2 as a ratio of excesses — through a coefficient of `0.5` hard-coded at its call site
+and appearing in no table and no configuration file. Comparing 15.5% against the 1.000010 instead and
+calling the gap four orders of magnitude is the **withdrawn** comparison: 1.000010 is one role of one
+pair of species occupying a site. See PP-62-13.
 
 So the model's tropism is **melanin-mediated**. Radiation still drives it, but indirectly:
 `melanin_drive` is copied from the radiation field, giving
