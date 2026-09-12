@@ -330,6 +330,9 @@ CEILING_VOCAB_ALLOWED = [
     "data/calibration/suspended_isotherm_proposal.csv",
     "data/calibration/sop_index.csv",
     "data/claims_ledger.csv",
+    # the ontology bridge names the Langmuir isotherm, q_max and X_max as terms,
+    # each with a definition saying the ceiling is compared, not implemented
+    "data/ontology_bridge.csv",
     # the producer for PP-SORP-01, and this file's own assertions
     "analysis/henry_langmuir_bound.R",
     "tests/manuscript_claims_tests.jl",
