@@ -79,9 +79,10 @@ than a simulation output. At the shipped constants `I0 = 1.0` and `T_cpm = 5.0`:
 | `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
 
 `β_ion` — the one parameter Table 2 tabulates per species, and the one the entire sign convention is
-written around — biases acceptance by **one part in 10⁵** for exactly the species whose radial
-stratification is the headline result. The melanin term biases it by **15.5%**: four orders of
-magnitude more, through a coefficient of `0.5` hard-coded at its call site in `compute_delta_H`,
+written around — biases acceptance by **one part in 10⁵** *for one role of the two negatively
+signed species occupying a site*, which is not the term's reach: signed by role it reaches
+7.505e-2. The melanin term biases acceptance by **15.5%**, larger by about an order of
+magnitude (9.6 in ΔH), through a coefficient of `0.5` hard-coded at its call site in `compute_delta_H`,
 appearing in no table and in no configuration file.
 
 Radiation still reaches the dynamics. It reaches them **indirectly**, because `melanin_drive` is
