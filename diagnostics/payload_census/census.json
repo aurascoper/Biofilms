@@ -1,0 +1,138 @@
+{
+  "frames": 101,
+  "cells": 64000,
+  "bytes_per_site": 47,
+  "on_disk_bytes": 304236846,
+  "gzip_bytes": 75919993,
+  "gzip_ratio": 4.007335011213713,
+  "static_fraction": 0.44680851063829785,
+  "derivable_fraction": 0.10638297872340426,
+  "irreducible_fraction": 0.44680851063829785,
+  "occupancy_fraction_of_frame": 0.0026595744680851063,
+  "arrays": [
+    {
+      "name": "species",
+      "type": "UInt8",
+      "bytes_per_site": 1,
+      "distinct_max": 8,
+      "constant_in_frame": false,
+      "static_across_frames": false,
+      "derivable_from": [
+        {
+          "array": "cell_id",
+          "distinct": 44,
+          "informative": true
+        },
+        {
+          "array": "lineage_id",
+          "distinct": 43,
+          "informative": true
+        }
+      ]
+    },
+    {
+      "name": "cell_id",
+      "type": "Int32",
+      "bytes_per_site": 4,
+      "distinct_max": 44,
+      "constant_in_frame": false,
+      "static_across_frames": false,
+      "derivable_from": null
+    },
+    {
+      "name": "lineage_id",
+      "type": "Int32",
+      "bytes_per_site": 4,
+      "distinct_max": 43,
+      "constant_in_frame": false,
+      "static_across_frames": false,
+      "derivable_from": [
+        {
+          "array": "cell_id",
+          "distinct": 44,
+          "informative": true
+        }
+      ]
+    },
+    {
+      "name": "generation",
+      "type": "Int32",
+      "bytes_per_site": 4,
+      "distinct_max": 1,
+      "constant_in_frame": true,
+      "static_across_frames": true,
+      "derivable_from": null
+    },
+    {
+      "name": "interior_mask",
+      "type": "UInt8",
+      "bytes_per_site": 1,
+      "distinct_max": 2,
+      "constant_in_frame": false,
+      "static_across_frames": true,
+      "derivable_from": [
+        {
+          "array": "cell_id",
+          "distinct": 44,
+          "informative": true
+        },
+        {
+          "array": "radiation_cpm",
+          "distinct": 198,
+          "informative": true
+        }
+      ]
+    },
+    {
+      "name": "radiation_cpm",
+      "type": "Float64",
+      "bytes_per_site": 8,
+      "distinct_max": 198,
+      "constant_in_frame": false,
+      "static_across_frames": true,
+      "derivable_from": null
+    },
+    {
+      "name": "melanin",
+      "type": "Float64",
+      "bytes_per_site": 8,
+      "distinct_max": 50201,
+      "constant_in_frame": false,
+      "static_across_frames": false,
+      "derivable_from": null
+    },
+    {
+      "name": "accumulated_dose_Gy",
+      "type": "Float64",
+      "bytes_per_site": 8,
+      "distinct_max": 1,
+      "constant_in_frame": true,
+      "static_across_frames": true,
+      "derivable_from": null
+    },
+    {
+      "name": "signal",
+      "type": "Float64",
+      "bytes_per_site": 8,
+      "distinct_max": 50201,
+      "constant_in_frame": false,
+      "static_across_frames": false,
+      "derivable_from": null
+    },
+    {
+      "name": "occupied_above_threshold",
+      "type": "UInt8",
+      "bytes_per_site": 1,
+      "distinct_max": 2,
+      "constant_in_frame": false,
+      "static_across_frames": false,
+      "derivable_from": [
+        {
+          "array": "signal",
+          "distinct": 50201,
+          "informative": false
+        }
+      ]
+    }
+  ]
+}

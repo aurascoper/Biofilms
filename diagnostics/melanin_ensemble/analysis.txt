@@ -1,0 +1,41 @@
+sweep sweep_seeds42-57.csv, MCS 100, 16 seeds
+
+  seed        CS        CN        AN   ordering
+    42     2.283     1.098     1.511   AN>CN
+    43     2.313     1.243     1.365   AN>CN
+    44     2.527     1.773     1.253   alpha_M
+    45     2.106     1.868     1.401   alpha_M
+    46     2.587     1.811     1.197   alpha_M
+    47     1.943     1.232     1.247   AN>CN
+    48     1.603     1.609     1.129   CN>CS
+    49     2.250     1.533     1.173   alpha_M
+    50     2.388     2.139     0.943   alpha_M
+    51     2.243     1.369     1.540   AN>CN
+    52     2.141     1.935     1.289   alpha_M
+    53     2.390     1.795     1.287   alpha_M
+    54     2.001     1.962     1.082   alpha_M
+    55     2.492     1.593     1.497   alpha_M
+    56     1.767     1.559     1.190   alpha_M
+    57     2.030     1.837     1.277   alpha_M
+
+per species, marginal:
+  CS  alpha_M 0.140   mean 2.192   sd 0.274   range 1.603 - 2.587   C. sphaerospermum
+  CN  alpha_M 0.100   mean 1.647   sd 0.296   range 1.098 - 2.139   C. neoformans
+  AN  alpha_M 0.065   mean 1.274   sd 0.162   range 0.943 - 1.540   A. niger
+
+seeds displaying the full alpha_M ordering: 11 of 16
+
+pairwise, paired within seed:
+  CS - CN   mean +0.544
+      paired sd of the difference   0.380   <- needs no independence assumption
+      if the two were independent   0.403   (pooled sd 0.285, separation 1.91)
+      within-run correlation        +0.111   -> pooling overstates the uncertainty
+      15 of 16 seeds in the alpha_M direction, exact two-sided sign test p = 0.0005188
+  CN - AN   mean +0.373
+      paired sd of the difference   0.412   <- needs no independence assumption
+      if the two were independent   0.337   (pooled sd 0.238, separation 1.57)
+      within-run correlation        -0.585   -> pooling UNDERSTATES the uncertainty
+      12 of 16 seeds in the alpha_M direction, exact two-sided sign test p = 0.07681
+
+The ordering is an input. These numbers describe how reliably one trajectory
+displays it, and say nothing about whether the input is correct.
