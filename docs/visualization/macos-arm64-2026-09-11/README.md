@@ -203,17 +203,25 @@ render-time value is the actual evidence and lives in
 
 ## macOS notes for the doc
 
-Four ParaView-6.1.1-on-macOS issues, each cost a run:
+The four ParaView-6.1.1-on-macOS issues and the absent `libopenvkl_module_cpu_device.dylib`,
+each of which cost a run here, are stated **once**: in the `macOS / Apple Silicon, 2026-09-11`
+section of `docs/visualization/lattice_viewer.md`. This heading has said "for the doc" since it
+was written, and the account now lives in the doc rather than in both places.
 
-1. `GetLayout()` raises `No active view was found` in batch pvpython — no implicit layout exists. Use `CreateLayout()`.
-2. `hasattr(view, "EnableOSPRay")` **raises** `NotSupportedException` rather than returning `False`; the back-compat helper intercepts the 5.7-era name. Probe only `EnableRayTracing`.
-3. Preset is `Viridis`, not `Viridis (matplotlib)`.
-4. Setting `Background` alone leaves scalar-bar and axis text on the previous palette — white on white. Use `LoadPalette(paletteName='WhiteBackground')`.
+They were duplicated across the two files until the copies had drifted — "Preset is" against
+"The preset is", "both views" against "the views" — before either branch had merged. One
+account and a pointer is the repair. Two accounts and an intention to keep them aligned is what
+produced the drift.
 
-Also: `libopenvkl_module_cpu_device.dylib` is **absent from the macOS bundle**, so every run
-prints `[openvkl] INITIALIZATION ERROR`. That is the OSPRay volume path, unused here — ray
-tracing is off and both views are surface renders — but it is noise on every invocation and
-means the macOS build cannot do OSPRay volume rendering as shipped.
+The account sits there rather than here because `lattice_viewer.md` is already on the base both
+branches share, so a pointer to it is at worst **early**: if this branch merges before #27, that
+section is not in the file yet and the pointer does not resolve until #27 lands. A pointer the
+other way would have been to a file that does not exist on #27's base at all, which is the
+finding that started this.
+
+The same environment fact also appears as a `note` field in `render_manifest.json`
+(`make_render_manifest.py:126`). That is a receipt recording the conditions it was produced
+under, not a third copy of the account, and it is left alone.
 
 
 ## 4D voxels, and a threshold definition that matters

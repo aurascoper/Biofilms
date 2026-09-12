@@ -14,6 +14,44 @@ p = SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100)
 rp = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
                          basis_gate_ack = true)
 
+# ---------- a checkpoint with no provenance is UNKNOWN, not ungated ----------
+
+let
+    # Codex on f49fe94: defaulting missing provenance to false is rule 3 inside
+    # a gate. Simulate a pre-provenance file by deleting the dataset.
+    rpx = SR.RadiolysisParams(Nr = 20, Ddot_R = 1.0, c_ext = 1.0,
+                              basis_gate_ack = true)
+    sim = SR.init_coupled_simulation(p, rpx; seed = 11)
+    SR.advance_window!(sim, 2)
+    legacy = joinpath(tmp, "legacy_no_provenance.h5")
+    export_restart_checkpoint(SR, sim, legacy)
+    h5open(legacy, "r+") do f
+        delete_object(f, "rd/basis_from_occupancy")
+    end
+    @test !h5open(g -> haskey(g, "rd/basis_from_occupancy"), legacy, "r")
+
+    # refuses rather than assuming
+    err = try
+        restore_restart_checkpoint(SR, legacy); nothing
+    catch e
+        sprint(showerror, e)
+    end
+    @test err !== nothing
+    @test occursin("UNKNOWN", err)
+
+    # and both explicit declarations are honoured
+    simT = restore_restart_checkpoint(SR, legacy; declare_basis_from_occupancy = true)
+    @test simT.rd.basis_from_occupancy === true
+    simF = restore_restart_checkpoint(SR, legacy; declare_basis_from_occupancy = false)
+    @test simF.rd.basis_from_occupancy === false
+
+    # a CURRENT checkpoint still restores with no declaration needed, or the
+    # refusal above would just be blocking everything.
+    current = joinpath(tmp, "current_provenance.h5")
+    export_restart_checkpoint(SR, sim, current)
+    @test restore_restart_checkpoint(SR, current).rd.basis_from_occupancy === true
+end
+
 # ---------- the exported file declares a gated basis (rule 4) ----------
 
 let
