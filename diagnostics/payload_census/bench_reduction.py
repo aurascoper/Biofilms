@@ -68,23 +68,23 @@ def build(src_files, scratch):
             raise SystemExit(f"destination already exists: {d}")
         os.makedirs(d)
     cells = None
-    lut = None
+    lut = np.zeros(0, dtype=np.uint8)
     for i, p in enumerate(src_files):
-        arrays, fields, n, _, _ = read_vti(p)
+        arrays, fields, n, _, _, dims = read_vti(p)
         a = {k: v[0] for k, v in arrays.items()}
         if cells is None:
-            side = round(n ** (1 / 3))
-            cells = (side, side, side)
-            # one lookup table for the whole trajectory, from the first frame
-            lut = np.zeros(int(a["cell_id"].max()) + 1, dtype=np.uint8)
-            occ = a["cell_id"] > 0
-            lut[a["cell_id"][occ]] = a["species"][occ]
+            cells = dims          # the source's own extent; a cube root would resize 2x4x8 to 4x4x4
             write_vti(os.path.join(red_d, "static.vti"), cells,
                       {k: a[k] for k in STATIC})
-            np.save(os.path.join(red_d, "species_lut.npy"), lut)
-        else:
-            o = a["cell_id"] > 0
-            lut[a["cell_id"][o]] = a["species"][o]
+        elif dims != cells:
+            raise SystemExit(f"{p}: extent {dims} differs from the first frame's {cells}")
+        # One lookup table for the whole trajectory; grown when a later frame carries a
+        # cell id the first did not (divide_cell! allocates new ids).
+        top = int(a["cell_id"].max()) + 1
+        if top > len(lut):
+            lut = np.pad(lut, (0, top - len(lut)))
+        o = a["cell_id"] > 0
+        lut[a["cell_id"][o]] = a["species"][o]
         write_vti(os.path.join(full_d, f"f{i:06d}.vti"), cells, a)
         write_vti(os.path.join(red_d, f"f{i:06d}.vti"), cells, {k: a[k] for k in KEPT})
     np.save(os.path.join(red_d, "species_lut.npy"), lut)
@@ -154,8 +154,9 @@ def main(argv):
     sep = sr[-1] < sf[0] or sf[-1] < sr[0]
     print(f"  median ratio {mf/mr:.2f}x, but {slower} of {len(sr)} reduced samples exceed the "
           f"full median")
-    print(f"  distributions separate: {'yes' if sep else 'NO -- the difference is not '
-          'distinguishable from noise at this scale'}")
+    # Disjoint ranges are the strongest thing a handful of samples can show; overlapping
+    # ones show only that, not that the two are the same.
+    print(f"  sample ranges {'are disjoint' if sep else 'OVERLAP -- these samples do not separate the two'}")
 
     # Is the reconstruction faithful? A faster wrong answer is not an answer.
     bad = []
@@ -169,17 +170,23 @@ def main(argv):
           f"{'YES' if not bad else 'NO -> ' + str(bad[:5])}")
 
     # What a READER pays. Compression is quoted as a saving; on read it is a cost, and
-    # this is the comparison that says which dominates.
-    blobs = [open(os.path.join(full_d, f), "rb").read() for f in sorted(os.listdir(full_d))]
-    gz = [gzip.compress(b, 9) for b in blobs]
-    sraw, _ = samples(lambda: [open(os.path.join(full_d, f), "rb").read()
-                               for f in sorted(os.listdir(full_d))], reps)
-    sdec, _ = samples(lambda: [gzip.decompress(b) for b in gz], reps)
+    # this is the comparison that says which dominates. Both paths open and read files
+    # from disk: an earlier version decompressed in-memory buffers and compared that
+    # against file reads, which is CPU against I/O and not a read against a read.
+    gz_d = os.path.join(scratch, "full_gz")
+    os.makedirs(gz_d)
+    full_files = sorted(os.listdir(full_d))
+    for f in full_files:
+        with open(os.path.join(full_d, f), "rb") as fh, gzip.open(os.path.join(gz_d, f + ".gz"), "wb", 9) as gh:
+            gh.write(fh.read())
+    gz_files = sorted(os.listdir(gz_d))
+    sraw, _ = samples(lambda: [open(os.path.join(full_d, f), "rb").read() for f in full_files], reps)
+    sdec, _ = samples(lambda: [gzip.open(os.path.join(gz_d, f), "rb").read() for f in gz_files], reps)
     print()
     show("raw read, uncompressed", sraw)
-    show("gzip decompress on read", sdec)
+    show("gzip file read + decompress", sdec)
     ratio = statistics.median(sdec) / statistics.median(sraw)
-    saved = 100 * (1 - sum(len(b) for b in gz) / sum(len(b) for b in blobs))
+    saved = 100 * (1 - dirbytes(gz_d) / dirbytes(full_d))
     print(f"  compression makes a READ {ratio:.1f}x slower, to save {saved:.0f}% of disk")
 
     return 0 if not bad else 1
