@@ -61,6 +61,12 @@ end
 
 Read `lattice/cell_id` and `lattice/interior_mask` from a producer snapshot.
 
+The producer is `lattice_evidence.jl` (`write_snapshot`), which writes `run_id` and
+`mask_sha256` beside the exchange-schema attributes. `export_checkpoint.jl` writes the
+schema attributes only, so a transport snapshot from it is refused here by name rather
+than failing on a missing key: the chain of custody in `setup.jl` compares both values
+against the configuration, and a snapshot that cannot be compared is not a frozen input.
+
 Occupancy is `cell_id > 0`: the background sentinel (0) and the wall sentinel (-1) are
 both unoccupied, and conflating the wall with occupied medium would put capacity inside
 the wall. The snapshot's own sentinel declarations are read and checked rather than
@@ -77,6 +83,11 @@ function load_geometry(path::AbstractString; spacing::NTuple{3, Float64} = (1.0,
             throw(ArgumentError("unexpected cell_id sentinels: background=$background wall=$wall"))
         read(a["logical_axis_order"]) == "xyz" ||
             throw(ArgumentError("snapshot is not in xyz logical axis order"))
+        for k in ("mcs", "run_id", "label_state_hash", "mask_sha256")
+            haskey(a, k) || throw(ArgumentError(
+                "snapshot carries no `$k` attribute; the benchmark reads snapshots written by " *
+                "lattice_evidence.jl, not the transport snapshot from export_checkpoint.jl"))
+        end
         cell_id = read(f["lattice/cell_id"])
         mask = read(f["lattice/interior_mask"])
         size(cell_id) == size(mask) ||
@@ -198,8 +209,10 @@ end
 """
     make_state(geo, B; c0, b0)
 
-Uniform initial pools over the interior. `b0` is clipped to the local capacity, and a
-`b0` that would exceed capacity anywhere is refused rather than quietly clipped.
+Uniform initial pools: `c0` on every interior site, `b0` on every occupied site (capacity
+is zero off the occupied set, so the bound pool has nowhere else to live). `b0` is never
+clipped: a `b0` above the local capacity anywhere is refused with `ArgumentError`, and a
+`b0` at or below it is assigned unchanged.
 """
 function make_state(geo::Geometry, B::Array{Float64, 3}; c0::Float64, b0::Float64 = 0.0)
     c = zeros(Float64, size(B))

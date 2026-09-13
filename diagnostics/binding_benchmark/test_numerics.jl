@@ -12,7 +12,7 @@
 # a discrete Neumann eigenmode of the flux-form Laplacian, the geometric decay sequence,
 # and the capacity-overflow transfer. Where only a rate of convergence is available, the
 # observed order is measured and asserted, never assumed.
-using Test, Random
+using Test, Random, HDF5
 include(joinpath(@__DIR__, "BindingBenchmark.jl"))
 using .BindingBenchmark
 
@@ -242,6 +242,32 @@ end
     @test led2.dropped ≈ 1.5 * count(occ)
     @test closure_residual(st2, geo, led2) ≈ -led2.dropped rtol = 1e-12
     @test abs(closure_residual(st2, geo, led2)) > 1.0  # unmistakably red, not a rounding tail
+end
+
+@testset "load_geometry names the producer when an attribute is missing" begin
+    # A transport snapshot from export_checkpoint.jl carries the exchange-schema attributes
+    # and `label_state_hash`, but not `run_id` or `mask_sha256`; without this check the
+    # loader failed on a bare HDF5 key error that named neither the attribute nor the
+    # producer. The control is the file export_checkpoint.jl would write, in miniature.
+    path = joinpath(mktempdir(), "transport_snapshot.h5")
+    h5open(path, "w") do f
+        a = attributes(f)
+        a["cell_id_background"] = 0; a["cell_id_wall"] = -1
+        a["logical_axis_order"] = "xyz"; a["mcs"] = 0
+        a["label_state_hash"] = "deadbeef"
+        f["lattice/cell_id"] = zeros(Int32, 2, 2, 2)
+        f["lattice/interior_mask"] = ones(UInt8, 2, 2, 2)
+    end
+    err = try; load_geometry(path); nothing; catch e; e; end
+    @test err isa ArgumentError
+    @test occursin("run_id", err.msg)
+    @test occursin("lattice_evidence.jl", err.msg)
+    h5open(path, "r+") do f
+        attributes(f)["run_id"] = "synthetic"; attributes(f)["mask_sha256"] = "00"
+    end
+    geo = load_geometry(path)
+    @test geo.run_id == "synthetic" && geo.mask_sha256 == "00"
+    @test count(geo.interior) == 8 && count(geo.occupied) == 0
 end
 
 @testset "make_state refuses an initial pool above capacity" begin
