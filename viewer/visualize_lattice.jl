@@ -38,8 +38,9 @@ function show_lattice(snapshot::AbstractString; record_to = nothing, still = not
         return still
     end
     if record_to === nothing
-        display(fig)
-        return fig
+        # The screen that shows the figure is the one to wait on; a fresh
+        # GLMakie.Screen() is a second, empty window.
+        return display(fig)
     end
     record(fig, record_to, 1:frames; framerate = 24) do i
         ax.azimuth[] = 2π * (i - 1) / frames
@@ -50,5 +51,5 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     o = viewer_options(ARGS)
     out = show_lattice(o.snapshot; record_to = o.record_to, still = o.still, frames = o.frames)
-    out isa String ? println("wrote $out") : (println("close the window to exit"); wait(GLMakie.Screen()))
+    out isa String ? println("wrote $out") : (println("close the window to exit"); wait(out))
 end
