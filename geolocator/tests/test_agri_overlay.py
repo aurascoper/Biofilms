@@ -248,3 +248,11 @@ def test_plants_active_filter_excludes_unknown_and_reports_the_count(mixed_layer
     body = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 1.0}).json()
     assert {f["properties"]["name"] for f in body["features"]} == {"A"}
     assert body["excluded_unknown_capacity"] == 2
+
+
+def test_layers_reports_the_vintage_and_no_retrieval_time(agri_source):
+    """generated_at is when the dataset was made, not when these bytes arrived. The entry
+    used to pass the same extractor to retrieved_of, so /api/layers reported both."""
+    entry = next(l for l in client.get("/api/layers").json()["layers"] if l["id"] == "agri_overlay")
+    assert entry["vintage"] == "2026-08-27T00:00:00+00:00"
+    assert entry["retrieved_at"] is None

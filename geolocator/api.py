@@ -456,8 +456,9 @@ SOURCES: dict[str, TrackedSource] = {
         # LIVE -- the vintage is the export's generated_at, never today's clock.
         id="agri_overlay", path=AGRI_OVERLAY_JSON, layer_class=REFERENCE,
         loader=_load_agri_overlay, empty=_EMPTY_LAYER, count_of=_layer_count,
+        # No retrieved_of: the export records when the data was generated, not when these
+        # bytes arrived, and the two must not be conflated (see the power layer above).
         vintage_of=_agri_vintage,
-        retrieved_of=_agri_vintage,
     ),
 }
 LAYER_IDS = tuple(SOURCES.keys())
