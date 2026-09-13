@@ -19,7 +19,7 @@ using Printf
 """
 Load the serial model, minus its figure-export half.
 
-The `#  13. Figure export` marker is load-bearing: seven files in this repository split
+The `#  13. Figure export` marker is load-bearing: several files in this repository split
 the monolith on that exact two-space string and evaluate only the half above it, in a
 module whose imports are hardcoded to these four stdlibs. Loading this way means no
 CairoMakie, which is why this sweep writes a CSV and leaves plotting to whoever wants it.
@@ -54,12 +54,17 @@ function main(args)
     parcels = parse(Int, getopt(args, "--parcels", "2"))
     n_mcs   = parse(Int, getopt(args, "--mcs", "400"))
     at      = parse(Int, getopt(args, "--at", "100"))
+    # Refused before the model loads and before the destination opens, so a bad request
+    # leaves nothing behind. A reversed range parses to an empty list and used to write a
+    # header-only CSV and report success; an `--at` past the run used to run a whole seed
+    # first and fail afterwards, leaving a partial file.
+    isempty(seeds) && error("no seeds in --seeds $(getopt(args, "--seeds", "42:57"))")
+    n_mcs > 0 || error("--mcs must be positive, got $n_mcs")
+    0 <= at <= n_mcs || error("--at $at is outside the run, 0 to $n_mcs")
+    # Snapshots land on multiples of the interval; gcd makes MCS `at` one of them.
+    interval = gcd(at, n_mcs)
 
     SR = load_serial()
-    # Snapshot cadence must land exactly on `at`, otherwise the row the analysis wants
-    # does not exist. Asserted rather than assumed.
-    interval = gcd(at, n_mcs)
-    at % interval == 0 || error("snapshot interval $interval does not reach MCS $at")
     p = Base.invokelatest(SR.CPMParams; N = N, n_cells_per_species = parcels,
                           snapshot_interval = interval)
     alpha = Base.invokelatest(getfield, p, :α_M_species)

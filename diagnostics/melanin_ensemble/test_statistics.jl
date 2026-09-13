@@ -1,13 +1,17 @@
 #!/usr/bin/env julia
-# Data-free tests for the sweep's statistics.
+# Data-free tests for the sweep's statistics and its CSV contract.
 #
 #   julia diagnostics/melanin_ensemble/test_statistics.jl
 #
-# No CSV, no argument, no environment variable, so these assertions cannot be skipped by
-# a missing sweep. The sign-test values below are exact rationals over 2^16 and are
-# asserted as such rather than to a tolerance.
+# No committed sweep is required, no argument, no environment variable, so these assertions
+# cannot be skipped by a missing sweep. The sign-test values below are exact rationals over
+# 2^16 and are asserted as such rather than to a tolerance. The producer contract is tested
+# by running sweep.jl itself for a few MCS and reading what it wrote through read_sweep.
 using Test, Statistics
 include(joinpath(@__DIR__, "analyse.jl"))
+
+const SWEEP = joinpath(@__DIR__, "sweep.jl")
+sweep(out, args...) = success(pipeline(`$(Base.julia_cmd()) $SWEEP $out $args`; stdout = devnull, stderr = devnull))
 
 @testset "melanin ensemble statistics" begin
 
@@ -29,6 +33,8 @@ include(joinpath(@__DIR__, "analyse.jl"))
     end
     # Monotone away from the centre.
     @test binom_two_sided(9, 16) > binom_two_sided(10, 16) > binom_two_sided(11, 16)
+    # No observations: nothing is unlikely, p = 1.
+    @test binom_two_sided(0, 0) ≈ 1.0
 end
 
 @testset "paired and unpaired spreads differ, and the direction is informative" begin
@@ -60,7 +66,7 @@ end
     @test r.mean ≈ 0.5
     @test r.sd_paired ≈ 0.0 atol = 1e-12
     @test r.sd_indep > r.sd_paired
-    @test r.k == 5 && r.n == 5
+    @test r.k == 5 && r.n == 5 && r.ties == 0
     @test r.p ≈ 2 / 2^5                       # 5 of 5 one way: 2/32
 
     # Anticorrelated: the difference swings twice as far as either series, so the paired
@@ -95,20 +101,80 @@ end
     @test r.pooled ≈ sqrt((var([1.0,2,3,4,5]) + var([0.5,1.5,2.5,3.5,4.5])) / 2)
 end
 
-@testset "the sweep CSV contract" begin
-    # The header the analysis parses, pinned so a change to sweep.jl that reorders
-    # columns fails here rather than silently producing wrong numbers.
+@testset "a tie carries no sign and leaves the sign test" begin
+    # All tied, the committed sweeps at MCS 0: the old test reported 0 of 16 with
+    # p = 2/2^16, a directional result from data with no direction. Now: no trials, p = 1.
+    tied = Dict(i => Dict("A" => 0.0, "B" => 0.0) for i in 1:16)
+    t = paired_stats(tied, collect(1:16), "A", "B")
+    @test t.k == 0 && t.n == 0 && t.ties == 16
+    @test t.p ≈ 1.0
+    # Three ties among five: the test sees the other two, both in one direction.
+    mixed = Dict(1 => Dict("A"=>1.0,"B"=>1.0), 2 => Dict("A"=>2.0,"B"=>2.0),
+                 3 => Dict("A"=>3.0,"B"=>3.0), 4 => Dict("A"=>5.0,"B"=>4.0),
+                 5 => Dict("A"=>6.0,"B"=>4.0))
+    m = paired_stats(mixed, collect(1:5), "A", "B")
+    @test m.k == 2 && m.n == 2 && m.ties == 3
+    @test m.p ≈ binom_two_sided(2, 2)
+    # The mean and the spreads still see every seed; only the sign test drops ties.
+    @test m.mean ≈ 3 / 5
+end
+
+@testset "the sweep CSV contract, through the real reader" begin
+    dir = mktempdir()
     header = "seed,mcs,species,species_name,alpha_M,volume,n_cells,mean_melanin"
-    cols = split(header, ",")
-    @test length(cols) == 8
-    @test cols[1] == "seed" && cols[2] == "mcs" && cols[3] == "species"
-    @test cols[5] == "alpha_M" && cols[8] == "mean_melanin"
-    # analyse.jl reads field 8 as the observable and field 5 as the declared input.
-    src = read(joinpath(@__DIR__, "analyse.jl"), String)
-    @test occursin("parse(Float64, f[8])", src)
-    @test occursin("parse(Float64, f[5])", src)
+    body = ["42,100,3,C. sphaerospermum,0.1400,230,2,1.5",
+            "42,100,1,C. neoformans,0.1000,230,2,1.0",
+            "42,100,5,A. niger,0.0650,230,2,0.5",
+            "42,200,3,C. sphaerospermum,0.1400,230,2,9.9",   # another MCS, must be ignored
+            "43,100,3,C. sphaerospermum,0.1400,230,2,1.6",
+            "43,100,1,C. neoformans,0.1000,230,2,1.1",
+            "43,100,5,A. niger,0.0650,230,2,0.4",
+            "43,100,2,D. radiodurans,0.0000,230,2,7.7"]    # not a producer, must be ignored
+    csv(name, head, rows) = (p = joinpath(dir, name); write(p, join(["# comment"; head; rows], "\n") * "\n"); p)
+
+    rows, alpha = read_sweep(csv("ok.csv", header, body), 100)
+    @test sort(collect(keys(rows))) == [42, 43]
+    @test rows[42] == Dict("CS" => 1.5, "CN" => 1.0, "AN" => 0.5)
+    @test rows[43]["AN"] == 0.4
+    @test alpha == Dict("CS" => 0.14, "CN" => 0.1, "AN" => 0.065)
+
+    # Columns are found by name, so a producer that reorders them still parses correctly.
+    shuffled = "mean_melanin,alpha_M,species,mcs,seed"
+    rows2, alpha2 = read_sweep(csv("shuffled.csv", shuffled, ["1.5,0.1400,3,100,42", "1.0,0.1000,1,100,42"]), 100)
+    @test rows2[42] == Dict("CS" => 1.5, "CN" => 1.0)
+    @test alpha2["CN"] == 0.1
+
+    # A missing or renamed column refuses rather than parsing a neighbour as the observable.
+    @test_throws ErrorException read_sweep(csv("renamed.csv", replace(header, "mean_melanin" => "melanin"), body), 100)
+    @test_throws ErrorException read_sweep(csv("noalpha.csv", replace(header, "alpha_M" => "aM"), body), 100)
+    @test_throws ErrorException read_sweep(csv("noheader.csv", "# only comments", String[]), 100)
+
     # The three producers, by the species indices the model assigns.
     @test [id for (id, _, _) in PRODUCERS] == [3, 1, 5]
+end
+
+@testset "sweep.jl writes what read_sweep reads" begin
+    # The producer itself, for four MCS on two seeds at the default N = 20: about three
+    # seconds. This is the only test that touches biofilms_potts.jl, and it is the one that
+    # binds the writer's header to the reader's expectations.
+    dir = mktempdir()
+    out = joinpath(dir, "tiny.csv")
+    @test sweep(out, "--seeds", "42,43", "--mcs", "4", "--at", "4")
+    rows, alpha = read_sweep(out, 4)
+    @test sort(collect(keys(rows))) == [42, 43]
+    @test all(haskey(rows[s], c) for s in (42, 43), c in ("CS", "CN", "AN"))
+    @test alpha == Dict("CS" => 0.14, "CN" => 0.1, "AN" => 0.065)   # Table 2 midpoints
+    @test all(v >= 0 for r in values(rows) for v in values(r))
+    # The MCS 0 snapshot is in the file and is all ties; the reader must not confuse it.
+    rows0, _ = read_sweep(out, 0)
+    @test all(rows0[s]["CS"] == 0.0 for s in (42, 43))
+
+    # Refusals happen before anything is written: a bad request leaves no file behind.
+    @test !sweep(joinpath(dir, "late.csv"), "--seeds", "42", "--mcs", "4", "--at", "500")
+    @test !isfile(joinpath(dir, "late.csv"))
+    @test !sweep(joinpath(dir, "empty.csv"), "--seeds", "57:42", "--mcs", "4", "--at", "4")
+    @test !isfile(joinpath(dir, "empty.csv"))
+    @test !sweep(out, "--seeds", "42", "--mcs", "4", "--at", "4")       # destination exists
 end
 
 end
