@@ -90,19 +90,22 @@ def read_vti(path):
 def audit(files):
     frames, sizes, gz = [], [], []
     for p in files:
-        arrays, fields, cells, nbytes, raw, _ = read_vti(p)
-        frames.append((arrays, fields, cells))
+        arrays, fields, cells, nbytes, raw, dims = read_vti(p)
+        frames.append((arrays, fields, cells, dims))
         sizes.append(nbytes)
         gz.append(len(gzip.compress(raw, 9)))
     names = list(frames[0][0])
-    cells = frames[0][2]
+    cells, dims = frames[0][2], frames[0][3]
     # Names alone let a frame with another extent or another dtype through, and every
-    # bytes/site figure below would then be divided by the first frame's cell count.
+    # bytes/site figure below would then be divided by the first frame's cell count. The
+    # three dimensions are compared, not their product: 2x4x8 and 4x4x4 both hold 64
+    # cells and are not site-for-site aligned when flattened.
     schema = [(n, frames[0][0][n][1]) for n in names]
-    for i, (arrays, _, c) in enumerate(frames[1:], 1):
-        if [(n, arrays[n][1]) for n in arrays] != schema or c != cells:
-            raise ValueError(f"frame {i} ({files[i]}): inventory, types or cell count "
+    for i, (arrays, _, _, d) in enumerate(frames[1:], 1):
+        if [(n, arrays[n][1]) for n in arrays] != schema or d != dims:
+            raise ValueError(f"frame {i} ({files[i]}): inventory, types or extent "
                              f"differ from frame 0")
+    frames = [(a, f, c) for a, f, c, _ in frames]
 
     rows = []
     for n in names:

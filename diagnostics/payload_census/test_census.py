@@ -201,6 +201,12 @@ class TestAudit(unittest.TestCase):
         make_vti(files[1], (4, 4, 4), a)
         with self.assertRaises(ValueError):
             audit(files)
+        # Same 64 cells as a different box: flattened sites no longer correspond.
+        files = self.build(n_frames=2)
+        a = {k: v[0] for k, v in read_vti(files[0])[0].items()}
+        make_vti(files[1], (2, 4, 8), a)
+        with self.assertRaises(ValueError):
+            audit(files)
 
     def test_one_frame_cannot_be_static(self):
         # A single-file audit used to mark every array static and the whole frame redundant.
