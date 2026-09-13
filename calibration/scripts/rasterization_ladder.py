@@ -203,6 +203,14 @@ def main(argv=None) -> int:
 
     args.outdir.mkdir(parents=True, exist_ok=True)
     pitches = [float(p) for p in args.pitches.split(",")]
+    # A PITCH WITH NO JSON FORM IS REFUSED HERE, BY NAME. The raw list is
+    # echoed into the report and written with `allow_nan=False`, so NaN or
+    # inf ran the whole ladder and then crashed in `json.dumps` with no
+    # report written -- past the typed skip row `_grid_shape` gives them.
+    # Zero and negatives serialise, so they still become named skip rows.
+    if not all(math.isfinite(p) for p in pitches):
+        raise SystemExit(f"--pitches {args.pitches!r}: every pitch must be a "
+                         "finite number; NaN and inf have no place in the report")
     tolerances = load_tolerances()
 
     specs = {"slab": PhysicalSlab(), "spheres": PhysicalSpheres()}
