@@ -122,27 +122,51 @@ _WORKFLOW = (_REPO / ".github" / "workflows"
              / "golden-tally-verification.yml")
 
 
-def _modules_that_produce_the_fixture() -> set[Path]:
-    """Every first-party module `regenerate_golden_tally.py` imports, as
-    repo-relative paths. Walks the real AST -- including the function-local
-    imports inside `_run_one`, which is where all of them live -- so an
-    import added later is picked up without anyone remembering to."""
-    tree = ast.parse(_REGEN.read_text())
+_FIRST_PARTY_BASES = ("coupling", "coupling/scripts", "contract")
+
+
+def _first_party_imports(path: Path) -> set[Path]:
+    """The first-party modules one file imports, as repo-relative paths.
+    Walks the real AST, function-local imports included. A dotted name
+    resolves to `name.py` or to a package's `__init__.py`."""
+    tree = ast.parse(path.read_text())
     names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
             names.add(node.module)
         elif isinstance(node, ast.Import):
             names.update(a.name for a in node.names)
-
     out: set[Path] = set()
     for name in names:
-        parts = name.split(".")
-        for base in ("coupling", "coupling/scripts"):
-            candidate = _REPO / base / (Path(*parts).as_posix() + ".py")
-            if candidate.exists():
-                out.add(candidate.relative_to(_REPO))
+        rel = Path(*name.split("."))
+        for base in _FIRST_PARTY_BASES:
+            for candidate in (_REPO / base / (rel.as_posix() + ".py"),
+                              _REPO / base / rel / "__init__.py"):
+                if candidate.exists():
+                    out.add(candidate.relative_to(_REPO))
     return out
+
+
+def _modules_that_produce_the_fixture() -> set[Path]:
+    """Every first-party module the regeneration script reaches, TRANSITIVELY.
+
+    The first version walked the script's own imports and nothing further, so
+    `physical_contract` -- imported by `biofilm_openmc.config` and `.model`,
+    which the script imports inside `_run_one` -- was never in the inventory,
+    and the trigger test could not know the workflow omitted it. A change to
+    the shared vocabularies or validation there alters the generating run
+    while neither verification job fires. The closure over first-party
+    imports is the inventory; a base directory is added to
+    `_FIRST_PARTY_BASES`, not a module name."""
+    seen: set[Path] = set()
+    frontier = [_REGEN.relative_to(_REPO)]
+    while frontier:
+        here = frontier.pop()
+        for dep in _first_party_imports(_REPO / here):
+            if dep not in seen:
+                seen.add(dep)
+                frontier.append(dep)
+    return seen
 
 
 def _workflow_triggers() -> dict:
@@ -189,6 +213,19 @@ def test_every_fixture_producing_module_triggers_verification():
             f"changes the real tally -- but {_WORKFLOW.name}'s `{event}:` "
             "paths filter does not list them, so verification would not run "
             "and the committed fixture would go stale while CI stayed green.")
+
+
+def test_the_shared_contract_package_is_a_fixture_producer():
+    """THE INVENTORY MUST SEE THROUGH ONE IMPORT. `regenerate_golden_tally.py`
+    never names `physical_contract`; `biofilm_openmc.config` and `.model` do,
+    and both are imported inside `_run_one`. A walk that stopped at the
+    script's own imports listed neither the package nor, therefore, the
+    workflow's omission of it. Remove "contract" from `_FIRST_PARTY_BASES`
+    and this fails; remove the path from the workflow and the trigger test
+    above fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    assert "contract/physical_contract/__init__.py" in producers, sorted(producers)
+    assert "coupling/biofilm_openmc/config.py" in producers, sorted(producers)
 
 
 def test_a_pull_request_can_reach_this_workflow_at_all():

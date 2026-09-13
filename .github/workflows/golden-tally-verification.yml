@@ -64,6 +64,19 @@ on:
       - "coupling/biofilm_openmc/materials.py"
       - "coupling/biofilm_openmc/mesh.py"
       - "coupling/biofilm_openmc/model.py"
+      # THE CLOSURE, not the first hop. The inventory used to stop at the
+      # script's own imports, which is how `physical_contract` -- reached
+      # through config.py and model.py -- was never listed. It now walks every
+      # first-party import transitively, and these are what that reaches
+      # through the pilot's nuclear-data identity. Whether each one can move
+      # the water-phantom tally is not a judgment this list makes; a module
+      # the generating run executes is a fixture input.
+      - "contract/physical_contract/__init__.py"
+      - "coupling/biofilm_openmc/feedback_uq.py"
+      - "coupling/biofilm_openmc/fingerprint.py"
+      - "coupling/biofilm_openmc/lineage.py"
+      - "coupling/biofilm_openmc/snapshot.py"
+      - "coupling/biofilm_openmc/synthetic_gate.py"
   # ANCHORED, not copied. Two hand-maintained path lists drift, and the one
   # that drifts is the one nobody watches -- here that would be the PR trigger,
   # the only one that fires before a merge.
