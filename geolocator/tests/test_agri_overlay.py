@@ -256,3 +256,10 @@ def test_layers_reports_the_vintage_and_no_retrieval_time(agri_source):
     entry = next(l for l in client.get("/api/layers").json()["layers"] if l["id"] == "agri_overlay")
     assert entry["vintage"] == "2026-08-27T00:00:00+00:00"
     assert entry["retrieved_at"] is None
+
+
+def test_stats_source_names_the_overlay_repo_not_wri(agri_source):
+    r = client.get("/api/stats", params={"layer": "agri_overlay"})
+    assert r.json()["source"] == "agri_yield_pipeline"
+    # and the WRI label still belongs to the power layer
+    assert client.get("/api/stats", params={"layer": "power"}).json()["source"] != "agri_yield_pipeline"

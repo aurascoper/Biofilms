@@ -544,6 +544,11 @@ MARKET_SOURCE = TrackedSource(
     count_of=lambda d: (d or {}).get("rows", 0),
 )
 SOURCE = "WRI Global Power Plant Database" if DATA_CSV.exists() else "built-in sample"
+LAYER_SOURCE = {
+    "power": SOURCE,
+    "worldgrid": "WRI energy world grid",
+    "agri_overlay": "agri_yield_pipeline",
+}
 
 
 def layer_items(layer: str) -> list[dict]:
@@ -673,7 +678,8 @@ def stats(layer: str = Query("power")):
         by_country[p["country"]] = by_country.get(p["country"], 0) + 1
     return {
         "layer": layer,
-        "source": SOURCE,
+        # Per layer, keyed on the id so an empty layer is still attributed correctly.
+        "source": LAYER_SOURCE.get(layer, "authored CSV"),
         "count": len(items),
         "total_capacity_mw": round(total_cap, 1),
         "unknown_capacity_count": len(items) - len(known),
