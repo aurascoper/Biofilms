@@ -33,6 +33,21 @@ end
 
 order(a, b) = log2(abs(a) / abs(b))
 
+# The two controls whose correct outcome is red. Named here, once, so the receipt's
+# metadata and the verdict logic cannot drift apart; main() refuses a name that matches
+# no control, so a renamed control cannot silently drop out of this list.
+const EXPECTED_RED = ["K8 the same transfer, deliberately omitted",
+                      "K12 the derived restriction refuses a step above the bound"]
+
+"""
+K6's verdict. The question is whether the bound pool EVER exceeded capacity, and the step
+releases overflow before returning, so the final state alone answers a different question:
+`led.max_overshoot` is the pre-release record and is the term that can fail.
+"""
+k6_verdict(led::Ledger, overshoot_final::Float64) =
+    (led.min_dissolved >= 0 && led.min_bound >= 0 &&
+     led.max_overshoot <= 0 && overshoot_final <= 0) ? "PASS" : "FAIL"
+
 function controls(parent::String, config::String)
     cfg, p = read_config(config)
     geo, snap_path, snap_sha = frozen_geometry(parent, cfg)
@@ -183,8 +198,7 @@ function controls(parent::String, config::String)
     add!("K6 positivity and 0 <= b <= B",
          "over the production run, does either pool go negative, and does the bound " *
          "pool ever exceed the local capacity?",
-         (led.min_dissolved >= 0 && led.min_bound >= 0 && overshoot_final <= 0) ?
-             "PASS" : "FAIL",
+         k6_verdict(led, overshoot_final),
          Dict("min_dissolved" => led.min_dissolved, "min_bound" => led.min_bound,
               "max_overshoot_before_release" => led.max_overshoot,
               "max_b_minus_B_final" => overshoot_final))
@@ -209,7 +223,11 @@ function controls(parent::String, config::String)
          Dict("capacity_factor" => 0.25, "step_of_decrease" => half,
               "released" => l7.released, "dropped" => l7.dropped,
               "closure_residual" => r7, "closure_residual_relative" => r7 / scale,
-              "max_b_minus_B_final" => over7))
+              "max_b_minus_B_final" => over7,
+              "note" => "the cut is applied between steps, so `released` includes one " *
+                        "step of reaction and decay evaluated on the over-capacity state " *
+                        "before the release; the identity asserted is closure, not the " *
+                        "released amount"))
 
     s8, l8 = stress(false)
     r8 = closure_residual(s8, geo, l8)
@@ -303,6 +321,10 @@ function main(parent::String, out::String, config::String)
     refuse_inside(parent, out)
     hashes = code_hashes(config)
     cfg, geo, snap_path, snap_sha, results = controls(parent, config)
+    names = Set(r["control"] for r in results)
+    for n in EXPECTED_RED
+        require(n in names, "expected_red names a control that does not exist: $n")
+    end
     fresh_destination(out)
     doc = Dict{String, Any}(
         "diagnostic" => "closed diffusion-and-binding benchmark, control set",
@@ -310,8 +332,10 @@ function main(parent::String, out::String, config::String)
         "code_sha256" => hashes,
         "parent" => Dict("snapshot" => cfg["parent_snapshot"], "snapshot_sha256" => snap_sha,
                          "manifest_sha256" => cfg["parent_manifest_sha256"],
-                         "run_id" => geo.run_id, "mcs" => geo.mcs),
-        "expected_red" => ["K8 the same transfer, deliberately omitted"],
+                         "run_id" => geo.run_id, "mcs" => geo.mcs,
+                         "label_state_hash" => geo.label_state_hash,
+                         "mask_sha256" => geo.mask_sha256),
+        "expected_red" => EXPECTED_RED,
         "controls" => results,
         "julia_version" => string(VERSION),
         "created_utc" => string(now(UTC)) * "Z")

@@ -11,6 +11,13 @@
 using Test, TOML
 include(joinpath(@__DIR__, "setup.jl"))
 
+# controls.jl includes setup.jl itself, so it is loaded in its own module rather than a
+# second time into Main, where two copies of BindingBenchmark would make `Params` ambiguous.
+# Its main() is guarded by PROGRAM_FILE and does not run here.
+module CtlTest
+include(joinpath(@__DIR__, "controls.jl"))
+end
+
 const SHIPPED = TOML.parsefile(joinpath(@__DIR__, "benchmark.toml"))
 
 "Write the shipped configuration with `edit!` applied, and return its path."
@@ -97,6 +104,27 @@ end
     @test h["config_file"] == "benchmark.toml"      # the name alone would not have told them apart
     for f in ("Project.toml", "Manifest.toml", "test_setup.jl", "setup.jl")
         @test h[f] == sha256_file(joinpath(@__DIR__, f))
+    end
+end
+
+@testset "control verdicts and the expected-red list" begin
+    k6_verdict = CtlTest.k6_verdict; Ledger = CtlTest.Ledger; EXPECTED_RED = CtlTest.EXPECTED_RED
+    # A ledger whose pre-release record shows a transient overshoot, released before T:
+    # the final state is clean and the old predicate said PASS.
+    clean = Ledger(0.0, 0, 1.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1, 0.0, 0.0)
+    @test k6_verdict(clean, 0.0) == "PASS"
+    transient = Ledger(0.0, 0, 1.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1, 0.0, 1e-9)
+    @test k6_verdict(transient, 0.0) == "FAIL"
+    negative = Ledger(0.0, 0, 1.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, -1e-12, 0.0, 0.0)
+    @test k6_verdict(negative, 0.0) == "FAIL"
+    @test k6_verdict(clean, 1e-9) == "FAIL"
+
+    # Both red-by-design controls are declared, by the names controls.jl gives them.
+    src = read(joinpath(@__DIR__, "controls.jl"), String)
+    @test length(EXPECTED_RED) == 2
+    @test any(startswith("K8 "), EXPECTED_RED) && any(startswith("K12 "), EXPECTED_RED)
+    for n in EXPECTED_RED
+        @test occursin("add!(\"$n\",", src)
     end
 end
 
