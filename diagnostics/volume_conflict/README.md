@@ -40,8 +40,16 @@ Two arms, identical proposal streams, differing only in when `vols` is read. Bot
 
 A sweep-start snapshot is the **maximum** staleness achievable within a colour pass -- every
 read as stale as it can be. Live is 1.0x by construction. Concurrent GPU execution carries
-**partial** staleness and lands at 1.944x, between the two. The volume conflict brackets the
-observed effect.
+**partial** staleness and lands at 1.944x, numerically between the two.
+
+**That ordering is not a bracket.** Staleness has opposite effects at the two endpoints of a
+copy (the "Also withdrawn" paragraph below): a stale donor read lowers ΔH, a stale recipient
+read raises it. A concurrent evaluation can see one endpoint fresh and the other stale, so its
+acceptance rate need not interpolate monotonically between the all-live and all-snapshot
+arms, and `1 < 1.944 < 2.198` does not establish that the volume conflict brackets or
+explains the Metal gap. What it establishes is that the conflict is large enough to matter.
+Whether it accounts for the observed factor needs a controlled replay of the actual read
+interleavings, which has not been run.
 
 ### Why it compounds, and why a single pass does not show it
 

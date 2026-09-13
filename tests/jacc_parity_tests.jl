@@ -208,12 +208,13 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
             # Asserted SEPARATELY, not as `s1.V < V_MAX && s2.V < V_MAX`. Identical
             # pass/fail, but Julia prints no operand values for a `&&` compound, so a
             # failure named neither the offending half nor its number -- and which half
-            # drifts is the finding. Under concurrent execution all three failures here
-            # were the SECOND half (V = 0.03228, 0.02883, 0.02517 against V_MAX 0.025)
-            # and none the first, with s2.V > s1.V in 9 of 9 runs; pooled V stayed under
-            # threshold throughout because averaging a growing effect over the whole
-            # trajectory brings it back under the line. None of that is recoverable from
-            # a compound failure. See diagnostics/volume_conflict/parity_halves.jl.
+            # drifts is the finding. Pooled V can stay under threshold while a half-window
+            # exceeds it, because averaging over the whole trajectory brings a windowed
+            # excursion back under the line; none of that is recoverable from a compound
+            # failure. Which half drifts under concurrent execution is NOT stated here:
+            # the single-run attribution to the second half was withdrawn once replicates
+            # put the excursions in either half or neither (diagnostics/volume_conflict/
+            # README.md, "Replicates per configuration"). See parity_halves.jl there.
             h = size(A, 1) ÷ 2
             s1 = pooled(A, E, 1:h); s2 = pooled(A, E, h+1:size(A, 1))
             @test s1.V < V_MAX

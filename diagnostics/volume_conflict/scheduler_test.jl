@@ -35,7 +35,11 @@ function run_both(n_mcs)
         keys(dA) == keys(dB) || (mismatch += 1; continue)
         for k in keys(dA)
             a, b = dA[k], dB[k]
+            # Every recorded field, the volume reads included: a batching defect that
+            # shifts both endpoint reads equally leaves dH, the decision and the final
+            # state unchanged and is visible only here.
             (a.donor == b.donor && a.recipient == b.recipient &&
+             a.vol_donor == b.vol_donor && a.vol_recip == b.vol_recip &&
              a.dH == b.dH && a.draw == b.draw && a.accepted == b.accepted) || (mismatch += 1)
         end
     end
@@ -96,3 +100,11 @@ sl, sv = shuffled_batches(50)
 @printf("  reversed-order batching reproduces the oracle: lattice %s, volumes %s\n",
         sl ? "yes" : "NO", sv ? "yes" : "NO")
 println("  (if NO, conflict-freedom alone is insufficient and order preservation is required)")
+
+# The control is a control only if its outcome is asserted: if reversed batching
+# ever stops diverging, the README's claim that order preservation is load-bearing
+# has lost its evidence and this file must go red, not print "yes" and exit 0.
+@testset "reversed-order batching diverges from the oracle" begin
+    @test !sl
+    @test !sv
+end
