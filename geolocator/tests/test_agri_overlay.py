@@ -263,3 +263,21 @@ def test_stats_source_names_the_overlay_repo_not_wri(agri_source):
     assert r.json()["source"] == "agri_yield_pipeline"
     # and the WRI label still belongs to the power layer
     assert client.get("/api/stats", params={"layer": "power"}).json()["source"] != "agri_yield_pipeline"
+
+
+def test_plants_country_filter_scopes_the_unknown_counter(mixed_layer):
+    """The capacity check used to run before the country predicate, so a country-scoped
+    request counted unknowns from every other country as excluded by capacity."""
+    body = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 1.0,
+                                             "country": "MO"}).json()
+    assert {f["properties"]["name"] for f in body["features"]} == {"A"}
+    assert body["excluded_unknown_capacity"] == 1
+
+
+def test_plants_unknown_counter_is_not_truncated_by_limit(mixed_layer):
+    """The loop used to break at `limit`, so an unknown row past the first page was never
+    inspected and went uncounted."""
+    body = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 1.0,
+                                             "limit": 1}).json()
+    assert len(body["features"]) == 1
+    assert body["excluded_unknown_capacity"] == 2

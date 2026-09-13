@@ -703,7 +703,11 @@ def plants(
     out = []
     excluded_unknown_capacity = 0
     for p in items:
+        # Scope predicates first, so the exclusion counter only ever counts rows that
+        # would otherwise have been in the result.
         if fuel and p["color_key"] != fuel:
+            continue
+        if country and country.lower() not in p["country"].lower():
             continue
         cap = p["capacity_mw"]
         # An explicit min_capacity floor can't be verified against an unknown value, so it
@@ -718,12 +722,10 @@ def plants(
             if cap is None:
                 excluded_unknown_capacity += 1
             continue
-        if country and country.lower() not in p["country"].lower():
-            continue
         out.append(p)
-        if len(out) >= limit:
-            break
-    geojson = _to_geojson(out, layer)
+    # The counter covers every row, not just the first page: with the break that used to
+    # sit here, an unknown row past `limit` was never inspected and went uncounted.
+    geojson = _to_geojson(out[:limit], layer)
     # Always present, defaulting to 0 -- matching /api/stats's unknown_capacity_count, so a
     # consumer can tell "no filter active" apart from "filter active, nothing excluded" instead
     # of the two endpoints answering the same question in different shapes.
