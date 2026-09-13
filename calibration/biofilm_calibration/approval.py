@@ -71,7 +71,7 @@ def _match_key(value: str) -> str:
     return " ".join(str(value).split()).casefold()
 
 
-def _biosafety_mapping_problems(row) -> list[str]:
+def _biosafety_mapping_problems(row) -> list[tuple[str | None, str]]:
     """Whether `biosafety_level_by_strain` is a per-strain MAPPING at all.
 
     ADDING THE FIELD TO `_MUST_NAME_SOMETHING` MADE IT REACHABLE, NOT VALID.
@@ -109,7 +109,12 @@ def _biosafety_mapping_problems(row) -> list[str]:
 
     strains = _entries(row.get("strain_identities"))
     pairs = _entries(value)
-    out: list[str] = []
+    # (subject, text): THE SUBJECT TRAVELS WITH THE REFUSAL. `classified()`
+    # stamped every one of these `biosafety_level_by_strain`, including the
+    # one below that is about `strain_identities` -- so the structured field
+    # contradicted its own prose, for any consumer keying on the subject.
+    out: list[tuple[str | None, str]] = []
+    F = "biosafety_level_by_strain"
 
     # REFUSED AGAINST THE FIELD THAT IS ACTUALLY WRONG. A strain identifier
     # carrying ':' cannot be a key, and letting it through would surface below
@@ -117,37 +122,38 @@ def _biosafety_mapping_problems(row) -> list[str]:
     # the mapping is the only correct thing about the row.
     unexpressible = [s for s in strains if ":" in s]
     if unexpressible:
-        out.append(
+        out.append((
+            "strain_identities",
             f"strain_identities entries {unexpressible} contain ':', so they "
             "cannot be used as biosafety_level_by_strain keys, which are the "
             "identifiers verbatim. Rename the strain or the approval cannot "
-            "state a level for it")
+            "state a level for it"))
         return out
 
     malformed = [p for p in pairs if p.count(":") != 1
                  or not p.split(":")[0].strip()
                  or not p.split(":")[1].strip()]
     if malformed:
-        out.append(
+        out.append((F,
             f"biosafety_level_by_strain has entries that are not "
             f"strain:level pairs: {malformed}. A single level for a "
             "mixed-BSL consortium is the error this field exists to prevent "
-            "-- biosafety follows strains, not species")
+            "-- biosafety follows strains, not species"))
         return out
 
     levels = [p.split(":")[1].strip().upper().replace("-", "")
               for p in pairs]
     unknown = [lv for lv in levels if lv not in _BIOSAFETY_LEVELS]
     if unknown:
-        out.append(
+        out.append((F,
             f"biosafety_level_by_strain names levels {unknown}, which are not "
-            f"recognised biosafety levels {sorted(_BIOSAFETY_LEVELS)}")
+            f"recognised biosafety levels {sorted(_BIOSAFETY_LEVELS)}"))
 
     keys = [p.split(":")[0].strip() for p in pairs]
     if len(set(keys)) != len(keys):
-        out.append(
+        out.append((F,
             f"biosafety_level_by_strain repeats a strain key in {keys}; one "
-            "entry per strain, or a level is silently overridden")
+            "entry per strain, or a level is silently overridden"))
 
     # THE BINDING. This replaces a count comparison, which `XX:BSL1;YY:BSL2`
     # satisfied against two declared strains while naming neither of them. Sets,
@@ -167,12 +173,12 @@ def _biosafety_mapping_problems(row) -> list[str]:
                 detail.append(
                     f"names {unrecognised}, which strain_identities does not "
                     "declare")
-            out.append(
+            out.append((F,
                 "biosafety_level_by_strain is keyed by the strain_identities "
                 "entry verbatim, and this row " + " and ".join(detail) + ". An "
                 "approval that omits a strain does not cover it, and one that "
                 "names an organism this row never declared is evidence about "
-                "something else -- neither omission may read as coverage")
+                "something else -- neither omission may read as coverage"))
     return out
 
 
@@ -278,8 +284,8 @@ def classified(rows, sources=None, *,
                     "approval is evidence produced by an institution; filler "
                     "text has no evidentiary force whatever it says")
 
-        for text in _biosafety_mapping_problems(row):
-            add("biosafety_level_by_strain", text)
+        for subject, text in _biosafety_mapping_problems(row):
+            add(subject, text)
 
         if row.get("is_target_system") != "true":
             add("is_target_system",

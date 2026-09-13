@@ -369,3 +369,13 @@ def test_a_strain_identifier_containing_a_colon_is_refused_against_its_own_field
                                      biosafety_level_by_strain="ATCC:12345:BSL1"))
              if "strain_identities" in p and "':'" in p]
     assert found, "an unexpressible strain identifier must be refused by name"
+
+    # AND THE STRUCTURED SUBJECT AGREES WITH THE PROSE. `classified()` stamped
+    # every mapping refusal `biosafety_level_by_strain`, this one included, so
+    # a consumer keying on `Refusal.subject` was sent to the mapping while the
+    # sentence sent the reader to the strain list. One refusal, two fields.
+    seen = [r for r in approval.classified(
+                [row(strain_identities="ATCC:12345",
+                     biosafety_level_by_strain="ATCC:12345:BSL1")],
+                SOURCES, today=TODAY) if "':'" in r.text]
+    assert seen and all(r.subject == "strain_identities" for r in seen), seen
