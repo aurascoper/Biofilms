@@ -153,6 +153,25 @@ def test_a_missing_hash_is_refused_not_skipped(tmp_path, version, missing):
         _load_agri_overlay(f)
 
 
+@pytest.mark.parametrize("version", [None, 3, "2"])
+def test_an_unsupported_schema_version_is_refused_before_hashing(tmp_path, version):
+    """The else branch used to read every non-1 version, including a missing one, under
+    the v2 rule, so an unversioned export with a valid payload hash was accepted."""
+    f = tmp_path / "overlay.json"
+    payload = _payload(MIXED_CELLS)
+    del payload["payload_sha256"]
+    if version is None:
+        del payload["schema_version"]
+    else:
+        payload["schema_version"] = version
+    payload["payload_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()  # a VALID hash for the export as written
+    _write(f, payload)
+    with pytest.raises(ValueError, match="unsupported schema_version"):
+        _load_agri_overlay(f)
+
+
 def test_a_v2_export_cannot_downgrade_to_the_cells_only_hash(tmp_path):
     """A v2 export carrying only cells_sha256 must not be verified by the v1 rule: that
     would let generated_at / source_git_sha be edited under a still-valid cells hash."""

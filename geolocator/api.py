@@ -319,8 +319,13 @@ def _load_agri_overlay(path: Path) -> dict:
     version = d.get("schema_version")
     if version == 1:
         key, hashed = "cells_sha256", cells
-    else:
+    elif version == 2:
         key, hashed = "payload_sha256", {k: v for k, v in d.items() if k != "payload_sha256"}
+    else:
+        # Missing, malformed or future: refused before hashing. An unversioned export
+        # must not be read under v2 rules by default, and a v3 export whose hash covers
+        # something else must not pass because its bytes happen to hash like v2.
+        raise ValueError(f"agri overlay refused: unsupported schema_version {version!r}")
     expected = d.get(key)
     if expected is None:
         raise ValueError(f"agri overlay refused: schema_version {version!r} export carries no {key}")
