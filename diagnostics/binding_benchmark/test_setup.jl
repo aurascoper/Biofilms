@@ -81,6 +81,20 @@ end
     # Through a symlink from outside: the lexical prefix differs, the resolved one does not.
     link = joinpath(root, "link"); symlink(parent, link)
     @test_throws ArgumentError refuse_inside(parent, joinpath(link, "bench"))
+    # A root parent: the old prefix test built "//" and accepted everything.
+    @test_throws ArgumentError refuse_inside("/", "/tmp/out")
+    # A child whose name begins with ".." is a child, not an ancestor.
+    @test_throws ArgumentError refuse_inside(parent, joinpath(parent, "..bench"))
+
+    # The scope check is repeated on the created leaf: an intermediate component swapped
+    # for a symlink into the parent after the first check is caught, and nothing is left
+    # inside the parent.
+    mid = mkdir(joinpath(root, "mid"))
+    target = joinpath(mid, "out4")
+    @test isnothing(refuse_inside(parent, target))
+    swap = () -> (rm(mid); symlink(parent, mid))
+    @test_throws ArgumentError fresh_destination(target; parent = parent, race = swap)
+    @test isempty(readdir(parent))
 end
 
 @testset "the step count is shared, and a non-integral horizon is refused" begin
@@ -126,6 +140,13 @@ end
     for n in EXPECTED_RED
         @test occursin("add!(\"$n\",", src)
     end
+    # Every control has one expected verdict, and a red control that passes is unexpected.
+    ev = CtlTest.expected_verdict
+    @test ev(EXPECTED_RED[1]) == "FIRES" && ev(EXPECTED_RED[2]) == "FIRES"
+    @test ev("K1 matched total capacity") == "MEASURED"
+    @test ev("K10 both bound-fraction denominators") == "MEASURED"
+    @test ev("K11 ledger closure from independent accumulators") == "PASS"
+    @test "PASS" != ev(EXPECTED_RED[1])
 end
 
 end # setup

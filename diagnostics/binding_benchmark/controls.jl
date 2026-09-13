@@ -33,6 +33,15 @@ end
 
 order(a, b) = log2(abs(a) / abs(b))
 
+"""
+The verdict each control must report. K1 and K10 measure and do not judge; the two in
+EXPECTED_RED are red by design; every other control passes. A verdict that is not the
+expected one, including a PASS from a control that must be red, is an unexpected verdict.
+"""
+expected_verdict(name::AbstractString) =
+    name in EXPECTED_RED ? "FIRES" :
+    (startswith(name, "K1 ") || startswith(name, "K10 ")) ? "MEASURED" : "PASS"
+
 # The two controls whose correct outcome is red. Named here, once, so the receipt's
 # metadata and the verdict logic cannot drift apart; main() refuses a name that matches
 # no control, so a renamed control cannot silently drop out of this list.
@@ -325,7 +334,7 @@ function main(parent::String, out::String, config::String)
     for n in EXPECTED_RED
         require(n in names, "expected_red names a control that does not exist: $n")
     end
-    fresh_destination(out)
+    fresh_destination(out; parent = parent)
     doc = Dict{String, Any}(
         "diagnostic" => "closed diffusion-and-binding benchmark, control set",
         "configuration_file" => basename(config),
@@ -343,8 +352,8 @@ function main(parent::String, out::String, config::String)
     for r in results
         @printf("%-12s %-58s %s\n", r["verdict"], first(r["control"], 58), "")
     end
-    bad = [r["control"] for r in results
-           if r["verdict"] in ("FAIL", "INVALID", "DID-NOT-FIRE")]
+    bad = ["$(r["control"]) reported $(r["verdict"]), expected $(expected_verdict(r["control"]))"
+           for r in results if r["verdict"] != expected_verdict(r["control"])]
     println(isempty(bad) ? "all controls reported as expected" :
             "unexpected verdicts: " * join(bad, "; "))
     println("wrote ", joinpath(out, "control_verification.json"))

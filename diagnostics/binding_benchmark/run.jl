@@ -72,7 +72,7 @@ function main(parent::String, out::String, config::String)
     resid = closure_residual(st, geo, led)
     scale = led.initial_dissolved + led.initial_bound
 
-    fresh_destination(out)
+    fresh_destination(out; parent = parent)
     open(joinpath(out, "timeseries.csv"), "w") do io
         cols = ["step", "t", "dissolved", "bound", "capacity",
                 "bound_fraction_of_inventory", "bound_fraction_of_capacity",

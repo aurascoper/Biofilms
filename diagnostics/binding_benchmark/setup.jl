@@ -153,11 +153,23 @@ case, and nothing else can observe the gap. `race` is the test hook that reprodu
 refuse_existing(dir::AbstractString) =
     ispath(dir) && throw(ArgumentError("destination already exists: $dir"))
 
-function fresh_destination(dir::AbstractString; race = () -> nothing)
+function fresh_destination(dir::AbstractString; parent = nothing, race = () -> nothing)
     refuse_existing(dir)
     mkpath(dirname(abspath(dir)))
     race()
     mkdir(dir)
+    # The scope check ran before the run; an intermediate component can have become a
+    # symlink into the parent since. Now that the leaf exists its real path is exact, so
+    # the check is repeated on it and a directory that landed inside is removed again.
+    # ponytail: a swap between this check and the first write is still possible; closing
+    # it needs openat-relative writes, which HDF5 and JSON3 do not offer.
+    if !isnothing(parent)
+        try
+            refuse_inside(parent, dir)
+        catch
+            rm(dir); rethrow()
+        end
+    end
     dir
 end
 
@@ -180,7 +192,10 @@ the run promised not to write to.
 """
 function refuse_inside(parent::AbstractString, out::AbstractString)
     p = canonical(parent); o = canonical(out)
-    (o == p || startswith(o, p * "/")) &&
+    # By path component, not by string prefix: a prefix test with a literal separator is
+    # wrong for a root parent ("//") and for a platform whose separator is not "/".
+    rel = relpath(o, p)
+    (rel == "." || first(splitpath(rel)) != "..") &&
         throw(ArgumentError("output $out lies inside the parent bundle $parent"))
     nothing
 end
