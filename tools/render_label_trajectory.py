@@ -19,12 +19,6 @@ import tempfile
 from pathlib import Path
 
 import h5py
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.colors import to_rgba
-from matplotlib.patches import Patch
-from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,7 +82,23 @@ def snapshot(run: Path, mcs: int):
         return xyz(f["lattice/species_id"]), int(f.attrs["live_registry_count"])
 
 
+def refuse_built(run: Path) -> None:
+    # Before render, not inside stage_and_build: render overwrites the verified
+    # Figure 5 files, so a refusal that comes after it has already changed the
+    # run it refused to touch.
+    if (run / "manuscript").exists():
+        raise FileExistsError("refusing existing manuscript output directory")
+
+
 def render(run: Path, manifest: dict) -> Path:
+    # matplotlib is imported here so the refusal path is testable where the
+    # test tiers have h5py and numpy but no matplotlib.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+    from matplotlib.patches import Patch
+    from matplotlib.ticker import MaxNLocator
     output = run / "figures"
     output.mkdir(exist_ok=True)
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 13,
@@ -216,8 +226,7 @@ def results_tex(run: Path, manifest: dict) -> str:
 
 def stage_and_build(run: Path, manifest: dict, base: Path, *, install: bool) -> None:
     output = run / "manuscript"
-    if output.exists():
-        raise FileExistsError("refusing existing manuscript output directory")
+    refuse_built(run)
     # Live-source censuses walk the checkout. A temporary compilation must not
     # create extra live copies there. Retain the exact build tree as an archive
     # plus member hashes; its PDF remains directly available in the run folder.
@@ -293,6 +302,7 @@ def main() -> None:
     args = parser.parse_args()
     run = args.run_dir.resolve()
     manifest = verified_manifest(run)
+    refuse_built(run)
     base = render(run, manifest)
     stage_and_build(run, manifest, base, install=args.install)
     save_manifest(run, manifest)
