@@ -68,6 +68,37 @@ check "no codex review blocks"         1 "[]"                 ""
 check "resolved threads clear"         0 "$(thread P1 true)"  "$HEAD_SHA"
 check "no threads at all clears"       0 "[]"                 "$HEAD_SHA"
 
+# THE COMMENT-FORM REVIEW. Codex sometimes posts its pass as a comment whose
+# only commit reference is a blob permalink, with no "Reviewed commit:" text.
+# jq's `capture` yields empty on no match, so the `//` fallback is evaluated
+# and the permalink sha is read -- a review claimed otherwise, and this pins
+# the behaviour it questioned rather than leaving it to the reader of the jq.
+# $1 name, $2 expected exit, $3 the sha in the permalink
+check_comment() {
+  local name="$1" want="$2" sha="$3"
+  cat >"$TMP/fixture.json" <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"fixture","headRefOid":"$HEAD_SHA",
+  "reviews":{"nodes":[]},
+  "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+    "createdAt":"2026-08-16T00:00:00Z",
+    "body":"Codex Review: Didn't find any major issues. https://github.com/o/r/blob/$sha/a/b.py#L7"}]},
+  "reviewThreads":{"nodes":[]}
+}}}}
+JSON
+  PREFLIGHT_FIXTURE="$TMP/fixture.json" "$GATE" 1 >"$TMP/out" 2>&1
+  local got=$?
+  if [[ "$got" == "$want" ]]; then
+    printf '  ok    %s (exit %s)\n' "$name" "$got"
+  else
+    printf '  FAIL  %s: expected exit %s, got %s\n' "$name" "$want" "$got"
+    sed 's/^/        | /' "$TMP/out"
+    fail=1
+  fi
+}
+check_comment "a permalink-only comment review of the head clears" 0 "$HEAD_SHA"
+check_comment "a permalink-only comment review of another commit blocks" 1 "0000000000"
+
 # ---------------------------------------------------------------------------
 # The pagination path, which PREFLIGHT_FIXTURE bypasses entirely.
 #
