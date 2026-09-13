@@ -717,17 +717,17 @@ def plants(
         if country and country.lower() not in p["country"].lower():
             continue
         cap = p["capacity_mw"]
-        # An explicit min_capacity floor can't be verified against an unknown value, so it
-        # excludes it -- conservative: don't claim something unproven clears a floor. The
-        # *default* min_capacity=0.0 must not filter out unknowns just because 0.0 is a
-        # technically-passable floor when cap happens to be known.
-        if min_capacity > 0.0 and (cap is None or cap < min_capacity):
-            if cap is None:
+        if cap is None:
+            # An explicit bound can't be verified against an unknown value, so it excludes
+            # it and says so. The default floor of 0.0 is not a bound anyone asked for and
+            # must not drop unknowns.
+            if min_capacity > 0.0 or max_capacity is not None:
                 excluded_unknown_capacity += 1
-            continue
-        if max_capacity is not None and (cap is None or cap > max_capacity):
-            if cap is None:
-                excluded_unknown_capacity += 1
+                continue
+        elif cap < min_capacity or (max_capacity is not None and cap > max_capacity):
+            # A KNOWN value always meets the floor, default included: a negative capacity
+            # was excluded before this layer existed and a special case for unknowns must
+            # not readmit it.
             continue
         # Keep scanning past the page for the counter, but hold only the page: the power
         # layer has 34,936 rows against a default limit of 5,000.

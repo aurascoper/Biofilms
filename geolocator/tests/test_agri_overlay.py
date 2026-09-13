@@ -297,6 +297,27 @@ def test_stats_source_names_the_overlay_repo_not_wri(agri_source):
     assert client.get("/api/stats", params={"layer": "power"}).json()["source"] != "agri_yield_pipeline"
 
 
+def test_plants_default_floor_still_applies_to_a_known_capacity(monkeypatch):
+    """The unknown special case skipped the floor for every known value when min_capacity
+    was the default 0.0, so a negative capacity_mw came back; before this layer existed
+    `cap < min_capacity` excluded it. Unknowns stay in under the default floor."""
+    items = [
+        {"name": "neg", "country": "MO", "latitude": 1, "longitude": 1, "color_key": "x",
+         "capacity_mw": -5.0},
+        {"name": "unk", "country": "MO", "latitude": 1, "longitude": 1, "color_key": "x",
+         "capacity_mw": None},
+    ]
+    src = TrackedSource(
+        id="agri_overlay", path=Path(__file__), layer_class=REFERENCE,
+        loader=lambda _p: {"items": items, "meta": {}}, empty={"items": [], "meta": {}},
+        count_of=lambda d: len((d or {}).get("items", [])),
+    )
+    monkeypatch.setitem(SOURCES, "agri_overlay", src)
+    body = client.get("/api/plants", params={"layer": "agri_overlay"}).json()
+    assert {f["properties"]["name"] for f in body["features"]} == {"unk"}
+    assert body["excluded_unknown_capacity"] == 0
+
+
 def test_plants_country_filter_scopes_the_unknown_counter(mixed_layer):
     """The capacity check used to run before the country predicate, so a country-scoped
     request counted unknowns from every other country as excluded by capacity."""
