@@ -527,13 +527,35 @@ def test_coefficient_rows_pair_prior_with_shipped(rows):
     assert text.count("0.5 * M_local") == 2, "the hard-coded coupling moved"
 
 
+def declared_radiotropic() -> set:
+    """The radiotropic set AS THE MODEL DECLARES IT, parsed from the source.
+
+    `biofilms_potts.jl:49` already says `const RADIOTROPIC = Set([CN, CS])`, and
+    the first version of this guard restated it here instead of reading it. Two
+    declarations that must agree catch strictly more than one: a sign flipped in
+    the vector alone fails the check below, and a set edited to match a flipped
+    sign fails HERE, where a human has to look at it. Found by reading an
+    independent Odin port of this model, whose own coefficient table gates the
+    melanin coupling on the same pair.
+    """
+    import re
+    m = re.search(r"^const RADIOTROPIC = Set\(\[([^\]]*)\]\)",
+                  POTTS.read_text(encoding="utf-8"), re.M)
+    assert m, "biofilms_potts.jl no longer declares RADIOTROPIC where this can read it"
+    return {t.strip() for t in m.group(1).split(",") if t.strip()}
+
+
 def test_shipped_numbers_are_the_tabulated_priors():
     vectors, ranges = code_vectors(), table_ranges()
     assert substitution_problems(vectors, ranges) == []          # magnitudes AND signs
     assert vectors["alpha_M"]["DR"] == 0.0                        # no melanin pathway
-    # RADIOTROPIC is only as good as the convention it mirrors, and that
-    # convention is prose in the source. If it is reworded, this declaration may
-    # quietly stop meaning what it says while every assertion stays green.
+    # The model's own declaration and this file's must agree. If they diverge the
+    # sign check above is enforcing a set the model no longer uses.
+    assert declared_radiotropic() == set(RADIOTROPIC), (
+        f"biofilms_potts.jl declares {sorted(declared_radiotropic())} and this "
+        f"file expects {sorted(RADIOTROPIC)}")
+    # And the declaration is only as good as the convention it mirrors, which is
+    # prose. If that is reworded, the set may quietly stop meaning what it says.
     assert "negative = drifts UP it (toward the source)" in POTTS.read_text(encoding="utf-8"), \
         "biofilms_potts.jl's sign convention moved; re-read it before trusting RADIOTROPIC"
 
