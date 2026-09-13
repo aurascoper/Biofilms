@@ -134,13 +134,21 @@ function bandTip(p) {
   return html;
 }
 
+/** Feature text comes from data files, two of them cross-repository exports; the tooltip
+ *  is built as HTML, so every interpolated value is escaped. `&` first, or the entities
+ *  it produces would be re-escaped. */
+const esc = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 function siteTip(p) {
-  let html = `<div class="t-name">${p.name}</div>
-    <div class="t-row">${p.color_key}${p.country ? ' · ' + p.country : ''}</div>`;
-  if (p.capacity_mw) html += `<div class="t-row">${p.capacity_mw.toLocaleString()} MW</div>`;
+  const country = p.country ? ' · ' + esc(p.country) : '';
+  let html = `<div class="t-name">${esc(p.name)}</div>
+    <div class="t-row">${esc(p.color_key)}${country}</div>`;
+  if (p.capacity_mw) html += `<div class="t-row">${esc(p.capacity_mw.toLocaleString())} MW</div>`;
   if (p.extra && p.extra.distance_ly)
-    html += `<div class="t-row">${p.extra.distance_ly} ly · ${p.extra.star_type || ''}</div>`;
-  if (p.note) html += `<div class="t-row">${p.note}</div>`;
+    html += `<div class="t-row">${esc(p.extra.distance_ly)} ly · ${esc(p.extra.star_type || '')}</div>`;
+  if (p.note) html += `<div class="t-row">${esc(p.note)}</div>`;
   return html;
 }
 

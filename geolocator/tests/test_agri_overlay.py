@@ -386,6 +386,23 @@ def test_plants_holds_only_the_page_while_scanning_past_it(mixed_layer, monkeypa
     assert peak == 1
 
 
+def test_the_tooltip_escapes_every_feature_field_it_interpolates():
+    """siteTip is assigned through innerHTML and its fields come from data files, two of
+    them cross-repository exports, so a county name carrying markup executed on hover.
+    Source-level: no interpolation in siteTip may read a property raw, and the helper
+    must escape the characters that open markup, `&` before the rest."""
+    js = _client("main.js")
+    tip = js.split("function siteTip(", 1)[1].split("\n}\n", 1)[0]
+    raw = re.findall(r"\$\{(?!esc\()[^}]*\bp\.", tip)
+    assert raw == [], raw
+    # name, color_key, country, capacity_mw, extra.distance_ly, extra.star_type, note
+    assert tip.count("esc(p.") == 7
+    helper = js.split("const esc = ", 1)[1].split(";\n", 1)[0]
+    order = [helper.index(f"replace(/{ch}/g, '{ent}')") for ch, ent in
+             [("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"), ('"', "&quot;")]]
+    assert order == sorted(order)
+
+
 # ── client: every server layer is selectable ──────────────────────────────────
 
 
