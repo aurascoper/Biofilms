@@ -729,10 +729,11 @@ def plants(
             if cap is None:
                 excluded_unknown_capacity += 1
             continue
-        out.append(p)
-    # The counter covers every row, not just the first page: with the break that used to
-    # sit here, an unknown row past `limit` was never inspected and went uncounted.
-    geojson = _to_geojson(out[:limit], layer)
+        # Keep scanning past the page for the counter, but hold only the page: the power
+        # layer has 34,936 rows against a default limit of 5,000.
+        if len(out) < limit:
+            out.append(p)
+    geojson = _to_geojson(out, layer)
     # Always present, defaulting to 0 -- matching /api/stats's unknown_capacity_count, so a
     # consumer can tell "no filter active" apart from "filter active, nothing excluded" instead
     # of the two endpoints answering the same question in different shapes.

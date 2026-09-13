@@ -315,6 +315,34 @@ def test_plants_unknown_counter_is_not_truncated_by_limit(mixed_layer):
     assert body["excluded_unknown_capacity"] == 2
 
 
+def test_plants_holds_only_the_page_while_scanning_past_it(mixed_layer, monkeypatch):
+    """Scanning past `limit` for the counter must not accumulate every match: the power
+    layer is 34,936 rows against a default limit of 5,000. Measured, not inferred: a
+    trace on the route's frame records the largest `out` it ever holds."""
+    import sys
+    from geolocator import api as api_mod
+    peak = 0
+
+    def tracer(frame, event, arg):
+        nonlocal peak
+        if frame.f_code is api_mod.plants.__code__:
+            out = frame.f_locals.get("out")
+            if out is not None:
+                peak = max(peak, len(out))
+            return tracer
+        return None
+
+    monkeypatch.setattr(api_mod, "_to_geojson", lambda items, layer="power": {"type": "FeatureCollection", "features": [None] * len(items)})
+    sys.settrace(tracer)
+    try:
+        body = api_mod.plants(layer="agri_overlay", fuel=None, min_capacity=0.0,
+                              max_capacity=None, country=None, limit=1)
+    finally:
+        sys.settrace(None)
+    assert len(body["features"]) == 1
+    assert peak == 1
+
+
 # ── client: every server layer is selectable ──────────────────────────────────
 
 
