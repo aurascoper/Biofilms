@@ -306,6 +306,22 @@ def test_plants_unknown_counter_is_not_truncated_by_limit(mixed_layer):
 # ── client: every server layer is selectable ──────────────────────────────────
 
 
+def _client(name):
+    return (Path(__file__).resolve().parents[1] / "static" / "app" / name).read_text()
+
+
+def test_the_min_mw_filter_does_not_apply_to_a_layer_without_capacity():
+    """Every overlay item has capacity_mw null, so `(capacity_mw || 0) >= minCap` hid the
+    whole layer the moment the Min MW control went above zero. The layer declares mw:
+    false and the predicate is gated on hasCapacity(id). Source-level: no JS runtime here."""
+    js = _client("layers.js")
+    block = js.split("const SITE_LAYERS = [", 1)[1].split("];", 1)[0]
+    assert re.search(r"id:\s*'agri_overlay'.*mw:\s*false", block)
+    predicate = js.split("const shown = activeFeatures().filter(", 1)[1].split(");", 1)[0]
+    assert "!hasCapacity(id) ||" in predicate
+    assert ">= minCap" in predicate
+
+
 def test_every_server_layer_is_selectable_in_the_client():
     """The browser's site-layer list is hard-coded in layers.js; a layer registered only
     on the server appears in /api/layers and can never be toggled or rendered. This

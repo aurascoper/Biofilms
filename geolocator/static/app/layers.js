@@ -25,12 +25,18 @@ const SITE_LAYERS = [
   { id: 'battery',   name: 'Battery Cycle',  icon: '▮' },
   { id: 'gridcoin',  name: 'Gridcoin/BOINC', icon: '◈' },
   { id: 'stars',     name: 'Star Systems',   icon: '✦' },
-  { id: 'agri_overlay', name: 'Agri Overlay', icon: '🌾' },
+  // mw: false -- this layer carries no MW figure (capacity_mw is null for every county),
+  // so the Min MW filter does not apply to it and the HUD must not report it in MW.
+  { id: 'agri_overlay', name: 'Agri Overlay', icon: '🌾', mw: false },
 ];
 
+/** Whether a layer's items carry a capacity in MW. Non-MW layers are neither filtered
+ *  nor summed by the MW controls: an MW predicate over a null is a statement about a
+ *  quantity the layer does not have. */
+export const hasCapacity = (id) => SITE_LAYERS.find((l) => l.id === id)?.mw !== false;
+
 // Marker size is normalised per layer, and the magnitude is layer-specific: the agri
-// overlay carries no MW figure (capacity_mw is null for every county), so it sizes from
-// the NDVI anomaly instead of being drawn at the minimum radius.
+// overlay sizes from the NDVI anomaly instead of being drawn at the minimum radius.
 function magnitude(id, p) {
   if (id === 'agri_overlay') return Math.abs(p.extra?.ndvi?.z ?? 0);
   return p.capacity_mw || 0;
@@ -86,8 +92,9 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
 
     const fuel = document.getElementById('fuel-filter')?.value || '';
     const minCap = parseFloat(document.getElementById('min-cap')?.value) || 0;
-    const shown = activeFeatures().filter(([, f]) =>
-      (!fuel || f.properties.color_key === fuel) && (f.properties.capacity_mw || 0) >= minCap);
+    const shown = activeFeatures().filter(([id, f]) =>
+      (!fuel || f.properties.color_key === fuel) &&
+      (!hasCapacity(id) || (f.properties.capacity_mw || 0) >= minCap));
 
     // Normalise per layer: a 4-degree grid cell and a single mine are not comparable.
     const maxCap = {};
