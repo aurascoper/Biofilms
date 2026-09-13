@@ -63,6 +63,15 @@ SPECIES = {"CN": "C. neoformans", "DR": "D. radiodurans", "CS": "C. sphaerosperm
 # A code coefficient with no tabulated row must be zero, except these, which
 # the source comments as estimated.
 UNTABULATED_NONZERO = frozenset({("beta_s_ion", "OI")})
+# TABLE 2 TABULATES MAGNITUDES, so the range check below compares |value| and
+# the SIGN has to be declared here or nowhere. It is not a measurement, it is
+# the modelling choice biofilms_potts.jl:98-100 states: "positive = drifts DOWN
+# the dose gradient (away from the source), negative = drifts UP it (toward the
+# source)". These are the two species shipped negative, and they are the pair
+# whose radiotropy the audit records as CONTESTED -- so flipping either one
+# reverses the headline result while every magnitude stays inside its Table 2
+# row, which is precisely what a range check cannot see.
+RADIOTROPIC = frozenset({"CN", "CS"})
 QUDT_VERSION = "QUDT v3.5.1"
 OBO = "http://purl.obolibrary.org/obo/"
 # A model term is an equation or a process, never a quantity.
@@ -392,6 +401,31 @@ def table_ranges() -> dict:
     return out
 
 
+def sign_problems(symbol, tag, value) -> list:
+    """What the magnitude check above throws away.
+
+    `beta_s_ion`'s sign IS the direction of the tropism, so a flipped sign turns
+    a source-seeking species into a source-avoiding one with the magnitude
+    untouched. Checked for EVERY entry, tabulated or not: OI has no Table 2 row
+    and its sign means the same thing. Zero is a failure rather than a neutral
+    value, because a zero has no direction and would make the species inert
+    without any range moving.
+
+    `alpha_M` is a production rate. Negative melanin production is not a sign
+    convention, it is impossible.
+    """
+    if symbol == "beta_s_ion":
+        toward = tag in RADIOTROPIC
+        if value == 0.0:
+            return [f"beta_s_ion[{tag}] = 0.0, which has no sign; the sign carries the tropism"]
+        if (value < 0) != toward:
+            want = "negative (toward the source)" if toward else "positive (away from the source)"
+            return [f"beta_s_ion[{tag}] = {value}, declared {want}"]
+    elif symbol == "alpha_M" and value < 0:
+        return [f"alpha_M[{tag}] = {value}: a melanin production rate is not negative"]
+    return []
+
+
 def substitution_problems(vectors, ranges) -> list:
     out = []
     for symbol, values in vectors.items():
@@ -403,6 +437,7 @@ def substitution_problems(vectors, ranges) -> list:
                     out.append(f"{symbol}[{tag}] = {value} with no Table 2 row")
             elif not rng[0] <= abs(value) <= rng[1]:
                 out.append(f"{symbol}[{tag}] = {value} outside Table 2's {rng}")
+            out += sign_problems(symbol, tag, value)
     return out
 
 
@@ -424,8 +459,13 @@ def test_coefficient_rows_pair_prior_with_shipped(rows):
 
 def test_shipped_numbers_are_the_tabulated_priors():
     vectors, ranges = code_vectors(), table_ranges()
-    assert substitution_problems(vectors, ranges) == []
-    assert vectors["beta_s_ion"]["CN"] < 0 and vectors["alpha_M"]["DR"] == 0.0   # sign by role; no melanin
+    assert substitution_problems(vectors, ranges) == []          # magnitudes AND signs
+    assert vectors["alpha_M"]["DR"] == 0.0                        # no melanin pathway
+    # RADIOTROPIC is only as good as the convention it mirrors, and that
+    # convention is prose in the source. If it is reworded, this declaration may
+    # quietly stop meaning what it says while every assertion stays green.
+    assert "negative = drifts UP it (toward the source)" in POTTS.read_text(encoding="utf-8"), \
+        "biofilms_potts.jl's sign convention moved; re-read it before trusting RADIOTROPIC"
 
 
 def test_step5_controls_fire(rows):
@@ -434,6 +474,32 @@ def test_step5_controls_fire(rows):
     assert any("outside Table 2" in p for p in substitution_problems(drifted, ranges))
     invented = {k: dict(v) for k, v in vectors.items()}; invented["alpha_M"]["DR"] = 0.2
     assert any("no Table 2 row" in p for p in substitution_problems(invented, ranges))
+
+    # THE SIGN CONTROLS, AND THE POINT IS THAT THE RANGE CHECK STAYS SILENT.
+    # Raised as P1 by Codex on pull request #24: substitution_problems compared
+    # |value|, so this exact flip -- CS from source-seeking to source-avoiding --
+    # produced no problem at all, and the only sign assertion in the file read CN.
+    flipped = {k: dict(v) for k, v in vectors.items()}; flipped["beta_s_ion"]["CS"] = 5e-5
+    problems = substitution_problems(flipped, ranges)
+    assert not any("outside Table 2" in p for p in problems), (
+        "the flipped magnitude left its Table 2 row, so this control would pass "
+        "even with the sign discarded and would prove nothing")
+    assert any("declared negative (toward the source)" in p for p in problems)
+
+    # The other direction: a tabulated species that must stay positive.
+    avoider = {k: dict(v) for k, v in vectors.items()}; avoider["beta_s_ion"]["SO"] = -7.5e-2
+    assert any("declared positive (away from the source)" in p
+               for p in substitution_problems(avoider, ranges))
+
+    # And the entry with no Table 2 row at all, where only the sign check reaches.
+    untabulated = {k: dict(v) for k, v in vectors.items()}; untabulated["beta_s_ion"]["OI"] = -1e-2
+    assert any("beta_s_ion[OI]" in p for p in substitution_problems(untabulated, ranges))
+
+    inert = {k: dict(v) for k, v in vectors.items()}; inert["beta_s_ion"]["OI"] = 0.0
+    assert any("no sign" in p for p in substitution_problems(inert, ranges))
+
+    negative_rate = {k: dict(v) for k, v in vectors.items()}; negative_rate["alpha_M"]["CS"] = -0.14
+    assert any("not negative" in p for p in substitution_problems(negative_rate, ranges))
     assert any("relation ''" in p for p in bridge_problems(_plant(rows, "beta_ion_cpm", "coefficient", relation="")))
     same_system = _plant(rows, "beta_ion_cpm", "coefficient", substitution_of="alpha_M_cpm")
     assert any("must substitute a tabulated SI prior" in p for p in bridge_problems(same_system))
