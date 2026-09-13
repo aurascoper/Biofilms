@@ -282,6 +282,17 @@ def test_plants_active_filter_excludes_unknown_and_reports_the_count(mixed_layer
     assert body["excluded_unknown_capacity"] == 2
 
 
+def test_country_is_the_country_and_the_state_is_kept(agri_source):
+    """The loader stored the state abbreviation in `country`, so country=US matched no
+    county and /api/stats listed `MO` under top_countries."""
+    body = client.get("/api/plants", params={"layer": "agri_overlay", "country": "US"}).json()
+    assert {f["properties"]["name"] for f in body["features"]} == {"Boone", "St. Louis City"}
+    assert {f["properties"]["extra"]["state"] for f in body["features"]} == {"MO"}
+    assert client.get("/api/plants", params={"layer": "agri_overlay", "country": "MO"}).json()["features"] == []
+    stats = client.get("/api/stats", params={"layer": "agri_overlay"}).json()
+    assert stats["top_countries"] == [["US", 2]]
+
+
 def test_layers_reports_the_vintage_and_no_retrieval_time(agri_source):
     """generated_at is when the dataset was made, not when these bytes arrived. The entry
     used to pass the same extractor to retrieved_of, so /api/layers reported both."""

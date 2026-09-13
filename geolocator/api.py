@@ -350,7 +350,10 @@ def _load_agri_overlay(path: Path) -> dict:
         items.append(
             {
                 "name": cell.get("name") or "",
-                "country": cell.get("state") or "",
+                # The dataset is US counties: `country` keeps the API's country semantics
+                # (country=US matches, top_countries aggregates a country) and the state
+                # abbreviation travels in extra.state, where a consumer can read it.
+                "country": "US",
                 "latitude": lat,
                 "longitude": lon,
                 "color_key": _agri_stress_class(cell),
@@ -363,6 +366,7 @@ def _load_agri_overlay(path: Path) -> dict:
                 "source": "agri_yield_pipeline",
                 "note": f"NDVI z={z:.2f}" if z is not None else "no NDVI baseline for this county",
                 "extra": {
+                    "state": cell.get("state") or "",
                     "ndvi": cell.get("ndvi"),
                     "ndvi_unavailable_reason": cell.get("ndvi_unavailable_reason"),
                     "weather": cell.get("weather"),
