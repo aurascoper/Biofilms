@@ -1,0 +1,37 @@
+                                         Every seed descends: 16 of 16 display the α_M ordering                                                                                                         The published seed is the third smallest of 16
+
+                                                                                                                                                                                                  0.8
+
+
+
+
+                                                                                                                                                   C. neoformans − A. niger, paired within seed
+                                   2.0
+
+
+
+
+mean melanin over occupied sites
+                                                                                                                                                                                                  0.6
+
+
+
+                                   1.5
+                                                                                                                                                                                                  0.4
+                                                                                                                                                                                                           ensemble mean +0.326
+
+
+
+                                                                                                                                                                                                  0.2
+                                   1.0
+
+                                                                                                                                                                                                                       seed 42: +0.0347
+                                                                                                                                                                                                  0.0
+                                   C. sphaerospermum                               C. neoformans                                      A. niger                                                                             seeds, sorted by that difference
+
+                                   the other 15 seeds, one line each              seed 42, the run the published figure and the golden fixture use
+
+
+                                         biofilms_potts.jl run_simulation via diagnostics/melanin_ensemble/sweep.jl | N=40, 6 parcels/species, 400 MCS, seeds 42:57, read at MCS 100
+                                         observable: volume-weighted mean melanin over occupied sites, NOT the mean of per-parcel means | α_M is a declared input, so an ordering displays it and does not measure it
+

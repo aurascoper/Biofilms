@@ -1,0 +1,143 @@
+#!/usr/bin/env julia
+# The melanin ensemble at the published configuration, as one figure.
+#
+# WHAT THIS SHOWS AND WHY IT IS DRAWN PAIRED. The three producers share one
+# lattice per run, so their melanin values are not independent draws: the
+# within-run correlation is +0.299 for CS-CN and -0.287 for CN-AN, opposite in
+# sign, which means one pooled standard deviation would overstate one pair and
+# understate the other. Three independent box plots would be that error drawn.
+# Panel A therefore connects each seed's three values with a line -- a line that
+# descends throughout IS a seed displaying the alpha_M ordering, so "16 of 16"
+# is read off the picture rather than asserted beside it.
+#
+# Panel B is the CN-AN paired difference, sorted, because that is the pair the
+# N=20 sweep could not resolve (12 of 16, sign test p = 0.077) and the one the
+# published figure separates by 0.03.
+#
+# THE PUBLISHED SEED IS MARKED because it is not typical: seed 42's CN-AN gap is
+# the third smallest of sixteen and the ensemble mean is 9.4x it. A reader who
+# takes the published figure as representative of the model is reading its
+# weakest draw for this pair.
+#
+# Not a manuscript artifact. It lives in diagnostics/ and writes its own .sha256
+# and .txt sidecars so it is already compliant if it ever moves to
+# preprint/figures/, where the staleness guards would apply to it.
+#
+#   julia --project=. diagnostics/melanin_ensemble/figure.jl [sweep.csv]
+
+using CairoMakie, Printf, Statistics
+
+const HERE   = dirname(@__DIR__) |> dirname
+const CSVIN  = length(ARGS) >= 1 ? ARGS[1] :
+               joinpath(@__DIR__, "sweep_n40_p6_seeds42-57.csv")
+const OUTBASE = joinpath(@__DIR__, "melanin_ensemble_n40_p6")
+
+# Provenance, as constants rather than prose, so the line printed into the image
+# cannot drift from what was plotted.
+const N          = 40
+const PARCELS    = 6
+const AT_MCS     = 100
+const PUBLISHED  = 42          # the seed tests/fixtures/serial_seed42.csv pins
+const PRODUCERS  = [(3, "C. sphaerospermum", 0.140),
+                    (1, "C. neoformans",     0.100),
+                    (5, "A. niger",          0.065)]
+
+# Validated with the dataviz palette validator, light surface: worst adjacent
+# CVD dE 24.7 (protan), normal-vision dE 33.6, both well above the >= 8 target.
+const ENSEMBLE = colorant"#2a78d6"
+const MARKED   = colorant"#eb6834"
+const INK      = colorant"#2f2f2e"
+const MUTED    = colorant"#6b6b68"
+
+function read_at(path, at)
+    rows = Dict{Int,Dict{Int,Float64}}()
+    for line in eachline(path)
+        startswith(line, "#") && continue
+        f = split(line, ",")
+        f[1] == "seed" && continue
+        parse(Int, f[2]) == at || continue
+        get!(rows, parse(Int, f[1]), Dict{Int,Float64}())[parse(Int, f[3])] =
+            parse(Float64, f[8])
+    end
+    isempty(rows) && error("no rows at MCS $at in $path")
+    return rows
+end
+
+function main()
+    data  = read_at(CSVIN, AT_MCS)
+    seeds = sort(collect(keys(data)))
+    xs    = 1:length(PRODUCERS)
+    gapc  = [(s, data[s][1] - data[s][5]) for s in seeds]      # CN - AN
+    sort!(gapc, by = last)
+    ordered = count(s -> data[s][3] > data[s][1] > data[s][5], seeds)
+
+    fig = Figure(size = (1000, 460), backgroundcolor = colorant"#fcfcfb")
+
+    axA = Axis(fig[1, 1], xticks = (collect(xs), [p[2] for p in PRODUCERS]),
+               ylabel = "mean melanin over occupied sites",
+               title = "Every seed descends: $(ordered) of $(length(seeds)) display the α_M ordering",
+               titlealign = :left, xgridvisible = false,
+               ygridcolor = (:black, 0.06), leftspinevisible = false,
+               topspinevisible = false, rightspinevisible = false,
+               xticklabelrotation = 0.0, xticklabelsize = 11)
+    for s in seeds
+        s == PUBLISHED && continue
+        lines!(axA, xs, [data[s][p[1]] for p in PRODUCERS];
+               color = (ENSEMBLE, 0.45), linewidth = 2)
+        scatter!(axA, xs, [data[s][p[1]] for p in PRODUCERS];
+                 color = (ENSEMBLE, 0.55), markersize = 8)
+    end
+    lines!(axA, xs, [data[PUBLISHED][p[1]] for p in PRODUCERS];
+           color = MARKED, linewidth = 3.5)
+    scatter!(axA, xs, [data[PUBLISHED][p[1]] for p in PRODUCERS];
+             color = MARKED, markersize = 12, strokecolor = colorant"#fcfcfb",
+             strokewidth = 2)
+
+    axB = Axis(fig[1, 2], ylabel = "C. neoformans − A. niger, paired within seed",
+               xlabel = "seeds, sorted by that difference",
+               title = "The published seed is the third smallest of $(length(seeds))",
+               titlealign = :left, xgridvisible = false,
+               ygridcolor = (:black, 0.06), leftspinevisible = false,
+               topspinevisible = false, rightspinevisible = false,
+               xticksvisible = false, xticklabelsvisible = false)
+    hlines!(axB, [0.0]; color = (:black, 0.35), linewidth = 1.5)
+    for (i, (s, g)) in enumerate(gapc)
+        c = s == PUBLISHED ? MARKED : ENSEMBLE
+        lines!(axB, [i, i], [0.0, g]; color = (c, 0.5), linewidth = 2)
+        scatter!(axB, [i], [g]; color = c,
+                 markersize = s == PUBLISHED ? 13 : 9,
+                 strokecolor = colorant"#fcfcfb", strokewidth = s == PUBLISHED ? 2 : 0)
+    end
+    mg = mean(last.(gapc))
+    hlines!(axB, [mg]; color = (ENSEMBLE, 0.8), linewidth = 2, linestyle = :dash)
+    text!(axB, 0.5, mg; text = @sprintf(" ensemble mean %+.3f", mg),
+          align = (:left, :bottom), color = ENSEMBLE, fontsize = 11)
+    pubgap = data[PUBLISHED][1] - data[PUBLISHED][5]
+    text!(axB, findfirst(t -> t[1] == PUBLISHED, gapc) + 0.4, pubgap;
+          text = @sprintf(" seed %d: %+.4f", PUBLISHED, pubgap),
+          align = (:left, :bottom), color = MARKED, fontsize = 11)
+
+    Legend(fig[2, 1],
+           [LineElement(color = (ENSEMBLE, 0.55), linewidth = 2),
+            LineElement(color = MARKED, linewidth = 3.5)],
+           ["the other $(length(seeds) - 1) seeds, one line each",
+            "seed $(PUBLISHED), the run the published figure and the golden fixture use"];
+           orientation = :horizontal, framevisible = false, labelsize = 11,
+           labelcolor = INK, tellheight = true)
+
+    # Two lines, because one ran off the page -- and a provenance line that is
+    # clipped is worse than none: the .txt sidecar would carry the truncation.
+    Label(fig[3, 1:2],
+          @sprintf("biofilms_potts.jl run_simulation via diagnostics/melanin_ensemble/sweep.jl  |  N=%d, %d parcels/species, %d MCS, seeds %d:%d, read at MCS %d\nobservable: volume-weighted mean melanin over occupied sites, NOT the mean of per-parcel means  |  α_M is a declared input, so an ordering displays it and does not measure it",
+                   N, PARCELS, 400, minimum(seeds), maximum(seeds), AT_MCS);
+          fontsize = 9, color = MUTED, halign = :left, justification = :left,
+          tellwidth = false)
+
+    save(OUTBASE * ".pdf", fig)
+    save(OUTBASE * ".png", fig; px_per_unit = 2)
+    @printf("wrote %s.{pdf,png}\n  %d of %d seeds ordered; CN-AN mean %+.4f, seed %d %+.4f (rank %d)\n",
+            OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap,
+            findfirst(t -> t[1] == PUBLISHED, gapc))
+end
+
+main()
