@@ -329,11 +329,20 @@ def test_the_transport_environment_has_exactly_one_spec():
 
     doc = _STACK_DOC.read_text()
     assert "environment.yml" in doc, "the doc must name the single spec"
-    # The version pin is the thing worth restating nowhere: if it appears in
-    # the doc, the doc can disagree with the file about which OpenMC is pinned.
-    assert "openmc=0.15.3" not in doc, (
-        "docs/openmc_stack.md restates the pinned version, which is a fourth "
-        "copy of environment.yml's contents -- name the file instead")
+    # THE DOC'S RESOLVED TABLE MUST AGREE WITH THE PIN. This asserted only
+    # that the literal `openmc=0.15.3` was absent, while the table two
+    # paragraphs down still said `| openmc | 0.15.3 |`: bump the pin in
+    # environment.yml and the doc goes stale with the check green. Read both
+    # and require the same version, whatever it is.
+    pinned = [str(d) for d in spec["dependencies"]
+              if re.split(r"[=<>!~ ]", str(d))[0].strip() == "openmc"]
+    assert len(pinned) == 1 and "=" in pinned[0], pinned
+    pin = pinned[0].split("=", 1)[1].strip()
+    table = re.findall(r"^\|\s*openmc\s*\|\s*([^|]+?)\s*\|", doc, re.M)
+    assert table, "docs/openmc_stack.md no longer tabulates the resolved openmc"
+    assert table == [pin], (
+        f"docs/openmc_stack.md tabulates openmc {table} while environment.yml "
+        f"pins {pin}; the doc is stale against the single spec")
 
 
 def test_the_installed_vtk_satisfies_pyvistas_own_requirement():
