@@ -198,8 +198,17 @@ says nothing about ROCm, where the decomposition was separately measured.
 
 ## Timing, and the comparison that is honest
 
-Both `parallel_for` kernels (`melanin_k!`, `nutrient_k!`) at N = 40, 200 iterations,
-warmed up, `to_host` before stopping the clock so the device is synchronised:
+**Scope: two field kernels, not the port.** Both `parallel_for` kernels (`melanin_k!`,
+`nutrient_k!`) at N = 40, 200 iterations, warmed up, `to_host` before stopping the clock so
+the device is synchronised. `cpm_color!` (eight launches per MCS, carrying the
+`JACC.@atomic` volume updates), the host radiolysis step and the per-MCS synchronisation in
+`run_coupled` were **not** timed on Metal. No per-MCS figure for the port exists, and the
+ratio below must not be read as one; the omitted work can change both the ratio and its
+attribution to launch overhead.
+
+The producer is `diagnostics/metal_feasibility/bench_field_kernels.jl`. The rows below were
+taken on the Mac with an untracked loop of the same shape before that script existed, so
+they are recorded, not pinned: re-running the script on the same machine is what pins them.
 
 | Backend | per step | vs saturated CPU |
 |---|---|---|
@@ -217,10 +226,12 @@ above one thread. The 1→2 step is therefore 32x — Polyester versus a plain c
 loop, not parallelism. Real parallel scaling is the 2→4 step, a clean 2x that
 saturates at the 4 performance cores and is flat thereafter.
 
-Against the saturated CPU — the only honest comparison — **Metal is 2.3x slower**,
-and the reading is the same one `jacc_coupling_port.md` gives for ROCm at 8x: at
-N = 40 the lattice is ~6.4e4 sites and the run is launch-overhead-bound, not
-arithmetic-bound. A larger device does not fix that; kernel structure does.
+Against the saturated CPU — the only honest comparison — **the two field kernels run
+2.3x slower on Metal**, and the reading for what was measured is the same one
+`jacc_coupling_port.md` gives for ROCm at 8x: at N = 40 the lattice is ~6.4e4 sites and
+the run is launch-overhead-bound, not arithmetic-bound. A larger device does not fix that;
+kernel structure does. Whether the full driver is also overhead-bound on Metal is not
+established here.
 
 **How to read the nthreads = 1 row.** It is not a defect in this repository.
 `tests/jacc_parity_tests.jl:235` asserts `Threads.nthreads() == 1` deliberately,
@@ -255,8 +266,15 @@ julia --project=. -e 'using Pkg; Pkg.add("Metal")'          # and remove AMDGPU:
 julia --project=. -e 'using JACC; JACC.set_backend("metal")'
 julia --project=. biofilms_potts_jacc.jl --selftest          # Gate 2
 julia --project=. validate_serial.jl 42                      # Gate 3 as specified
+julia --project=. tests/runtests.jl                          # the CPM kernel on device (parity tier)
+julia --project=. diagnostics/metal_feasibility/bench_field_kernels.jl        # timing table, metal row
+JULIA_NUM_THREADS=4 julia --project=. diagnostics/metal_feasibility/bench_field_kernels.jl  # after set_backend("threads")
 julia --project=. -e 'using JACC; JACC.set_backend("threads")'   # restore
 ```
+
+The timing script prints one line per invocation (backend, thread count, N, iterations,
+ms per step over both kernels). Run it once per row of the table, on the same machine,
+and replace the table with what it prints.
 
 ## Observed, not fixed
 
