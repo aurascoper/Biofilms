@@ -235,7 +235,8 @@ def authorization_criteria(baseline, sources=None, *, today=None):
 
 
 def readiness(requirements, spatial_verdict, material_verdict,
-              binding, baseline=(), sources=()) -> dict[str, tuple[bool, list[str]]]:
+              binding, baseline=(), sources=(), *,
+              today=None) -> dict[str, tuple[bool, list[str]]]:
     """The four thresholds, which gate different things and must not be one
     flag. Institutional authorization gates culturing; a campaign can be ready
     while a config is not; a config can be ready while the sweep has not run."""
@@ -253,7 +254,10 @@ def readiness(requirements, spatial_verdict, material_verdict,
     # Count against what was actually judged, not against the constant: an
     # unmapped refusal appends a row, and "10 of 9 unmet" would read as a bug in
     # the reporter rather than as the gap in the criteria that it is.
-    judged = authorization_criteria(baseline, sources)
+    # ON THE DATE THE CALLER JUDGED, not the real one: `main` prints the
+    # criteria for an injected `today` and this recomputed them on the clock,
+    # so the two could disagree about expiry and the verdict was untestable.
+    judged = authorization_criteria(baseline, sources, today=today)
     authorized_blockers = [c for c, ok in judged if not ok]
     if authorized_blockers:
         campaign_blockers.append(
@@ -469,7 +473,7 @@ def main(argv=None) -> int:
 
     for verdict, (reached, blockers) in readiness(
             requirements, spatial.verdict, material.openmc, binding,
-            baseline, sources).items():
+            baseline, sources, today=today).items():
         print(f"  {verdict:<46} {'YES' if reached else 'no'}")
         for b in blockers:
             print(f"      - {b}")

@@ -185,6 +185,35 @@ def test_campaign_readiness_is_separate_from_config_readiness(requirements):
     assert not verdicts[status.SWEEP_READY][0]
 
 
+def test_readiness_judges_authorization_on_the_date_it_is_handed(requirements):
+    """THE VERDICT AND THE CRITERIA IT PRINTS MUST BE JUDGED ON ONE DATE.
+
+    `main` passes an injected `today` to the criteria print and `readiness`
+    recomputed the same criteria on the real date, so a caller evaluating a
+    pinned historical or future date could get a blocker the printed criteria
+    did not show, and the readiness verdict was untestable for expiry.
+    """
+    from test_approval import SOURCES, row
+    from datetime import date
+
+    s = status.spatial_report.evaluate(
+        status.DATA / "spatial",
+        REPO / "config" / "reference_d_spatial_acceptance.toml")
+    m = status.material_report.evaluate(
+        status.DATA / "materials",
+        REPO / "config" / "reference_d_material_acceptance.toml")
+
+    def blockers(today):
+        return status.readiness(requirements, s.verdict, m.openmc,
+                                status.declared_binding(), [row()], SOURCES,
+                                today=today)[status.AUTHORIZED][1]
+
+    # row() is valid from 2026-06-01 and expires 2027-06-01
+    assert blockers(date(2026, 8, 16)) == []
+    assert any("expired" in b for b in blockers(date(2027, 7, 1))), \
+        blockers(date(2027, 7, 1))
+
+
 def test_authorization_cannot_be_reached_without_a_baseline_row():
     """CAMPAIGN_READY requires the institutional verdict, so the two can never
     disagree — which is the point of deriving one from the other rather than
