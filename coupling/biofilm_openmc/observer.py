@@ -320,7 +320,12 @@ def plot_layer(path, layer_name, *, plotter=None, show_banner=True,
             occupied = image.threshold(0.5, scalars="_occupied")
             occupied.set_active_scalars(layer_name)
         elif layer.background is None:
-            occupied = image.threshold(scalars=layer_name)   # keeps everything
+            # "EVERY CELL CARRIES INFORMATION" MEANS NO FILTER AT ALL. This was
+            # `image.threshold(scalars=layer_name)`, which keeps every finite
+            # value only because pyvista's unvalued threshold spans the data
+            # range; the declared semantics were resting on a library default
+            # rather than stated here. Draw the image as-is.
+            occupied = image
         elif is_undeclared(layer.background):
             # write_bundle refuses this, so a bundle in hand cannot reach here.
             raise ValueError(
