@@ -44,10 +44,26 @@ function read_config(path)
     require(cfg["params"]["q_ext"] == 0.0, "a closed benchmark has no external source")
     require(cfg["spacing"] == [1.0, 1.0, 1.0],
             "lattice pitch is unit; a declared physical pitch is blocked")
-    require(cfg["dt"] > 0 && cfg["total_time"] > 0, "dt and total_time must be positive")
+    require(isfinite(cfg["dt"]) && cfg["dt"] > 0 && isfinite(cfg["total_time"]) && cfg["total_time"] > 0,
+            "dt and total_time must be finite and positive")
     require(cfg["record_every"] isa Integer && cfg["record_every"] >= 1,
             "record_every must be a positive integer")
-    p = cfg["params"]
+    # Domains. `--config` reaches this parser, so a sign or a NaN the shipped file never
+    # carries can still arrive: a negative lambda is growth, a negative k_on is a sink at
+    # zero, and either writes a receipt for a scheme this diagnostic does not describe.
+    # TOML integers are widened here too, since Params is Float64-typed and `D_c = 0`
+    # would otherwise be a MethodError rather than a configuration.
+    p = Dict(k => Float64(v) for (k, v) in cfg["params"])
+    for k in ("D_c", "lambda", "k_on", "k_off", "B0", "dB")
+        require(isfinite(p[k]) && p[k] >= 0, "$k must be finite and non-negative, got $(p[k])")
+    end
+    require(isfinite(p["K"]) && p["K"] > 0 && isfinite(p["n"]) && p["n"] > 0,
+            "Hill K and n must be finite and positive")
+    require(p["B0"] + p["dB"] > 0, "capacity must be positive somewhere on the occupied set")
+    c0, b0 = Float64(cfg["c0"]), Float64(cfg["b0"])
+    require(isfinite(c0) && c0 >= 0 && isfinite(b0) && b0 >= 0,
+            "c0 and b0 must be finite and non-negative")
+    require(c0 + b0 > 0, "an empty initial inventory makes every relative residual 0/0")
     cfg, Params(p["D_c"], p["lambda"], p["k_on"], p["k_off"],
                 p["B0"], p["dB"], p["K"], p["n"], p["q_ext"])
 end
