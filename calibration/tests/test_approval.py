@@ -296,6 +296,12 @@ _DR, _CN = "D. radiodurans R1", "C. neoformans H99"
     ("all strains are safe", True, "prose, not a mapping"),
     (f"{_DR}:BSL1;{_DR}:BSL2", True,
      "a repeated key silently overrides a level"),
+    # THE SAME KEY, DIFFERENTLY TYPED. Uniqueness was checked on the raw keys
+    # while the binding below normalised them, so this had three distinct raw
+    # keys, collapsed to two in the binding, covered both declared strains and
+    # passed -- with one strain holding two levels and one of them dropped.
+    (f"{_DR}:BSL1;d.  RADIODURANS r1:BSL2;{_CN}:BSL2", True,
+     "a key repeated in different typography still overrides a level"),
     (f"{_DR}:BSL9;{_CN}:BSL2", True, "BSL9 is not a containment level"),
     (f"{_DR}:;{_CN}:BSL2", True, "an empty level is not a level"),
     (f":BSL1;{_CN}:BSL2", True, "an empty strain key names no organism"),

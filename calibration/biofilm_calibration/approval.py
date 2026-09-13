@@ -150,7 +150,11 @@ def _biosafety_mapping_problems(row) -> list[tuple[str | None, str]]:
             f"recognised biosafety levels {sorted(_BIOSAFETY_LEVELS)}"))
 
     keys = [p.split(":")[0].strip() for p in pairs]
-    if len(set(keys)) != len(keys):
+    # UNIQUE UNDER THE SAME NORMALISATION THE BINDING USES. Checked raw, three
+    # keys differing only in case and spacing were distinct here and collapsed
+    # to two in `keyed` below, so one strain carried two levels and the row
+    # passed with one of them silently dropped.
+    if len({_match_key(k) for k in keys}) != len(keys):
         out.append((F,
             f"biosafety_level_by_strain repeats a strain key in {keys}; one "
             "entry per strain, or a level is silently overridden"))
