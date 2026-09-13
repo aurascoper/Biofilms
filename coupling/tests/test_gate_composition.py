@@ -130,20 +130,38 @@ def _first_party_imports(path: Path) -> set[Path]:
     Walks the real AST, function-local imports included. A dotted name
     resolves to `name.py` or to a package's `__init__.py`."""
     tree = ast.parse(path.read_text())
-    names: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module:
-            names.add(node.module)
-        elif isinstance(node, ast.Import):
-            names.update(a.name for a in node.names)
     out: set[Path] = set()
-    for name in names:
-        rel = Path(*name.split("."))
-        for base in _FIRST_PARTY_BASES:
-            for candidate in (_REPO / base / (rel.as_posix() + ".py"),
-                              _REPO / base / rel / "__init__.py"):
+
+    def add(rel: Path, roots) -> None:
+        for root in roots:
+            for candidate in (root / (rel.as_posix() + ".py"),
+                              root / rel / "__init__.py"):
                 if candidate.exists():
                     out.add(candidate.relative_to(_REPO))
+
+    absolute_roots = [_REPO / b for b in _FIRST_PARTY_BASES]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.level:
+                # RELATIVE IMPORTS RESOLVE AGAINST THE IMPORTING PACKAGE.
+                # `from .snapshot import ...` has `module == "snapshot"` and
+                # `level == 1`; the first version skipped every node whose
+                # module was None and resolved the rest as absolute, so a
+                # relative dependency was invisible to the closure and could
+                # be absent from both workflow path lists while this passed.
+                pkg = path.parent
+                for _ in range(node.level - 1):
+                    pkg = pkg.parent
+                if node.module:
+                    add(Path(*node.module.split(".")), [pkg])
+                else:
+                    for alias in node.names:      # from . import x
+                        add(Path(alias.name), [pkg])
+            elif node.module:
+                add(Path(*node.module.split(".")), absolute_roots)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                add(Path(*alias.name.split(".")), absolute_roots)
     return out
 
 
@@ -213,6 +231,17 @@ def test_every_fixture_producing_module_triggers_verification():
             f"changes the real tally -- but {_WORKFLOW.name}'s `{event}:` "
             "paths filter does not list them, so verification would not run "
             "and the committed fixture would go stale while CI stayed green.")
+
+
+def test_relative_imports_are_part_of_the_closure():
+    """`biofilm_openmc.model` reaches `snapshot` as `from .snapshot import`,
+    which has no absolute module name. A walk that resolved only absolute
+    imports could not see it, so a relative-only dependency that changes the
+    fixture would be missing from both path lists while the trigger test
+    stayed green. Drop the `node.level` branch and this fails."""
+    deps = {p.as_posix() for p in _first_party_imports(
+        _REPO / "coupling" / "biofilm_openmc" / "model.py")}
+    assert "coupling/biofilm_openmc/snapshot.py" in deps, sorted(deps)
 
 
 def test_the_shared_contract_package_is_a_fixture_producer():
