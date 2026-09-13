@@ -14,12 +14,13 @@ applied to its own output.
 ```sh
 julia diagnostics/melanin_ensemble/sweep.jl /tmp/sweep.csv      # 16 seeds, about 11 s
 julia diagnostics/melanin_ensemble/analyse.jl /tmp/sweep.csv
-julia diagnostics/melanin_ensemble/test_statistics.jl           # 47 assertions, no data
+julia diagnostics/melanin_ensemble/test_statistics.jl           # 73 assertions, no data
 ```
 
-`sweep.jl` refuses a destination that already exists. `test_statistics.jl` takes no
-argument, no path and no environment variable, so its assertions cannot be skipped by a
-missing sweep.
+`sweep.jl` refuses a destination that already exists, an empty seed list, and an `--at`
+outside the run, all before the model loads. `test_statistics.jl` takes no argument, no
+path and no environment variable, so its assertions cannot be skipped by a missing sweep;
+it runs `sweep.jl` itself for four MCS to bind the writer's header to the reader.
 
 No project environment is needed. The model loads through the same `#  13. Figure export`
 split-marker sandbox `validate_serial.jl` uses, whose imports are four stdlibs, so this
@@ -76,7 +77,9 @@ trajectory displays an input, and says nothing about whether the input is right.
 ## A claim this sweep contradicts
 
 A draft write-up states that every species holds between 232 and 234 sites for the whole run.
-Measured across the sweep the range is **231 to 237**, with 152 of 448 samples outside. At
+Measured across the sweep at MCS 100, 200, 300 and 400 (the MCS 0 rows are the seeding
+frame, 2 to 246 sites, and are excluded) the range is **231 to 237**, with 152 of 448
+samples outside. At
 that draft's own seed and frame cadence (42, every 4 MCS) it is **226 to 237**, with 150 of
 700 outside, roughly three times the stated width.
 
@@ -90,6 +93,6 @@ model does.
 | | |
 |---|---|
 | `sweep.jl` | runs the seeds, writes one row per (seed, mcs, species) |
-| `analyse.jl` | paired statistics, ordering counts, exact binomial sign test |
-| `test_statistics.jl` | 47 data-free assertions |
+| `analyse.jl` | paired statistics, ordering counts, exact binomial sign test (ties leave the test) |
+| `test_statistics.jl` | 73 data-free assertions |
 | `sweep_seeds42-57.csv`, `analysis.txt` | committed receipts of the run above |
