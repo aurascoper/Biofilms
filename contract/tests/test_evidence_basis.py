@@ -97,6 +97,27 @@ def test_canonicaliser_maps_legacy_reads_canonical_and_refuses_the_rest():
 
 # --- the files -----------------------------------------------------------
 
+def test_blank_is_a_claims_null_and_not_a_parameter_one():
+    """THE NULLS ARE NOT SYMMETRIC, and blank used to pass on both sides.
+
+    A claim may be blank: the claims ledger's "EMPTY IS NOT ZERO" rule gives it
+    a meaning, not established, distinct from `absent`. A ledger VALUE may not:
+    neither parameter header states a blank rule and the vocabulary has no word
+    for one. The old pass-through made the parameter check agree with the claims
+    check on the one input where they must differ. Raised as P2 by Codex on #24.
+    """
+    assert claim_evidence_problems("") == []
+    assert claim_evidence_problems("absent") == []
+    problems = parameter_evidence_problems("")
+    assert problems and "may not be blank" in problems[0], problems
+    # None and whitespace take the same path as the empty string, so a stripped
+    # cell cannot slip past by being " " rather than "".
+    assert parameter_evidence_problems(None) == problems
+    assert parameter_evidence_problems("   ") == problems
+    # And the message is the blank one, not the generic "not a parameter basis".
+    assert "not a parameter evidence basis" not in problems[0]
+
+
 def test_parameter_ledgers_use_the_value_vocabulary():
     for path in (PARAMETERS, SPECIES):
         bad = [(r.get("config_key") or r.get("claim_id"), r["evidence_basis"])

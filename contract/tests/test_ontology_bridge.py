@@ -38,6 +38,21 @@ UNIT_LEDGERS = {  # file -> its unit column
 }
 # Unit rows that no ledger carries: manuscript strings and the parent of one.
 MANUSCRIPT_UNITS = frozenset({"Gy", "mGy h^-1", "R", "R h^-1"})
+# THE LEDGERS ARE NOT THE ONLY PRODUCERS. `data/ontology_bridge.csv` claimed to map
+# every unit string in the REPOSITORY while this file only ever checked those four
+# CSVs, so the strings the code declares were invisible to it -- and they are not
+# decoration: viewer.py:295-296 refuses a blank layer unit and observer.py:59,302
+# renders it into plot titles. Raised as P2 by Codex on pull request #24, which
+# named two of them; scanning found a third.
+CODE_UNIT_ROOTS = (REPO / "coupling" / "biofilm_openmc", REPO / "coupling" / "scripts")
+# Code-declared strings with no bridge row yet. THIS IS A DECLARED GAP, not a
+# waiver: the three need mirrored QUDT rows (`Gy/s` is unit:GRAY-PER-SEC; `kg`
+# additionally needs a `Mass` quantity kind, which the bridge has no row for) and
+# the bridge's convention is that a mirrored row records a real lookup against a
+# pinned QUDT release. Writing `verified_on`/`verified_via` for a lookup nobody
+# performed is the defect this repository audits, so the rows wait for the lookup
+# and the gap is enumerated and guarded meanwhile. The set may only SHRINK.
+CODE_UNITS_UNMAPPED = frozenset({"Gy/s", "Gy/source-particle", "kg"})
 # Rows allowed a blank verified_on. Empty: every mirrored term was re-verified
 # on 2026-09-06 and minted rows carry their mint date. A new entry here is a
 # term someone wrote down without looking it up, and the list may not grow.
@@ -254,6 +269,61 @@ def test_contract_sets_and_bridge_agree_in_both_directions(rows):
     assert by_axis(rows, "null") == {"blank" if v == "" else v for v in EVIDENCE_NULLS}
     assert by_axis(rows, "phenomenon") == PHENOMENA
     assert by_axis(rows, "status") == set(), "status rows are not in scope yet"
+
+
+def code_unit_strings() -> set:
+    """Unit strings the code declares, SCANNED rather than listed.
+
+    A list goes stale silently, which is exactly how this gap opened. Parsed with
+    `ast` and not a regex, because the two declaration forms do not look alike: a
+    module/class attribute `unit = "Gy/s"`, and the THIRD POSITIONAL argument of
+    `Layer(name, source, unit, kind, ...)`. A pattern matching `unit =` sees the first
+    and misses every Layer, which is why `kg` went unreported -- and the Layer
+    calls wrap across lines, so a line-oriented scan misses them too.
+    """
+    import ast
+    found = set()
+    for root in CODE_UNIT_ROOTS:
+        for path in sorted(root.rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                    if (any(isinstance(t, ast.Name) and t.id == "unit" for t in targets)
+                            and isinstance(node.value, ast.Constant)
+                            and isinstance(node.value.value, str)):
+                        found.add(node.value.value)
+                if isinstance(node, ast.Call):
+                    name = (node.func.id if isinstance(node.func, ast.Name)
+                            else getattr(node.func, "attr", None))
+                    if (name == "Layer" and len(node.args) >= 3
+                            and isinstance(node.args[2], ast.Constant)
+                            and isinstance(node.args[2].value, str)):
+                        found.add(node.args[2].value)
+                    for kw in node.keywords:
+                        if (kw.arg == "unit" and isinstance(kw.value, ast.Constant)
+                                and isinstance(kw.value.value, str)):
+                            found.add(kw.value.value)
+    return found
+
+
+def test_every_code_declared_unit_is_mapped_or_named_unmapped(rows):
+    """THE FIFTH PRODUCER, and the reason the repository-wide claim was false.
+
+    Mapped or named, with nothing in between: a code-declared string either has a
+    bridge row or appears in CODE_UNITS_UNMAPPED. A new one does neither and fails
+    here, which is what stops the gap reopening the next time someone adds a Layer.
+    """
+    found = code_unit_strings()
+    assert found, "the code scan returned nothing; it has stopped scanning"
+    assert "dimensionless" in found, (
+        "the scan no longer reaches a string known to be declared in code and "
+        "already mapped, so a pass below would not mean coverage")
+    unmapped = found - by_axis(rows, "unit")
+    assert unmapped == CODE_UNITS_UNMAPPED, (
+        f"code-declared unit strings neither mapped nor declared: "
+        f"{sorted(unmapped - CODE_UNITS_UNMAPPED)}; declared but now mapped or "
+        f"gone: {sorted(CODE_UNITS_UNMAPPED - unmapped)}")
 
 
 def test_every_ledger_unit_string_has_a_row(rows):

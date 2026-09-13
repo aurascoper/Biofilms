@@ -111,8 +111,12 @@ PROVENANCE_SOURCES = frozenset({"simulation_output", "code", "code_inspection",
 EVIDENCE_NULLS = frozenset({"absent", ""})
 
 # --- the ontology bridge ---------------------------------------------------
-# data/ontology_bridge.csv maps every controlled value, unit string and
-# phenomenon word to an external IRI or to a term minted under this namespace.
+# data/ontology_bridge.csv maps every controlled value and phenomenon word, and
+# every unit string in the four unit ledgers, to an external IRI or to a term
+# minted under this namespace. It said "every unit string" until 2026-09-13
+# while checking only those ledgers; the units the CODE declares are scanned
+# separately by test_ontology_bridge.py and the three still unmapped are named
+# there rather than guessed at.
 # The namespace is a name, not a resolvable URL, until a w3id is registered;
 # the test asserts mirrored and minted IRIs are disjoint by prefix.
 PROJECT_NAMESPACE = "https://github.com/aurascoper/Biofilms/onto#"
@@ -195,10 +199,24 @@ def canonical_claim_evidence(stored) -> tuple:
 
 
 def parameter_evidence_problems(value) -> list:
-    """Why `value` is not a usable evidence basis for a ledger VALUE."""
+    """Why `value` is not a usable evidence basis for a ledger VALUE.
+
+    THERE IS NO PARAMETER-SIDE NULL, and blank used to pass here as though there
+    were. The claims side has two: `absent` for an ESTABLISHED none -- audited,
+    nothing supports it -- and blank for not established. The parameter side has
+    neither word and neither ledger header states a rule for one, so the
+    pass-through was the claims convention imported without its vocabulary.
+    `coupling/tests/test_provenance_ledger.py:79` already refuses blank on
+    data/parameter_provenance.csv with no escape, so the two guards disagreed and
+    the weaker one was the one the contract exported. Raised as P2 by Codex on
+    pull request #24.
+    """
     v = "" if value is None else str(value).strip()
-    if v in PARAMETER_EVIDENCE_BASIS or v == "":
+    if v in PARAMETER_EVIDENCE_BASIS:
         return []
+    if v == "":
+        return ["a value's evidence basis may not be blank; the parameter side "
+                "has no null, and 'not established' is not one of its words"]
     if v in CLAIM_EVIDENCE_BASIS:
         return [f"{v!r} is a claim's evidence basis, not a value's"]
     return [f"{v!r} is not a parameter evidence basis"]

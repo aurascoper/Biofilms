@@ -1,5 +1,6 @@
-# ontology_bridge — every controlled vocabulary value, unit string and phenomenon word in this
-# repository, mapped to an external IRI (namespace=mirrored) or to a term under the project
+# ontology_bridge — every controlled vocabulary value and phenomenon word in this repository,
+# and every unit string in the four unit ledgers named by contract/tests/test_ontology_bridge.py,
+# mapped to an external IRI (namespace=mirrored) or to a term under the project
 # namespace (namespace=minted) when nothing external exists. `derived` is namespace=unmapped on
 # purpose: it is a source with an unresolved basis and may carry no evidence class.
 # External terms re-verified 2026-09-06: OBO labels through the OLS4 API (defining ontology only);
@@ -8,6 +9,12 @@
 # Exponents L M T I Theta N J are SI base dimensions, taken from the QUDT dimension vectors for
 # mirrored rows (QUDT's E is electric current, its I is luminous intensity). A count is
 # dimensionless (UCUM {cell} = 1); `count_of` keeps what was counted. The rad/hr row is an ANGLE
+# THIS FILE SAID "every unit string in this repository" UNTIL 2026-09-13 AND CHECKED FOUR CSVs.
+# The strings the code declares were outside the check and three are still unmapped -- Gy/s,
+# Gy/source-particle and kg -- named in CODE_UNITS_UNMAPPED in the test and now scanned out of
+# the source with `ast`, so a fourth cannot appear unnoticed. They are unmapped rather than
+# guessed because a mirrored row records a real lookup against a pinned QUDT release, and
+# nobody has performed it for these. Raised as P2 by Codex on pull request #24.
 # parent_relation says how a minted row relates to its nearest_parent: same_dimension (exponents must
 # match, checked) or semantic (nearest by meaning, no dimension claim). definition is required on every
 # model_term row, every minted quantity kind and every dimensionless kind, because seven zeros cannot
