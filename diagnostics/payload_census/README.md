@@ -28,8 +28,9 @@ occupied_above_threshold   UInt8         1    2.1%         2                 sig
   binary occupancy, 1 bit/site       0.266%  <- the DAG ceiling (0.77 MiB)
 ```
 
-`radiation_cpm` is **bit-identical across all 101 frames**: 51.7 MiB of a field that never
-changes. `accumulated_dose_Gy` is identically zero, another 51.7 MiB. `generation` is
+`radiation_cpm` is **bit-identical across all 101 frames**: 49.3 MiB (8 × 64,000 × 101 =
+51.7 MB) of a field that never changes. `accumulated_dose_Gy` is identically zero, another
+49.3 MiB. `generation` is
 identically zero because `divide_cell!` has no trigger. `interior_mask` never moves.
 
 `lineage_id` equals `cell_id` on every occupied site and zero elsewhere, verified frame by
@@ -112,22 +113,32 @@ timings, 15 samples each, warm cache (the repeat-viewing case)
   full trajectory, 10 arrays         median   54.7 ms   IQR  53.8- 65.9   min  53.0
   reduced + reconstruction           median   53.9 ms   IQR  50.7- 58.3   min  49.1
   median ratio 1.02x, but 7 of 15 reduced samples exceed the full median
-  distributions separate: NO -- the difference is not distinguishable from noise
+  sample ranges OVERLAP -- these samples do not separate the two
 
   reconstruction exact on all 101 frames x 10 arrays: YES
 
   raw read, uncompressed             median   50.4 ms   IQR  49.8- 60.8   min  48.6
-  gzip decompress on read            median  351.8 ms   IQR 346.8-361.9   min 345.0
-  compression makes a READ 7.0x slower, to save 75% of disk
+  gzip decompress, in memory         median  351.8 ms   IQR 346.8-361.9   min 345.0
 ```
 
-**The reduction is a storage argument and not a performance one.** 57% fewer bytes, and the
-load time does not separate from noise. Reading 290 MiB from warm cache is 50 ms, so halving
-it saves nothing anyone can perceive.
+The block above is the committed run's output with two labels corrected after review. The
+second-to-last line was printed as "distributions separate: NO -- the difference is not
+distinguishable from noise"; overlapping ranges from 15 samples show only that the samples
+overlap, and the script now says exactly that. The last line was printed as "gzip decompress
+on read ... compression makes a READ 7.0x slower": at that commit the compressed samples
+decompressed buffers already in memory while the raw samples opened files, so the 7.0x
+compared CPU against I/O. The script now reads the compressed files from disk in both
+paths. **That comparison has not been rerun**: the 101-frame tier is not on the machine
+that made this correction, so no read-against-read ratio is claimed here.
 
-**Compression inverts.** It is quoted as a 75% saving, and on every read it is a 7x penalty:
-352 ms against 50 ms, with the two distributions cleanly separated where the reduction's are
-not. Write it once at 10.8 s if disk is the constraint; do not pay it per read.
+**The reduction is a storage argument and not a performance one.** 57% fewer bytes, and the
+load time does not separate from noise in 15 samples. Reading 290 MiB from warm cache is
+50 ms, so halving it saves nothing anyone can perceive.
+
+**Compression is a per-read cost.** It is quoted as a 75% saving; decompressing 290 MiB
+takes 352 ms of CPU against a 50 ms warm-cache read, and that is the floor of what a
+compressed read costs, before its own file I/O. Write it once at 10.8 s if disk is the
+constraint; do not pay it per read.
 
 That is the honest ranking at this scale. Dropping the four static arrays is worth doing
 because the bytes are meaningless, not because anything is slow. Nothing here is slow.
@@ -150,7 +161,7 @@ finding here applies to new runs only.
 
 ```sh
 python3 diagnostics/payload_census/census.py <file.vti | directory> [--json out.json]
-python3 diagnostics/payload_census/test_census.py    # 9 assertions, no data
+python3 diagnostics/payload_census/test_census.py    # 14 tests, no data
 ```
 
 numpy only; VTK deliberately absent, since an audit of the renderer's output should not need
@@ -158,17 +169,25 @@ the renderer's toolchain. About 42 s over 101 frames, dominated by the pairwise 
 search.
 
 `test_census.py` builds its own `.vti` files, header and appended binary both, so it takes no
-data path. Four things it pins, each found by mutating `census.py` and watching for a green
-suite: static detection must compare frames rather than one frame to itself; the weak-source
-threshold must survive; `PointData` sits inside `<Piece>` and must not be counted per cell;
-and **independent arrays must not be reported as dependent**, without which a dependence test
-that answers "yes" unconditionally passes everything else in the file.
+data path. What it pins, each found by mutating `census.py` and watching for a green suite:
+static detection must compare frames rather than one frame to itself, and a single frame is
+never static; the weak-source threshold must survive; `PointData` sits inside `<Piece>` and
+must not be counted per cell; **independent arrays must not be reported as dependent**,
+without which a dependence test that answers "yes" unconditionally passes everything else
+in the file; a lookup that changes between frames is not a lookup; `Int64` values past 2^53
+are compared exactly, not through `Float64`; a mutually derivable pair is counted as
+removable once, not twice; and a frame whose extent, dtype or array length disagrees with
+the file's own header or with frame 0 is refused rather than divided by the wrong count.
+
+`census.json` was written before the `removable` flag existed and does not carry it. Its
+fractions are unaffected: `species` and `lineage_id` derive from `cell_id`, which is kept,
+so nothing in that run was double-counted.
 
 ## Files
 
 | | |
 |---|---|
 | `census.py` | per-array bytes, distinct values, constant, static, discovered dependences |
-| `test_census.py` | 9 data-free assertions |
+| `test_census.py` | 14 data-free tests |
 | `census.json` | receipt of the run above |
 | `bench_reduction.py` | does the reduction make anything faster? (no) |
