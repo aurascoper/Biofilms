@@ -487,6 +487,25 @@ def test_an_all_background_species_layer_draws_instead_of_crashing(tmp_path):
     assert plotter is not None
 
 
+def test_the_display_plan_dict_carries_the_absence_contract():
+    """`as_dict` IS THE PLAN'S PORTABLE FORM, and it dropped both new fields.
+
+    `background` and `occupancy_from` reached the dataclass and not the dict,
+    so any caller persisting or transporting a plan through the public method
+    lost the producer's declaration silently. The dict must say what the
+    object says.
+    """
+    layer = observer.DisplayLayer(
+        "generation", "cpm_labels", "dimensionless", "categorical", True, "",
+        "", "scalar", background=UNDECLARED, occupancy_from="cell_id")
+    d = layer.as_dict()
+    assert d["occupancy_from"] == "cell_id"
+    assert d["background"] is UNDECLARED
+    assert observer.DisplayLayer("x", "g", "u", "categorical", True, "", "",
+                                 "scalar", background=None).as_dict()[
+        "background"] is None
+
+
 def test_a_categorical_layer_must_declare_what_absence_means():
     """OMISSION MUST NOT ACQUIRE A SEMANTICS.
 

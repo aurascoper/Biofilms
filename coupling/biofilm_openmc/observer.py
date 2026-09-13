@@ -69,7 +69,13 @@ class DisplayLayer:
         return {"name": self.name, "grid_id": self.grid_id, "unit": self.unit,
                 "semantic_kind": self.semantic_kind, "quotable": self.quotable,
                 "banner": self.banner, "derivation_note": self.derivation_note,
-                "colour_by": self.colour_by}
+                "colour_by": self.colour_by,
+                # THE ABSENCE CONTRACT TRAVELS WITH THE PLAN. Both fields were
+                # added to the dataclass and not to this dict, so a plan that
+                # went through `as_dict` lost the producer's declaration on
+                # the way and a categorical layer could be rendered without it.
+                "background": self.background,
+                "occupancy_from": self.occupancy_from}
 
 
 def _banner(layer: dict) -> str:
