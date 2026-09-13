@@ -116,21 +116,51 @@ def test_corrupted_source_git_sha_is_rejected(tmp_path):
         _load_agri_overlay(f)
 
 
-def test_schema_v1_cells_only_hash_still_verifies(tmp_path):
-    """Backward compatibility: an old export with only cells_sha256 (no payload_sha256)
-    still verifies against cells-only corruption, via the fallback path."""
-    f = tmp_path / "overlay_v1.json"
+def _v1_payload():
     cells_hash = hashlib.sha256(
         json.dumps(MIXED_CELLS, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
-    payload = {
+    return {
         "schema_version": 1, "source_repo": "agri_yield_pipeline", "source_git_sha": "x",
         "generated_at": "2026-08-27T00:00:00+00:00", "cells_sha256": cells_hash,
-        "provenance": {}, "cells": MIXED_CELLS,
+        "provenance": {}, "cells": copy.deepcopy(MIXED_CELLS),
     }
-    _write(f, payload)
+
+
+def test_schema_v1_cells_only_hash_still_verifies(tmp_path):
+    """Backward compatibility: an old export with only cells_sha256 (no payload_sha256)
+    still verifies against cells-only corruption, via the version-1 path."""
+    f = tmp_path / "overlay_v1.json"
+    _write(f, _v1_payload())
     result = _load_agri_overlay(f)
     assert len(result["items"]) == 2
+
+
+@pytest.mark.parametrize("version, missing", [(2, "payload_sha256"), (1, "cells_sha256")])
+def test_a_missing_hash_is_refused_not_skipped(tmp_path, version, missing):
+    """Negative control for failing closed. The old code selected the cells-only path by
+    the ABSENCE of payload_sha256 and skipped the check when cells_sha256 was absent too,
+    so a v2 export with its hash deleted (or no hash at all) was served unverified."""
+    f = tmp_path / "overlay.json"
+    payload = _payload(MIXED_CELLS) if version == 2 else _v1_payload()
+    del payload[missing]
+    _write(f, payload)
+    with pytest.raises(ValueError, match=f"carries no {missing}"):
+        _load_agri_overlay(f)
+
+
+def test_a_v2_export_cannot_downgrade_to_the_cells_only_hash(tmp_path):
+    """A v2 export carrying only cells_sha256 must not be verified by the v1 rule: that
+    would let generated_at / source_git_sha be edited under a still-valid cells hash."""
+    f = tmp_path / "overlay.json"
+    payload = _payload(MIXED_CELLS)
+    del payload["payload_sha256"]
+    payload["cells_sha256"] = hashlib.sha256(
+        json.dumps(payload["cells"], sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    _write(f, payload)
+    with pytest.raises(ValueError, match="carries no payload_sha256"):
+        _load_agri_overlay(f)
 
 
 # ── endpoint-level: unknown capacity_mw handling ──────────────────────────────

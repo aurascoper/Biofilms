@@ -313,29 +313,25 @@ def _load_agri_overlay(path: Path) -> dict:
     d = json.loads(path.read_text())
     cells = d.get("cells") or []
 
-    payload_expected = d.get("payload_sha256")
-    if payload_expected is not None:
-        unhashed = {k: v for k, v in d.items() if k != "payload_sha256"}
-        actual = hashlib.sha256(
-            json.dumps(unhashed, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
-        if actual != payload_expected:
-            raise ValueError(
-                f"agri overlay corruption: payload hash mismatch "
-                f"(recorded {payload_expected[:12]}..., actual {actual[:12]}...)"
-            )
+    # The schema version, not the presence of a hash, selects which hash is required. A
+    # missing hash is a refusal: an export that carries none is indistinguishable from one
+    # whose hash was deleted alongside an edit, and this is a cross-repository trust boundary.
+    version = d.get("schema_version")
+    if version == 1:
+        key, hashed = "cells_sha256", cells
     else:
-        # schema_version 1 fallback: only cells were ever hashed.
-        cells_expected = d.get("cells_sha256")
-        if cells_expected is not None:
-            actual = hashlib.sha256(
-                json.dumps(cells, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
-            if actual != cells_expected:
-                raise ValueError(
-                    f"agri overlay corruption: cells hash mismatch "
-                    f"(recorded {cells_expected[:12]}..., actual {actual[:12]}...)"
-                )
+        key, hashed = "payload_sha256", {k: v for k, v in d.items() if k != "payload_sha256"}
+    expected = d.get(key)
+    if expected is None:
+        raise ValueError(f"agri overlay refused: schema_version {version!r} export carries no {key}")
+    actual = hashlib.sha256(
+        json.dumps(hashed, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    if actual != expected:
+        raise ValueError(
+            f"agri overlay corruption: {key} mismatch "
+            f"(recorded {expected[:12]}..., actual {actual[:12]}...)"
+        )
 
     items: list[dict] = []
     for cell in cells:
