@@ -412,7 +412,11 @@ def test_the_hud_never_reports_a_non_capacity_layer_as_zero_mw():
     non-capacity selection reads "n/a" rather than a measured zero."""
     stats = _client("main.js").split("function updateStats(", 1)[1].split("\n}\n", 1)[0]
     assert "hasCapacity(id)" in stats
-    assert "withMw.length ?" in stats and "'n/a'" in stats
+    # Applicability is decided from the enabled layers, not from the shown features: an
+    # MW layer whose filters match nothing must read "0 MW", not n/a.
+    assert "enabled.some(hasCapacity)" in stats
+    assert "mwApplies ?" in stats and "'n/a'" in stats
+    assert "withMw.length ?" not in stats
     html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
     assert "</b> MW" not in html.split('id="stat-cap"', 1)[1].split("</div>", 1)[0]
 

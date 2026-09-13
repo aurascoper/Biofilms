@@ -52,13 +52,14 @@ manager.buildTogglePanel($('layer-panel'));
 
 /* ── HUD readouts ─────────────────────────────────────────────────────────── */
 function updateStats(shown, features, enabled) {
-  // Only layers that carry a capacity are summed. With just a non-MW layer selected the
-  // readout used to say "0 MW", presenting a quantity the layer does not have as a
-  // measured zero; it now says the capacity is not applicable.
-  const withMw = shown.filter(([id]) => hasCapacity(id));
-  const cap = withMw.reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
+  // Applicability comes from the ENABLED layers, the sum from the SHOWN features: an
+  // MW layer whose filters match nothing reads "0 MW", a selection of non-MW layers
+  // only reads n/a. Deciding from `shown` said n/a for an empty filter on power.
+  const mwApplies = enabled.some(hasCapacity);
+  const cap = shown.filter(([id]) => hasCapacity(id))
+    .reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
   $('stat-count').textContent = shown.length.toLocaleString();
-  $('stat-cap').textContent = withMw.length ? `${Math.round(cap).toLocaleString()} MW` : 'n/a';
+  $('stat-cap').textContent = mwApplies ? `${Math.round(cap).toLocaleString()} MW` : 'n/a';
   // The fetch limit used to truncate power from 34,936 to 5,000 with no notice.
   const trunc = enabled.filter((id) => (features[id] || []).length >= PLANT_LIMIT);
   const el = $('stat-trunc');
