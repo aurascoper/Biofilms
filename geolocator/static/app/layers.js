@@ -25,6 +25,7 @@ const SITE_LAYERS = [
   { id: 'battery',   name: 'Battery Cycle',  icon: '▮' },
   { id: 'gridcoin',  name: 'Gridcoin/BOINC', icon: '◈' },
   { id: 'stars',     name: 'Star Systems',   icon: '✦' },
+  { id: 'agri_overlay', name: 'Agri Overlay', icon: '🌾' },
 ];
 
 // Marker size is normalised per layer, and the magnitude is layer-specific: the agri

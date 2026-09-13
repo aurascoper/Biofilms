@@ -18,6 +18,7 @@ import copy
 import dataclasses
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from geolocator.api import SOURCES, _load_agri_overlay, app  # noqa: E402
+from geolocator.api import LAYER_IDS, SOURCES, _load_agri_overlay, app  # noqa: E402
 from geolocator.freshness import REFERENCE, TrackedSource  # noqa: E402
 
 client = TestClient(app)
@@ -281,3 +282,16 @@ def test_plants_unknown_counter_is_not_truncated_by_limit(mixed_layer):
                                              "limit": 1}).json()
     assert len(body["features"]) == 1
     assert body["excluded_unknown_capacity"] == 2
+
+
+# ── client: every server layer is selectable ──────────────────────────────────
+
+
+def test_every_server_layer_is_selectable_in_the_client():
+    """The browser's site-layer list is hard-coded in layers.js; a layer registered only
+    on the server appears in /api/layers and can never be toggled or rendered. This
+    reads the client's list from source because there is no JS runtime in this tier."""
+    js = (Path(__file__).resolve().parents[1] / "static" / "app" / "layers.js").read_text()
+    block = js.split("const SITE_LAYERS = [", 1)[1].split("];", 1)[0]
+    client_ids = set(re.findall(r"id:\s*'([a-z_]+)'", block))
+    assert client_ids == set(LAYER_IDS)
