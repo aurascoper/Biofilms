@@ -89,4 +89,15 @@ end
     end
 end
 
+@testset "the receipt hashes bind the configuration that was read, and the environment" begin
+    custom = config_with(c -> c["params"]["lambda"] = 0.02)
+    h = code_hashes(custom)
+    @test h["config"] == sha256_file(custom)
+    @test h["config"] != sha256_file(joinpath(@__DIR__, "benchmark.toml"))
+    @test h["config_file"] == "benchmark.toml"      # the name alone would not have told them apart
+    for f in ("Project.toml", "Manifest.toml", "test_setup.jl", "setup.jl")
+        @test h[f] == sha256_file(joinpath(@__DIR__, f))
+    end
+end
+
 end # setup

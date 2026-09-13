@@ -301,7 +301,7 @@ end
 function main(parent::String, out::String, config::String)
     refuse_existing(out)
     refuse_inside(parent, out)
-    hashes = code_hashes()
+    hashes = code_hashes(config)
     cfg, geo, snap_path, snap_sha, results = controls(parent, config)
     fresh_destination(out)
     doc = Dict{String, Any}(

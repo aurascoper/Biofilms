@@ -122,11 +122,21 @@ function nsteps_for(total::Float64, dt::Float64)
     n
 end
 
-"Hashes of the code and configuration that produced a receipt, recorded beside it."
-function code_hashes()
-    Dict(f => sha256_file(joinpath(@__DIR__, f)) for f in
+"""
+Hashes of the code, the environment and the configuration that produced a receipt,
+recorded beside it. The configuration hashed is the one the run parsed, under the key
+`config`, with its basename beside it: hashing the bundled benchmark.toml regardless of
+--config bound a receipt to a file the run may never have read. Project.toml and
+Manifest.toml are in the set because they are the environment the numbers came out of.
+"""
+function code_hashes(config::AbstractString)
+    d = Dict{String, Any}(f => sha256_file(joinpath(@__DIR__, f)) for f in
          ("BindingBenchmark.jl", "setup.jl", "run.jl", "controls.jl",
-          "mutation_controls.jl", "test_numerics.jl", "benchmark.toml"))
+          "mutation_controls.jl", "test_numerics.jl", "test_setup.jl",
+          "Project.toml", "Manifest.toml"))
+    d["config"] = sha256_file(config)
+    d["config_file"] = basename(config)
+    d
 end
 
 """
