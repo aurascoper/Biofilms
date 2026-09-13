@@ -317,15 +317,17 @@ def _load_agri_overlay(path: Path) -> dict:
     # missing hash is a refusal: an export that carries none is indistinguishable from one
     # whose hash was deleted alongside an edit, and this is a cross-repository trust boundary.
     version = d.get("schema_version")
+    # Exact int: Python equality lets True == 1 and 1.0 == 1, so a malformed version
+    # would otherwise select a hash rule. Missing, malformed or future versions are
+    # refused before hashing; an unversioned export must not be read under v2 rules by
+    # default, and a v3 export whose hash covers something else must not pass because
+    # its bytes happen to hash like v2.
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError(f"agri overlay refused: unsupported schema_version {version!r}")
     if version == 1:
         key, hashed = "cells_sha256", cells
-    elif version == 2:
-        key, hashed = "payload_sha256", {k: v for k, v in d.items() if k != "payload_sha256"}
     else:
-        # Missing, malformed or future: refused before hashing. An unversioned export
-        # must not be read under v2 rules by default, and a v3 export whose hash covers
-        # something else must not pass because its bytes happen to hash like v2.
-        raise ValueError(f"agri overlay refused: unsupported schema_version {version!r}")
+        key, hashed = "payload_sha256", {k: v for k, v in d.items() if k != "payload_sha256"}
     expected = d.get(key)
     if expected is None:
         raise ValueError(f"agri overlay refused: schema_version {version!r} export carries no {key}")

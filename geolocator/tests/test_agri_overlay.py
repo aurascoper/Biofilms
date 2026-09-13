@@ -172,6 +172,18 @@ def test_an_unsupported_schema_version_is_refused_before_hashing(tmp_path, versi
         _load_agri_overlay(f)
 
 
+@pytest.mark.parametrize("version", [True, 1.0])
+def test_a_version_that_merely_equals_1_is_not_version_1(tmp_path, version):
+    """`True == 1` and `1.0 == 1`, so a malformed version with a valid cells hash used
+    to enter the v1 path; the gate requires an exact int."""
+    f = tmp_path / "overlay.json"
+    payload = _v1_payload()
+    payload["schema_version"] = version
+    _write(f, payload)
+    with pytest.raises(ValueError, match="unsupported schema_version"):
+        _load_agri_overlay(f)
+
+
 def test_a_v2_export_cannot_downgrade_to_the_cells_only_hash(tmp_path):
     """A v2 export carrying only cells_sha256 must not be verified by the v1 rule: that
     would let generated_at / source_git_sha be edited under a still-valid cells hash."""
