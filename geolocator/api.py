@@ -706,7 +706,10 @@ def stats(layer: str = Query("power")):
 def plants(
     layer: str = Query("power"),
     fuel: str | None = Query(None, description="Filter by color_key (fuel/stage)"),
-    min_capacity: float = Query(0.0, ge=0.0),
+    # None, not 0.0: an omitted floor and an explicit floor of 0 are different requests
+    # for an unknown capacity. Omitted keeps unknowns; explicit 0 is a bound that cannot
+    # be verified against None, so it excludes and counts them like any other bound.
+    min_capacity: float | None = Query(None, ge=0.0),
     max_capacity: float | None = Query(None, ge=0.0),
     country: str | None = Query(None),
     limit: int = Query(5000, ge=1, le=50000),
@@ -714,6 +717,7 @@ def plants(
     items = layer_items(layer)
     out = []
     excluded_unknown_capacity = 0
+    floor = 0.0 if min_capacity is None else min_capacity
     for p in items:
         # Scope predicates first, so the exclusion counter only ever counts rows that
         # would otherwise have been in the result.
@@ -724,12 +728,12 @@ def plants(
         cap = p["capacity_mw"]
         if cap is None:
             # An explicit bound can't be verified against an unknown value, so it excludes
-            # it and says so. The default floor of 0.0 is not a bound anyone asked for and
-            # must not drop unknowns.
-            if min_capacity > 0.0 or max_capacity is not None:
+            # it and says so. An omitted floor is not a bound anyone asked for and must
+            # not drop unknowns.
+            if min_capacity is not None or max_capacity is not None:
                 excluded_unknown_capacity += 1
                 continue
-        elif cap < min_capacity or (max_capacity is not None and cap > max_capacity):
+        elif cap < floor or (max_capacity is not None and cap > max_capacity):
             # A KNOWN value always meets the floor, default included: a negative capacity
             # was excluded before this layer existed and a special case for unknowns must
             # not readmit it.

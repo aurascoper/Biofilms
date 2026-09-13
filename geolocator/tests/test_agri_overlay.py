@@ -308,6 +308,18 @@ def test_stats_source_names_the_overlay_repo_not_wri(agri_source):
     assert client.get("/api/stats", params={"layer": "power"}).json()["source"] != "agri_yield_pipeline"
 
 
+def test_plants_explicit_zero_floor_is_a_bound_and_omitted_is_not(mixed_layer):
+    """min_capacity=0 used to be indistinguishable from the omitted default, so an explicit
+    floor of zero kept every unknown and counted none, against the rule that a bound
+    cannot be verified for an unknown value."""
+    explicit = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 0}).json()
+    assert {f["properties"]["name"] for f in explicit["features"]} == {"A"}
+    assert explicit["excluded_unknown_capacity"] == 2
+    omitted = client.get("/api/plants", params={"layer": "agri_overlay"}).json()
+    assert len(omitted["features"]) == 3
+    assert omitted["excluded_unknown_capacity"] == 0
+
+
 def test_plants_max_capacity_excludes_unknown_and_reports_the_count(mixed_layer):
     """The second MW bound. Every other regression test exercised min_capacity only, so
     this path could regress to a None comparison or admit unknowns unnoticed."""
