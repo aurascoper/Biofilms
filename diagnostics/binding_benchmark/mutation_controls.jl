@@ -1,6 +1,7 @@
 #!/usr/bin/env julia
 # Does the data-free suite bite? Seven single-line defects, each planted in a scratch copy
-# of the module, each expected to turn `test_numerics.jl` red.
+# of the module, each expected to turn `test_numerics.jl` red; and one planted parse
+# error, expected to be reported as the suite not running rather than as a catch.
 #
 #   julia --project=diagnostics/binding_benchmark \
 #         diagnostics/binding_benchmark/mutation_controls.jl <out_dir>
@@ -22,7 +23,9 @@ struct Mutation
     defect::String
     from::String
     to::String
+    expected::String   # CAUGHT for a defect; SUITE-ERRORED for the classifier's own control
 end
+Mutation(name, defect, from, to) = Mutation(name, defect, from, to, "CAUGHT")
 
 const MUTATIONS = [
     Mutation("laplacian loses flux form",
@@ -59,6 +62,15 @@ const MUTATIONS = [
              "comparison of a field with itself",
              "        maximum(vals) > minimum(vals) ||\n            throw(ArgumentError(",
              "        false &&\n            throw(ArgumentError("),
+    # Not a defect: the classifier's own control. A module that does not parse makes the
+    # suite exit non-zero with zero failing assertions. A harness that read every
+    # non-zero exit as CAUGHT reported exactly that as coverage; this row must come out
+    # SUITE-ERRORED, and a harness that calls it CAUGHT is red.
+    Mutation("the module does not parse",
+             "a syntax error, so no assertion runs at all",
+             "module BindingBenchmark\n",
+             "module BindingBenchmark (\n",
+             "SUITE-ERRORED"),
 ]
 
 function apply_mutation(src::String, m::Mutation)
@@ -99,17 +111,23 @@ function main(out::String)
         log = joinpath(dir, "out.txt")
         ok = success(pipeline(`julia --project=$proj $(joinpath(dir, "test_numerics.jl"))`;
                               stdout = log, stderr = log))
-        failing = [strip(l) for l in eachline(log)
+        # The scratch path is replaced so the receipt is the same on every machine; the
+        # suite file and line are what identify a failure.
+        failing = [replace(strip(l), dir => "<scratch>") for l in eachline(log)
                    if occursin("Test Failed", l) || occursin("Error During Test", l)]
+        # A non-zero exit with no failing assertion is the suite not running, not the
+        # suite biting: a parse error, a crash at load, a missing dependency.
+        verdict = ok ? "SUITE-STAYED-GREEN" : isempty(failing) ? "SUITE-ERRORED" : "CAUGHT"
         push!(results, Dict{String, Any}(
             "mutation" => m.name, "defect" => m.defect,
-            "verdict" => ok ? "SUITE-STAYED-GREEN" : "CAUGHT",
+            "verdict" => verdict, "expected" => m.expected,
             "match_count" => hits,
             "failing_assertions" => length(failing),
             "first_failures" => first(failing, 3)))
     end
 
-    mkpath(out)
+    mkpath(dirname(abspath(out)))
+    mkdir(out)          # exclusive: a destination that appeared meanwhile is refused
     doc = Dict{String, Any}(
         "diagnostic" => "mutation controls for the binding-benchmark numerics suite",
         "question" => "can test_numerics.jl fail?",
@@ -125,12 +143,12 @@ function main(out::String)
 
     println("baseline suite green: ", baseline)
     for r in results
-        println(rpad(r["verdict"], 20), r["mutation"],
+        println(rpad(r["verdict"], 20), r["mutation"], " (expected ", r["expected"], ")",
                 haskey(r, "failing_assertions") ? "  ($(r["failing_assertions"]) assertions)" : "")
     end
-    bad = [r["mutation"] for r in results if r["verdict"] != "CAUGHT"]
-    println(isempty(bad) && baseline ? "every planted defect was caught" :
-            "not caught: " * join(bad, "; "))
+    bad = [r["mutation"] for r in results if r["verdict"] != get(r, "expected", "CAUGHT")]
+    println(isempty(bad) && baseline ? "every planted defect was caught, and the parse error was told apart" :
+            "unexpected: " * join(bad, "; "))
     println("wrote ", joinpath(out, "mutation_verification.json"))
     (baseline && isempty(bad)) || exit(1)
 end
