@@ -741,16 +741,21 @@ PP-62-11's defect and is why this hook exists rather than a scratch script.
 IT MUST NOT CONSULT `rng`. The hook is called before the draw, so a closure that
 touches the generator moves the trajectory; `tests/rad_proposals_tests.jl` pins
 the shipped harness inert against the bare path with a different-seed control.
+
+`on_accepted(event)` observes each accepted copy AFTER the decision and BEFORE
+mutation. The immutable event contains values only, never a state or RNG
+reference. Linear sites are Julia xyz indices, 1-based; proposal_index counts
+all N^3 attempts, including skipped attempts. The observer must be inert.
 """
 function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
-                   on_proposal = nothing)
+                   on_proposal = nothing, on_accepted = nothing)
     p = state.params
     N = p.N
     lat = state.lattice
     n_attempts = N^3
     state.current_mcs += 1
 
-    for _ in 1:n_attempts
+    for proposal_index in 1:n_attempts
         # 1. Pick random source site inside cylinder
         sx = rand(rng, 1:N)
         sy = rand(rng, 1:N)
@@ -806,6 +811,17 @@ function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
         end
 
         if accept
+            if on_accepted !== nothing
+                on_accepted((mcs = state.current_mcs,
+                    proposal_index = proposal_index,
+                    donor_site = LinearIndices(lat)[sx, sy, sz],
+                    recipient_site = LinearIndices(lat)[tx, ty, tz],
+                    donor_id = σ_s, recipient_id = σ_t,
+                    donor_species = species_of(σ_s, state.cells),
+                    recipient_species = species_of(σ_t, state.cells),
+                    adh = terms.adh, vol = terms.vol, rad = terms.rad,
+                    mel = terms.mel, delta_h = ΔH, draw = u))
+            end
             # Execute copy: target site gets source cell ID
             # Update volumes
             if σ_t > 0 && haskey(state.cells, Int(σ_t))
@@ -2101,7 +2117,8 @@ function init_coupled_simulation(params::CPMParams, rp::RadiolysisParams;
     return CoupledSimulation(state, rd, contaminant, rng, 0, 0.0)
 end
 
-function advance_window!(sim::CoupledSimulation, n_mcs::Int)
+function advance_window!(sim::CoupledSimulation, n_mcs::Int;
+                         on_accepted = nothing)
     state = sim.state
     rd = sim.rd
     N = state.params.N
@@ -2109,7 +2126,7 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int)
         sim.mcs += 1
         mcs = sim.mcs
 
-        mcs_step!(state, sim.rng)
+        mcs_step!(state, sim.rng; on_accepted)
 
         if mcs % 10 == 1
             X_tot, X_rd = compute_radial_biomass(state, rd.params.Nr)

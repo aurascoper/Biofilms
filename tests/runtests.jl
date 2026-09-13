@@ -40,6 +40,10 @@ end
     include("checkpoint_io_tests.jl")
 end
 
+@testset ".vti export for ParaView (lattice units)" begin
+    include("vti_export_tests.jl")
+end
+
 # The JACC port had no automated execution at all until this tier. It runs on
 # whichever backend JACC selects — threads where there is no GPU, which is what
 # a CI runner sees — so the portability layer's portability is itself tested.
@@ -73,3 +77,5 @@ include("rad_proposals_tests.jl")
 # Table 4 was published from a configuration nothing shipped could reproduce.
 # decided_moves.jl is that entry point; this runs it.
 include("decided_moves_tests.jl")
+
+include("lattice_evidence_tests.jl")

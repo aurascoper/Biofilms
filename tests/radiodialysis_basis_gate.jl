@@ -205,7 +205,11 @@
             "validate_serial.jl",              # CPM trajectory determinism
             "tests/genealogy_tests.jl",        # legacy vs windowed API equivalence
             "tests/checkpoint_io_tests.jl",    # snapshot/restart round trip
+            "tests/vti_export_tests.jl",       # snapshot fixture for the .vti
+                                              # round trip; asserts no magnitude
             "export_checkpoint.jl",            # interchange export; labels the file
+            "lattice_evidence.jl",             # canonical labelled trajectory;
+                                              # production postflight checks 10x uptake
             "tests/radiodialysis_basis_gate.jl",  # this file, testing the gate
             "tests/jacc_parity_tests.jl",      # CPM acceptance counts; the
                                               # 10x-uptake testset in that file
@@ -217,23 +221,34 @@
                                               # that script proves it before it
                                               # copies anything
         ])
-        repo = dirname(@__DIR__)
-        found = Set{String}()
-        for (root, _, files) in walkdir(repo)
-            occursin("/.git", root) && continue
-            for fname in files
-                endswith(fname, ".jl") || continue
-                path = joinpath(root, fname)
-                src = read(path, String)
-                parsed = try
-                    Meta.parseall(src)
-                catch
-                    continue
+        function check_ack_census(repo, expected)
+            found = Set{String}()
+            for (root, _, files) in walkdir(repo)
+                occursin("/.git", root) && continue
+                for fname in files
+                    endswith(fname, ".jl") || continue
+                    path = joinpath(root, fname)
+                    src = read(path, String)
+                    parsed = Meta.parseall(src)
+                    _opens_gate(parsed) && push!(found, relpath(path, repo))
                 end
-                _opens_gate(parsed) && push!(found, relpath(path, repo))
             end
+            found == expected || error("unrecognised direct basis-gate acknowledgement: $(setdiff(found, expected)); missing: $(setdiff(expected, found))")
+            return found
         end
-        @test found == expected
+        repo = dirname(@__DIR__)
+        @test check_ack_census(repo, expected) == expected
+        # Artifact-derived control enters the same directory walker: the real
+        # factory copied to an undeclared location must fail the census.
+        mktempdir() do scratch
+            source = read(joinpath(repo, "lattice_evidence.jl"), String)
+            write(joinpath(scratch, "lattice_evidence.jl"), source)
+            allowed = Set(["lattice_evidence.jl"])
+            @test check_ack_census(scratch, allowed) == allowed
+            write(joinpath(scratch, "unrecognised.jl"), source)
+            @test isfile(joinpath(scratch, "unrecognised.jl"))
+            @test_throws ErrorException check_ack_census(scratch, allowed)
+        end
     end
 
     @testset "the exemption's claim is true: nothing recorded depends on the basis" begin

@@ -144,6 +144,15 @@ test, proves a helper and leaves the production path free to bypass it. This is
 not satisfied by sharing an assertion: the control must traverse the same input
 boundary and return the same finest-grained result production consumes.
 
+**A guard's stated scope is a claim, and the control that proves it is a plant outside
+the scope the author had in mind.** On 2026-09-07 the retracted figure word planted in a
+viewer script's title left every suite green: the figure guard read the sidecars under
+`preprint/figures`, and the walk whose comment says "every file under the root" scans three
+other terms. The first fix scanned the directory the plant landed in, which is the defect
+relocated. The scan now walks every `.jl`, `.R` and `.py` under the root against a declared
+list, and its control plants the word under a directory that did not exist when the scan was
+written (`GUARD-SCOPE-01`).
+
 **An exemption is keyed on the property that earns it, at the location where it
 is true.** A directory name, suffix, token value or other surface marker can
 select a candidate; it cannot justify skipping one. Verify the relation itself:
