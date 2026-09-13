@@ -20,12 +20,17 @@
 # weakest draw for this pair.
 #
 # Not a manuscript artifact. It lives in diagnostics/ and writes its own .sha256
-# and .txt sidecars so it is already compliant if it ever moves to
+# (of the PNG: cairo stamps a CreationDate into the PDF, so two renders of one
+# drawing hash differently there and identically here) and .txt (pdftotext
+# -layout of the PDF) sidecars, so it is already compliant if it ever moves to
 # preprint/figures/, where the staleness guards would apply to it.
 #
 #   julia --project=. diagnostics/melanin_ensemble/figure.jl [sweep.csv]
+#
+# A sweep at any other configuration is refused: the provenance line below is
+# printed from constants, and the CSV's own header must agree with them.
 
-using CairoMakie, Printf, Statistics
+using CairoMakie, Printf, SHA, Statistics
 
 const HERE   = dirname(@__DIR__) |> dirname
 const CSVIN  = length(ARGS) >= 1 ? ARGS[1] :
@@ -51,20 +56,41 @@ const MUTED    = colorant"#6b6b68"
 
 function read_at(path, at)
     rows = Dict{Int,Dict{Int,Float64}}()
+    meta = Dict{String,Int}()
+    col = nothing
     for line in eachline(path)
+        if startswith(line, "# N=")
+            # sweep.jl's configuration line: "# N=40 parcels_per_species=6 n_mcs=400 ..."
+            for kv in split(line[3:end])
+                k, v = split(kv, "=")
+                meta[k] = parse(Int, v)
+            end
+            continue
+        end
         startswith(line, "#") && continue
         f = split(line, ",")
-        f[1] == "seed" && continue
-        parse(Int, f[2]) == at || continue
-        get!(rows, parse(Int, f[1]), Dict{Int,Float64}())[parse(Int, f[3])] =
-            parse(Float64, f[8])
+        if isnothing(col)
+            col = Dict(name => i for (i, name) in enumerate(f))
+            all(haskey(col, c) for c in ("seed", "mcs", "species", "mean_melanin")) ||
+                error("$path: header lacks a column this figure reads: $line")
+            continue
+        end
+        parse(Int, f[col["mcs"]]) == at || continue
+        get!(rows, parse(Int, f[col["seed"]]), Dict{Int,Float64}())[parse(Int, f[col["species"]])] =
+            parse(Float64, f[col["mean_melanin"]])
     end
     isempty(rows) && error("no rows at MCS $at in $path")
-    return rows
+    for k in ("N", "parcels_per_species", "n_mcs")
+        haskey(meta, k) || error("$path: no '# N=... parcels_per_species=... n_mcs=...' line; cannot state provenance")
+    end
+    return rows, meta
 end
 
 function main()
-    data  = read_at(CSVIN, AT_MCS)
+    data, meta = read_at(CSVIN, AT_MCS)
+    (meta["N"], meta["parcels_per_species"]) == (N, PARCELS) ||
+        error("$CSVIN is N=$(meta["N"]) with $(meta["parcels_per_species"]) parcels; " *
+              "this figure is drawn for N=$N with $PARCELS, and its provenance line would lie")
     seeds = sort(collect(keys(data)))
     xs    = 1:length(PRODUCERS)
     gapc  = [(s, data[s][1] - data[s][5]) for s in seeds]      # CN - AN
@@ -129,12 +155,18 @@ function main()
     # clipped is worse than none: the .txt sidecar would carry the truncation.
     Label(fig[3, 1:2],
           @sprintf("biofilms_potts.jl run_simulation via diagnostics/melanin_ensemble/sweep.jl  |  N=%d, %d parcels/species, %d MCS, seeds %d:%d, read at MCS %d\nobservable: volume-weighted mean melanin over occupied sites, NOT the mean of per-parcel means  |  α_M is a declared input, so an ordering displays it and does not measure it",
-                   N, PARCELS, 400, minimum(seeds), maximum(seeds), AT_MCS);
+                   N, PARCELS, meta["n_mcs"], minimum(seeds), maximum(seeds), AT_MCS);
           fontsize = 9, color = MUTED, halign = :left, justification = :left,
           tellwidth = false)
 
     save(OUTBASE * ".pdf", fig)
     save(OUTBASE * ".png", fig; px_per_unit = 2)
+    # The sidecars the header promises. Written here, by the same run, so a changed CSV
+    # cannot leave a stale extraction and checksum beside a fresh image.
+    write(OUTBASE * ".sha256", bytes2hex(sha256(read(OUTBASE * ".png"))) * "\n")
+    isnothing(Sys.which("pdftotext")) &&
+        error("pdftotext not found: the .txt sidecar would go stale, refusing to leave it")
+    run(pipeline(`pdftotext -layout $(OUTBASE * ".pdf") -`; stdout = OUTBASE * ".txt"))
     @printf("wrote %s.{pdf,png}\n  %d of %d seeds ordered; CN-AN mean %+.4f, seed %d %+.4f (rank %d)\n",
             OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap,
             findfirst(t -> t[1] == PUBLISHED, gapc))
