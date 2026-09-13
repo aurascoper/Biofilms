@@ -14,8 +14,13 @@ applied to its own output.
 ```sh
 julia diagnostics/melanin_ensemble/sweep.jl /tmp/sweep.csv      # 16 seeds, about 11 s
 julia diagnostics/melanin_ensemble/analyse.jl /tmp/sweep.csv
-julia diagnostics/melanin_ensemble/test_statistics.jl           # 73 assertions, no data
+julia diagnostics/melanin_ensemble/test_statistics.jl           # 78 assertions, no data
+julia --project=diagnostics/melanin_ensemble diagnostics/melanin_ensemble/figure.jl   # the N=40 figure
 ```
+
+`figure.jl` needs CairoMakie, which the root `Project.toml` does not declare; this
+directory's `Project.toml` and `Manifest.toml` pin the version that rendered the committed
+PNG (`julia --project=diagnostics/melanin_ensemble -e 'import Pkg; Pkg.instantiate()'` once).
 
 `sweep.jl` refuses a destination that already exists, an empty seed list, and an `--at`
 outside the run, all before the model loads. `test_statistics.jl` takes no argument, no
@@ -94,5 +99,5 @@ model does.
 |---|---|
 | `sweep.jl` | runs the seeds, writes one row per (seed, mcs, species) |
 | `analyse.jl` | paired statistics, ordering counts, exact binomial sign test (ties leave the test) |
-| `test_statistics.jl` | 73 data-free assertions |
+| `test_statistics.jl` | 78 data-free assertions |
 | `sweep_seeds42-57.csv`, `analysis.txt` | committed receipts of the run above |
