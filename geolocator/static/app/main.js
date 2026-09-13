@@ -6,7 +6,7 @@ import { installTokens, BAND_STATUS, FEED } from './tokens.js';
 import { createGlobe } from './globe.js';
 import { createImageryLayer, imageryCredit } from './imagery.js';
 import { createLayerManager, fmtAge } from './layerManager.js';
-import { createSiteSystem, createBandSystem, PLANT_LIMIT } from './layers.js';
+import { createSiteSystem, createBandSystem, PLANT_LIMIT, hasCapacity } from './layers.js';
 import { createLatticePanel, createLatticeLayer } from './hud/latticePanel.js';
 import { createDetectionOverlay } from './hud/detectionOverlay.js';
 import { createStyleChain } from './postprocess.js';
@@ -52,9 +52,13 @@ manager.buildTogglePanel($('layer-panel'));
 
 /* ── HUD readouts ─────────────────────────────────────────────────────────── */
 function updateStats(shown, features, enabled) {
-  const cap = shown.reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
+  // Only layers that carry a capacity are summed. With just a non-MW layer selected the
+  // readout used to say "0 MW", presenting a quantity the layer does not have as a
+  // measured zero; it now says the capacity is not applicable.
+  const withMw = shown.filter(([id]) => hasCapacity(id));
+  const cap = withMw.reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
   $('stat-count').textContent = shown.length.toLocaleString();
-  $('stat-cap').textContent = Math.round(cap).toLocaleString();
+  $('stat-cap').textContent = withMw.length ? `${Math.round(cap).toLocaleString()} MW` : 'n/a';
   // The fetch limit used to truncate power from 34,936 to 5,000 with no notice.
   const trunc = enabled.filter((id) => (features[id] || []).length >= PLANT_LIMIT);
   const el = $('stat-trunc');

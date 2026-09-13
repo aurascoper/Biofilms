@@ -322,6 +322,18 @@ def test_the_min_mw_filter_does_not_apply_to_a_layer_without_capacity():
     assert ">= minCap" in predicate
 
 
+def test_the_hud_never_reports_a_non_capacity_layer_as_zero_mw():
+    """main.js summed capacity_mw || 0 over every shown feature and index.html fixed the
+    unit outside the readout, so selecting only the overlay displayed "0 MW". The sum is
+    now over hasCapacity layers only and the unit travels with the number, so a
+    non-capacity selection reads "n/a" rather than a measured zero."""
+    stats = _client("main.js").split("function updateStats(", 1)[1].split("\n}\n", 1)[0]
+    assert "hasCapacity(id)" in stats
+    assert "withMw.length ?" in stats and "'n/a'" in stats
+    html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+    assert "</b> MW" not in html.split('id="stat-cap"', 1)[1].split("</div>", 1)[0]
+
+
 def test_every_server_layer_is_selectable_in_the_client():
     """The browser's site-layer list is hard-coded in layers.js; a layer registered only
     on the server appears in /api/layers and can never be toggled or rendered. This
