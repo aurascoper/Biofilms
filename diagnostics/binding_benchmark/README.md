@@ -16,29 +16,38 @@ conditions, rate laws, and a corrected source audit, before any line of it is wr
 ## Running it
 
 ```sh
-P=~/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/original_evidence
+P=/path/to/original_evidence   # the lattice_evidence.jl run that wrote snap_mcs000000.h5
 J="julia --project=diagnostics/binding_benchmark"
 
-$J diagnostics/binding_benchmark/test_numerics.jl              # 81 assertions, no data
+$J -e 'import Pkg; Pkg.instantiate()'                           # once per clone
+$J diagnostics/binding_benchmark/test_numerics.jl              # 86 assertions, no data
+$J diagnostics/binding_benchmark/test_setup.jl                 # 48 assertions, no data
 $J diagnostics/binding_benchmark/run.jl       $P /tmp/bench    # benchmark_receipt.json
 $J diagnostics/binding_benchmark/controls.jl  $P /tmp/ctl      # control_verification.json
 $J diagnostics/binding_benchmark/mutation_controls.jl /tmp/mut # mutation_verification.json
 ```
 
-`test_numerics.jl` and `mutation_controls.jl` take no data path, no argument and no
-environment variable, so their assertions cannot be skipped by a missing bundle. That is
-deliberate: a suite whose assertions are reachable only when a data directory happens to
-be mounted reports "passed" on a machine where it never ran, and this repository has
-already shipped one file with exactly that defect.
+`test_numerics.jl`, `test_setup.jl` and `mutation_controls.jl` take no data path and no
+environment variable (`mutation_controls.jl` takes one argument, where to write its
+receipt), so their assertions cannot be skipped by a missing bundle. That is deliberate:
+a suite whose assertions are reachable only when a data directory happens to be mounted
+reports "passed" on a machine where it never ran, and this repository has already
+shipped one file with exactly that defect. CI runs all three (`coupling-tests.yml`,
+`julia-tests`).
 
 `run.jl` and `controls.jl` refuse a destination that already exists, and check it twice:
 once before the run so a typo costs nothing, once at write time because a long run can
-finish into a directory that appeared while it was running. The directory is created only
-at the second check, so a run that fails leaves nothing behind to block the retry.
+finish into a directory that appeared while it was running. The second check is the
+creation itself, an exclusive `mkdir`, so a directory that appears between the two checks
+is refused rather than written into, and a run that fails leaves nothing behind to block
+the retry. A destination at or below the parent bundle is refused before anything runs,
+by canonical path, so `$P/bench` and a symlink into `$P` are both caught.
 
-This diagnostic carries its own `Project.toml`. The repository root project lists AMDGPU,
-which cannot instantiate on darwin, so a benchmark sharing it could not be run on the
-machine it was written on. The root `Project.toml` is untouched by this branch.
+This diagnostic carries its own `Project.toml` and `Manifest.toml`. The repository root
+project lists AMDGPU, which cannot instantiate on darwin, so a benchmark sharing it could
+not be run on the machine it was written on. The root `Project.toml` is untouched by this
+branch. The lockfile is committed so that instantiation resolves the package versions the
+receipts were written under; both files are in every receipt's hash set.
 
 ## The scheme
 
@@ -114,7 +123,7 @@ read off a source, and the receipt says so.
 | `B0`, `ΔB` | 1.0, 2.0 | concentration |
 | `K`, `n` | 0.5, 2.0 | units of `A`, dimensionless |
 | `q_ext` | 0.0 | closed |
-| `c(0)`, `b(0)` | 1.0, 0.0 | uniform on the interior |
+| `c(0)`, `b(0)` | 1.0, 0.0 | `c(0)` on every interior site; `b(0)` on every occupied site, capacity being zero elsewhere |
 | `Δt`, `T` | 0.5, 50.0 | dtu, 100 steps |
 
 ## The timestep bound is derived here, not imported
@@ -136,8 +145,8 @@ three contributing terms is pinned by its own assertion rather than by one combi
 number. The rate is re-evaluated inside every step, because `max(c)` and `max(B − b)` both
 move and a run can leave the admissible region after entering it. On the shipped
 configuration the initial rate is 0.74, the bound is 1.3514, the declared step is 0.5, and
-the margin is 0.37 at every recorded time (both maxima start at their largest and decrease
-from there).
+the margin is 0.37 at the start and 0.3527 at T (both maxima start at their largest and
+decrease from there, so the margin only shrinks).
 
 `Δt ≤ 1/λ` is a positivity condition and not an accuracy condition. At `Δt = 1/λ` the
 scheme returns exactly zero against a continuum value of `1/e`, and the suite asserts
@@ -206,9 +215,12 @@ identity: folding it in would let a real boundary leak close the books.
 
 `mutation_controls.jl` plants seven single-line defects in a scratch copy of the module and
 runs the data-free suite against each. All seven are caught, and the unmutated baseline is
-green. Each patch is checked for having applied exactly once before its suite is run, and
-a patch that matched zero times or many times is reported as DID-NOT-APPLY rather than as
-a result, because a textual patch that quietly matched nothing is indistinguishable in the
+green. An eighth row plants a parse error and is the harness's control on itself: a suite
+that never ran exits non-zero with no failing assertion, and that is reported as
+SUITE-ERRORED, not as a catch, so a classifier that counted every non-zero exit as
+coverage is red. Each patch is checked for having applied exactly once before its suite is
+run, and a patch that matched zero times or many times is reported as DID-NOT-APPLY rather
+than as a result, because a textual patch that quietly matched nothing is indistinguishable in the
 report from a defect the suite failed to catch. That is not a hypothetical: a colour-table
 control elsewhere in this repository spent an entire run rewriting a digit inside an XML
 attribute name instead of the value it was aimed at, and reported a pass.
@@ -248,8 +260,10 @@ hash, in its own receipt, for exactly that reason.
 |---|---|
 | `BindingBenchmark.jl` | geometry, capacity, ledger, flux-form Laplacian, the step |
 | `benchmark.toml` | the declared configuration; unknown keys are refused |
-| `setup.jl` | configuration reading and the parent chain of custody |
+| `setup.jl` | configuration reading, domain checks, the destination guards, the parent chain of custody |
 | `run.jl` | the production run; writes `benchmark_receipt.json` and `timeseries.csv` |
 | `controls.jl` | K1 to K12; writes `control_verification.json` |
-| `test_numerics.jl` | 81 data-free assertions |
-| `mutation_controls.jl` | seven planted defects; writes `mutation_verification.json` |
+| `test_numerics.jl` | 86 data-free assertions on the integrator |
+| `test_setup.jl` | 48 data-free assertions on the reader, the guards and the control verdicts |
+| `mutation_controls.jl` | seven planted defects and one planted parse error; writes `mutation_verification.json` |
+| `Project.toml`, `Manifest.toml` | the environment, pinned; both hashed into every receipt |
