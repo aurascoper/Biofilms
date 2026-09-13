@@ -50,4 +50,30 @@ end
     @test pb isa Params
 end
 
+@testset "the destination is created exclusively, and never inside the parent" begin
+    root = mktempdir()
+    d = joinpath(root, "out")
+    @test fresh_destination(d) == d && isdir(d)
+    @test_throws ArgumentError fresh_destination(d)            # the first check
+    # The gap between the check and the creation: a directory that appears inside it
+    # must be refused by the creation, not accepted by it. With `mkpath` this test
+    # returned normally and the run would have written into the intruder's directory.
+    d2 = joinpath(root, "out2")
+    @test_throws Base.IOError fresh_destination(d2; race = () -> mkdir(d2))
+    # A failed run leaves nothing behind: the parent is made, the leaf is not.
+    d3 = joinpath(root, "deep", "out3")
+    @test_throws Base.IOError fresh_destination(d3; race = () -> mkdir(d3))
+    @test isdir(joinpath(root, "deep"))
+
+    parent = mkdir(joinpath(root, "parent"))
+    @test_throws ArgumentError refuse_inside(parent, joinpath(parent, "bench"))
+    @test_throws ArgumentError refuse_inside(parent, parent)
+    @test_throws ArgumentError refuse_inside(parent, joinpath(parent, "a", "..", "b"))
+    @test isnothing(refuse_inside(parent, joinpath(root, "parent2")))  # a sibling, not a child
+    @test isnothing(refuse_inside(parent, joinpath(root, "elsewhere", "bench")))
+    # Through a symlink from outside: the lexical prefix differs, the resolved one does not.
+    link = joinpath(root, "link"); symlink(parent, link)
+    @test_throws ArgumentError refuse_inside(parent, joinpath(link, "bench"))
+end
+
 end # setup

@@ -122,14 +122,45 @@ Refuse a destination that already exists. Checked twice on purpose: once before 
 so a typo costs nothing, and once at write time, because a long run can finish into a
 directory that appeared while it was running. The directory is created only at the
 second call, so a run that fails leaves nothing behind to block the retry.
+
+The second check is the creation itself. `mkpath` accepts a directory that already
+exists, so a check followed by `mkpath` has a gap in which another process can create
+the destination and have this run write into it; `mkdir` refuses with EEXIST in that
+case, and nothing else can observe the gap. `race` is the test hook that reproduces it.
 """
 refuse_existing(dir::AbstractString) =
     ispath(dir) && throw(ArgumentError("destination already exists: $dir"))
 
-function fresh_destination(dir::AbstractString)
+function fresh_destination(dir::AbstractString; race = () -> nothing)
     refuse_existing(dir)
-    mkpath(dir)
+    mkpath(dirname(abspath(dir)))
+    race()
+    mkdir(dir)
     dir
+end
+
+"""
+The path as the filesystem would resolve it, for a path that need not exist yet: the
+longest existing prefix is resolved through symlinks and the rest is appended lexically.
+"""
+function canonical(path::AbstractString)
+    p = normpath(abspath(path)); rest = String[]
+    while !ispath(p)
+        pushfirst!(rest, basename(p)); p = dirname(p)
+    end
+    joinpath(realpath(p), rest...)
+end
+
+"""
+Refuse an output at or below the parent bundle. `refuse_existing` cannot see this case:
+a destination that does not exist yet passes it and is then created inside the evidence
+the run promised not to write to.
+"""
+function refuse_inside(parent::AbstractString, out::AbstractString)
+    p = canonical(parent); o = canonical(out)
+    (o == p || startswith(o, p * "/")) &&
+        throw(ArgumentError("output $out lies inside the parent bundle $parent"))
+    nothing
 end
 
 write_json(path, obj) = open(path, "w") do io

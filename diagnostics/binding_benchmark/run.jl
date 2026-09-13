@@ -20,6 +20,7 @@ end
 
 function main(parent::String, out::String, config::String)
     refuse_existing(out)
+    refuse_inside(parent, out)
     hashes = code_hashes()
     cfg, p = read_config(config)
     geo, snap_path, snap_sha = frozen_geometry(parent, cfg)
