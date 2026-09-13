@@ -130,6 +130,26 @@ def _seed(rep: int, state: str, paired: bool) -> int:
     return 7000 + rep + (0 if paired or state == "baseline" else 500_000)
 
 
+def parse_ratios(text: str) -> list[int]:
+    """The ratio list as positive integers, sorted, or a named refusal.
+
+    `int()` over `split(",")` turned `''` into an IndexError one line later,
+    `1,,4` into a ValueError from `int('')`, and let `1,0` reach the divisor
+    arithmetic and `1,-1` through entirely. A pre-transport refusal that can
+    crash or pass on malformed input is not the deterministic guard promised.
+    """
+    tokens = [t.strip() for t in text.split(",")]
+    try:
+        ratios = sorted({int(t) for t in tokens})
+    except ValueError:
+        raise SystemExit(
+            f"--ratios {text!r}: every entry must be an integer") from None
+    if not ratios or any(r < 1 for r in ratios):
+        raise SystemExit(
+            f"--ratios {text!r}: every ratio must be a positive integer")
+    return ratios
+
+
 def refuse_non_divisor_ratios(ratios) -> None:
     """EVERY RATIO MUST DIVIDE THE FINEST, checked before any transport.
 
@@ -218,7 +238,7 @@ def main(argv=None) -> int:
     #
     # Sorted so ratio 1 runs first: it defines the common Omega_b that every
     # finer ratio is then evaluated on.
-    ratios = sorted({int(r) for r in args.ratios.split(",")})
+    ratios = parse_ratios(args.ratios)
     if ratios[0] != 1:
         raise SystemExit("ratio 1 is the reference grid and must be included")
     refuse_non_divisor_ratios(ratios)
