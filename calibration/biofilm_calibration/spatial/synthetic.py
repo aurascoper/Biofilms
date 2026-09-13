@@ -115,6 +115,7 @@ def graded_field(shape=(16, 16, 32), top: float = 0.9,
 # system, not a finer view of the same one. Rasterising a fixed analytic shape
 # has no such confound, which is exactly why it is the first study to run.
 
+import math
 from dataclasses import dataclass
 
 
@@ -134,6 +135,14 @@ def _grid_shape(extent_um, pitch_um) -> tuple:
     A ladder is meant to hold the object fixed and move only the sampling. A
     pitch that cannot do that is not a coarser view of the same object.
     """
+    # A PITCH IS A POSITIVE FINITE LENGTH, refused under the same type as a
+    # non-tiling one so the ladder names it as a skipped row. Zero divided by
+    # zero below, NaN reached `round()`, and neither was a NonTilingPitchError,
+    # so a bad `--pitches` entry crashed the run past the ladder's `except`.
+    if not (float(pitch_um) > 0.0 and math.isfinite(float(pitch_um))):
+        raise NonTilingPitchError(
+            f"pitch {pitch_um} is not a positive finite length and tiles "
+            "nothing")
     shape = []
     for axis, extent in enumerate(extent_um):
         exact = float(extent) / float(pitch_um)

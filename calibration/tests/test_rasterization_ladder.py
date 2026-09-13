@@ -158,6 +158,28 @@ def test_a_pitch_that_does_not_tile_the_extent_is_refused():
             assert n * pitch == pytest.approx(extent)
 
 
+@pytest.mark.parametrize("pitch", [0.0, -1.6, float("nan"), float("inf")])
+def test_a_pitch_that_is_not_a_positive_length_is_refused_by_name(pitch):
+    """THE SAME TYPED REFUSAL FOR EVERY PITCH THAT CANNOT TILE ANYTHING.
+
+    `--pitches` accepts any float. Zero divided the extent by zero, NaN reached
+    `round()` and raised something else, and either escaped the ladder's
+    `except NonTilingPitchError`, so a bad pitch in the list crashed the run
+    instead of becoming a named `skipped` row like 3.2 does.
+    """
+    import sys
+    from pathlib import Path
+
+    from biofilm_calibration.spatial.synthetic import NonTilingPitchError
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    with pytest.raises(NonTilingPitchError, match="positive finite"):
+        PhysicalSpheres().rasterize(pitch)
+    rows = rl.run_ladder(PhysicalSpheres(), [pitch, 1.6], rl.load_tolerances())
+    assert "skipped" in rows[0] and "skipped" not in rows[1], rows
+
+
 def test_the_default_ladder_actually_exercises_the_skip_it_promises():
     """A REFUSAL THAT IS NEVER REACHED IS NOT A REFUSAL.
 
