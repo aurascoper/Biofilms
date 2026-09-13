@@ -347,13 +347,11 @@ def _load_agri_overlay(path: Path) -> dict:
                 "latitude": lat,
                 "longitude": lon,
                 "color_key": _agri_stress_class(cell),
-                # Reused as a numeric marker-size magnitude, not a true capacity -- this layer
-                # has no MW figure. |NDVI z| keeps larger markers on the more anomalous
-                # counties. None (not 0.0) when no NDVI baseline exists -- "unknown" and "zero
-                # magnitude" are different claims, and /api/stats + /api/plants are the ones
-                # responsible for handling an unknown capacity_mw correctly, not this loader
-                # papering over it by picking a number.
-                "capacity_mw": abs(z) if z is not None else None,
+                # This layer has no MW figure, so capacity_mw is None for every county. |z|
+                # used to be stored here as a marker-size magnitude, which /api/stats summed
+                # as megawatts and the HUD labelled "MW"; the client now sizes this layer
+                # from extra.ndvi.z instead. None, not 0.0: unknown is not measured-zero.
+                "capacity_mw": None,
                 "status": cell.get("kind") or "county",
                 "source": "agri_yield_pipeline",
                 "note": f"NDVI z={z:.2f}" if z is not None else "no NDVI baseline for this county",

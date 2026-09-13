@@ -27,6 +27,14 @@ const SITE_LAYERS = [
   { id: 'stars',     name: 'Star Systems',   icon: '✦' },
 ];
 
+// Marker size is normalised per layer, and the magnitude is layer-specific: the agri
+// overlay carries no MW figure (capacity_mw is null for every county), so it sizes from
+// the NDVI anomaly instead of being drawn at the minimum radius.
+function magnitude(id, p) {
+  if (id === 'agri_overlay') return Math.abs(p.extra?.ndvi?.z ?? 0);
+  return p.capacity_mw || 0;
+}
+
 export function createSiteSystem({ markerRoot, manager, onRender }) {
   const groups = {};
   const features = {};
@@ -83,13 +91,13 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     // Normalise per layer: a 4-degree grid cell and a single mine are not comparable.
     const maxCap = {};
     shown.forEach(([id, f]) => {
-      maxCap[id] = Math.max(maxCap[id] || 1, f.properties.capacity_mw || 0);
+      maxCap[id] = Math.max(maxCap[id] || 1, magnitude(id, f.properties));
     });
 
     shown.forEach(([id, f]) => {
       const p = f.properties;
       const isStar = id === 'stars';
-      const size = isStar ? 0.05 : (0.004 + 0.03 * Math.sqrt((p.capacity_mw || 0) / maxCap[id]));
+      const size = isStar ? 0.05 : (0.004 + 0.03 * Math.sqrt(magnitude(id, p) / maxCap[id]));
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(size, 8, 8),
         new THREE.MeshBasicMaterial({ color: new THREE.Color(p.color || '#BDC3C7') }));

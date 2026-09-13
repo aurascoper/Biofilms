@@ -2,9 +2,9 @@
 Rev 6A agri_overlay: hash verification, and unknown-capacity handling in the two
 generic endpoints (/api/stats, /api/plants) that assume capacity_mw is always a float.
 
-capacity_mw=None is a real value for this layer (no NDVI baseline for a county), not an
-edge case. The load-bearing tests here are the ones that would have caught the bug that
-actually shipped once already: a payload with a mix of known and unknown capacity_mw
+capacity_mw is None for EVERY county in this layer: it has no MW figure, and |NDVI z|
+was once stored there as a marker magnitude, which /api/stats summed as megawatts. The
+endpoint tests use a synthetic layer with a mix of known and unknown capacity_mw, which
 must not crash either endpoint, must exclude unknowns from any sum, and must report how
 many were excluded rather than let that count disappear silently.
 
@@ -15,6 +15,7 @@ scheme would have let that corruption straight through.
 """
 
 import copy
+import dataclasses
 import hashlib
 import json
 import sys
@@ -76,8 +77,10 @@ def test_loader_accepts_a_valid_payload(tmp_path):
     result = _load_agri_overlay(f)
     assert len(result["items"]) == 2
     by_name = {i["name"]: i for i in result["items"]}
-    assert by_name["Boone"]["capacity_mw"] == pytest.approx(4.0)
-    # The whole point: unknown is None, not 0.0 or any other stand-in number.
+    # No county has a capacity: a z-score is not a megawatt figure, and it used to be
+    # stored here as |z| (Boone would have read 4.0 MW). The anomaly stays in extra.
+    assert by_name["Boone"]["capacity_mw"] is None
+    assert by_name["Boone"]["extra"]["ndvi"]["z"] == pytest.approx(-4.0)
     assert by_name["St. Louis City"]["capacity_mw"] is None
     assert by_name["St. Louis City"]["extra"]["ndvi_unavailable_reason"] == "no_cropland"
 
@@ -168,48 +171,80 @@ def test_a_v2_export_cannot_downgrade_to_the_cells_only_hash(tmp_path):
 
 @pytest.fixture
 def agri_source(tmp_path, monkeypatch):
+    """The REAL registry entry, pointed at a fixture file: dataclasses.replace keeps every
+    other field exactly as registered, so these tests exercise the registration and not a
+    copy of it."""
     f = tmp_path / "overlay.json"
     _write(f, _payload(MIXED_CELLS))
-    src = TrackedSource(
-        id="agri_overlay", path=f, layer_class=REFERENCE,
-        loader=_load_agri_overlay, empty={"items": [], "meta": {}},
-        count_of=lambda d: len((d or {}).get("items", [])),
-    )
+    src = dataclasses.replace(SOURCES["agri_overlay"], path=f)
     monkeypatch.setitem(SOURCES, "agri_overlay", src)
     return src
 
 
-def test_stats_excludes_unknown_from_sum_and_reports_the_count(agri_source):
+def test_stats_never_sums_a_z_score_as_megawatts(agri_source):
+    """Boone's z of -4.0 used to reach total_capacity_mw as 4.0 MW."""
     r = client.get("/api/stats", params={"layer": "agri_overlay"})
     assert r.status_code == 200
     body = r.json()
     assert body["count"] == 2
-    assert body["unknown_capacity_count"] == 1
-    # total_capacity_mw is Boone's 4.0 only -- St. Louis City's unknown must not have
-    # been coerced into the sum as 0.0 (which would be indistinguishable from this
-    # correct value here, but the point is it was *excluded*, not coincidentally equal).
+    assert body["unknown_capacity_count"] == 2
+    assert body["total_capacity_mw"] == 0.0
+    assert body["capacity_by_fuel"] == {}
+
+
+def test_plants_mw_filter_never_admits_a_z_score(agri_source):
+    """min_capacity=1 used to pass Boone through on |z| = 4. Every county is unknown, so an
+    explicit floor excludes them all and says so; the default floor keeps them all."""
+    r = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 1.0})
+    assert r.status_code == 200
+    assert r.json()["features"] == []
+    assert r.json()["excluded_unknown_capacity"] == 2
+    r = client.get("/api/plants", params={"layer": "agri_overlay"})
+    assert len(r.json()["features"]) == 2
+    assert r.json()["excluded_unknown_capacity"] == 0
+    assert all(f["properties"]["capacity_mw"] is None for f in r.json()["features"])
+
+
+# ── endpoint-level: the unknown-capacity counter on a mixed layer ─────────────
+
+
+@pytest.fixture
+def mixed_layer(monkeypatch):
+    """A layer with known and unknown capacities across two countries, registered under
+    the overlay's id so the routes see it through the same registry."""
+    items = [
+        {"name": "A", "country": "MO", "latitude": 1, "longitude": 1, "color_key": "x",
+         "capacity_mw": 4.0},
+        {"name": "B", "country": "MO", "latitude": 1, "longitude": 1, "color_key": "x",
+         "capacity_mw": None},
+        {"name": "C", "country": "IL", "latitude": 1, "longitude": 1, "color_key": "x",
+         "capacity_mw": None},
+    ]
+    src = TrackedSource(
+        id="agri_overlay", path=Path(__file__), layer_class=REFERENCE,
+        loader=lambda _p: {"items": items, "meta": {}}, empty={"items": [], "meta": {}},
+        count_of=lambda d: len((d or {}).get("items", [])),
+    )
+    monkeypatch.setitem(SOURCES, "agri_overlay", src)
+
+
+def test_stats_excludes_unknown_from_sum_and_reports_the_count(mixed_layer):
+    body = client.get("/api/stats", params={"layer": "agri_overlay"}).json()
+    assert body["count"] == 3
+    assert body["unknown_capacity_count"] == 2
     assert body["total_capacity_mw"] == pytest.approx(4.0)
 
 
-def test_plants_default_filter_reports_zero_excluded(agri_source):
+def test_plants_default_filter_reports_zero_excluded(mixed_layer):
     """min_capacity defaults to 0.0 -- an unknown capacity_mw must not be excluded just
     because 0.0 is a technically-passable floor. excluded_unknown_capacity must still be
-    present (0), not merely absent, so a consumer can tell 'no filter active' apart from
-    'filter active, nothing excluded'."""
-    r = client.get("/api/plants", params={"layer": "agri_overlay"})
-    assert r.status_code == 200
-    body = r.json()
-    assert len(body["features"]) == 2
+    present (0), not merely absent."""
+    body = client.get("/api/plants", params={"layer": "agri_overlay"}).json()
+    assert len(body["features"]) == 3
     assert body["excluded_unknown_capacity"] == 0
 
 
-def test_plants_active_filter_excludes_unknown_and_reports_the_count(agri_source):
-    """The case that actually recurs: an explicit min_capacity can't be verified against
-    an unknown value, so it's excluded -- and unlike the bug being fixed, that exclusion
-    is now counted, not silent."""
-    r = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 1.0})
-    assert r.status_code == 200
-    body = r.json()
-    names = {f["properties"]["name"] for f in body["features"]}
-    assert names == {"Boone"}
-    assert body["excluded_unknown_capacity"] == 1
+def test_plants_active_filter_excludes_unknown_and_reports_the_count(mixed_layer):
+    body = client.get("/api/plants", params={"layer": "agri_overlay", "min_capacity": 1.0}).json()
+    assert {f["properties"]["name"] for f in body["features"]} == {"A"}
+    assert body["excluded_unknown_capacity"] == 2
