@@ -305,11 +305,12 @@ def _load_agri_overlay(path: Path) -> dict:
     energy_market_bridge_probe*.py snapshot loaders. Never imports agri_yield_pipeline's code,
     only reads its frozen JSON export.
 
-    Verifies `payload_sha256` (schema_version>=2) over the whole payload minus that key itself --
+    Verifies `payload_sha256` (schema_version 2) over the whole payload minus that key itself --
     not just `cells`. A cells-only hash (schema_version 1's `cells_sha256`, kept here only for
     backward compatibility with exports written before this fix) would let a corrupted or
     hand-edited `generated_at`/`source_git_sha`/`provenance` pass untouched, since none of those
-    live inside `cells`."""
+    live inside `cells`. Exactly versions 1 and 2 are read; anything else is refused before
+    hashing, so a future schema is a deliberate change here rather than a silent v2 read."""
     d = json.loads(path.read_text())
     cells = d.get("cells") or []
 
