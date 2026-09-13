@@ -110,6 +110,18 @@ function frozen_geometry(parent::AbstractString, cfg)
     geo, path, snap_sha
 end
 
+"""
+Steps in `total` at `dt`. A quotient that is not an integer is refused rather than
+rounded: rounding integrates a different horizon while every control still compares
+against the declared one. Shared by run.jl and controls.jl so they cannot disagree.
+"""
+function nsteps_for(total::Float64, dt::Float64)
+    n = round(Int, total / dt)
+    require(abs(n * dt - total) <= 1e-9 * max(1.0, total),
+            "total_time / dt = $(total / dt) is not an integer number of steps")
+    n
+end
+
 "Hashes of the code and configuration that produced a receipt, recorded beside it."
 function code_hashes()
     Dict(f => sha256_file(joinpath(@__DIR__, f)) for f in

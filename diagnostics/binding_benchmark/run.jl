@@ -39,9 +39,7 @@ function main(parent::String, out::String, config::String)
     require(dt <= bound, "declared dt = $dt exceeds the derived bound $bound")
 
     total = Float64(cfg["total_time"])
-    nsteps = round(Int, total / dt)
-    require(abs(nsteps * dt - total) <= 1e-9 * max(1.0, total),
-            "total_time / dt = $(total / dt) is not an integer number of steps")
+    nsteps = nsteps_for(total, dt)
     every = Int(cfg["record_every"])
 
     rows = Vector{Dict{String, Any}}()

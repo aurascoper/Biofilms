@@ -39,7 +39,7 @@ function controls(parent::String, config::String)
     A = neighbour_fraction(geo.occupied)
     B = capacity_field(geo, p; A = A)
     dt = Float64(cfg["dt"]); total = Float64(cfg["total_time"])
-    nsteps = round(Int, total / dt); every = max(1, nsteps ÷ 10)
+    nsteps = nsteps_for(total, dt); every = max(1, nsteps ÷ 10)
     c0 = Float64(cfg["c0"]); b0 = Float64(cfg["b0"])
     results = Vector{Dict{String, Any}}()
     add!(name, question, verdict, detail) =

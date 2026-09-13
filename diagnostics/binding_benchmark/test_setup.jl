@@ -76,4 +76,17 @@ end
     @test_throws ArgumentError refuse_inside(parent, joinpath(link, "bench"))
 end
 
+@testset "the step count is shared, and a non-integral horizon is refused" begin
+    @test nsteps_for(50.0, 0.5) == 100
+    @test nsteps_for(50.0, 0.1) == 500                         # 0.1 is inexact; the tolerance absorbs it
+    @test_throws ArgumentError nsteps_for(50.1, 0.5)          # what controls.jl used to round to 100
+    @test_throws ArgumentError nsteps_for(1.0, 0.3)
+    # Both entry points route through it: neither may round on its own.
+    for f in ("run.jl", "controls.jl")
+        src = read(joinpath(@__DIR__, f), String)
+        @test occursin("nsteps_for(total, dt)", src)
+        @test !occursin("round(Int, total / dt)", src)
+    end
+end
+
 end # setup
