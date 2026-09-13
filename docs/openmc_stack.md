@@ -106,8 +106,13 @@ Regenerate with `coupling/scripts/regenerate_golden_tally.py` under this
 env (needs `OPENMC_CROSS_SECTIONS`, same as everything else here). It
 refuses to overwrite the committed fixture unless all 12 runs complete,
 matching `openmc_nested_pilot.py`'s `writes_canonical_tables` /
-`refuse_partial_publish` guard. Legitimately changes only if OpenMC or the
-nuclear-data library changes — the fixture header records both — which is
-what `.github/workflows/golden-tally-verification.yml` regenerates and
-diffs against on exactly that trigger, same compare-only-in-CI discipline
-as `tests/contract_csv.jl` for the serial fixture.
+`refuse_partial_publish` guard. Legitimately changes when OpenMC or the
+nuclear-data library changes — the fixture header records both — and when
+any module that produces the tally changes: the script's first-party import
+closure (`biofilm_openmc` config, model, mesh, materials, dose, the pilot's
+nuclear-data identity, and the shared `physical_contract` package). That
+closure is the `paths:` list of `.github/workflows/golden-tally-verification.yml`,
+which regenerates and diffs on any of them, same compare-only-in-CI
+discipline as `tests/contract_csv.jl` for the serial fixture. An earlier
+version of this sentence said only the first two could change it, which told
+a maintainer to ignore a valid drift.
