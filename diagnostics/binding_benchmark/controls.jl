@@ -34,12 +34,14 @@ end
 order(a, b) = log2(abs(a) / abs(b))
 
 """
-The verdict each control must report. K1 and K10 measure and do not judge; the two in
-EXPECTED_RED are red by design; every other control passes. A verdict that is not the
-expected one, including a PASS from a control that must be red, is an unexpected verdict.
+The verdict each control must report. K1 and K10 measure and do not judge. K7, K8 and
+K12 ask whether something fires and answer FIRES or DID-NOT-FIRE: K7 fires when the
+transfer happens, K8 and K12 (EXPECTED_RED) fire when the defect or the refusal shows.
+Every other control passes. A verdict that is not the expected one, including a PASS from
+a control whose vocabulary is FIRES, is an unexpected verdict.
 """
 expected_verdict(name::AbstractString) =
-    name in EXPECTED_RED ? "FIRES" :
+    (name in EXPECTED_RED || startswith(name, "K7 ")) ? "FIRES" :
     (startswith(name, "K1 ") || startswith(name, "K10 ")) ? "MEASURED" : "PASS"
 
 # The two controls whose correct outcome is red. Named here, once, so the receipt's

@@ -6,7 +6,7 @@
 #   julia --project=diagnostics/binding_benchmark \
 #         diagnostics/binding_benchmark/mutation_controls.jl <out_dir>
 #
-# An 81-assertion suite that went green the first time it ran is a suite nobody has seen
+# A suite that went green the first time it ran is a suite nobody has seen
 # fail. This is the receipt that it can.
 #
 # Every mutation is checked for having applied EXACTLY once before the suite is run. A

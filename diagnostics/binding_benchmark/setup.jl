@@ -57,6 +57,10 @@ function read_config(path)
     for k in ("D_c", "lambda", "k_on", "k_off", "B0", "dB")
         require(isfinite(p[k]) && p[k] >= 0, "$k must be finite and non-negative, got $(p[k])")
     end
+    # Without binding there is no bound trajectory: K3's convergence order is 0/0 and K1's
+    # relative bound difference has no denominator. The controls that do not need binding
+    # switch it off themselves, per control, from a configuration that has it.
+    require(p["k_on"] > 0, "k_on must be positive; this is a diffusion-and-binding benchmark")
     require(isfinite(p["K"]) && p["K"] > 0 && isfinite(p["n"]) && p["n"] > 0,
             "Hill K and n must be finite and positive")
     require(p["B0"] + p["dB"] > 0, "capacity must be positive somewhere on the occupied set")
@@ -117,6 +121,7 @@ against the declared one. Shared by run.jl and controls.jl so they cannot disagr
 """
 function nsteps_for(total::Float64, dt::Float64)
     n = round(Int, total / dt)
+    require(n >= 1, "total_time = $total is below one step of dt = $dt")
     require(abs(n * dt - total) <= 1e-9 * max(1.0, total),
             "total_time / dt = $(total / dt) is not an integer number of steps")
     n

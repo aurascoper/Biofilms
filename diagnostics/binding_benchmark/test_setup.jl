@@ -40,6 +40,7 @@ end
     # Signs: a negative loss rate is growth; the closed-decay claim does not survive it.
     @test_throws ArgumentError read_config(config_with(c -> c["params"]["lambda"] = -0.01))
     @test_throws ArgumentError read_config(config_with(c -> c["params"]["k_on"] = -1.0))
+    @test_throws ArgumentError read_config(config_with(c -> c["params"]["k_on"] = 0.0))   # K3 would be order(0, 0)
     @test_throws ArgumentError read_config(config_with(c -> c["params"]["D_c"] = -0.1))
     @test_throws ArgumentError read_config(config_with(c -> c["params"]["B0"] = -1.0))
     # Hill parameters: K = 0 divides by zero at A = 0, n = 0 is not a response.
@@ -102,6 +103,7 @@ end
     @test nsteps_for(50.0, 0.1) == 500                         # 0.1 is inexact; the tolerance absorbs it
     @test_throws ArgumentError nsteps_for(50.1, 0.5)          # what controls.jl used to round to 100
     @test_throws ArgumentError nsteps_for(1.0, 0.3)
+    @test_throws ArgumentError nsteps_for(1e-10, 1.0)         # rounded to zero steps, within tolerance
     # Both entry points route through it: neither may round on its own.
     for f in ("run.jl", "controls.jl")
         src = read(joinpath(@__DIR__, f), String)
@@ -146,6 +148,12 @@ end
     @test ev("K1 matched total capacity") == "MEASURED"
     @test ev("K10 both bound-fraction denominators") == "MEASURED"
     @test ev("K11 ledger closure from independent accumulators") == "PASS"
+    @test ev("K7 conservative release under a forced capacity decrease") == "FIRES"   # green is FIRES here
+    # Every add! call in controls.jl names a control the table classifies without falling
+    # through to PASS by accident: the FIRES-vocabulary controls are exactly K7, K8, K12.
+    names = [m.captures[1] for m in eachmatch(r"add!\(\"(K\d+ [^\"]+)\"", src)]
+    @test length(names) == 12
+    @test [n[1:findfirst(' ', n)-1] for n in names if ev(n) == "FIRES"] == ["K7", "K8", "K12"]
     @test "PASS" != ev(EXPECTED_RED[1])
 end
 

@@ -145,8 +145,9 @@ three contributing terms is pinned by its own assertion rather than by one combi
 number. The rate is re-evaluated inside every step, because `max(c)` and `max(B − b)` both
 move and a run can leave the admissible region after entering it. On the shipped
 configuration the initial rate is 0.74, the bound is 1.3514, the declared step is 0.5, and
-the margin is 0.37 at the start and 0.3527 at T (both maxima start at their largest and
-decrease from there, so the margin only shrinks).
+the margin is 0.37 at the start and stays below it throughout: it falls to 0.3524 by step
+70 and drifts back to 0.3527 at T as the bound pool saturates and `max(B − b)` stops
+shrinking faster than `max(c)`.
 
 `Δt ≤ 1/λ` is a positivity condition and not an accuracy condition. At `Δt = 1/λ` the
 scheme returns exactly zero against a continuum value of `1/e`, and the suite asserts
