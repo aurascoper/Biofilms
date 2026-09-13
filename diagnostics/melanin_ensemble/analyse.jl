@@ -81,11 +81,19 @@ function read_sweep(path, at)
         for (id, code, _) in PRODUCERS
             sp == id || continue
             seed = parse(Int, f[col["seed"]])
-            get!(rows, seed, Dict{String, Float64}())[code] = parse(Float64, f[col["mean_melanin"]])
+            r = get!(rows, seed, Dict{String, Float64}())
+            # A concatenated or duplicated sweep would otherwise overwrite silently.
+            haskey(r, code) && error("$path: duplicate row for seed $seed, species $sp, MCS $at")
+            r[code] = parse(Float64, f[col["mean_melanin"]])
             alpha[code] = parse(Float64, f[col["alpha_M"]])
         end
     end
     isnothing(col) && error("$path: no header line")
+    # Every seed the statistics see must carry all three producers; a seed missing one
+    # used to pass the seed count and fail later with a KeyError inside the pairing.
+    for (seed, r) in rows, (_, code, _) in PRODUCERS
+        haskey(r, code) || error("$path: seed $seed has no $code row at MCS $at")
+    end
     rows, alpha
 end
 
@@ -126,10 +134,16 @@ function main(args)
         r = paired_stats(rows, seeds, hi, lo)
         @printf("  %s - %s   mean %+.3f\n", hi, lo, r.mean)
         @printf("      paired sd of the difference   %.3f   <- needs no independence assumption\n", r.sd_paired)
-        @printf("      if the two were independent   %.3f   (pooled sd %.3f, separation %.2f)\n",
-                r.sd_indep, r.pooled, r.separation)
-        @printf("      within-run correlation        %+.3f   -> pooling %s the uncertainty\n",
-                r.r, r.sd_paired > r.sd_indep ? "UNDERSTATES" : "overstates")
+        @printf("      if the two were independent   %.3f   (pooled sd %.3f, separation %s)\n",
+                r.sd_indep, r.pooled, isnan(r.separation) ? "undefined" : @sprintf("%.2f", r.separation))
+        # Zero variance (MCS 0, before anything is produced) makes r and the separation
+        # undefined; a NaN compared false and used to print "overstates".
+        if isnan(r.r)
+            println("      within-run correlation        undefined: zero variance, nothing to compare")
+        else
+            @printf("      within-run correlation        %+.3f   -> pooling %s the uncertainty\n",
+                    r.r, r.sd_paired > r.sd_indep ? "UNDERSTATES" : "overstates")
+        end
         @printf("      %d of %d seeds in the alpha_M direction, exact two-sided sign test p = %.4g%s\n",
                 r.k, r.n, r.p, r.ties == 0 ? "" : @sprintf(" (%d ties dropped)", r.ties))
     end

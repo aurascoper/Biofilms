@@ -59,6 +59,7 @@ function main(args)
     # header-only CSV and report success; an `--at` past the run used to run a whole seed
     # first and fail afterwards, leaving a partial file.
     isempty(seeds) && error("no seeds in --seeds $(getopt(args, "--seeds", "42:57"))")
+    allunique(seeds) || error("duplicate seed in --seeds $(getopt(args, "--seeds", "42:57"))")
     n_mcs > 0 || error("--mcs must be positive, got $n_mcs")
     0 <= at <= n_mcs || error("--at $at is outside the run, 0 to $n_mcs")
     # Snapshots land on multiples of the interval; gcd makes MCS `at` one of them.

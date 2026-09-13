@@ -117,6 +117,8 @@ end
     @test m.p ≈ binom_two_sided(2, 2)
     # The mean and the spreads still see every seed; only the sign test drops ties.
     @test m.mean ≈ 3 / 5
+    # Zero variance leaves the correlation and the separation undefined, not directional.
+    @test isnan(t.r) && isnan(t.separation)
 end
 
 @testset "the sweep CSV contract, through the real reader" begin
@@ -140,14 +142,18 @@ end
 
     # Columns are found by name, so a producer that reorders them still parses correctly.
     shuffled = "mean_melanin,alpha_M,species,mcs,seed"
-    rows2, alpha2 = read_sweep(csv("shuffled.csv", shuffled, ["1.5,0.1400,3,100,42", "1.0,0.1000,1,100,42"]), 100)
-    @test rows2[42] == Dict("CS" => 1.5, "CN" => 1.0)
+    rows2, alpha2 = read_sweep(csv("shuffled.csv", shuffled, ["1.5,0.1400,3,100,42", "1.0,0.1000,1,100,42", "0.5,0.0650,5,100,42"]), 100)
+    @test rows2[42] == Dict("CS" => 1.5, "CN" => 1.0, "AN" => 0.5)
     @test alpha2["CN"] == 0.1
 
     # A missing or renamed column refuses rather than parsing a neighbour as the observable.
     @test_throws ErrorException read_sweep(csv("renamed.csv", replace(header, "mean_melanin" => "melanin"), body), 100)
     @test_throws ErrorException read_sweep(csv("noalpha.csv", replace(header, "alpha_M" => "aM"), body), 100)
     @test_throws ErrorException read_sweep(csv("noheader.csv", "# only comments", String[]), 100)
+    # A seed missing one producer used to pass the seed count and KeyError inside the pairing.
+    @test_throws ErrorException read_sweep(csv("missing.csv", header, body[1:6]), 100)   # seed 43 lacks AN
+    # A duplicated row is refused rather than silently overwriting the first.
+    @test_throws ErrorException read_sweep(csv("dup.csv", header, [body; body[1]]), 100)
 
     # The three producers, by the species indices the model assigns.
     @test [id for (id, _, _) in PRODUCERS] == [3, 1, 5]
@@ -175,6 +181,8 @@ end
     @test !sweep(joinpath(dir, "empty.csv"), "--seeds", "57:42", "--mcs", "4", "--at", "4")
     @test !isfile(joinpath(dir, "empty.csv"))
     @test !sweep(out, "--seeds", "42", "--mcs", "4", "--at", "4")       # destination exists
+    @test !sweep(joinpath(dir, "dup.csv"), "--seeds", "42,42", "--mcs", "4", "--at", "4")
+    @test !isfile(joinpath(dir, "dup.csv"))
 end
 
 end

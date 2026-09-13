@@ -34,6 +34,12 @@ for CN−AN against `+0.111` for CS−CN:
 | CN − AN | 0.373 | 0.0347 | 0.91 | 0.15 | 12 of 16 | **~9 of 16, a coin flip** |
 | full `alpha_M` ordering | | | | | 11 of 16 | **~9 of 16** |
 
+> **Correction, added after the run (2026-09-13; the table above is preserved as written).**
+> The two "gap N=40" entries are seed 42 alone, read from the pinned fixture, while the
+> "gap N=20" entries are ensemble means over sixteen seeds. Mixing the two estimands is the
+> error the ledger row MEL-N40-01 records: the ensemble CN−AN gap at N=40 came back 0.3256,
+> 9.4x the seed-42 value this table used, and the prediction built on it was wrong.
+
 **Predict the pairs, not the total.** The aggregate count moves 11 → about 9, which
 reads as "no change", while underneath CS−CN hardens and CN−AN collapses to chance.
 A single k-of-16 can stay flat while its composition inverts, and "eleven of sixteen"

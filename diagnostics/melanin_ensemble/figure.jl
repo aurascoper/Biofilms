@@ -25,9 +25,13 @@
 # -layout of the PDF) sidecars, so it is already compliant if it ever moves to
 # preprint/figures/, where the staleness guards would apply to it.
 #
-#   julia --project=. diagnostics/melanin_ensemble/figure.jl [sweep.csv]
+#   julia --project=diagnostics/melanin_ensemble diagnostics/melanin_ensemble/figure.jl [sweep.csv]
 #
-# A sweep at any other configuration is refused: the provenance line below is
+# The root Project.toml does not declare CairoMakie; this directory's does, with a
+# Manifest pinning the version that rendered the committed PNG.
+#
+# A sweep at any other configuration (N, parcels, MCS) is refused, and so is one
+# missing a producer row or the published seed: the provenance line below is
 # printed from constants, and the CSV's own header must agree with them.
 
 using CairoMakie, Printf, SHA, Statistics
@@ -41,6 +45,7 @@ const OUTBASE = joinpath(@__DIR__, "melanin_ensemble_n40_p6")
 # cannot drift from what was plotted.
 const N          = 40
 const PARCELS    = 6
+const N_MCS      = 400
 const AT_MCS     = 100
 const PUBLISHED  = 42          # the seed tests/fixtures/serial_seed42.csv pins
 const PRODUCERS  = [(3, "C. sphaerospermum", 0.140),
@@ -87,10 +92,18 @@ function read_at(path, at)
 end
 
 function main()
+    # Refused before any output is written: nothing here may leave a fresh image beside
+    # a stale sidecar, and the .txt needs pdftotext.
+    isnothing(Sys.which("pdftotext")) &&
+        error("pdftotext not found: the .txt sidecar could not be written, refusing to render")
     data, meta = read_at(CSVIN, AT_MCS)
-    (meta["N"], meta["parcels_per_species"]) == (N, PARCELS) ||
-        error("$CSVIN is N=$(meta["N"]) with $(meta["parcels_per_species"]) parcels; " *
-              "this figure is drawn for N=$N with $PARCELS, and its provenance line would lie")
+    (meta["N"], meta["parcels_per_species"], meta["n_mcs"]) == (N, PARCELS, N_MCS) ||
+        error("$CSVIN is N=$(meta["N"]), $(meta["parcels_per_species"]) parcels, $(meta["n_mcs"]) MCS; " *
+              "this figure is drawn for N=$N, $PARCELS parcels, $N_MCS MCS, and its provenance line would lie")
+    haskey(data, PUBLISHED) || error("$CSVIN has no seed $PUBLISHED, the marked one")
+    for (s, v) in data, (id, name, _) in PRODUCERS
+        haskey(v, id) || error("$CSVIN: seed $s has no row for $name (species $id) at MCS $AT_MCS")
+    end
     seeds = sort(collect(keys(data)))
     xs    = 1:length(PRODUCERS)
     gapc  = [(s, data[s][1] - data[s][5]) for s in seeds]      # CN - AN
@@ -155,7 +168,7 @@ function main()
     # clipped is worse than none: the .txt sidecar would carry the truncation.
     Label(fig[3, 1:2],
           @sprintf("biofilms_potts.jl run_simulation via diagnostics/melanin_ensemble/sweep.jl  |  N=%d, %d parcels/species, %d MCS, seeds %d:%d, read at MCS %d\nobservable: volume-weighted mean melanin over occupied sites, NOT the mean of per-parcel means  |  α_M is a declared input, so an ordering displays it and does not measure it",
-                   N, PARCELS, meta["n_mcs"], minimum(seeds), maximum(seeds), AT_MCS);
+                   N, PARCELS, N_MCS, minimum(seeds), maximum(seeds), AT_MCS);
           fontsize = 9, color = MUTED, halign = :left, justification = :left,
           tellwidth = false)
 
@@ -164,8 +177,6 @@ function main()
     # The sidecars the header promises. Written here, by the same run, so a changed CSV
     # cannot leave a stale extraction and checksum beside a fresh image.
     write(OUTBASE * ".sha256", bytes2hex(sha256(read(OUTBASE * ".png"))) * "\n")
-    isnothing(Sys.which("pdftotext")) &&
-        error("pdftotext not found: the .txt sidecar would go stale, refusing to leave it")
     run(pipeline(`pdftotext -layout $(OUTBASE * ".pdf") -`; stdout = OUTBASE * ".txt"))
     @printf("wrote %s.{pdf,png}\n  %d of %d seeds ordered; CN-AN mean %+.4f, seed %d %+.4f (rank %d)\n",
             OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap,
