@@ -36,6 +36,12 @@ def read_vti(path):
     head = raw[:cut].decode("utf-8", "replace")
     if "compressor=" in head:
         raise ValueError(f"{path}: compressed .vti; this reader handles the raw form only")
+    # The block-length prefix is read as 8 bytes little-endian below; a file declaring
+    # anything else would be decoded misaligned rather than refused.
+    if 'header_type="UInt64"' not in head:
+        raise ValueError(f"{path}: header_type is not UInt64; this reader handles no other")
+    if 'byte_order="BigEndian"' in head:
+        raise ValueError(f"{path}: BigEndian; this reader handles little-endian only")
     m = re.search(r'WholeExtent="([^"]+)"', head)
     if not m:
         raise ValueError(f"{path}: no WholeExtent")
@@ -47,9 +53,13 @@ def read_vti(path):
     marker = raw.index(b"_", cut) + 1
 
     def grab(dtype, off):
-        n = int(np.frombuffer(raw, np.uint64, count=1, offset=marker + off)[0])
-        return np.frombuffer(raw, dtype, count=n // np.dtype(dtype).itemsize,
-                             offset=marker + off + 8)
+        w = np.dtype(dtype).itemsize
+        n = int(np.frombuffer(raw, "<u8", count=1, offset=marker + off)[0])
+        # Flooring n // w would accept a truncated block and drop its tail silently.
+        if n % w or marker + off + 8 + n > len(raw):
+            raise ValueError(f"{path}: block at offset {off} declares {n} bytes, "
+                             f"not a whole number of {w}-byte items inside the file")
+        return np.frombuffer(raw, dtype, count=n // w, offset=marker + off + 8)
 
     # Only <CellData> is per-site. FieldData is a sibling of <Piece> and PointData sits
     # inside it; counting either per cell inflates bytes/site by a whole array's width.
@@ -61,7 +71,10 @@ def read_vti(path):
         t, n, off = a.group(1), a.group(2), int(a.group(3))
         if t not in DT:
             raise ValueError(f"{path}: unknown DataArray type {t}")
-        arrays[n] = (grab(DT[t], off), t, np.dtype(DT[t]).itemsize)
+        arr = grab(DT[t], off)
+        if len(arr) != cells:
+            raise ValueError(f"{path}: cell array {n} holds {len(arr)} values for {cells} cells")
+        arrays[n] = (arr, t, np.dtype(DT[t]).itemsize)
     if not arrays:
         raise ValueError(f"{path}: no CellData arrays")
 
@@ -71,21 +84,25 @@ def read_vti(path):
         for a in re.finditer(r'<DataArray type="(\w+)" Name="(\w+)"[^>]*offset="(\d+)"', fd.group(1)):
             if a.group(1) in DT:
                 fields[a.group(2)] = float(grab(DT[a.group(1)], int(a.group(3)))[0])
-    return arrays, fields, cells, len(raw), raw
+    return arrays, fields, cells, len(raw), raw, (nx, ny, nz)
 
 
 def audit(files):
     frames, sizes, gz = [], [], []
     for p in files:
-        arrays, fields, cells, nbytes, raw = read_vti(p)
+        arrays, fields, cells, nbytes, raw, _ = read_vti(p)
         frames.append((arrays, fields, cells))
         sizes.append(nbytes)
         gz.append(len(gzip.compress(raw, 9)))
     names = list(frames[0][0])
-    for arrays, _, _ in frames[1:]:
-        if list(arrays) != names:
-            raise ValueError("array inventory differs between frames")
     cells = frames[0][2]
+    # Names alone let a frame with another extent or another dtype through, and every
+    # bytes/site figure below would then be divided by the first frame's cell count.
+    schema = [(n, frames[0][0][n][1]) for n in names]
+    for i, (arrays, _, c) in enumerate(frames[1:], 1):
+        if [(n, arrays[n][1]) for n in arrays] != schema or c != cells:
+            raise ValueError(f"frame {i} ({files[i]}): inventory, types or cell count "
+                             f"differ from frame 0")
 
     rows = []
     for n in names:
@@ -93,11 +110,22 @@ def audit(files):
         hs = {hashlib.sha256(np.ascontiguousarray(a[n][0]).tobytes()).hexdigest() for a, _, _ in frames}
         distinct = max(len(np.unique(a[n][0])) for a, _, _ in frames)
         rows.append({"name": n, "type": t, "bytes_per_site": w, "distinct_max": int(distinct),
-                     "constant_in_frame": bool(distinct == 1), "static_across_frames": len(hs) == 1})
+                     "constant_in_frame": bool(distinct == 1),
+                     # One frame has nothing to be static against; the flag was true for
+                     # every array of a single-file audit and the whole frame read as waste.
+                     "static_across_frames": len(frames) > 1 and len(hs) == 1})
 
     # Functional dependence: X is derivable from Y when no two sites sharing a Y value
-    # disagree about X, in every frame. Checked by counting unique (Y, X) pairs against
-    # unique Y values.
+    # disagree about X, across the WHOLE trajectory. The pairs of every frame are pooled
+    # before counting, so a lookup that changes between frames is not a lookup; and the
+    # pair keeps both native dtypes, since a Float64 cast merges Int64 values past 2^53.
+    def determines(other, name):
+        y = np.concatenate([np.ascontiguousarray(a[other][0]).ravel() for a, _, _ in frames])
+        x = np.concatenate([np.ascontiguousarray(a[name][0]).ravel() for a, _, _ in frames])
+        pair = np.empty(len(y), dtype=[("y", y.dtype), ("x", x.dtype)])
+        pair["y"], pair["x"] = y, x
+        return len(np.unique(pair)) == len(np.unique(y))
+
     for r in rows:
         if r["constant_in_frame"]:
             r["derivable_from"] = None
@@ -106,15 +134,7 @@ def audit(files):
         for other in names:
             if other == r["name"]:
                 continue
-            ok = True
-            for arrays, _, _ in frames:
-                y = np.ascontiguousarray(arrays[other][0]).ravel()
-                x = np.ascontiguousarray(arrays[r["name"]][0]).ravel()
-                pair = np.stack([y.astype(np.float64), x.astype(np.float64)], axis=1)
-                if len(np.unique(pair, axis=0)) != len(np.unique(y)):
-                    ok = False
-                    break
-            if ok:
+            if determines(other, r["name"]):
                 # A near-unique source determines everything trivially: if almost every
                 # site has its own Y value, no two sites can disagree about X. Record the
                 # source cardinality so a reader can tell a real lookup from an artefact,
@@ -123,6 +143,16 @@ def audit(files):
                 src.append({"array": other, "distinct": int(card),
                             "informative": bool(card <= cells // 8)})
         r["derivable_from"] = src or None
+
+    # What can actually be dropped. An array is removable only while an informative
+    # source of it is still kept, largest first; otherwise a mutual pair (the fixture's
+    # label and label_squared) was counted twice although one of them must stay.
+    kept = set(names)
+    for r in sorted(rows, key=lambda r: (-r["bytes_per_site"], r["name"])):
+        srcs = [d["array"] for d in (r["derivable_from"] or []) if d["informative"]]
+        r["removable"] = not r["static_across_frames"] and any(s in kept for s in srcs)
+        if r["removable"]:
+            kept.discard(r["name"])
     return rows, cells, sum(sizes), sum(gz), len(files)
 
 
@@ -140,14 +170,12 @@ def report(files, out_json=None):
               f"{', '.join(d['array'] + ('' if d['informative'] else ' (weak)') for d in r['derivable_from']) if r['derivable_from'] else ''}")
 
     static = sum(r["bytes_per_site"] for r in rows if r["static_across_frames"])
-    deriv = sum(r["bytes_per_site"] for r in rows
-                if not r["static_across_frames"] and r["derivable_from"]
-                and any(d["informative"] for d in r["derivable_from"]))
+    deriv = sum(r["bytes_per_site"] for r in rows if r["removable"])
     occ = cells * n / 8
     print(f"\n  on disk                         {tot/2**20:9.2f} MiB")
     print(f"  gzip -9                         {tot_gz/2**20:9.2f} MiB  ({tot/tot_gz:.2f}x)")
     print(f"  static across frames            {100*static/per:8.1f}% of every frame, "
-          f"written {n}x, needed once")
+          f"written {n}x, needed once" + ("" if n > 1 else "  (one frame: not assessable)"))
     print(f"  derivable from another array    {100*deriv/per:8.1f}%")
     print(f"  neither                         {100*(per-static-deriv)/per:8.1f}%  <- the real payload")
     print(f"  binary occupancy, 1 bit/site    {100*(1/8)/per:8.3f}%  <- the DAG ceiling "

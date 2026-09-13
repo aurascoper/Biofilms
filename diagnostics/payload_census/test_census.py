@@ -21,13 +21,15 @@ def make_vti(path, cells_xyz, cell_arrays, field_arrays=(), point_arrays=(), com
     nx, ny, nz = cells_xyz
     ext = f"0 {nx} 0 {ny} 0 {nz}"
     blob, offs = bytearray(), {}
-    for name, arr in cell_arrays.items():
+    # Every declared array gets its own block. Field and point arrays used to be declared
+    # at offset 0 and alias the first cell block, which is not a valid .vti.
+    for name, arr in [*cell_arrays.items(), *field_arrays, *point_arrays]:
         offs[name] = len(blob)
         b = np.ascontiguousarray(arr).tobytes()
         blob += struct.pack("<Q", len(b)) + b
     def decls(items):
         return "".join(f'<DataArray type="{VTK[np.asarray(a).dtype.name]}" Name="{n}" '
-                       f'format="appended" offset="{offs.get(n, 0)}"/>' for n, a in items)
+                       f'format="appended" offset="{offs[n]}"/>' for n, a in items)
     comp = ' compressor="vtkZLibDataCompressor"' if compressed else ""
     pd = f"<PointData>{decls(point_arrays)}</PointData>" if point_arrays else ""
     fd = f"<FieldData>{decls(field_arrays)}</FieldData>" if field_arrays else ""
@@ -53,8 +55,9 @@ class TestReader(unittest.TestCase):
     def test_cells_from_whole_extent_and_values_round_trip(self):
         # WholeExtent counts POINTS; cells are one fewer per axis.
         v = np.arange(4 * 3 * 2, dtype=np.int32)
-        arrays, _, cells, _, _ = read_vti(make_vti(self.f(), (4, 3, 2), {"x": v}))
+        arrays, _, cells, _, _, dims = read_vti(make_vti(self.f(), (4, 3, 2), {"x": v}))
         self.assertEqual(cells, 24)
+        self.assertEqual(dims, (4, 3, 2))
         np.testing.assert_array_equal(arrays["x"][0], v)
         self.assertEqual(arrays["x"][1], "Int32")
         self.assertEqual(arrays["x"][2], 4)
@@ -63,10 +66,11 @@ class TestReader(unittest.TestCase):
         # FieldData is a sibling of <Piece>; PointData sits inside it. Counting either
         # per cell inflates bytes/site by a whole array's width.
         c = {"species": np.ones(8, dtype=np.uint8)}
-        arrays, _, _, _, _ = read_vti(make_vti(self.f(), (2, 2, 2), c,
-                                               field_arrays=[("mcs", np.zeros(1, np.float64))],
+        arrays, fields, _, _, _, _ = read_vti(make_vti(self.f(), (2, 2, 2), c,
+                                               field_arrays=[("mcs", np.full(1, 7.0))],
                                                point_arrays=[("nodal", np.zeros(27, np.float64))]))
         self.assertEqual(list(arrays), ["species"])
+        self.assertEqual(fields, {"mcs": 7.0})          # its own block, not the species bytes
 
     def test_malformed_input_is_refused_not_guessed(self):
         with open(self.f("bad.vti"), "wb") as fh:
@@ -78,6 +82,23 @@ class TestReader(unittest.TestCase):
                               {"x": np.zeros(8, np.uint8)}, compressed=True))
         with self.assertRaises(ValueError):
             read_vti(make_vti(self.f("z.vti"), (0, 2, 2), {"x": np.zeros(0, np.uint8)}))
+        # A cell array shorter than the extent, or a block not a whole number of items.
+        with self.assertRaises(ValueError):
+            read_vti(make_vti(self.f("short.vti"), (2, 2, 2), {"x": np.zeros(7, np.int32)}))
+        p = make_vti(self.f("ragged.vti"), (2, 2, 2), {"x": np.zeros(8, np.int32)})
+        raw = open(p, "rb").read()
+        i = raw.index(b"_", raw.index(b"<AppendedData")) + 1
+        with open(p, "wb") as fh:
+            fh.write(raw[:i] + struct.pack("<Q", 31) + raw[i + 8:])   # 31 bytes of Int32
+        with self.assertRaises(ValueError):
+            read_vti(p)
+        # Header forms this reader does not decode are refused, not misread.
+        p = make_vti(self.f("u32.vti"), (2, 2, 2), {"x": np.zeros(8, np.int32)})
+        with open(p, "r+b") as fh:
+            raw = fh.read().replace(b'header_type="UInt64"', b'header_type="UInt32"')
+            fh.seek(0); fh.write(raw); fh.truncate()
+        with self.assertRaises(ValueError):
+            read_vti(p)
 
 
 class TestAudit(unittest.TestCase):
@@ -166,6 +187,57 @@ class TestAudit(unittest.TestCase):
         make_vti(files[1], (4, 4, 4), {"label": np.zeros(64, np.int32)})   # different inventory
         with self.assertRaises(ValueError):
             audit(files)
+
+    def test_a_frame_with_another_extent_or_dtype_is_refused(self):
+        # Same names, 27 cells instead of 64: was accepted and divided by 64.
+        files = self.build(n_frames=2)
+        a = {k: v[0] for k, v in read_vti(files[0])[0].items()}
+        make_vti(files[1], (3, 3, 3), {k: v[:27] for k, v in a.items()})
+        with self.assertRaises(ValueError):
+            audit(files)
+        files = self.build(n_frames=2)
+        a = {k: v[0] for k, v in read_vti(files[0])[0].items()}
+        a["label"] = a["label"].astype(np.int64)                             # same name, other type
+        make_vti(files[1], (4, 4, 4), a)
+        with self.assertRaises(ValueError):
+            audit(files)
+
+    def test_one_frame_cannot_be_static(self):
+        # A single-file audit used to mark every array static and the whole frame redundant.
+        rows = {r["name"]: r for r in audit(self.build(n_frames=1))[0]}
+        self.assertFalse(any(r["static_across_frames"] for r in rows.values()))
+        self.assertFalse(rows["static_field"]["static_across_frames"])
+        # and with two frames the same array is static again, so the flag is about frames
+        self.assertTrue({r["name"]: r for r in audit(self.build(n_frames=2))[0]}["static_field"]["static_across_frames"])
+
+    def test_a_lookup_that_changes_between_frames_is_not_a_lookup(self):
+        # X = Y in frame 0 and X = 3 - Y in frame 1: a function in each frame, and no single
+        # table reconstructs X from Y across the trajectory. Was reported derivable.
+        y = (np.arange(64) % 3).astype(np.int32)
+        f0 = make_vti(os.path.join(self.d, "m0.vti"), (4, 4, 4), {"y": y, "x": y.copy()})
+        f1 = make_vti(os.path.join(self.d, "m1.vti"), (4, 4, 4), {"y": y, "x": (3 - y).astype(np.int32)})
+        rows = {r["name"]: r for r in audit([f0, f1])[0]}
+        self.assertNotIn("y", [d["array"] for d in (rows["x"]["derivable_from"] or [])])
+        # and the consistent direction still holds, so this is not vacuous
+        f2 = make_vti(os.path.join(self.d, "m2.vti"), (4, 4, 4), {"y": y, "x": y.copy()})
+        rows = {r["name"]: r for r in audit([f0, f2])[0]}
+        self.assertIn("y", [d["array"] for d in rows["x"]["derivable_from"]])
+
+    def test_int64_above_2_53_is_compared_exactly(self):
+        # 2^53 and 2^53 + 1 are one Float64; two sites sharing Y with those two X values
+        # were reported as a lookup.
+        y = np.zeros(8, np.int32)
+        x = np.array([2**53, 2**53 + 1] * 4, dtype=np.int64)
+        f = make_vti(os.path.join(self.d, "big.vti"), (2, 2, 2), {"y": y, "x": x, "spread": np.arange(8, dtype=np.int32)})
+        rows = {r["name"]: r for r in audit([f])[0]}
+        self.assertNotIn("y", [d["array"] for d in (rows["x"]["derivable_from"] or [])])
+
+    def test_a_mutual_pair_is_counted_once(self):
+        # label and label_squared each determine the other; one of them has to stay.
+        rows = {r["name"]: r for r in audit(self.build())[0]}
+        self.assertEqual(sum(rows[k]["removable"] for k in ("label", "label_squared")), 1)
+        self.assertFalse(rows["static_field"]["removable"])       # static is counted elsewhere
+        self.assertFalse(rows["noise"]["removable"])              # only weak sources
 
 
 if __name__ == "__main__":
