@@ -26,6 +26,7 @@ pinned heating tally through the real, live repo code -- specific_energy_per_sou
 from __future__ import annotations
 
 import ast
+import sys
 import json
 from pathlib import Path
 
@@ -165,13 +166,19 @@ def _first_party_imports(path: Path) -> set[Path]:
                 pkg = path.parent
                 for _ in range(node.level - 1):
                     pkg = pkg.parent
-                if node.module:
-                    add(Path(*node.module.split(".")), [pkg])
-                else:
-                    for alias in node.names:      # from . import x
-                        add(Path(alias.name), [pkg])
-            elif node.module:
-                add(Path(*node.module.split(".")), absolute_roots)
+                base, roots = Path(*node.module.split(".")) if node.module else Path(), [pkg]
+            else:
+                base, roots = Path(*node.module.split(".")), absolute_roots
+            if node.module:
+                add(base, roots)
+            # AN ALIAS MAY BE A SUBMODULE. `from biofilm_openmc import x`
+            # loads `biofilm_openmc.x` when x is a module; the walker used to
+            # record the package initialiser and stop, so a producer pulled
+            # in by name ran without being in either workflow filter. `add`
+            # keeps a name only when a file exists for it, so an attribute
+            # resolves to nothing and is ignored.
+            for alias in node.names:
+                add(base / alias.name, roots)
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 add(Path(*alias.name.split(".")), absolute_roots)
@@ -255,6 +262,39 @@ def test_relative_imports_are_part_of_the_closure():
     deps = {p.as_posix() for p in _first_party_imports(
         _REPO / "coupling" / "biofilm_openmc" / "model.py")}
     assert "coupling/biofilm_openmc/snapshot.py" in deps, sorted(deps)
+
+
+def test_from_import_aliases_that_name_submodules_are_resolved(tmp_path, monkeypatch):
+    """`from biofilm_openmc import producer` LOADS `biofilm_openmc.producer`
+    when that name is a submodule, and so does `from .sub import leaf`. The
+    walker recorded the package initialiser and stopped, so a producer pulled
+    in by name entered the generating run without entering either workflow
+    filter. Each alias is now tried as a child module and kept when the file
+    exists; a name that resolves to no file is an attribute and is ignored.
+
+    KNOWN-BAD, on a throwaway tree so nothing is written into the repository:
+    a package with a child module and a nested package with a leaf, imported
+    only through from-import aliases. Disable the alias branch and this fails.
+    """
+    root = tmp_path / "coupling"
+    (root / "pkg" / "sub").mkdir(parents=True)
+    (root / "pkg" / "__init__.py").write_text("VALUE = 1\n")
+    (root / "pkg" / "child.py").write_text("")
+    (root / "pkg" / "sub" / "__init__.py").write_text("")
+    (root / "pkg" / "sub" / "leaf.py").write_text("")
+    (root / "pkg" / "user.py").write_text("from .sub import leaf\n")
+    (root / "main.py").write_text("from pkg import child, VALUE\n")
+    monkeypatch.setattr(sys.modules[__name__], "_REPO", tmp_path)
+    monkeypatch.setattr(sys.modules[__name__], "_FIRST_PARTY_BASES", ("coupling",))
+
+    absolute = {p.as_posix() for p in _first_party_imports(root / "main.py")}
+    assert "coupling/pkg/child.py" in absolute, sorted(absolute)
+    assert "coupling/pkg/__init__.py" in absolute, sorted(absolute)
+    assert not [p for p in absolute if "VALUE" in p], sorted(absolute)
+
+    relative = {p.as_posix() for p in _first_party_imports(root / "pkg" / "user.py")}
+    assert "coupling/pkg/sub/leaf.py" in relative, sorted(relative)
+    assert "coupling/pkg/sub/__init__.py" in relative, sorted(relative)
 
 
 def test_the_calibration_root_is_part_of_the_closure():
