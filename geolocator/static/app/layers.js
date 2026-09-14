@@ -122,7 +122,7 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
       markers.push(mesh);
     });
 
-    onRender?.(shown, features, enabled());
+    onRender?.(shown, features, enabled(), health.freshness || {});
   }
 
   async function refreshAndRender() {

@@ -443,9 +443,14 @@ def test_the_hud_never_reports_a_non_capacity_layer_as_zero_mw():
     assert "hasCapacity(id)" in stats
     # Applicability is decided from the enabled layers, not from the shown features: an
     # MW layer whose filters match nothing must read "0 MW", not n/a.
-    assert "enabled.some(hasCapacity)" in stats
     assert "mwApplies ?" in stats and "'n/a'" in stats
     assert "withMw.length ?" not in stats
+    # ... and from those layers' data state, not their ids alone: an enabled MW layer
+    # whose source is unavailable serves nothing and must read n/a, not 0 MW.
+    assert "enabled.some(hasCapacity)" not in stats
+    applies = stats.split("const mwApplies = ", 1)[1].split(";", 1)[0]
+    assert "hasCapacity(id)" in applies and "!== 'unavailable'" in applies
+    assert "onRender?.(shown, features, enabled(), health.freshness" in _client("layers.js")
     html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
     assert "</b> MW" not in html.split('id="stat-cap"', 1)[1].split("</div>", 1)[0]
 
