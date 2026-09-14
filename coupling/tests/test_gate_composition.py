@@ -122,7 +122,11 @@ _WORKFLOW = (_REPO / ".github" / "workflows"
              / "golden-tally-verification.yml")
 
 
-_FIRST_PARTY_BASES = ("coupling", "coupling/scripts", "contract")
+# Every directory a first-party absolute import can resolve against. The pilot
+# puts `calibration` on sys.path and imports `biofilm_calibration` from it, so
+# the calibration root is a base like the others; leaving it out hid
+# joint_uncertainty.py from the closure.
+_FIRST_PARTY_BASES = ("coupling", "coupling/scripts", "contract", "calibration")
 
 
 def _first_party_imports(path: Path) -> set[Path]:
@@ -138,6 +142,15 @@ def _first_party_imports(path: Path) -> set[Path]:
                               root / rel / "__init__.py"):
                 if candidate.exists():
                     out.add(candidate.relative_to(_REPO))
+                    # IMPLICIT PACKAGE INITIALISERS EXECUTE TOO. Importing
+                    # `biofilm_openmc.config` runs `biofilm_openmc/__init__.py`
+                    # first, whether or not anything names it; every
+                    # `__init__.py` between the root and the module is part of
+                    # the generating run and belongs in the closure.
+                    for parent in candidate.relative_to(root).parents:
+                        init = root / parent / "__init__.py"
+                        if init.exists():
+                            out.add(init.relative_to(_REPO))
 
     absolute_roots = [_REPO / b for b in _FIRST_PARTY_BASES]
     for node in ast.walk(tree):
@@ -242,6 +255,29 @@ def test_relative_imports_are_part_of_the_closure():
     deps = {p.as_posix() for p in _first_party_imports(
         _REPO / "coupling" / "biofilm_openmc" / "model.py")}
     assert "coupling/biofilm_openmc/snapshot.py" in deps, sorted(deps)
+
+
+def test_the_calibration_root_is_part_of_the_closure():
+    """`openmc_nested_pilot.py` puts `calibration` on sys.path and imports
+    `biofilm_calibration.joint_uncertainty`, the correlated-draw sampler the
+    pilot's outer draws come from. With the calibration root missing from
+    `_FIRST_PARTY_BASES` the module resolved nowhere and was silently absent
+    from the closure and the workflow. Drop "calibration" from the bases and
+    this fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    assert "calibration/biofilm_calibration/joint_uncertainty.py" in producers, \
+        sorted(producers)
+
+
+def test_implicit_package_initialisers_are_part_of_the_closure():
+    """Importing any `biofilm_openmc.*` module executes
+    `coupling/biofilm_openmc/__init__.py`; nothing names it, so a walk over
+    named imports never returned it. Disable the initialiser rule in `add`
+    and this fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    for init in ("coupling/biofilm_openmc/__init__.py",
+                 "calibration/biofilm_calibration/__init__.py"):
+        assert init in producers, sorted(producers)
 
 
 def test_the_shared_contract_package_is_a_fixture_producer():

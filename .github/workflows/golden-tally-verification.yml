@@ -77,6 +77,13 @@ on:
       - "coupling/biofilm_openmc/lineage.py"
       - "coupling/biofilm_openmc/snapshot.py"
       - "coupling/biofilm_openmc/synthetic_gate.py"
+      # The calibration root and the implicit package initialisers, found by
+      # the closure once it resolved against `calibration` and returned every
+      # `__init__.py` it passes through (Codex, PR #12 at a29ecc0).
+      - "calibration/biofilm_calibration/__init__.py"
+      - "calibration/biofilm_calibration/joint_uncertainty.py"
+      - "calibration/biofilm_calibration/schema.py"
+      - "coupling/biofilm_openmc/__init__.py"
   # ANCHORED, not copied. Two hand-maintained path lists drift, and the one
   # that drifts is the one nobody watches -- here that would be the PR trigger,
   # the only one that fires before a merge.
