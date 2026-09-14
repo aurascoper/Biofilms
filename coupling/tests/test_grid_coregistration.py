@@ -168,3 +168,92 @@ def test_a_shifted_grid_origin_is_caught(tmp_path):
                        "target_calibration": False,
                        "evidence_policy": "synthetic",
                        "openmc_version": "0.15.3"})
+
+
+# ------------------------------------------- the two production reshapes
+
+def _openmc_bin_order(field: np.ndarray) -> np.ndarray:
+    """OpenMC's mesh-filter bin order, written out as the loops rather than as
+    a numpy transpose: x fastest, then y, then z. INDEPENDENT of the
+    `reshape(...[::-1]).transpose(2, 1, 0)` the two production helpers use,
+    so a wrong helper cannot be cancelled by a wrong fixture written from the
+    same expression."""
+    nx, ny, nz = field.shape
+    return np.array([field[x, y, z]
+                     for z in range(nz) for y in range(ny) for x in range(nx)],
+                    dtype=float)
+
+
+class _Material:
+    def __init__(self, name, density):
+        self.name = name
+        self._rho = density
+
+    def get_mass_density(self):
+        return self._rho
+
+
+class _Geometry:
+    def __init__(self, materials):
+        self._m = {i: m for i, m in enumerate(materials)}
+
+    def get_all_materials(self):
+        return self._m
+
+
+class _Model:
+    def __init__(self, materials):
+        self.geometry = _Geometry(materials)
+
+
+def test_extract_heating_places_each_bin_where_the_lattice_says(tmp_path):
+    """THE PRODUCTION TRANSFORM, PROBED. The tests above check the bundle's
+    declaration; this one calls `dose.extract_heating`, which reimplements
+    the mesh-bin reshape on its own, and requires the value it puts at each
+    probe to be the value the loops put there."""
+    from biofilm_openmc.dose import extract_heating
+
+    from conftest import FakeStatepoint, FakeTally
+
+    field = _asymmetric_field(SHAPE)
+    flat = _openmc_bin_order(field).reshape(-1, 1)
+    mean, _ = extract_heating(FakeStatepoint(
+        {"heating": FakeTally(flat, np.zeros_like(flat))}), SHAPE)
+    for idx in PROBES:
+        assert mean[idx] == pytest.approx(field[idx]), (
+            f"extract_heating put {mean[idx]} at {idx}; the tally holds "
+            f"{field[idx]} there")
+
+
+def test_mesh_material_masses_place_each_bin_where_the_lattice_says():
+    """The second reimplementation, `materials.mesh_material_masses_kg`, takes
+    the raytraced per-bin volumes in the same OpenMC order and reshapes them
+    itself. Fed volumes whose value encodes the bin's index (in grams, at unit
+    density), the mass at each probe must be that index's value."""
+    from biofilm_openmc.materials import mesh_material_masses_kg
+
+    field = _asymmetric_field(SHAPE)
+    volumes = {"biomass": _openmc_bin_order(field)}          # cm^3 per bin
+    mass = mesh_material_masses_kg(None, _Model([_Material("biomass", 1.0)]),
+                                   SHAPE, volumes=volumes)
+    for idx in PROBES:
+        assert mass[idx] == pytest.approx(field[idx] * 1e-3), (
+            f"mesh_material_masses_kg put {mass[idx]} at {idx}; the volume "
+            f"list holds {field[idx]} cm^3 there")
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2])
+def test_a_flipped_tally_is_caught_by_the_production_transform(axis):
+    """The negative control for the two tests above: a tally written in
+    flipped order must land at the wrong probes, or the probes are not
+    asymmetric enough to see a wrong transform."""
+    from biofilm_openmc.dose import extract_heating
+
+    from conftest import FakeStatepoint, FakeTally
+
+    field = _asymmetric_field(SHAPE)
+    flat = _openmc_bin_order(np.flip(field, axis=axis)).reshape(-1, 1)
+    mean, _ = extract_heating(FakeStatepoint(
+        {"heating": FakeTally(flat, np.zeros_like(flat))}), SHAPE)
+    assert [idx for idx in PROBES if mean[idx] != field[idx]], (
+        f"a flip of axis {axis} changed nothing at any probe")
