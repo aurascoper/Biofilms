@@ -42,10 +42,13 @@ def test_refinement_is_refused_by_name_before_transport(tmp_path):
 
 
 def test_the_base_resolution_gets_past_the_refusal(tmp_path):
-    """The control's control: factor 1 must reach the next stage, which here
-    is the missing openmc stack."""
+    """The control's control: factor 1 must reach the next stage. Which stage
+    that is depends on the tier: in the bare tier the openmc import is
+    missing; in the golden-tally job openmc is present and the next thing
+    missing is the dosimetry config beside the transport one. The first
+    version named only the import and went red in the tier with openmc."""
     cfg = tmp_path / "base.toml"
     cfg.write_text(VALID_CONFIG)
-    with pytest.raises((ModuleNotFoundError, ImportError)):
+    with pytest.raises((ModuleNotFoundError, ImportError, FileNotFoundError)):
         e2e.main(["--snapshot", str(tmp_path / "nope.h5"),
                   "--config", str(cfg), "--outdir", str(tmp_path / "out")])
