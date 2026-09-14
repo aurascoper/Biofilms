@@ -415,6 +415,22 @@ def test_the_tooltip_escapes_every_feature_field_it_interpolates():
     assert order == sorted(order)
 
 
+def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
+    """ensureFetched caches on `id in features` and nothing ever dropped the entry, so a
+    layer fetched while its export was missing, or since updated, stayed stale until a
+    page reload. The poll now compares each cached id's fingerprint and status against
+    the previous poll and deletes the entry on change; an enabled changed layer is
+    refetched at once. Source-level: no JS runtime in this tier."""
+    js = _client("layers.js")
+    assert "if (id in features) return;" in js.split("async function ensureFetched(", 1)[1].split("\n  }\n", 1)[0]
+    inv = js.split("function invalidateChanged(", 1)[1].split("\n  }\n", 1)[0]
+    assert "a.fingerprint !== b.fingerprint" in inv and "a.status !== b.status" in inv
+    assert "delete features[id]" in inv
+    poll = js.split("async function pollHealth(", 1)[1].split("\n  }\n", 1)[0]
+    assert "invalidateChanged(before, health.freshness" in poll
+    assert "manager.isEnabled(id)" in poll and "await refreshAndRender()" in poll
+
+
 # ── client: every server layer is selectable ──────────────────────────────────
 
 

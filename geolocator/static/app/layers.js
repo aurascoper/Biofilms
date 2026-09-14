@@ -53,12 +53,27 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     markerRoot.add(groups[id]);
   });
 
+  /** Drop a layer's cached features when the poll says its source changed, so the next
+   *  render refetches. `ensureFetched` caches on first fetch; without this a layer
+   *  fetched while its source was missing stayed empty, and a routine export update
+   *  stayed invisible, until a page reload. Only ids the previous poll had already
+   *  reported are compared, so the first poll does not refetch what was just loaded. */
+  function invalidateChanged(before, after) {
+    return Object.keys(features).filter((id) => {
+      const a = before[id]; const b = after[id] || {};
+      return a && (a.fingerprint !== b.fingerprint || a.status !== b.status);
+    }).map((id) => { delete features[id]; return id; });
+  }
+
   async function pollHealth() {
+    const before = { ...(health.freshness || {}) };
     try {
       const r = await fetch('/api/health', { cache: 'no-store' });
       Object.assign(health, await r.json());
     } catch { /* the panel will show what it last knew */ }
+    const changed = invalidateChanged(before, health.freshness || {});
     manager.refresh();
+    if (changed.some((id) => manager.isEnabled(id))) await refreshAndRender();
   }
 
   async function ensureFetched(id) {
