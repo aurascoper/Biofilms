@@ -71,9 +71,15 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
       const r = await fetch('/api/health', { cache: 'no-store' });
       Object.assign(health, await r.json());
     } catch { /* the panel will show what it last knew */ }
-    const changed = invalidateChanged(before, health.freshness || {});
+    const after = health.freshness || {};
+    const changed = invalidateChanged(before, after);
     manager.refresh();
     if (changed.some((id) => manager.isEnabled(id))) await refreshAndRender();
+    // The HUD reads freshness only during a render. A poll that changed freshness but
+    // invalidated nothing (the first poll, whose ids the previous poll had not reported)
+    // must still re-render, or an enabled layer that is unavailable from page load reads
+    // 0 MW until the next poll or a user action.
+    else if (JSON.stringify(before) !== JSON.stringify(after)) render();
   }
 
   async function ensureFetched(id) {
