@@ -436,7 +436,11 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     assert "if (!r.ok) return;" in fetched and "catch {" in fetched
     # A poll that changed freshness without invalidating anything (the first poll) must
     # still re-render, so the HUD's applicability predicate sees the new status.
-    assert "else if (JSON.stringify(before) !== JSON.stringify(after)) render();" in poll
+    # ... comparing only the site layers' status and fingerprint: the full map carries
+    # market_bars.age_s, which changes every poll and rebuilt every marker each time.
+    assert "else if (JSON.stringify(siteFreshness(before)) !== JSON.stringify(siteFreshness(after))) render();" in poll
+    proj = js.split("const siteFreshness = ", 1)[1].split(";\n", 1)[0]
+    assert "SITE_LAYERS.map(" in proj and ".status" in proj and ".fingerprint" in proj and "age_s" not in proj
 
 
 # ── client: every server layer is selectable ──────────────────────────────────

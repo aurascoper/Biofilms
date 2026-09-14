@@ -65,6 +65,12 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     }).map((id) => { delete features[id]; return id; });
   }
 
+  /** The two freshness fields site rendering reads, for the site layers only. The full
+   *  map also carries market_bars, whose age_s is recomputed on every request, so
+   *  comparing it whole re-rendered every marker on every poll. */
+  const siteFreshness = (fresh) => SITE_LAYERS.map(({ id }) =>
+    [id, fresh?.[id]?.status, fresh?.[id]?.fingerprint]);
+
   async function pollHealth() {
     const before = { ...(health.freshness || {}) };
     try {
@@ -83,7 +89,7 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     // invalidated nothing (the first poll, whose ids the previous poll had not reported)
     // must still re-render, or an enabled layer that is unavailable from page load reads
     // 0 MW until the next poll or a user action.
-    else if (JSON.stringify(before) !== JSON.stringify(after)) render();
+    else if (JSON.stringify(siteFreshness(before)) !== JSON.stringify(siteFreshness(after))) render();
   }
 
   async function ensureFetched(id) {
