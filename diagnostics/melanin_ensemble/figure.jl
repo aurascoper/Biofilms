@@ -30,9 +30,10 @@
 # The root Project.toml does not declare CairoMakie; this directory's does, with a
 # Manifest pinning the version that rendered the committed PNG.
 #
-# A sweep at any other configuration (N, parcels, MCS) is refused, and so is one
-# missing a producer row or the published seed: the provenance line below is
-# printed from constants, and the CSV's own header must agree with them.
+# A sweep at any other configuration (N, parcels, MCS, or the alpha_M coefficients
+# that give the x-axis its order) is refused, and so is one missing a producer row
+# or the published seed: the provenance line below is printed from constants, and
+# the CSV's own header and columns must agree with them.
 
 using CairoMakie, Printf, SHA, Statistics
 
@@ -61,6 +62,7 @@ const MUTED    = colorant"#6b6b68"
 
 function read_at(path, at)
     rows = Dict{Int,Dict{Int,Float64}}()
+    alpha = Dict{Int,Float64}()
     meta = Dict{String,Int}()
     col = nothing
     for line in eachline(path)
@@ -76,19 +78,21 @@ function read_at(path, at)
         f = split(line, ",")
         if isnothing(col)
             col = Dict(name => i for (i, name) in enumerate(f))
-            all(haskey(col, c) for c in ("seed", "mcs", "species", "mean_melanin")) ||
+            all(haskey(col, c) for c in ("seed", "mcs", "species", "alpha_M", "mean_melanin")) ||
                 error("$path: header lacks a column this figure reads: $line")
             continue
         end
         parse(Int, f[col["mcs"]]) == at || continue
-        get!(rows, parse(Int, f[col["seed"]]), Dict{Int,Float64}())[parse(Int, f[col["species"]])] =
+        sp = parse(Int, f[col["species"]])
+        get!(rows, parse(Int, f[col["seed"]]), Dict{Int,Float64}())[sp] =
             parse(Float64, f[col["mean_melanin"]])
+        alpha[sp] = parse(Float64, f[col["alpha_M"]])
     end
     isempty(rows) && error("no rows at MCS $at in $path")
     for k in ("N", "parcels_per_species", "n_mcs")
         haskey(meta, k) || error("$path: no '# N=... parcels_per_species=... n_mcs=...' line; cannot state provenance")
     end
-    return rows, meta
+    return rows, alpha, meta
 end
 
 function main()
@@ -96,10 +100,17 @@ function main()
     # a stale sidecar, and the .txt needs pdftotext.
     isnothing(Sys.which("pdftotext")) &&
         error("pdftotext not found: the .txt sidecar could not be written, refusing to render")
-    data, meta = read_at(CSVIN, AT_MCS)
+    data, alpha, meta = read_at(CSVIN, AT_MCS)
     (meta["N"], meta["parcels_per_species"], meta["n_mcs"]) == (N, PARCELS, N_MCS) ||
         error("$CSVIN is N=$(meta["N"]), $(meta["parcels_per_species"]) parcels, $(meta["n_mcs"]) MCS; " *
               "this figure is drawn for N=$N, $PARCELS parcels, $N_MCS MCS, and its provenance line would lie")
+    # The x-axis order IS the alpha_M order; a sweep run with other coefficients would be
+    # drawn under a label that no longer describes it.
+    for (id, name, a) in PRODUCERS
+        isapprox(get(alpha, id, NaN), a; atol = 1e-6) ||
+            error("$CSVIN: alpha_M for $name (species $id) is $(get(alpha, id, "absent")), " *
+                  "this figure is drawn for $a")
+    end
     haskey(data, PUBLISHED) || error("$CSVIN has no seed $PUBLISHED, the marked one")
     for (s, v) in data, (id, name, _) in PRODUCERS
         haskey(v, id) || error("$CSVIN: seed $s has no row for $name (species $id) at MCS $AT_MCS")
