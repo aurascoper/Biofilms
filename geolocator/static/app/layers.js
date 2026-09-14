@@ -61,15 +61,16 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
   /** Drop a layer's cached features when the poll says its source changed, so the next
    *  render refetches. `ensureFetched` caches on first fetch; without this a layer
    *  fetched while its source was missing stayed empty, and a routine export update
-   *  stayed invisible, until a page reload. Only ids the previous poll had already
-   *  reported are compared, so the first poll does not refetch what was just loaded. */
+   *  stayed invisible, until a page reload. A layer with no baseline (the first poll)
+   *  counts as changed: main.js awaits that poll before any site fetch, so the first
+   *  fetch is associated with a known fingerprint rather than racing it. */
   function invalidateChanged(before, after) {
     // Over the site layers, not the cache keys: a layer whose first fetch is still in
     // flight has no cache entry, and iterating the cache never bumped its generation, so
     // the old request passed the guard and cached a stale response.
     return SITE_LAYERS.map(({ id }) => id).filter((id) => {
       const a = before[id]; const b = after[id] || {};
-      return a && (a.fingerprint !== b.fingerprint || a.status !== b.status);
+      return !a || a.fingerprint !== b.fingerprint || a.status !== b.status;
     }).map((id) => { delete features[id]; generation[id] = (generation[id] || 0) + 1; return id; });
   }
 

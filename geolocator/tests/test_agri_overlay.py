@@ -442,6 +442,13 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     # is in flight has no cache entry and must still be bumped.
     assert "SITE_LAYERS.map(({ id }) => id).filter(" in inv
     assert "Object.keys(features)" not in inv
+    # A layer with no baseline counts as changed, and the baseline exists before any site
+    # fetch: main.js awaits the first health poll instead of launching the fetch beside it.
+    assert "return !a || a.fingerprint !== b.fingerprint" in inv
+    boot = _client("main.js")
+    assert "await sites.pollHealth();" in boot
+    assert "\nsites.refreshAndRender();" not in boot
+    assert boot.index("await sites.pollHealth();") < boot.index("setInterval(sites.pollHealth")
     assert "if (id in features || inflight.has(id)) return;" in fetched
     assert "const gen = generation[id] || 0;" in fetched
     assert "if ((generation[id] || 0) === gen) features[id] = got;" in fetched

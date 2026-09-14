@@ -206,8 +206,11 @@ let last = performance.now();
 $('fuel-filter').addEventListener('change', sites.render);
 $('min-cap').addEventListener('change', sites.render);
 
-sites.refreshAndRender();
-sites.pollHealth();
+// The first health response seeds the freshness baseline before any site fetch, so the
+// first fetch is associated with a known fingerprint; the poll then fetches what is
+// enabled and absent. Launching the fetch beside the poll let a pre-retarget response
+// be cached against a fingerprint the poll had already superseded.
+await sites.pollHealth();
 setInterval(sites.pollHealth, 15000);
 bandsys.load();
 latticeLayer.update();
