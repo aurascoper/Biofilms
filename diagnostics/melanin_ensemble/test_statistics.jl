@@ -39,6 +39,12 @@ sweep(out, args...) = success(pipeline(`$(Base.julia_cmd()) $SWEEP $out $args`; 
     # extreme one small but nonzero.
     @test binom_two_sided(512, 1024) ≈ 1.0 atol = 1e-12
     @test 0 < binom_two_sided(0, 1024) < 1e-300
+    # From n = 1076 one direction is below Float64's smallest subnormal; the value is kept
+    # exact and printed from BigFloat, so it prints as a number and not as 0.
+    @test binom_two_sided(1076, 1076) == 2 // big(2)^1076
+    @test Float64(binom_two_sided(1076, 1076)) == 0.0            # what the old form printed
+    @test fmtp(binom_two_sided(1076, 1076)) == "2.47e-324"
+    @test fmtp(binom_two_sided(16, 16)) == "3.052e-05"           # the committed receipts' value
     # The pinned small-n values, to 1e-12, so the exact form cannot drift from the old one.
     @test isapprox(binom_two_sided(15, 16), 34 / 65536; atol = 1e-12)
     @test isapprox(binom_two_sided(12, 16), 5034 / 65536; atol = 1e-12)
@@ -163,6 +169,11 @@ end
     @test_throws ErrorException read_sweep(csv("missing.csv", header, body[1:6]), 100)   # seed 43 lacks AN
     # A duplicated row is refused rather than silently overwriting the first.
     @test_throws ErrorException read_sweep(csv("dup.csv", header, [body; body[1]]), 100)
+    # Coefficients in another order are refused by name: "the alpha_M direction" is CS > CN > AN.
+    rev = [replace(replace(replace(l, ",0.1400," => ",X,"), ",0.0650," => ",0.1400,"), ",X," => ",0.0650,") for l in body]
+    @test_throws ErrorException read_sweep(csv("reversed.csv", header, rev), 100)
+    # A file whose early seeds carry other coefficients is refused at the first disagreement.
+    @test_throws ErrorException read_sweep(csv("mixed.csv", header, [rev[1:3]; body[5:8]]), 100)
 
     # The three producers, by the species indices the model assigns.
     @test [id for (id, _, _) in PRODUCERS] == [3, 1, 5]

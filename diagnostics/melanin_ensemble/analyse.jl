@@ -18,13 +18,19 @@ using Printf, Statistics
 
 const PRODUCERS = [(3, "CS", "C. sphaerospermum"), (1, "CN", "C. neoformans"), (5, "AN", "A. niger")]
 
-"Exact two-sided binomial sign test at p = 1/2: the total probability of every outcome no more likely than the one observed."
+"""
+Exact two-sided binomial sign test at p = 1/2: the total probability of every outcome no
+more likely than the one observed, as an exact rational. Not converted to Float64: the
+earlier form divided each term by 2.0^n, Inf past n = 1023, and the one after it converted
+the exact result, which underflows to 0 from n = 1076 in one direction. `fmtp` prints it.
+"""
 function binom_two_sided(k::Int, n::Int)
-    # Exact in BigInt, one division at the end. The earlier form divided each term by
-    # 2.0^n, which is Inf past n = 1023, so 512 of 1024 came back p = 0 instead of 1.
     c = [binomial(big(n), big(i)) for i in 0:n]
-    Float64(sum(c[i] for i in eachindex(c) if c[i] <= c[k + 1]) // big(2)^n)
+    sum(c[i] for i in eachindex(c) if c[i] <= c[k + 1]) // big(2)^n
 end
+
+"Format a probability without losing it to Float64 underflow."
+fmtp(p) = @sprintf("%.4g", BigFloat(p))
 
 """
     paired_stats(rows, seeds, hi, lo)
@@ -86,7 +92,11 @@ function read_sweep(path, at)
             # A concatenated or duplicated sweep would otherwise overwrite silently.
             haskey(r, code) && error("$path: duplicate row for seed $seed, species $sp, MCS $at")
             r[code] = parse(Float64, f[col["mean_melanin"]])
-            alpha[code] = parse(Float64, f[col["alpha_M"]])
+            a = parse(Float64, f[col["alpha_M"]])
+            # A mixed-configuration file would otherwise keep only the last value seen.
+            get(alpha, code, a) == a || error("$path: alpha_M for $code changes within the file, " *
+                                              "$(alpha[code]) then $a at seed $seed")
+            alpha[code] = a
         end
     end
     isnothing(col) && error("$path: no header line")
@@ -95,6 +105,11 @@ function read_sweep(path, at)
     for (seed, r) in rows, (_, code, _) in PRODUCERS
         haskey(r, code) || error("$path: seed $seed has no $code row at MCS $at")
     end
+    # "The alpha_M direction" below means CS > CN > AN, the Table 2 order. A sweep run
+    # with other coefficients would have its votes counted against the wrong ordering.
+    alpha["CS"] > alpha["CN"] > alpha["AN"] ||
+        error("$path: alpha_M order is not CS > CN > AN (CS $(alpha["CS"]), CN $(alpha["CN"]), " *
+              "AN $(alpha["AN"])); this analysis counts against that order")
     rows, alpha
 end
 
@@ -145,8 +160,8 @@ function main(args)
             @printf("      within-run correlation        %+.3f   -> pooling %s the uncertainty\n",
                     r.r, r.sd_paired > r.sd_indep ? "UNDERSTATES" : "overstates")
         end
-        @printf("      %d of %d seeds in the alpha_M direction, exact two-sided sign test p = %.4g%s\n",
-                r.k, r.n, r.p, r.ties == 0 ? "" : @sprintf(" (%d ties dropped)", r.ties))
+        @printf("      %d of %d seeds in the alpha_M direction, exact two-sided sign test p = %s%s\n",
+                r.k, r.n, fmtp(r.p), r.ties == 0 ? "" : @sprintf(" (%d ties dropped)", r.ties))
     end
 
     println("\nThe ordering is an input. These numbers describe how reliably one trajectory")
