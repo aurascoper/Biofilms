@@ -884,6 +884,14 @@ def lattice():
     return get_lattice()
 
 
+@app.get("/api/research/fuel-baskets")
+def research_fuel_baskets():
+    """Complete research family; does not call the unredacted lattice source."""
+    from geolocator.market import DB_PATH
+    from geolocator.research import research_snapshot
+    return research_snapshot(DB_PATH)
+
+
 @app.get("/api/imagery/blue-marble/meta")
 def imagery_meta():
     """The imagery contract: provider, vintage, projection, attribution, and the
