@@ -14,7 +14,7 @@ applied to its own output.
 ```sh
 julia diagnostics/melanin_ensemble/sweep.jl /tmp/sweep.csv      # 16 seeds, about 11 s
 julia diagnostics/melanin_ensemble/analyse.jl /tmp/sweep.csv
-julia diagnostics/melanin_ensemble/test_statistics.jl           # 78 assertions, no data
+julia diagnostics/melanin_ensemble/test_statistics.jl           # 84 assertions, no data
 julia --project=diagnostics/melanin_ensemble diagnostics/melanin_ensemble/figure.jl   # the N=40 figure
 ```
 
@@ -99,5 +99,5 @@ model does.
 |---|---|
 | `sweep.jl` | runs the seeds, writes one row per (seed, mcs, species) |
 | `analyse.jl` | paired statistics, ordering counts, exact binomial sign test (ties leave the test) |
-| `test_statistics.jl` | 78 data-free assertions |
+| `test_statistics.jl` | 84 data-free assertions |
 | `sweep_seeds42-57.csv`, `analysis.txt` | committed receipts of the run above |

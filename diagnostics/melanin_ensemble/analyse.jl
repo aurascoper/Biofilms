@@ -20,9 +20,10 @@ const PRODUCERS = [(3, "CS", "C. sphaerospermum"), (1, "CN", "C. neoformans"), (
 
 "Exact two-sided binomial sign test at p = 1/2: the total probability of every outcome no more likely than the one observed."
 function binom_two_sided(k::Int, n::Int)
-    pk(i) = Float64(binomial(big(n), big(i))) / 2.0^n
-    target = pk(k) * (1 + 1e-12)
-    sum(pk(i) for i in 0:n if pk(i) <= target)
+    # Exact in BigInt, one division at the end. The earlier form divided each term by
+    # 2.0^n, which is Inf past n = 1023, so 512 of 1024 came back p = 0 instead of 1.
+    c = [binomial(big(n), big(i)) for i in 0:n]
+    Float64(sum(c[i] for i in eachindex(c) if c[i] <= c[k + 1]) // big(2)^n)
 end
 
 """

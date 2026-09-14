@@ -35,6 +35,15 @@ sweep(out, args...) = success(pipeline(`$(Base.julia_cmd()) $SWEEP $out $args`; 
     @test binom_two_sided(9, 16) > binom_two_sided(10, 16) > binom_two_sided(11, 16)
     # No observations: nothing is unlikely, p = 1.
     @test binom_two_sided(0, 0) ≈ 1.0
+    # Past n = 1023 a Float64 2^n is Inf; a balanced result must still be p = 1 and an
+    # extreme one small but nonzero.
+    @test binom_two_sided(512, 1024) ≈ 1.0 atol = 1e-12
+    @test 0 < binom_two_sided(0, 1024) < 1e-300
+    # The pinned small-n values, to 1e-12, so the exact form cannot drift from the old one.
+    @test isapprox(binom_two_sided(15, 16), 34 / 65536; atol = 1e-12)
+    @test isapprox(binom_two_sided(12, 16), 5034 / 65536; atol = 1e-12)
+    @test isapprox(binom_two_sided(0, 16), 2 / 65536; atol = 1e-12)
+    @test isapprox(binom_two_sided(8, 16), 1.0; atol = 1e-12)
 end
 
 @testset "paired and unpaired spreads differ, and the direction is informative" begin
