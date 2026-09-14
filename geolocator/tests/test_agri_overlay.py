@@ -428,7 +428,12 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     assert "delete features[id]" in inv
     poll = js.split("async function pollHealth(", 1)[1].split("\n  }\n", 1)[0]
     assert "const after = health.freshness" in poll and "invalidateChanged(before, after)" in poll
-    assert "manager.isEnabled(id)" in poll and "await refreshAndRender()" in poll
+    # Every enabled layer whose entry is absent is refetched on each poll: the ones just
+    # invalidated and any whose last fetch failed, so a transient failure is retried.
+    assert "if (enabled().some((id) => !(id in features))) await refreshAndRender();" in poll
+    fetched = js.split("async function ensureFetched(", 1)[1].split("\n  }\n", 1)[0]
+    assert "features[id] = []" not in fetched
+    assert "if (!r.ok) return;" in fetched and "catch {" in fetched
     # A poll that changed freshness without invalidating anything (the first poll) must
     # still re-render, so the HUD's applicability predicate sees the new status.
     assert "else if (JSON.stringify(before) !== JSON.stringify(after)) render();" in poll

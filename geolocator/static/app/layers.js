@@ -72,9 +72,13 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
       Object.assign(health, await r.json());
     } catch { /* the panel will show what it last knew */ }
     const after = health.freshness || {};
-    const changed = invalidateChanged(before, after);
+    invalidateChanged(before, after);
     manager.refresh();
-    if (changed.some((id) => manager.isEnabled(id))) await refreshAndRender();
+    // Refetch every enabled layer whose entry is absent: the ones just invalidated, and
+    // any whose last fetch failed. A failed fetch leaves no entry, so every poll is a
+    // retry; the one-shot refetch that used to hang off `changed` alone could not recover
+    // from a transient failure until the source changed again.
+    if (enabled().some((id) => !(id in features))) await refreshAndRender();
     // The HUD reads freshness only during a render. A poll that changed freshness but
     // invalidated nothing (the first poll, whose ids the previous poll had not reported)
     // must still re-render, or an enabled layer that is unavailable from page load reads
@@ -84,9 +88,13 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
 
   async function ensureFetched(id) {
     if (id in features) return;
-    const r = await fetch(`/api/plants?layer=${id}&limit=${PLANT_LIMIT}`, { cache: 'no-store' });
-    if (!r.ok) { features[id] = []; return; }
-    features[id] = (await r.json()).features;
+    // A failed fetch is not cached: the entry stays absent and the next poll retries.
+    // Storing [] here made a transient non-2xx look like an empty layer until reload.
+    try {
+      const r = await fetch(`/api/plants?layer=${id}&limit=${PLANT_LIMIT}`, { cache: 'no-store' });
+      if (!r.ok) return;
+      features[id] = (await r.json()).features;
+    } catch { /* left absent; retried on the next poll */ }
   }
 
   const enabled = () => SITE_LAYERS.map((l) => l.id).filter((id) => manager.isEnabled(id));
