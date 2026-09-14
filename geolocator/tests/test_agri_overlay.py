@@ -422,7 +422,6 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     the previous poll and deletes the entry on change; an enabled changed layer is
     refetched at once. Source-level: no JS runtime in this tier."""
     js = _client("layers.js")
-    assert "if (id in features) return;" in js.split("async function ensureFetched(", 1)[1].split("\n  }\n", 1)[0]
     inv = js.split("function invalidateChanged(", 1)[1].split("\n  }\n", 1)[0]
     assert "a.fingerprint !== b.fingerprint" in inv and "a.status !== b.status" in inv
     assert "delete features[id]" in inv
@@ -430,10 +429,20 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     assert "const after = health.freshness" in poll and "invalidateChanged(before, after)" in poll
     # Every enabled layer whose entry is absent is refetched on each poll: the ones just
     # invalidated and any whose last fetch failed, so a transient failure is retried.
-    assert "if (enabled().some((id) => !(id in features))) await refreshAndRender();" in poll
+    assert "if (enabled().some((id) => !(id in features) && !inflight.has(id))) await refreshAndRender();" in poll
     fetched = js.split("async function ensureFetched(", 1)[1].split("\n  }\n", 1)[0]
     assert "features[id] = []" not in fetched
     assert "if (!r.ok) return;" in fetched and "catch {" in fetched
+    # A fetch in flight across an invalidating poll must not land after the retry and
+    # restore the old dataset, and the poll must not start a second request beside it:
+    # a per-id generation is bumped on invalidation, captured before the await, and
+    # checked before assignment; in-flight ids are skipped by the fetch and the poll.
+    assert "generation[id] = (generation[id] || 0) + 1" in inv
+    assert "if (id in features || inflight.has(id)) return;" in fetched
+    assert "const gen = generation[id] || 0;" in fetched
+    assert "if ((generation[id] || 0) === gen) features[id] = got;" in fetched
+    assert "finally { inflight.delete(id); }" in fetched
+    assert "!(id in features) && !inflight.has(id)" in poll
     # A poll that changed freshness without invalidating anything (the first poll) must
     # still re-render, so the HUD's applicability predicate sees the new status.
     # ... comparing only the site layers' status and fingerprint: the full map carries

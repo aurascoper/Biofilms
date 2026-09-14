@@ -45,6 +45,11 @@ function magnitude(id, p) {
 export function createSiteSystem({ markerRoot, manager, onRender }) {
   const groups = {};
   const features = {};
+  // Per-layer generation, bumped on invalidation, and the ids with a request in flight.
+  // A fetch that started before an invalidation must not land after the retry and
+  // restore the old dataset; a poll must not start a second request beside one in flight.
+  const generation = {};
+  const inflight = new Set();
   const health = { freshness: {} };
   let markers = [];
 
@@ -62,7 +67,7 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     return Object.keys(features).filter((id) => {
       const a = before[id]; const b = after[id] || {};
       return a && (a.fingerprint !== b.fingerprint || a.status !== b.status);
-    }).map((id) => { delete features[id]; return id; });
+    }).map((id) => { delete features[id]; generation[id] = (generation[id] || 0) + 1; return id; });
   }
 
   /** The two freshness fields site rendering reads, for the site layers only. The full
@@ -84,7 +89,7 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     // any whose last fetch failed. A failed fetch leaves no entry, so every poll is a
     // retry; the one-shot refetch that used to hang off `changed` alone could not recover
     // from a transient failure until the source changed again.
-    if (enabled().some((id) => !(id in features))) await refreshAndRender();
+    if (enabled().some((id) => !(id in features) && !inflight.has(id))) await refreshAndRender();
     // The HUD reads freshness only during a render. A poll that changed freshness but
     // invalidated nothing (the first poll, whose ids the previous poll had not reported)
     // must still re-render, or an enabled layer that is unavailable from page load reads
@@ -93,14 +98,18 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
   }
 
   async function ensureFetched(id) {
-    if (id in features) return;
+    if (id in features || inflight.has(id)) return;
+    const gen = generation[id] || 0;
+    inflight.add(id);
     // A failed fetch is not cached: the entry stays absent and the next poll retries.
     // Storing [] here made a transient non-2xx look like an empty layer until reload.
     try {
       const r = await fetch(`/api/plants?layer=${id}&limit=${PLANT_LIMIT}`, { cache: 'no-store' });
       if (!r.ok) return;
-      features[id] = (await r.json()).features;
-    } catch { /* left absent; retried on the next poll */ }
+      const got = (await r.json()).features;
+      // Discard a response that predates the latest observed source state.
+      if ((generation[id] || 0) === gen) features[id] = got;
+    } catch { /* left absent; retried on the next poll */ } finally { inflight.delete(id); }
   }
 
   const enabled = () => SITE_LAYERS.map((l) => l.id).filter((id) => manager.isEnabled(id));
