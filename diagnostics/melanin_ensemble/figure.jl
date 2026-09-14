@@ -60,6 +60,10 @@ const MARKED   = colorant"#eb6834"
 const INK      = colorant"#2f2f2e"
 const MUTED    = colorant"#6b6b68"
 
+ordinal(n) = n == 1 ? "smallest" : n == 2 ? "second" : n == 3 ? "third" :
+             string(n, n % 10 == 1 && n % 100 != 11 ? "st" : n % 10 == 2 && n % 100 != 12 ? "nd" :
+                       n % 10 == 3 && n % 100 != 13 ? "rd" : "th")
+
 function read_at(path, at)
     rows = Dict{Int,Dict{Int,Float64}}()
     alpha = Dict{Int,Float64}()
@@ -86,7 +90,11 @@ function read_at(path, at)
         sp = parse(Int, f[col["species"]])
         get!(rows, parse(Int, f[col["seed"]]), Dict{Int,Float64}())[sp] =
             parse(Float64, f[col["mean_melanin"]])
-        alpha[sp] = parse(Float64, f[col["alpha_M"]])
+        a = parse(Float64, f[col["alpha_M"]])
+        # Keeping only the last value seen let a mixed-configuration file through.
+        get(alpha, sp, a) == a || error("$path: alpha_M for species $sp changes within the file, " *
+                                        "$(alpha[sp]) then $a")
+        alpha[sp] = a
     end
     isempty(rows) && error("no rows at MCS $at in $path")
     for k in ("N", "parcels_per_species", "n_mcs")
@@ -119,6 +127,7 @@ function main()
     xs    = 1:length(PRODUCERS)
     gapc  = [(s, data[s][1] - data[s][5]) for s in seeds]      # CN - AN
     sort!(gapc, by = last)
+    pubrank = findfirst(t -> t[1] == PUBLISHED, gapc)          # computed, not asserted
     ordered = count(s -> data[s][3] > data[s][1] > data[s][5], seeds)
 
     fig = Figure(size = (1000, 460), backgroundcolor = colorant"#fcfcfb")
@@ -145,7 +154,7 @@ function main()
 
     axB = Axis(fig[1, 2], ylabel = "C. neoformans − A. niger, paired within seed",
                xlabel = "seeds, sorted by that difference",
-               title = "The published seed is the third smallest of $(length(seeds))",
+               title = "The published seed is the $(ordinal(pubrank)) smallest of $(length(seeds))",
                titlealign = :left, xgridvisible = false,
                ygridcolor = (:black, 0.06), leftspinevisible = false,
                topspinevisible = false, rightspinevisible = false,
@@ -163,7 +172,7 @@ function main()
     text!(axB, 0.5, mg; text = @sprintf(" ensemble mean %+.3f", mg),
           align = (:left, :bottom), color = ENSEMBLE, fontsize = 11)
     pubgap = data[PUBLISHED][1] - data[PUBLISHED][5]
-    text!(axB, findfirst(t -> t[1] == PUBLISHED, gapc) + 0.4, pubgap;
+    text!(axB, pubrank + 0.4, pubgap;
           text = @sprintf(" seed %d: %+.4f", PUBLISHED, pubgap),
           align = (:left, :bottom), color = MARKED, fontsize = 11)
 
@@ -190,8 +199,7 @@ function main()
     write(OUTBASE * ".sha256", bytes2hex(sha256(read(OUTBASE * ".png"))) * "\n")
     run(pipeline(`pdftotext -layout $(OUTBASE * ".pdf") -`; stdout = OUTBASE * ".txt"))
     @printf("wrote %s.{pdf,png}\n  %d of %d seeds ordered; CN-AN mean %+.4f, seed %d %+.4f (rank %d)\n",
-            OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap,
-            findfirst(t -> t[1] == PUBLISHED, gapc))
+            OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap, pubrank)
 end
 
 main()
