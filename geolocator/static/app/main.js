@@ -57,8 +57,11 @@ function updateStats(shown, features, enabled, freshness = {}) {
   // selection of non-MW layers only reads n/a, and so does an enabled MW layer whose
   // source is unavailable (worldgrid with its JSON missing serves an empty payload
   // and reports `unavailable`), which deciding from the ids alone showed as 0 MW.
-  const mwApplies = enabled.some((id) => hasCapacity(id) &&
-    ((features[id] || []).length > 0 || freshness[id]?.status !== 'unavailable'));
+  // A layer counts only once its fetch has completed (a cache entry exists): with the
+  // request in flight, or failed while health is nominal, there is nothing to sum and
+  // "0 MW" would be a claim about data not yet seen.
+  const mwApplies = enabled.some((id) => hasCapacity(id) && id in features &&
+    (features[id].length > 0 || freshness[id]?.status !== 'unavailable'));
   const cap = shown.filter(([id]) => hasCapacity(id))
     .reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
   $('stat-count').textContent = shown.length.toLocaleString();

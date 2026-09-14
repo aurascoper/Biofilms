@@ -438,6 +438,10 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     # a per-id generation is bumped on invalidation, captured before the await, and
     # checked before assignment; in-flight ids are skipped by the fetch and the poll.
     assert "generation[id] = (generation[id] || 0) + 1" in inv
+    # The bump loop is over the site layers, not the cache keys: an id whose first fetch
+    # is in flight has no cache entry and must still be bumped.
+    assert "SITE_LAYERS.map(({ id }) => id).filter(" in inv
+    assert "Object.keys(features)" not in inv
     assert "if (id in features || inflight.has(id)) return;" in fetched
     assert "const gen = generation[id] || 0;" in fetched
     assert "if ((generation[id] || 0) === gen) features[id] = got;" in fetched
@@ -487,6 +491,10 @@ def test_the_hud_never_reports_a_non_capacity_layer_as_zero_mw():
     assert "enabled.some(hasCapacity)" not in stats
     applies = stats.split("const mwApplies = ", 1)[1].split(";", 1)[0]
     assert "hasCapacity(id)" in applies and "!== 'unavailable'" in applies
+    # ... and only for a layer whose fetch has completed: no cache entry (in flight, or
+    # failed while health is nominal) must not read as 0 MW.
+    assert "id in features &&" in applies
+    assert "(features[id] || [])" not in applies
     assert "onRender?.(shown, features, enabled(), health.freshness" in _client("layers.js")
     html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
     assert "</b> MW" not in html.split('id="stat-cap"', 1)[1].split("</div>", 1)[0]

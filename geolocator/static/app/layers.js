@@ -64,7 +64,10 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
    *  stayed invisible, until a page reload. Only ids the previous poll had already
    *  reported are compared, so the first poll does not refetch what was just loaded. */
   function invalidateChanged(before, after) {
-    return Object.keys(features).filter((id) => {
+    // Over the site layers, not the cache keys: a layer whose first fetch is still in
+    // flight has no cache entry, and iterating the cache never bumped its generation, so
+    // the old request passed the guard and cached a stale response.
+    return SITE_LAYERS.map(({ id }) => id).filter((id) => {
       const a = before[id]; const b = after[id] || {};
       return a && (a.fingerprint !== b.fingerprint || a.status !== b.status);
     }).map((id) => { delete features[id]; generation[id] = (generation[id] || 0) + 1; return id; });
