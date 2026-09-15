@@ -786,7 +786,16 @@ No calibration test skips: the pilot ND2 file is present on this machine, so `te
 The OpenMC integration tier is manual opt-in: activate the `openmc-biofilms`
 environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
 `.github/workflows/coupling-tests.yml` — `julia-tests`, `python-unit`, `calibration-unit`, and
-`openmc-integration` behind a `workflow_dispatch` input.
+`openmc-integration` behind a `workflow_dispatch` input. Real-data-backed verification of the
+golden-tally fixture (`coupling/tests/fixtures/golden_tally_water_phantom.json`) is a separate
+workflow, `.github/workflows/golden-tally-verification.yml`, triggered by `workflow_dispatch`
+and by every `push` and `pull_request` touching a path that can change what the tally produces:
+the transitive closure of the modules the regeneration script imports, plus the two
+editable-install manifests and `environment.yml`. `coupling/tests/test_gate_composition.py`
+derives that closure from the script's own imports and fails when a path is missing from either
+trigger. An earlier version of this sentence said the fixture "only change[s] when" the
+OpenMC or nuclear-data version does, and named only `workflow_dispatch` and `push`; both halves
+were wrong, and the first told a maintainer to dismiss a drift caused by a producer edit.
 
 What the tests pin:
 

@@ -21,7 +21,13 @@ openmc = ["openmc==0.15.3"]
 # imports it function-locally so the whole contract stays testable in the
 # bare tier.
 viewer = ["pyvista>=0.44"]
-dev = ["pytest"]
+# PyYAML IS STATED, not inherited. test_gate_composition.py parses
+# golden-tally-verification.yml's `on:` block to prove every fixture-producing
+# module is in BOTH trigger filters -- a substring search over the file text
+# passed while the pull_request trigger was missing entirely. It resolves today
+# only as a transitive dependency of something else, which works until whatever
+# pulls it stops, so state it rather than inherit it.
+dev = ["pytest", "pyyaml"]
 
 [tool.setuptools.packages.find]
 include = ["biofilm_openmc*"]
