@@ -8,8 +8,11 @@ and reaches a compatible conclusion by a different route.
 
 **Verdict: do not port — and the reason is correctness, not speed.** The CPM kernel executes
 on device, but the port does **not reproduce the CPU's acceptance statistics**: the Metropolis
-acceptance rate is **1.94x** the threads-backend rate, uniformly across all eight parity
-classes. Timing is the lesser finding.
+acceptance rate is **1.94x** the threads-backend rate. Timing is the lesser finding.
+
+An earlier revision of this verdict added "uniformly across all eight parity classes". The
+failure breakdown below does not support that: it is not established that the inflation is
+uniform across classes, and in 3 of 9 runs the colour classes disagree within a half-window.
 
 An earlier revision of this file said "Metal runs the port correctly and is 2.3x slower."
 That was measured over **two field kernels** (`melanin_k!`, `nutrient_k!`) and a host-side
