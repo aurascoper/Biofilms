@@ -293,6 +293,57 @@ else
   sed 's/^/        | /' <<<"$out"; fail=1
 fi
 
+# ---------------------------------------------------------------------------
+# FINDINGS OUTSIDE THREADS, IN EVERY SHAPE CODEX USES. The scanner keyed on the
+# `</sub></sub>` title markup and a `#L` anchor, and never read review bodies:
+# the first three shapes below each printed "Clear to merge" before the fix.
+# The review-body fixture is the shape of Codex's review of 675d332 on #12,
+# which carried a P2 in its body with no thread, pointed at the head.
+printf '\n  findings outside threads — every shape Codex uses\n  %s\n' \
+       "──────────────────────────────────────────"
+
+json_str() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+
+verdict() {  # $1 name, $2 expected exit, $3 actual exit, $4 text the output must carry ("" for none)
+  if [[ "$3" == "$2" ]] && { [[ -z "$4" ]] || grep -qF -- "$4" "$TMP/out"; }; then
+    printf '  ok    %s (exit %s)\n' "$1" "$3"
+  else
+    printf '  FAIL  %s: expected exit %s%s, got %s\n' "$1" "$2" "${4:+ naming \"$4\"}" "$3"
+    sed 's/^/        | /' "$TMP/out"; fail=1
+  fi
+}
+
+CODEX='"chatgpt-codex-connector"'
+QUIET='"routine chatter, no commit named"'
+
+# A badge with no `<sub>` markup around it: zero titles used to mean zero rows.
+BODY_NOSUB="$(json_str "$(printf 'https://github.com/o/r/blob/%s/f.py#L5-L6\n![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat) Live P1 without the sub markup' "$HEAD_SHA")")"
+comment_fixture "$BODY_NOSUB" "[]"
+verdict "a badge without the title markup blocks, reported as unparsed" 1 $? "title not parsed"
+
+# A file-level permalink with no `#L` anchor: the select() used to drop it.
+BODY_NOL="$(json_str "$(printf 'https://github.com/o/r/blob/%s/f.py\n**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  File-level finding with no line anchor**' "$HEAD_SHA")")"
+comment_fixture "$BODY_NOL" "[]"
+verdict "a finding on a file-level permalink blocks" 1 $? "File-level finding with no line anchor"
+
+# A finding in a formal review body, with no thread and no comment finding.
+BODY_REVIEW="$(json_str "$(printf '### Codex Review\n\nhttps://github.com/o/r/blob/%s/viewer.py#L315\n**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Require reductions to be coarser on every axis**\n\nDetail.' "$HEAD_SHA")")"
+comment_fixture "$QUIET" "[{\"author\":{\"login\":$CODEX},\"submittedAt\":\"2026-08-17T18:01:00Z\",\"state\":\"COMMENTED\",\"body\":$BODY_REVIEW}]"
+verdict "a finding in a formal review body on the head blocks" 1 $? "Require reductions to be coarser on every axis"
+
+# ...and it terminates: the same review body on an older sha, beside a current pass, clears.
+BODY_REVIEW_OLD="${BODY_REVIEW//$HEAD_SHA/0000000000}"
+comment_fixture "$(json_str "https://github.com/o/r/blob/$HEAD_SHA/a.py#L1 no findings")" "[{\"author\":{\"login\":$CODEX},\"submittedAt\":\"2026-08-17T17:00:00Z\",\"state\":\"COMMENTED\",\"body\":$BODY_REVIEW_OLD}]"
+verdict "the same review-body finding on an older sha does not block" 0 $? ""
+
+# A DISMISSED review was withdrawn from the record: it is not coverage.
+REVIEW_OF_HEAD="$(json_str "**Reviewed commit:** \`$HEAD_SHA\`")"
+comment_fixture "$QUIET" "[{\"author\":{\"login\":$CODEX},\"submittedAt\":\"2026-08-17T18:01:00Z\",\"state\":\"DISMISSED\",\"body\":$REVIEW_OF_HEAD}]"
+verdict "a dismissed review is not coverage" 1 $? "NO CODEX REVIEW FOUND"
+# The control: the identical review, not dismissed, covers the head.
+comment_fixture "$QUIET" "[{\"author\":{\"login\":$CODEX},\"submittedAt\":\"2026-08-17T18:01:00Z\",\"state\":\"COMMENTED\",\"body\":$REVIEW_OF_HEAD}]"
+verdict "the same review, not dismissed, is coverage" 0 $? ""
+
 printf '  %s\n' "──────────────────────────────────────────"
 if (( fail )); then printf '  FAILED\n\n'; exit 1; fi
 printf '  all pass\n\n'

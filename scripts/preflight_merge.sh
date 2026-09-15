@@ -50,7 +50,7 @@ query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
       title
       headRefOid
       reviews(last:20) {
-        nodes { author { login } submittedAt body }
+        nodes { author { login } submittedAt state body }
       }
       reviewThreads(first:100, after:$endCursor) {
         pageInfo { hasNextPage endCursor }
@@ -111,9 +111,12 @@ fail=0
 # comment, the gate reported a stale review and "no unresolved threads" while a
 # live P2 finding sat in that comment -- a fail-open, and the fifth one found
 # in this script. Take whichever surface is NEWER.
+# A DISMISSED review was withdrawn from the record by a maintainer. It is not
+# coverage, and the finding scan below does not read it either.
 reviewed="$(jq -r '
   ( [ .reviews.nodes[]
       | select(.author.login == "chatgpt-codex-connector")
+      | select((.state // "") != "DISMISSED")
       | {at: .submittedAt, body: .body} ]
     + [ (.comments.nodes // [])[]
       | select(.author.login == "chatgpt-codex-connector")
@@ -137,40 +140,59 @@ else
   printf '  Codex reviewed %s — current.\n' "${reviewed:0:10}"
 fi
 
-# ---- 1b. findings that arrived as a COMMENT, not a thread -------------------
+# ---- 1b. findings outside review threads ------------------------------------
 # These carry no resolved state, so they block only while they name the CURRENT
-# head: push a fix and the comment describes older code, exactly as a stale
-# review does. That terminates, and it cannot be cleared by ignoring it.
+# head: push a fix and they describe older code, exactly as a stale review does.
+# That terminates, and it cannot be cleared by ignoring it.
+#
+# A BADGE IS A FINDING; THE TITLE IS ONLY ITS LABEL. This block used to emit one
+# row per `</sub></sub>` title, required a `#L` line anchor, and read comments
+# only. A badge without that markup, a file-level permalink, or a finding in a
+# formal REVIEW BODY therefore produced no row, and the gate printed "Clear to
+# merge" over it. The review surface is not hypothetical: Codex put a P2 in the
+# body of its review of 675d332 on #12, with no thread for it. Every badge on a
+# Codex body that names the head is now a row, and a title that cannot be parsed
+# is reported as unparsed rather than dropped.
+#
 # NO 2>/dev/null HERE. Swallowing a jq error turns a broken query into a clean
 # bill of health: the first version of this block mis-scoped `.` inside
 # startswith(), jq failed on every comment, the error went to /dev/null and the
 # gate printed "Clear to merge" over a live P2. A query that cannot run is an
 # unknown, not an all-clear, so the failure is fatal here.
-if ! comment_findings="$(jq -r --arg head "$HEAD" '
-  (.comments.nodes // [])[]
-  | select(.author.login == "chatgpt-codex-connector")
-  | select(.body | test("/blob/[0-9a-f]{7,40}/[^)]*#L[0-9]"))
-  | (.body | capture("/blob/(?<s>[0-9a-f]{7,40})/").s) as $sha
-  | select($head | startswith($sha))
+if ! outside_findings="$(jq -r --arg head "$HEAD" '
+  ( [ .reviews.nodes[]
+      | select(.author.login == "chatgpt-codex-connector")
+      | select((.state // "") != "DISMISSED")
+      | {kind: "review body", body: (.body // "")} ]
+    + [ (.comments.nodes // [])[]
+      | select(.author.login == "chatgpt-codex-connector")
+      | {kind: "comment", body: (.body // "")} ] )[]
+  | .kind as $k
   | .body as $b
-  | [ $b | scan("</sub></sub>\\s*([^*\n]+)") ] | flatten
-  | to_entries[]
-  | ( ([ $b | scan("badge/(P[0-9])-") ] | flatten)[.key] // "COMMENT" )
-    + "\t" + (.value | sub("^\\s+";"") | sub("\\s+$";""))
+  | ( ($b | capture("Reviewed commit:\\*{0,2}\\s*`?(?<s>[0-9a-f]{7,40})`?").s)
+      // ($b | capture("/blob/(?<s>[0-9a-f]{7,40})/").s)
+      // "" ) as $sha
+  | select($sha != "" and ($head | startswith($sha)))
+  | ([ $b | scan("badge/(P[0-9])-") ] | flatten) as $sev
+  | ([ $b | scan("</sub></sub>\\s*([^*\n]+)") ] | flatten) as $titles
+  | range(0; $sev | length) as $i
+  | $sev[$i] + "\t" + $k + "\t"
+    + ( ($titles[$i] // "") | sub("^\\s+";"") | sub("\\s+$";"")
+        | if . == "" then "(title not parsed; read the \($k) itself)" else . end )
 ' <<<"$PRJ")"; then
-  printf '  COULD NOT READ COMMENT-FORM FINDINGS: the query failed.\n'
+  printf '  COULD NOT READ FINDINGS OUTSIDE THREADS: the query failed.\n'
   printf '  Treating that as unknown, not as clean.\n'
   exit 1
 fi
 
-if [[ -n "$comment_findings" ]]; then
-  printf '\n  CODEX POSTED FINDINGS AS A COMMENT on this head, not as review\n'
-  printf '  threads. They have no resolve button; fix them and push.\n\n'
-  while IFS=$'\t' read -r sev title; do
-    [[ -z "$title" ]] && continue
-    printf '  OPEN  %-8s (comment, no thread) %s\n' "$sev" "$title"
+if [[ -n "$outside_findings" ]]; then
+  printf '\n  CODEX POSTED FINDINGS OUTSIDE REVIEW THREADS on this head, in a\n'
+  printf '  review body or a comment. They have no resolve button; fix and push.\n\n'
+  while IFS=$'\t' read -r sev kind title; do
+    [[ -z "$sev" ]] && continue
+    printf '  OPEN  %-8s (%s, no thread) %s\n' "$sev" "$kind" "$title"
     fail=1
-  done <<<"$comment_findings"
+  done <<<"$outside_findings"
 fi
 
 # ---- 2. unresolved threads, by severity ------------------------------------
