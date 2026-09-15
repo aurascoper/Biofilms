@@ -93,7 +93,15 @@ def _original_manuscript() -> str | None:
     got = subprocess.run(
         ["git", "-C", str(REPO), "show", f"{ORIGINAL_COMMIT}:{ORIGINAL_PATH}"],
         capture_output=True, text=True)
-    return normalise_markup(got.stdout) if got.returncode == 0 else None
+    if got.returncode != 0:
+        # NOT A SHALLOW CLONE -- that case returned above. Any other failure (an
+        # abbreviated sha grown ambiguous, a path absent at that commit, an
+        # unreachable object) used to return None too, and the caller skipped
+        # under "shallow clone", sending the reader to the wrong diagnosis while
+        # the control silently did not run.
+        pytest.fail(f"git show {ORIGINAL_COMMIT}:{ORIGINAL_PATH} failed in a full "
+                    f"clone: {got.stderr.strip()}")
+    return normalise_markup(got.stdout)
 
 
 def _detected(rows, text) -> list[str]:
@@ -711,3 +719,17 @@ def test_the_blanket_reassurance_pattern_actually_matches(rows):
     ]
     for phrase in scoped:
         assert not blanket_reassurance_hits(phrase), f"false positive: {phrase}"
+
+
+def test_an_unreadable_original_fails_the_control_rather_than_skipping(monkeypatch):
+    """The control above may skip for a shallow clone and for nothing else."""
+    import subprocess
+    import sys
+    shallow = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+        capture_output=True, text=True).stdout.strip() == "true"
+    if shallow:
+        pytest.skip("shallow clone: the non-shallow failure path cannot be exercised")
+    monkeypatch.setattr(sys.modules[__name__], "ORIGINAL_COMMIT", "0" * 40)
+    with pytest.raises(pytest.fail.Exception, match="failed in a full clone"):
+        _original_manuscript()
