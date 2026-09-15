@@ -8,8 +8,12 @@ Every pass writes one JSON line per pull request to --log and prints one line. T
 things are kept apart in every record, because they are different facts:
 
   acquisition  ok | failed:<reason>   -- could the service be observed at all?
-  coverage     current | stale | none | unrecognized | unknown
+  coverage     current | stale | none | unrecognized | service_unavailable | unknown
                -- what the newest Codex review says about the CURRENT head.
+
+`service_unavailable` is Codex answering a review request with a usage-limit or
+subscription notice: the service was reached and declined. It establishes neither a
+pending review nor a clean result, and the previous coverage is kept in `last_known`.
 
 A failed acquisition never reads as "no reviews": the record carries `last_known`, the
 previous successful observation of that pull request verbatim (its head, its coverage,
@@ -25,7 +29,8 @@ during which either moved is discarded. The deadline is monotonic.
 Exit codes. --once: 0 every pull request observed (whatever its coverage), 2 any
 acquisition failed. Loop: 0 once every pull request is `current` (coverage has arrived
 on the head; open findings are for a person to triage, and a fix moves the head again),
-3 at the deadline. Merge authorization stays with scripts/preflight_merge.sh and triage.
+3 at the deadline, 4 as soon as any pull request reports `service_unavailable` (waiting
+cannot change that). Merge authorization stays with scripts/preflight_merge.sh and triage.
 """
 from __future__ import annotations
 
@@ -45,6 +50,9 @@ FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA_RE = re.compile(r"Reviewed commit:\**\s*`?([0-9a-f]{7,40})`?|/blob/([0-9a-f]{7,40})/")
 PERMALINK_RE = re.compile(r"/blob/([0-9a-f]{7,40})/")
 BADGE_RE = re.compile(r"badge/(P[0-9])-")
+# Codex declining to review: "You have reached your Codex usage limits for code reviews".
+USAGE_LIMIT_RE = re.compile(r"reached your Codex usage limits|usage limits? for code reviews|"
+                            r"upgrade your account or add credits", re.I)
 MARKUP_RE = re.compile(r"</?sub>|!\[[^\]]*\]\([^)]*\)|\*\*|\s+")
 
 _PR = "repository(owner:$owner,name:$name){pullRequest(number:$pr){%s}}"
@@ -190,6 +198,8 @@ def classify(newest: dict | None, head: str, resolve) -> tuple[str, str | None]:
     reported as `none` and never as `current`."""
     if newest is None:
         return "none", None
+    if USAGE_LIMIT_RE.search(newest["body"]):
+        return "service_unavailable", None
     full = newest["oid"] if newest["kind"] == "review" else None
     if not (isinstance(full, str) and FULL_SHA.match(full)):
         m = SHA_RE.search(newest["body"])
@@ -279,8 +289,13 @@ def failed_record(repo: str, pr: int, reason: str, last_known: dict | None) -> d
             "last_known": last_known}
 
 
+def known(rec: dict) -> bool:
+    """An observation that established coverage: acquired, and not a declined review."""
+    return rec.get("acquisition") == "ok" and rec.get("coverage") != "service_unavailable"
+
+
 def load_last_known(log: Path) -> dict[int, dict]:
-    """The newest successful observation per pull request already in the log."""
+    """The newest coverage-establishing observation per pull request already in the log."""
     last: dict[int, dict] = {}
     if not log.exists():
         return last
@@ -292,17 +307,20 @@ def load_last_known(log: Path) -> dict[int, dict]:
         except json.JSONDecodeError:
             print(f"{log}:{n}: unreadable record skipped", file=sys.stderr)
             continue
-        if isinstance(rec, dict) and rec.get("acquisition") == "ok" and isinstance(rec.get("pr"), int):
+        if isinstance(rec, dict) and known(rec) and isinstance(rec.get("pr"), int):
             last[rec["pr"]] = rec
     return last
 
 
 def one_line(rec: dict) -> str:
+    lk = rec.get("last_known")
+    prior = (f"last known {lk['coverage']} at {lk['head'][:10]} observed {lk['observed_at']}"
+             if lk else "nothing previously observed")
     if rec["acquisition"] != "ok":
-        lk = rec.get("last_known")
-        known = (f"last known {lk['coverage']} at {lk['head'][:10]} observed {lk['observed_at']}"
-                 if lk else "nothing previously observed")
-        return f"pr {rec['pr']}  ACQUISITION {rec['acquisition']}  coverage unknown  ({known})"
+        return f"pr {rec['pr']}  ACQUISITION {rec['acquisition']}  coverage unknown  ({prior})"
+    if rec["coverage"] == "service_unavailable":
+        return (f"pr {rec['pr']}  ok  SERVICE UNAVAILABLE (Codex declined: usage limit)  head {rec['head'][:10]}"
+                f"  unresolved threads {len(rec['threads'])}  ({prior})")
     sev = ",".join(t["severity"] for t in rec["threads"]) or "-"
     reviewed = f"{rec['reviewed_sha'][:10]} ({rec['reviewed_kind']} {rec['reviewed_at']})" \
         if rec["reviewed_sha"] else "none"
@@ -342,17 +360,25 @@ def main(argv=None, clock=time.monotonic, sleep=time.sleep) -> int:
         for pr in a.pr:
             try:
                 rec = observe(repo, pr, a.gh_timeout)
-                last[pr] = rec
+                if known(rec):
+                    last[pr] = rec
+                else:                       # declined: keep what was last established
+                    rec["last_known"] = last.get(pr)
             except Unavailable as e:
                 rec = failed_record(repo, pr, str(e), last.get(pr))
             with a.log.open("a") as fh:
                 fh.write(json.dumps(rec, sort_keys=True) + "\n")
             print(one_line(rec), flush=True)
             recs.append(rec)
+        unavailable = any(r["coverage"] == "service_unavailable" for r in recs)
         if a.once:
-            return 0 if all(r["acquisition"] == "ok" for r in recs) else 2
+            return 2 if any(r["acquisition"] != "ok" for r in recs) else (4 if unavailable else 0)
         if all(r["coverage"] == "current" for r in recs):
             return 0
+        if unavailable:
+            print("the review service declined (usage limit or subscription); polling cannot "
+                  "change that", file=sys.stderr)
+            return 4
         if clock() >= deadline:
             print(f"deadline reached after {a.deadline:g} minutes; coverage is not current on "
                   "every pull request", file=sys.stderr)

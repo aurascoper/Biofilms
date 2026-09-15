@@ -186,6 +186,28 @@ class WatcherControls(unittest.TestCase):
         self.assertEqual(rec["coverage"], "unrecognized")
         self.assertEqual(rec["reviewed_kind"], "comment")
 
+    def test_a_usage_limit_notice_is_service_unavailable_not_none_and_not_current(self):
+        rc, rec, _ = self.run_once("usage_limit")           # a current review exists, the notice is newer
+        self.assertEqual(rc, 4)
+        self.assertEqual(rec["acquisition"], "ok")
+        self.assertEqual(rec["coverage"], "service_unavailable")
+        self.assertIsNone(rec["reviewed_sha"])
+        self.assertEqual([t["path"] for t in rec["threads"]], ["a.py"])   # threads are still observed
+        self.assertIn("SERVICE UNAVAILABLE", w.one_line(rec))
+
+    def test_a_declined_review_keeps_the_previously_established_coverage(self):
+        _, good, _ = self.run_once("current")
+        rc, rec, _ = self.run_once("usage_limit", log=self.log)
+        self.assertEqual(rec["last_known"], good)
+        _, later, _ = self.run_once("gh_fail", log=self.log)   # and a later failure still points at it
+        self.assertEqual(later["last_known"], good)
+
+    def test_the_loop_exits_4_when_the_service_declines_instead_of_polling(self):
+        os.environ["FAKE_GH_SCENARIO"] = "usage_limit"
+        rc = w.main(["--repo", "o/r", "--pr", "1", "--log", str(self.log)],
+                    clock=lambda: 0.0, sleep=lambda s: self.fail("polled although the service declined"))
+        self.assertEqual(rc, 4)
+
     # -- acquisition failures ----------------------------------------------------------
     def test_malformed_json_is_an_acquisition_failure(self):
         rc, rec, _ = self.run_once("malformed")
