@@ -1,0 +1,50 @@
+# Declared configuration for the closed diffusion-and-binding benchmark.
+#
+# Every constant below is CHOSEN to exercise the scheme. None of it is measured, fitted
+# or read off a source, and nothing here names a molecule, a species or an isotope. The
+# benchmark's claim is about the numerics: that the implemented scheme conserves what it
+# should, loses only what the ledger books, and converges at the order it claims.
+schema_version = 1
+basis = "declared"
+claim = "numerical only; no chemistry and no isotope is asserted by this diagnostic"
+
+# Units are the diagnostic's own. `dtu` is a declared diagnostic time unit; it is not a
+# second, and it is not a day. The decay illustration elsewhere in this repository works
+# in days against an evaluated half-life; that is a different diagnostic with a different
+# clock, and importing its unit here would attach a physical meaning nothing establishes.
+time_unit = "dtu (declared diagnostic time unit)"
+length_unit = "lattice site"
+concentration_unit = "declared arbitrary concentration unit"
+physical_conversion = "blocked: D-PITCH and D-TIMESERIES"
+
+# The frozen geometry. The manifest hash is the only pin that has to be trusted: the
+# snapshot is then checked against the hash the manifest itself carries for it.
+parent_manifest_sha256 = "f00e470afd982620a15def3a2e0624eb50f1ad7c09b3ef063b219c185d91c7fe"
+parent_snapshot = "snapshots/snap_mcs000000.h5"
+parent_run_id = "manuscript42_seed42_8cbb8ee"
+parent_mcs = 0
+parent_label_state_hash = "ce3b19fb85811ac5f690a797996e4deaddf897da52ec24b63146981da3baf105"
+parent_mask_sha256 = "38c8a34f7f6e71a8c4bcc115fddfa8dcdc0b1e8ce48d5af992cf54d6206b86d0"
+
+# `A` is read off the frozen labels, not off any field carried in the snapshot. The
+# 6-connected face-neighbour fraction is the same adjacency the diffusion stencil and the
+# no-flux boundary use, so this diagnostic has exactly one adjacency rule.
+capacity_modulator = "occupied face-neighbour fraction, 6-connected"
+
+spacing = [1.0, 1.0, 1.0]
+dt = 0.5
+total_time = 50.0
+record_every = 5
+c0 = 1.0
+b0 = 0.0
+
+[params]
+D_c = 0.1       # lattice^2 / dtu
+lambda = 0.01   # 1 / dtu, applied to both pools
+k_on = 0.05     # 1 / (concentration * dtu)
+k_off = 0.02    # 1 / dtu
+B0 = 1.0        # capacity floor on an occupied site
+dB = 2.0        # capacity added at full modulation
+K = 0.5         # Hill half-saturation, in units of A
+n = 2.0         # Hill exponent
+q_ext = 0.0     # external source; zero is what makes this benchmark closed
