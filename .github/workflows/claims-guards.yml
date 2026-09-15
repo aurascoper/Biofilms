@@ -1,0 +1,53 @@
+# The claims-ledger guards have never run anywhere but a developer's machine.
+# That is how RM-PROP-01 happened: a correction landed on six branches, master
+# served the withdrawn comparison for thirteen more days, and nothing was
+# watching. These suites need pytest and the standard library, nothing else, so
+# there is no tier to justify leaving them out.
+#
+# NO `paths` FILTER, DELIBERATELY. The defect this catches is prose in README
+# and rows in data/*.csv, which every path filter in this repository excludes.
+name: claims-guards
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claims-guards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history: test_the_guard_actually_detects_deleted_claims calibrates
+      # against the manuscript as first committed (5980dc5) and SKIPS on a
+      # shallow clone, which would leave the survivor guard uncontrolled.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      # Globbed, not listed. test_claims_generated_artifacts.py exists only on
+      # the branches stacked above this one, and a named file that is absent
+      # fails collection while a named file that is MISSING from the list runs
+      # nothing and says so in neither case.
+      - name: Claims-ledger and withdrawn-comparison guards
+        working-directory: calibration/tests
+        shell: bash
+        run: python -m pytest test_claims*.py test_withdrawn_comparisons.py -v
+      - name: Assert the deleted-claim guard was calibrated, not skipped
+        working-directory: calibration/tests
+        run: |
+          set -o pipefail
+          python -m pytest test_claims_ledger.py -q \
+            -k test_the_guard_actually_detects_deleted_claims --no-header -rs | tee out.txt
+          grep -q "1 passed" out.txt || { echo "the control did not run"; exit 1; }
