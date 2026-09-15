@@ -9,6 +9,7 @@
 # by running sweep.jl itself for a few MCS and reading what it wrote through read_sweep.
 using Test, Statistics
 include(joinpath(@__DIR__, "analyse.jl"))
+include(joinpath(@__DIR__, "figure_text.jl"))
 
 const SWEEP = joinpath(@__DIR__, "sweep.jl")
 sweep(out, args...) = success(pipeline(`$(Base.julia_cmd()) $SWEEP $out $args`; stdout = devnull, stderr = devnull))
@@ -203,6 +204,62 @@ end
     @test !sweep(out, "--seeds", "42", "--mcs", "4", "--at", "4")       # destination exists
     @test !sweep(joinpath(dir, "dup.csv"), "--seeds", "42,42", "--mcs", "4", "--at", "4")
     @test !isfile(joinpath(dir, "dup.csv"))
+end
+
+@testset "figure_text: the figure reader refuses duplicates, and its strings follow the data" begin
+    dir = mktempdir()
+    meta = ["# melanin ensemble sweep", "# N=40 parcels_per_species=6 n_mcs=400 snapshot_interval=100"]
+    header = "seed,mcs,species,species_name,alpha_M,volume,n_cells,mean_melanin"
+    alpha_of(sp) = sp == 3 ? "0.1400" : sp == 1 ? "0.1000" : sp == 5 ? "0.0650" : "0.0000"
+    row(seed, sp, mel) = "$seed,100,$sp,X,$(alpha_of(sp)),600,6,$mel"
+    csv(name, rows) = (p = joinpath(dir, name); write(p, join([meta; header; rows], "\n") * "\n"); p)
+    good = [row(42, 3, 1.4), row(42, 1, 0.9), row(42, 5, 0.8),
+            row(43, 3, 1.3), row(43, 1, 1.0), row(43, 5, 0.7)]
+    rows, alpha, m = read_at(csv("ok.csv", good), 100)
+    @test sort(collect(keys(rows))) == [42, 43]
+    @test rows[42][3] == 1.4 && alpha[3] == 0.14 && m["N"] == 40
+    # A repeated (seed, species) measurement at this MCS is refused in either order --
+    # equal or conflicting. Equal coefficients do not make two copies one run; the old
+    # assignment kept whichever came last and said nothing.
+    @test_throws ErrorException read_at(csv("dup_equal_last.csv", [good; good[1]]), 100)
+    @test_throws ErrorException read_at(csv("dup_equal_first.csv", [good[1]; good]), 100)
+    @test_throws ErrorException read_at(csv("dup_conflict_last.csv", [good; row(42, 3, 1.5)]), 100)
+    @test_throws ErrorException read_at(csv("dup_conflict_first.csv", [row(42, 3, 1.5); good]), 100)
+    # A repeat at another MCS is another observation, not a duplicate of this one.
+    other, _, _ = read_at(csv("other_mcs.csv", [good; replace(good[1], ",100," => ",200,")]), 100)
+    @test other[42][3] == 1.4
+    # The mid-file alpha_M guard is kept beside the duplicate guard, not replaced by it.
+    @test_throws ErrorException read_at(csv("alpha.csv", [good; replace(row(57, 3, 1.0), "0.1400" => "0.2000");
+                                                           row(57, 1, 0.5); row(57, 5, 0.1)]), 100)
+
+    # The title claims "every seed" only when every seed does.
+    @test ordering_title(16, 16) == "Every seed descends: 16 of 16 display the α_M ordering"
+    @test ordering_title(15, 16) == "15 of 16 display the α_M ordering"
+    @test !occursin("Every seed", ordering_title(0, 2))
+    # The provenance line prints the seeds that were plotted, not the interval between them.
+    @test seed_set_label(42:57) == "42:57"
+    @test seed_set_label([57, 42]) == "42,57"
+    @test seed_set_label([42, 43, 44, 45, 50, 57]) == "42:45,50,57"
+    @test seed_set_label([42]) == "42"
+    @test_throws ErrorException seed_set_label(Int[])
+
+    # The inverted, sparse fixture through the reader and the count figure.jl uses: seed 57
+    # has CN above CS, and the seeds are 42 and 57 with nothing between.
+    inverted = [row(42, 3, 1.4), row(42, 1, 0.9), row(42, 5, 0.8),
+                row(57, 3, 1.0), row(57, 1, 1.2), row(57, 5, 0.7)]
+    r2, _, _ = read_at(csv("inverted.csv", inverted), 100)
+    seeds = sort(collect(keys(r2)))
+    ordered = count(s -> r2[s][3] > r2[s][1] > r2[s][5], seeds)
+    @test ordering_title(ordered, length(seeds)) == "1 of 2 display the α_M ordering"
+    @test seed_set_label(seeds) == "42,57"
+    # The all-ordered contiguous control keeps the committed wording byte for byte.
+    @test ordering_title(2, 2) == "Every seed descends: 2 of 2 display the α_M ordering"
+    @test seed_set_label([42, 43]) == "42:43"
+    # Panel B: rank one is "the smallest", not "the smallest smallest".
+    @test rank_title(1, 2) == "The published seed is the smallest of 2"
+    @test rank_title(3, 16) == "The published seed is the third smallest of 16"
+    @test rank_title(12, 16) == "The published seed is the 12th smallest of 16"
+    @test rank_title(2, 16) == "The published seed is the second smallest of 16"
 end
 
 end

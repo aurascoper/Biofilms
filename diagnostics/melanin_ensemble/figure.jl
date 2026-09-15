@@ -37,6 +37,10 @@
 
 using CairoMakie, Printf, SHA, Statistics
 
+# The reader and the two data-dependent strings live in a stdlib-only file so the
+# diagnostic suite can test them without CairoMakie.
+include(joinpath(@__DIR__, "figure_text.jl"))
+
 const HERE   = dirname(@__DIR__) |> dirname
 const CSVIN  = length(ARGS) >= 1 ? ARGS[1] :
                joinpath(@__DIR__, "sweep_n40_p6_seeds42-57.csv")
@@ -59,49 +63,6 @@ const ENSEMBLE = colorant"#2a78d6"
 const MARKED   = colorant"#eb6834"
 const INK      = colorant"#2f2f2e"
 const MUTED    = colorant"#6b6b68"
-
-ordinal(n) = n == 1 ? "smallest" : n == 2 ? "second" : n == 3 ? "third" :
-             string(n, n % 10 == 1 && n % 100 != 11 ? "st" : n % 10 == 2 && n % 100 != 12 ? "nd" :
-                       n % 10 == 3 && n % 100 != 13 ? "rd" : "th")
-
-function read_at(path, at)
-    rows = Dict{Int,Dict{Int,Float64}}()
-    alpha = Dict{Int,Float64}()
-    meta = Dict{String,Int}()
-    col = nothing
-    for line in eachline(path)
-        if startswith(line, "# N=")
-            # sweep.jl's configuration line: "# N=40 parcels_per_species=6 n_mcs=400 ..."
-            for kv in split(line[3:end])
-                k, v = split(kv, "=")
-                meta[k] = parse(Int, v)
-            end
-            continue
-        end
-        startswith(line, "#") && continue
-        f = split(line, ",")
-        if isnothing(col)
-            col = Dict(name => i for (i, name) in enumerate(f))
-            all(haskey(col, c) for c in ("seed", "mcs", "species", "alpha_M", "mean_melanin")) ||
-                error("$path: header lacks a column this figure reads: $line")
-            continue
-        end
-        parse(Int, f[col["mcs"]]) == at || continue
-        sp = parse(Int, f[col["species"]])
-        get!(rows, parse(Int, f[col["seed"]]), Dict{Int,Float64}())[sp] =
-            parse(Float64, f[col["mean_melanin"]])
-        a = parse(Float64, f[col["alpha_M"]])
-        # Keeping only the last value seen let a mixed-configuration file through.
-        get(alpha, sp, a) == a || error("$path: alpha_M for species $sp changes within the file, " *
-                                        "$(alpha[sp]) then $a")
-        alpha[sp] = a
-    end
-    isempty(rows) && error("no rows at MCS $at in $path")
-    for k in ("N", "parcels_per_species", "n_mcs")
-        haskey(meta, k) || error("$path: no '# N=... parcels_per_species=... n_mcs=...' line; cannot state provenance")
-    end
-    return rows, alpha, meta
-end
 
 function main()
     # Refused before any output is written: nothing here may leave a fresh image beside
@@ -134,7 +95,7 @@ function main()
 
     axA = Axis(fig[1, 1], xticks = (collect(xs), [p[2] for p in PRODUCERS]),
                ylabel = "mean melanin over occupied sites",
-               title = "Every seed descends: $(ordered) of $(length(seeds)) display the α_M ordering",
+               title = ordering_title(ordered, length(seeds)),
                titlealign = :left, xgridvisible = false,
                ygridcolor = (:black, 0.06), leftspinevisible = false,
                topspinevisible = false, rightspinevisible = false,
@@ -154,7 +115,7 @@ function main()
 
     axB = Axis(fig[1, 2], ylabel = "C. neoformans − A. niger, paired within seed",
                xlabel = "seeds, sorted by that difference",
-               title = "The published seed is the $(ordinal(pubrank)) smallest of $(length(seeds))",
+               title = rank_title(pubrank, length(seeds)),
                titlealign = :left, xgridvisible = false,
                ygridcolor = (:black, 0.06), leftspinevisible = false,
                topspinevisible = false, rightspinevisible = false,
@@ -187,8 +148,8 @@ function main()
     # Two lines, because one ran off the page -- and a provenance line that is
     # clipped is worse than none: the .txt sidecar would carry the truncation.
     Label(fig[3, 1:2],
-          @sprintf("biofilms_potts.jl run_simulation via diagnostics/melanin_ensemble/sweep.jl  |  N=%d, %d parcels/species, %d MCS, seeds %d:%d, read at MCS %d\nobservable: volume-weighted mean melanin over occupied sites, NOT the mean of per-parcel means  |  α_M is a declared input, so an ordering displays it and does not measure it",
-                   N, PARCELS, N_MCS, minimum(seeds), maximum(seeds), AT_MCS);
+          @sprintf("biofilms_potts.jl run_simulation via diagnostics/melanin_ensemble/sweep.jl  |  N=%d, %d parcels/species, %d MCS, seeds %s, read at MCS %d\nobservable: volume-weighted mean melanin over occupied sites, NOT the mean of per-parcel means  |  α_M is a declared input, so an ordering displays it and does not measure it",
+                   N, PARCELS, N_MCS, seed_set_label(seeds), AT_MCS);
           fontsize = 9, color = MUTED, halign = :left, justification = :left,
           tellwidth = false)
 
@@ -202,4 +163,7 @@ function main()
             OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap, pubrank)
 end
 
-main()
+# Parenthesised: `@__FILE__ && x` parses as `@__FILE__(&& x)`.
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
