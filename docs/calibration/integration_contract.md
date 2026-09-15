@@ -155,13 +155,13 @@ Naming the radiation term correctly is not the end of it. At the shipped `I0 = 1
 |------|-----|---------------------------|
 | `ΔH_rad`, radiotropic species (β = −5e-5) | −5.0e-5 | 1.000010 |
 | `ΔH_rad`, most radiosensitive species (β = 7.5e-2) | +7.5e-2 | 0.985 |
-| `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
+| `ΔH_mel` at M = 1.44, the seed-42 run's value | −0.720 | **1.155** |
 
 `β_ion` — the one parameter Table 2 tabulates per species, and the one the sign convention is
 written around — biases acceptance by **one part in 10⁵** *for one role of the two negatively
 signed species occupying a site*, which is not the term's reach: signed by role it reaches
-7.505e-2. The melanin term biases acceptance by 15.5%, larger by about an order of
-magnitude more, through a coefficient of `0.5` hard-coded at its call site and appearing in no
+7.505e-2. At seed 42's field value the melanin term biases acceptance by 15.5%, larger by about an order of
+magnitude, through a coefficient of `0.5` hard-coded at its call site and appearing in no
 table and no configuration file.
 
 So the model's tropism is **melanin-mediated**. Radiation still drives it, but indirectly:
