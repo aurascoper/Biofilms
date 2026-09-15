@@ -113,6 +113,7 @@
             "detail": {
                 "dropped": 0,
                 "max_b_minus_B_final": 0,
+                "note": "the cut is applied between steps, so `released` includes one step of reaction and decay evaluated on the over-capacity state before the release; the identity asserted is closure, not the released amount",
                 "closure_residual_relative": 1.0145757629339439e-15,
                 "closure_residual": 5.093170329928398e-11,
                 "capacity_factor": 0.25,
@@ -209,23 +210,30 @@
     ],
     "diagnostic": "closed diffusion-and-binding benchmark, control set",
     "code_sha256": {
-        "test_numerics.jl": "d8e8f487756751dd6d30d02b06a826d32cdd0aaf325bff9611d55d3266c661bf",
-        "mutation_controls.jl": "2ef54b87d121726712b56b94602bf80eeec91f2e51c71cdafdd2994464b241db",
-        "BindingBenchmark.jl": "fc78bdfb3eea457004ec6f7aeb70b2c469898307ab91bbe1134a8bf37ba077d0",
-        "setup.jl": "49a8adf520b4e2353b9e99251755dc7fef00dd63c4b23ddefd78f22753c26509",
-        "run.jl": "dfe89be4dbed038626c33294ec725c00ebf91bd879aac58ff772e0efc24a18b5",
-        "benchmark.toml": "b66ac8be5c68552594d5b7201b1f7d06448be3b1da3491c5c213cd817073718e",
-        "controls.jl": "7cf17ad4535ee6894beb576a1ae3e77822bbbf77189cc93ae04be60677fb82f5"
+        "test_setup.jl": "5a0834393e97f95ea1fe6c305593a8ce7c59fa1eaf4f6edf941f3639f3a7a368",
+        "Project.toml": "032bed91c9bdf5b41f26aedd65f2fa105efeaa923504f62c7b40066f869f29cf",
+        "config": "b66ac8be5c68552594d5b7201b1f7d06448be3b1da3491c5c213cd817073718e",
+        "mutation_controls.jl": "53190b73fa5ca0e8bf8e5622accfb592c652c2c4acb24107570e55e2377f6543",
+        "BindingBenchmark.jl": "d9fef177f24e86f1b749ea6b0f9fdb86864db62044a11d6abee463830ca67094",
+        "Manifest.toml": "ec89f83c76846cee766ee4804fbe145332ae8b9272c041c0c785c8b7c8e39d7c",
+        "test_numerics.jl": "fecf635045696e0d0ca451261c3e2caf0acb89f89cf4270a07eb0852d0937e0c",
+        "setup.jl": "69c52238a2ca3cb4f29f9b49dcb1014a6a3213df6b4a8b1a1d62aed4a5f37032",
+        "config_file": "benchmark.toml",
+        "run.jl": "3620897a3c34295e2b884499facce4d89cf14624b829be03c453d485a2968946",
+        "controls.jl": "96222b79688dcc823a630e0e2a3b7d9fb0f186885e46780981a8755a0237f7ec"
     },
-    "created_utc": "2026-09-11T15:07:25.406Z",
+    "created_utc": "2026-09-15T05:44:24.803Z",
     "parent": {
         "snapshot_sha256": "bff6f61d5345fb82f863cdde8d8397e2d15e39d12b17012bb08821fd2fa42d9b",
         "run_id": "manuscript42_seed42_8cbb8ee",
+        "label_state_hash": "ce3b19fb85811ac5f690a797996e4deaddf897da52ec24b63146981da3baf105",
         "mcs": 0,
         "manifest_sha256": "f00e470afd982620a15def3a2e0624eb50f1ad7c09b3ef063b219c185d91c7fe",
-        "snapshot": "snapshots/snap_mcs000000.h5"
+        "snapshot": "snapshots/snap_mcs000000.h5",
+        "mask_sha256": "38c8a34f7f6e71a8c4bcc115fddfa8dcdc0b1e8ce48d5af992cf54d6206b86d0"
     },
     "expected_red": [
-        "K8 the same transfer, deliberately omitted"
+        "K8 the same transfer, deliberately omitted",
+        "K12 the derived restriction refuses a step above the bound"
     ]
 }
