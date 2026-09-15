@@ -91,6 +91,29 @@
         rd.basis_from_occupancy = true
         @test rd.params.X_total == 1.0        # indistinguishable by value
         @test_throws ErrorException SR.step_radiolysis!(rd, 0.5)
+        # AND THE MESSAGE SAYS WHICH REASON FIRED.  Reporting only the value here
+        # printed "refusing at X_total = 1.0 ... only X_total == 1.0 is allowed",
+        # which reads as a contradiction and sends the reader to the value rather
+        # than to the provenance that actually refused.
+        collision = try
+            SR.step_radiolysis!(rd, 0.5); ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("basis_from_occupancy = true", collision)
+        @test !occursin("Only the standalone default X_total == 1.0 is allowed here",
+                        collision)
+        # the value refusal still names the value, and not the provenance
+        value_only = try
+            SR.step_radiolysis!(
+                SR.init_radiolysis(
+                    SR.RadiolysisParams(Nr = 20, X_total = 0.065, Ddot_R = 1.0,
+                                        c_ext = 1.0); R = 10.0), 0.5); ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("supplied X_total = 0.065", value_only)
+        @test !occursin("basis_from_occupancy", value_only)
 
         # (b) STICKINESS: gated, stepped, then the value returns to the default.
         rd2 = SR.init_radiolysis(
@@ -122,6 +145,62 @@
         @test sim.rd.basis_from_occupancy === false   # before any step
         SR.advance_window!(sim, 2)
         @test sim.rd.basis_from_occupancy === true    # after the installer runs
+    end
+
+    @testset "the documented coupled entry point refuses, and that is the contract" begin
+        # `main_coupled()` -- the run README documents as `julia --project=.
+        # biofilms_potts.jl` -- builds RadiolysisParams WITHOUT the
+        # acknowledgement, and `run_simulation_coupled` marks the basis as
+        # occupancy-derived at its first installer tick, so the gate fires on
+        # MCS 1. That is the contract, not an oversight: the exemption is
+        # reserved for a harness that records no radiodialysis quantity, and
+        # acking the entry point would re-open the defect the gate names while
+        # printing a membrane report built on the refused basis.
+        #
+        # Pinned here for two reasons. Nobody should "repair" the entry point by
+        # widening the exemption, and the README must stay answerable to what
+        # this command actually does -- it claimed the run worked while it threw.
+        # TIED TO THE ENTRY POINT, not to a parameter form chosen here: read
+        # main_coupled's own RadiolysisParams call out of the source and require
+        # it to be what this testset exercises. Without this the testset pins a
+        # form nobody runs, and main_coupled could change under it unnoticed.
+        # (That the call carries no acknowledgement is enforced separately, and
+        # more strongly, by the ack census below: biofilms_potts.jl is not in its
+        # expected set, so any ack added here fails that test by name.)
+        body = let src = read(joinpath(dirname(@__DIR__), "biofilms_potts.jl"), String)
+            i = findfirst("function main_coupled()", src)
+            src[first(i):last(findnext("\nend\n", src, last(i)))]
+        end
+        call = let i = findfirst("RadiolysisParams(", body)
+            body[first(i):last(findnext(")", body, last(i)))]
+        end
+        @test call == "RadiolysisParams(Nr = 40, Ddot_R = 1.0, c_ext = 1.0)"
+
+        params = SR.CPMParams(N = 20, n_cells_per_species = 2,
+                              snapshot_interval = 1)
+        rp = SR.RadiolysisParams(Nr = 40, Ddot_R = 1.0, c_ext = 1.0)  # main_coupled's form
+        @test rp.basis_gate_ack === false
+        err = try
+            redirect_stdout(devnull) do
+                SR.run_simulation_coupled(params, rp, 2; seed = 42)
+            end
+            nothing
+        catch e
+            sprint(showerror, e)
+        end
+        @test err !== nothing
+        @test occursin("RADIODIALYSIS: BLOCKED", err)
+        @test occursin("basis_from_occupancy = true", err)
+
+        # THE CONTROL FOR THE CONTROL: the identical parameters WITH the
+        # acknowledgement complete two steps, so the refusal above is a statement
+        # about the missing ack and not about this lattice, this seed or this
+        # parameter set failing for some other reason.
+        rpa = SR.RadiolysisParams(Nr = 40, Ddot_R = 1.0, c_ext = 1.0,
+                                  basis_gate_ack = true)
+        redirect_stdout(devnull) do
+            SR.run_simulation_coupled(params, rpa, 2; seed = 42)
+        end
     end
 
     @testset "the ack census: exactly these sites, no more" begin

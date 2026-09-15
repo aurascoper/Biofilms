@@ -19,11 +19,15 @@ attributes that dose to lineage labels. A **calibration layer** (`calibration/`)
 currently refuses to emit a single physical unit.
 
 ```julia
-julia --project=. biofilms_potts.jl    # coupled CPM + radiodialysis, N = 40, 100 MCS, seed 42
+julia --project=. biofilms_potts.jl --no-radiolysis  # CPM only, N = 60, 200 MCS, seed 42
 ```
 
-(That command's previous open defect — an undeclared `CairoMakie` dependency — is fixed; see
-[Dependencies](#dependencies).)
+**The coupled entry point does not run.** `julia --project=. biofilms_potts.jl` (no flag) calls
+`main_coupled()`, which refuses on its first Monte Carlo step with `RADIODIALYSIS: BLOCKED`,
+because the coupled loop marks its biomass basis as an occupancy mean and the gate refuses that
+basis. That refusal is deliberate and is pinned by `tests/radiodialysis_basis_gate.jl`; it is not
+a bug to be cleared by acknowledging the gate. See
+[Radiodialysis membrane transport](#radiodialysis-membrane-transport).
 
 The framework is **uncalibrated**. Its parameters are literature priors and declared model inputs.
 No lattice pitch, no seconds-per-Monte-Carlo-step and no material density has been selected, and no
@@ -381,13 +385,25 @@ acceptance); **the radiation field is static** after `init_radiation!` and nothi
 it; **the nutrient field is written and never read** by the dynamics.
 
 ```julia
-julia --project=. biofilms_potts.jl                 # coupled CPM + radiodialysis
+julia --project=. biofilms_potts.jl                 # coupled — REFUSES at MCS 1, see below
 julia --project=. biofilms_potts.jl --no-radiolysis # CPM only
 ```
 
 Run provenance, both branches: the coupled default is `N = 40`, 6 parcels per species, 100 MCS,
 seed 42. `--no-radiolysis` runs `main()`, which is `N = 60`, **8** parcels per species, **200** MCS,
 seed 42. All reported numbers below come from the coupled `N = 40` run.
+
+**That coupled run can no longer be executed as documented.** `run_simulation_coupled` sets
+`basis_from_occupancy` on its first installer tick, and `main_coupled()` builds its
+`RadiolysisParams` without `basis_gate_ack`, so `step_radiolysis!` raises `RADIODIALYSIS: BLOCKED`
+at MCS 1 and neither the membrane report nor the figure export is reached. The numbers below
+therefore come from a run that predates the gate, and re-running them is blocked on measuring the
+biomass basis (`D-XRED`), not on a code change. The acknowledgement is reserved for
+`validate_serial.jl`, which records no radiodialysis quantity; acking `main_coupled` would print a
+membrane report computed on the basis the gate refuses.
+`tests/radiodialysis_basis_gate.jl` pins the refusal, and the ack census in the same file fails if
+an acknowledgement is added here. `julia --project=. biofilms_potts_jacc.jl [seeds]` refuses the
+same way and for the same reason: `run_coupled` defaults to `RadiolysisParams()`.
 
 **Fixed:** the two stale stdout banners (`main()` at `biofilms_potts.jl:1088`,
 `main_coupled()` at `:1540`) used to print `H = H_adh + H_vol + H_rad + H_pair + H_mel` — five
@@ -797,8 +813,13 @@ environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
 the five `tests/integration/` modules still skip there). Real-data-backed verification of the
 golden-tally fixture (`coupling/tests/fixtures/golden_tally_water_phantom.json`) is a separate
 workflow, `.github/workflows/golden-tally-verification.yml`, triggered by `workflow_dispatch`
-or a push touching the files that could invalidate the pin (the OpenMC/nuclear-data version)
-— not on a schedule, since the fixture's values only change when those do.
+and by every `push` and `pull_request` touching a path that can change what the tally produces:
+the transitive closure of the modules the regeneration script imports, plus the two
+editable-install manifests and `environment.yml`. `coupling/tests/test_gate_composition.py`
+derives that closure from the script's own imports and fails when a path is missing from either
+trigger. An earlier version of this sentence said the fixture "only change[s] when" the
+OpenMC or nuclear-data version does, and named only `workflow_dispatch` and `push`; both halves
+were wrong, and the first told a maintainer to dismiss a drift caused by a producer edit.
 
 What the tests pin:
 
@@ -927,9 +948,15 @@ figure-export path in `biofilms_potts.jl` (below the `#  13. Figure export` spli
 sandbox module the splitters build has hard-coded imports that never consult `Project.toml`, so
 this declaration only fixes `Pkg.instantiate()`, not what the split marker's own sandbox imports).
 
-**Fixed:** `CairoMakie` was previously undeclared, so `julia --project=. biofilms_potts.jl` failed
-at the `using CairoMakie` line (now `:1885`) unless CairoMakie happened to already be present in
-the default environment. It is now declared in `Project.toml`.
+**Fixed:** `CairoMakie` was previously undeclared, so the figure-export path failed at its
+`using CairoMakie` line unless CairoMakie happened to already be present in the default
+environment. It is now declared in `Project.toml`.
+
+That fix does **not** make `julia --project=. biofilms_potts.jl` run. An earlier version of this
+paragraph said it did, naming the dependency as "that command's previous open defect" — it was
+one defect of two, and the command now stops earlier, at the `RADIODIALYSIS: BLOCKED` refusal on
+MCS 1 described in [Radiodialysis membrane transport](#radiodialysis-membrane-transport). The
+export path is reachable through `--no-radiolysis`, which is what the declaration unblocks.
 
 That is a **declaration, not a lock.** `Manifest.toml` is gitignored (`.gitignore:377`), so a
 clean checkout has no resolved dependency graph and `Pkg.instantiate()` resolves versions afresh
