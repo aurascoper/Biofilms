@@ -397,3 +397,6 @@ geolocator/data/market_bars.sqlite
 # Large binary reference data gets an explicit distribution decision, not a
 # silent commit.
 geolocator/cache/
+
+# The figure environment pins the CairoMakie that rendered the committed PNG.
+!diagnostics/melanin_ensemble/Manifest.toml

@@ -32,6 +32,9 @@ jobs:
         run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
       - name: Run Julia test suite
         run: julia --project=. tests/runtests.jl
+      - name: Run the melanin-ensemble diagnostic suite
+        # No project: it loads biofilms_potts.jl through the split-marker sandbox.
+        run: julia diagnostics/melanin_ensemble/test_statistics.jl
 
   python-unit:
     # The Python suite contains Julia/HDF5 orientation round-trip tests.
@@ -63,6 +66,8 @@ jobs:
         run: pytest -rs contract/tests
       - name: Run unit tier
         run: cd coupling && pytest -rs tests
+      - name: Run the payload-census diagnostic suite
+        run: python3 diagnostics/payload_census/test_census.py
 
   calibration-unit:
     # Calibration contracts and harnesses: numpy/pytest only, no transport
