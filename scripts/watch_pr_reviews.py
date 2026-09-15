@@ -27,7 +27,7 @@ cursor; the head and base are read before and after collection and an observatio
 during which either moved is discarded. The deadline is monotonic.
 
 Exit codes. --once: 0 every pull request observed (whatever its coverage), 2 any
-acquisition failed. Loop: 0 once every pull request is `current` (coverage has arrived
+acquisition failed, 4 the review service declined. Loop: 0 once every pull request is `current` (coverage has arrived
 on the head; open findings are for a person to triage, and a fix moves the head again),
 3 at the deadline, 4 as soon as any pull request reports `service_unavailable` (waiting
 cannot change that). Merge authorization stays with scripts/preflight_merge.sh and triage.
@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import subprocess
 import sys
@@ -180,7 +181,9 @@ def _login(node: dict) -> str | None:
 def newest_codex(reviews: list, comments: list) -> dict | None:
     items = []
     for r in reviews:
-        if _login(r) == CODEX:
+        # A DISMISSED review is one a maintainer withdrew from the record. Counting it
+        # as coverage reports `current` over a review nobody may rely on.
+        if _login(r) == CODEX and r.get("state") != "DISMISSED":
             commit = r.get("commit")
             items.append({"at": r.get("submittedAt") or "", "body": r.get("body") or "",
                           "kind": "review",
@@ -337,15 +340,28 @@ def default_repo(timeout: float) -> str:
     return repo
 
 
+def positive_finite(text: str) -> float:
+    """argparse type for the three timing options. `float` accepts nan and inf, and each
+    broke a guarantee: a nan timeout raised uncaught inside subprocess.run, a nan
+    deadline never expired, and a nan interval slept zero seconds between passes."""
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number")
+    if not (math.isfinite(value) and value > 0):
+        raise argparse.ArgumentTypeError(f"{text!r} must be a positive finite number")
+    return value
+
+
 def main(argv=None, clock=time.monotonic, sleep=time.sleep) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--repo", help="OWNER/NAME (default: gh repo view)")
     ap.add_argument("--pr", type=int, action="append", required=True, help="repeatable")
     ap.add_argument("--log", type=Path, required=True, help="JSONL observation log")
     ap.add_argument("--once", action="store_true", help="one pass, then exit")
-    ap.add_argument("--interval", type=float, default=60.0, help="seconds between passes")
-    ap.add_argument("--deadline", type=float, default=90.0, help="minutes, monotonic")
-    ap.add_argument("--gh-timeout", type=float, default=60.0, help="seconds per gh call")
+    ap.add_argument("--interval", type=positive_finite, default=60.0, help="seconds between passes")
+    ap.add_argument("--deadline", type=positive_finite, default=90.0, help="minutes, monotonic")
+    ap.add_argument("--gh-timeout", type=positive_finite, default=60.0, help="seconds per gh call")
     a = ap.parse_args(argv)
 
     try:

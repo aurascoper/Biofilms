@@ -9,7 +9,9 @@ the deadline is monotonic, and a previous observation survives a later failure v
 
     python3 scripts/test_watch_pr_reviews.py
 """
+import contextlib
 import inspect
+import io
 import json
 import os
 import stat
@@ -77,6 +79,8 @@ resolved = dict(thread, id="PRRT_0", isResolved=True, path="done.py")
 if "reviews(" in joined:
     if S in ("empty", "unrecognized_comment", "stale_comment", "comment_finding"):
         out(conn("reviews", []))
+    if S == "dismissed":
+        out(conn("reviews", [dict(review, state="DISMISSED")]))
     if S == "stale":
         out(conn("reviews", [dict(review, commit={"oid": OTHER}, body="**Reviewed commit:** `%s`" % OTHER[:10])]))
     if S == "unrecognized":
@@ -210,6 +214,25 @@ class WatcherControls(unittest.TestCase):
         rc = w.main(["--repo", "o/r", "--pr", "1", "--log", str(self.log)],
                     clock=lambda: 0.0, sleep=lambda s: self.fail("polled although the service declined"))
         self.assertEqual(rc, 4)
+
+    def test_a_dismissed_review_is_not_coverage(self):
+        """The fake's only review names the head and is DISMISSED: nothing covers it."""
+        rc, rec, _ = self.run_once("dismissed")
+        self.assertEqual(rc, 0)
+        self.assertEqual(rec["coverage"], "none")
+        self.assertIsNone(rec["reviewed_sha"])
+
+    def test_non_finite_or_non_positive_timing_options_are_refused_at_parse_time(self):
+        os.environ["FAKE_GH_SCENARIO"] = "current"
+        for opt in ("--gh-timeout", "--deadline", "--interval"):
+            for bad in ("nan", "inf", "-inf", "0", "-1", "soon"):
+                with self.subTest(opt=opt, value=bad), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(SystemExit) as cm:
+                        w.main(["--repo", "o/r", "--pr", "1", "--log", str(self.log),
+                                "--once", opt, bad])
+                    self.assertEqual(cm.exception.code, 2)      # argparse's usage error
+        self.assertFalse(self.log.exists())                     # refused before any pass
 
     # -- acquisition failures ----------------------------------------------------------
     def test_malformed_json_is_an_acquisition_failure(self):
