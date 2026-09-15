@@ -339,10 +339,87 @@ verdict "the same review-body finding on an older sha does not block" 0 $? ""
 # A DISMISSED review was withdrawn from the record: it is not coverage.
 REVIEW_OF_HEAD="$(json_str "**Reviewed commit:** \`$HEAD_SHA\`")"
 comment_fixture "$QUIET" "[{\"author\":{\"login\":$CODEX},\"submittedAt\":\"2026-08-17T18:01:00Z\",\"state\":\"DISMISSED\",\"body\":$REVIEW_OF_HEAD}]"
-verdict "a dismissed review is not coverage" 1 $? "NO CODEX REVIEW FOUND"
+verdict "a dismissed review is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
 # The control: the identical review, not dismissed, covers the head.
 comment_fixture "$QUIET" "[{\"author\":{\"login\":$CODEX},\"submittedAt\":\"2026-08-17T18:01:00Z\",\"state\":\"COMMENTED\",\"body\":$REVIEW_OF_HEAD}]"
 verdict "the same review, not dismissed, is coverage" 0 $? ""
+
+# ---------------------------------------------------------------------------
+# COVERAGE FROM SOURCES OTHER THAN CODEX (docs/review_coverage_decision.md).
+# A self-review coverage comment is a deliberate lowering of this gate, so each
+# way it can be vacuous, stale, unauthorised or past its date gets the input
+# that must be refused, beside the input that must be accepted.
+printf '\n  coverage other than Codex — self-review and Copilot\n  %s\n' \
+       "──────────────────────────────────────────"
+
+# $1 comment body (plain text), $2 author association, $3 reviews nodes (default [])
+self_fixture() {
+  local body; body="$(json_str "$1")"
+  cat >"$TMP/fixture.json" <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"fixture","headRefOid":"$HEAD_SHA",
+  "reviews":{"nodes":${3:-[]}},
+  "comments":{"nodes":[{"author":{"login":"aurascoper"},"authorAssociation":"$2",
+    "createdAt":"2026-09-15T20:00:00Z","body":$body}]},
+  "reviewThreads":{"nodes":[]}
+}}}}
+JSON
+  PREFLIGHT_TODAY="${TODAY_OVERRIDE:-2026-09-15}" PREFLIGHT_FIXTURE="$TMP/fixture.json" "$GATE" 1 >"$TMP/out" 2>&1
+}
+
+SCOPE='scope: scripts/preflight_merge.sh; checklist: AGENTS.md, the six rules'
+COVERED="review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P1 fixed 71a5c90: the gate cleared a comment finding it could not parse
+- P2 deferred https://github.com/o/r/pull/12#issuecomment-1: the pilot publication guard"
+
+# The three the decision names: stale, vacuous, and the one that must pass.
+self_fixture "${COVERED//$HEAD_SHA/0000000000}" OWNER
+verdict "a coverage comment on a stale sha blocks" 1 $? "STALE REVIEW"
+self_fixture "review-coverage: $HEAD_SHA
+$SCOPE" OWNER
+verdict "the marker with no findings blocks, by name" 1 $? "MALFORMED COVERAGE COMMENT"
+self_fixture "$COVERED" OWNER
+verdict "fixed and deferred findings on the head clear" 0 $? "self-review by aurascoper reviewed"
+
+# An open finding blocks and is named; the disposition is what the gate enforces.
+self_fixture "$COVERED
+- P2 open: the finding this control names" OWNER
+verdict "an open finding in a coverage comment blocks, named" 1 $? "the finding this control names"
+
+# "No findings" is accepted only as a statement with its scope.
+self_fixture "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none" OWNER
+verdict "findings: none beside a scope line clears" 0 $? ""
+self_fixture "review-coverage: $HEAD_SHA
+findings: none" OWNER
+verdict "findings: none with no scope line blocks" 1 $? "needs a scope: line"
+
+# A deferral that does not say where is a finding nobody will find again.
+self_fixture "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P2 deferred: nothing says where this went" OWNER
+verdict "a deferral that names no place blocks" 1 $? "does not say where"
+
+# On a public repository anyone can type the marker.
+self_fixture "$COVERED" NONE
+verdict "a marker from outside the repository is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+
+# The expiry is enforced, not recorded: the last day counts, the next does not.
+TODAY_OVERRIDE=2026-10-15 self_fixture "$COVERED" OWNER
+verdict "self-review coverage still counts on its expiry date" 0 $? ""
+TODAY_OVERRIDE=2026-10-16 self_fixture "$COVERED" OWNER
+verdict "the day after expiry it is refused by name" 1 $? "SELF-REVIEW COVERAGE EXPIRED"
+
+# Copilot: the review's own commit is what it covers.
+COPILOT_REVIEW() { printf '[{"author":{"login":"copilot-pull-request-reviewer"},"authorAssociation":"NONE","submittedAt":"2026-09-15T21:00:00Z","state":"COMMENTED","body":"## Pull request overview","commit":{"oid":"%s"}}]' "$1"; }
+self_fixture "routine chatter, no marker" OWNER "$(COPILOT_REVIEW "$HEAD_SHA")"
+verdict "a Copilot review of the head is coverage" 0 $? "Copilot reviewed"
+self_fixture "routine chatter, no marker" OWNER "$(COPILOT_REVIEW 0000000000000000)"
+verdict "a Copilot review of an older commit is stale" 1 $? "STALE REVIEW"
 
 printf '  %s\n' "──────────────────────────────────────────"
 if (( fail )); then printf '  FAILED\n\n'; exit 1; fi
