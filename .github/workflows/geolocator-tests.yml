@@ -63,6 +63,14 @@ jobs:
           print(f"declared {decl['sha256']}\nactual   {got}\nbytes    {csv.stat().st_size} (declared {decl['bytes']})")
           sys.exit(0 if got == decl["sha256"] and csv.stat().st_size == decl["bytes"] else 1)
           PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Execute the client's JavaScript tier
+        # The first tier that RUNS the client: the boot order against a health
+        # request that never answers, and the site cache across failed and
+        # changed polls. Pinned to 22 for unflagged ESM detection of .js modules.
+        run: node --test geolocator/tests/js/*.test.mjs
       - name: pytest
         run: pytest -rs geolocator/tests
 
