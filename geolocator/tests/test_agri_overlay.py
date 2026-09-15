@@ -442,13 +442,22 @@ def test_a_layer_is_refetched_when_the_health_poll_reports_its_source_changed():
     # is in flight has no cache entry and must still be bumped.
     assert "SITE_LAYERS.map(({ id }) => id).filter(" in inv
     assert "Object.keys(features)" not in inv
-    # A layer with no baseline counts as changed, and the baseline exists before any site
-    # fetch: main.js awaits the first health poll instead of launching the fetch beside it.
-    assert "return !a || a.fingerprint !== b.fingerprint" in inv
-    boot = _client("main.js")
-    assert "await sites.pollHealth();" in boot
-    assert "\nsites.refreshAndRender();" not in boot
-    assert boot.index("await sites.pollHealth();") < boot.index("setInterval(sites.pollHealth")
+    # A layer the health map has never reported (absent on both sides, as after a failed
+    # poll) has no observed change; its first appearance is the initial change. Counting
+    # absent-to-absent as changed refetched every enabled layer on every failed poll.
+    # Executed by geolocator/tests/js/layers.test.mjs; the text is pinned here too.
+    assert "if (!a && !b) return false;" in inv
+    assert "if (!a || !b) return true;" in inv
+    assert "return !a ||" not in inv
+    # The first fetch still follows a stored baseline: boot() runs it inside the first poll
+    # and registers the poll interval only after that poll; the independent panels no
+    # longer wait on it. The order is executed by geolocator/tests/js/boot.test.mjs.
+    boot = _client("boot.js")
+    assert "sites.pollHealth().then(() => setInterval(sites.pollHealth, 15000))" in boot
+    main = _client("main.js")
+    assert "await sites.pollHealth();" not in main
+    assert "\nsites.refreshAndRender();" not in main
+    assert "boot({ sites, bandsys, latticeLayer, imageryLayer, loadProvenance });" in main
     assert "if (id in features || inflight.has(id)) return;" in fetched
     assert "const gen = generation[id] || 0;" in fetched
     assert "if ((generation[id] || 0) === gen) features[id] = got;" in fetched

@@ -10,6 +10,7 @@ import { createSiteSystem, createBandSystem, PLANT_LIMIT, hasCapacity } from './
 import { createLatticePanel, createLatticeLayer } from './hud/latticePanel.js';
 import { createDetectionOverlay } from './hud/detectionOverlay.js';
 import { createStyleChain } from './postprocess.js';
+import { boot } from './boot.js';
 
 installTokens();
 
@@ -206,16 +207,6 @@ let last = performance.now();
 $('fuel-filter').addEventListener('change', sites.render);
 $('min-cap').addEventListener('change', sites.render);
 
-// The first health response seeds the freshness baseline before any site fetch, so the
-// first fetch is associated with a known fingerprint; the poll then fetches what is
-// enabled and absent. Launching the fetch beside the poll let a pre-retarget response
-// be cached against a fingerprint the poll had already superseded.
-await sites.pollHealth();
-setInterval(sites.pollHealth, 15000);
-bandsys.load();
-latticeLayer.update();
-setInterval(latticeLayer.update, latticeLayer.refreshInterval);
-
 let powerProvenance = '';
 
 /* Attribution is a licence condition, not decoration: it is rendered from the
@@ -225,18 +216,27 @@ function renderProvenance() {
     .filter(Boolean).join('   ·   ');
 }
 
-fetch('/api/layers', { cache: 'no-store' })
-  .then((r) => r.json())
-  .then((d) => {
-    const power = d.layers.find((l) => l.id === 'power') || {};
-    // vintage is a WRI release ("1.3.0"), retrieved_at is a date. Slicing the
-    // first as if it were the second is how this line briefly read
-    // "retrieved 1.3.0".
-    powerProvenance =
-      `WRI Global Power Plant Database v${power.vintage || '?'} · CC BY 4.0 · ` +
-      `retrieved ${power.retrieved_at || '—'} · ${(power.count || 0).toLocaleString()} plants`;
-    renderProvenance();
-  })
-  .catch(() => {});
+/** The `/api/layers` request behind the attribution line. Started by boot() beside the
+ *  other independent work; nothing waits on it. */
+function loadProvenance() {
+  return fetch('/api/layers', { cache: 'no-store' })
+    .then((r) => r.json())
+    .then((d) => {
+      const power = d.layers.find((l) => l.id === 'power') || {};
+      // vintage is a WRI release ("1.3.0"), retrieved_at is a date. Slicing the
+      // first as if it were the second is how this line briefly read
+      // "retrieved 1.3.0".
+      powerProvenance =
+        `WRI Global Power Plant Database v${power.vintage || '?'} · CC BY 4.0 · ` +
+        `retrieved ${power.retrieved_at || '—'} · ${(power.count || 0).toLocaleString()} plants`;
+      renderProvenance();
+    })
+    .catch(() => {});
+}
 
-imageryLayer.update();
+// Bands, lattice, attribution and imagery do not depend on site freshness and start
+// now. The first health response still seeds the freshness baseline before the first
+// site fetch -- that fetch runs inside pollHealth, after the baseline is stored -- and
+// only the poll interval waits on it. Awaiting the poll at top level held everything
+// below it behind a provider timeout that had nothing to do with those panels.
+boot({ sites, bandsys, latticeLayer, imageryLayer, loadProvenance });
