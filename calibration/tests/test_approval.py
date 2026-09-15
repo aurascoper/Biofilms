@@ -106,6 +106,52 @@ def test_the_strains_must_be_named_because_biosafety_follows_strains():
                for p in problems(row(strain_identities="unknown")))
 
 
+@pytest.mark.parametrize("strains", [";", ";;", " ; "])
+def test_a_strain_list_that_splits_to_nothing_is_refused(strains):
+    """`;` is not filler text, so the placeholder pass let it through, and the
+    strain-to-level binding was skipped because no strain was declared: every
+    authorization criterion read met with no organism named."""
+    found = problems(row(strain_identities=strains,
+                         biosafety_level_by_strain="XX:BSL1"))
+    assert any("declares no strain" in p for p in found), found
+
+
+def test_a_comma_joined_consortium_is_refused():
+    """One verbatim key, one level, two organisms: the mixed-BSL error the
+    mapping exists to prevent, admitted because ',' is not the separator."""
+    found = problems(row(
+        strain_identities="D. radiodurans R1, C. neoformans H99",
+        biosafety_level_by_strain="D. radiodurans R1, C. neoformans H99:BSL2"))
+    assert any("contain ','" in p for p in found), found
+
+
+_SCOPE_ONLY = ["growth_medium", "temperature_C", "pH", "oxygen_condition",
+               "substrate_or_membrane", "biofilm_age_h", "flow_condition",
+               "irradiation"]
+
+
+@pytest.mark.parametrize("field", _SCOPE_ONLY)
+@pytest.mark.parametrize("filler", ["TBD", "pending", "unknown"])
+def test_filler_in_the_approved_scope_is_refused(field, filler):
+    """Every scope column enters the digest; filler in any of them bound the
+    approval to a condition nobody specified, and criterion 6 read met."""
+    found = problems(row(**{field: filler}))
+    assert any(f"{field} = {filler!r} is filler in the approved scope" in p
+               for p in found), found
+
+
+def test_the_scope_check_covers_every_scope_column():
+    """The list above is not a second copy that can drift from SCOPE_COLUMNS."""
+    from biofilm_calibration.approval import _MUST_NAME_SOMETHING, SCOPE_COLUMNS
+    assert set(_SCOPE_ONLY) == set(SCOPE_COLUMNS) - set(_MUST_NAME_SOMETHING)
+
+
+def test_none_is_a_condition_not_filler_in_the_scope():
+    """The exemption, pinned from its other side: "no irradiation" is a real growth
+    condition, and refusing it would make a valid approval unsatisfiable."""
+    assert problems(row(irradiation="none", flow_condition="n/a")) == []
+
+
 # ---------------------------------------------------------- the document
 
 def test_an_approval_that_resolves_to_the_wrong_kind_of_document_is_refused():

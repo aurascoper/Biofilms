@@ -91,7 +91,9 @@ BASELINE_CONDITION = TableSchema(
         # and not species: several components are commonly BSL-1 while
         # C. neoformans strains are commonly BSL-2, so assuming one facility
         # class from a species list is wrong.
-        Column("strain_identities"),
+        Column("strain_identities",
+               doc="one entry per strain, separated by ';'. An entry containing "
+                   "',' is refused: a comma-joined list would read as one strain"),
         # THE KEY IS THE STRAIN IDENTIFIER, VERBATIM. Stated here because the
         # gate cannot invent it: an abbreviation like `DR:BSL1` declares no
         # relationship to `D. radiodurans R1`, so a consumer that read one from

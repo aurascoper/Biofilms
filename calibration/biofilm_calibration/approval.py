@@ -209,6 +209,17 @@ SCOPE_COLUMNS = (
     "approved_protocol_version",
 )
 
+# A GROWTH CONDITION IS SCOPE, AND FILLER IN SCOPE HASHES AS IF IT WERE A CONDITION.
+# Every SCOPE_COLUMN enters the digest, but the placeholder pass covered only the
+# four of them in _MUST_NAME_SOMETHING, so `growth_medium = "TBD"` hashed into a
+# scope no committee reviewed and criterion 6 read met. These columns are now
+# refused like any other filler, with one exception stated rather than implied:
+# "none", "n/a" and "na" can be true of a growth condition (no irradiation, no
+# flow), so they are statements, not paperwork. KNOWN LIMIT: that also admits
+# `growth_medium = "none"`, which describes no culture anyone could run; the
+# per-column vocabulary that would refuse it belongs to acquisition.py, not here.
+_ABSENCE_STATEMENTS = frozenset({"none", "n/a", "na"})
+
 _DATE_FIELDS = ("approval_effective_date", "approval_expiration_date",
                 "culturing_start_date")
 
@@ -287,6 +298,37 @@ def classified(rows, sources=None, *,
                     f"{field} = {(row.get(field) or '')!r} names nothing. An "
                     "approval is evidence produced by an institution; filler "
                     "text has no evidentiary force whatever it says")
+
+        for field in SCOPE_COLUMNS:
+            if field in _MUST_NAME_SOMETHING:
+                continue                     # refused above, "none" included
+            value = row.get(field)
+            if (is_placeholder(value) and " ".join(str(value or "").split()).casefold()
+                    not in _ABSENCE_STATEMENTS):
+                add(field,
+                    f"{field} = {(value or '')!r} is filler in the approved scope. "
+                    "It enters the scope digest, so the recorded hash would bind "
+                    "the approval to a condition nobody specified")
+
+        # A STRAIN LIST THAT SPLITS TO NOTHING NAMES NOTHING. `";"` is not filler
+        # text, so the pass above let it through, and the strain-to-level binding
+        # below was skipped because no strain was declared: every authorization
+        # criterion then read met with no organism named (executed on 127db3cd).
+        # And the separator is ';': a comma-joined consortium parsed as ONE
+        # verbatim strain, so a single level covered a mixed-BSL consortium,
+        # which is the error biosafety_level_by_strain exists to prevent.
+        if not is_placeholder(row.get("strain_identities")):
+            declared_strains = _entries(row.get("strain_identities"))
+            if not declared_strains:
+                add("strain_identities",
+                    f"strain_identities = {row.get('strain_identities')!r} "
+                    "declares no strain once split on ';'")
+            joined = [s for s in declared_strains if "," in s]
+            if joined:
+                add("strain_identities",
+                    f"strain_identities entries {joined} contain ','. Entries are "
+                    "separated by ';', so a comma-joined list reads as one strain "
+                    "and a single biosafety level would cover the whole consortium")
 
         for subject, text in _biosafety_mapping_problems(row):
             add(subject, text)
