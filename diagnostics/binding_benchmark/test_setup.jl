@@ -157,4 +157,29 @@ end
     @test "PASS" != ev(EXPECTED_RED[1])
 end
 
+@testset "the committed receipts were produced by this code, in this environment" begin
+    # A receipt binds a run to the code and environment that made it. Both committed
+    # receipts drifted while every function they call kept passing: they held seven hash
+    # keys after code_hashes grew to eleven, and one expected-red control after controls.jl
+    # declared two. Nothing read the committed bytes; this does, so a producer edit without
+    # a regeneration against the parent bundle is red here, not discovered in review.
+    want = code_hashes(joinpath(@__DIR__, "benchmark.toml"))
+    for f in ("benchmark_receipt.json", "control_verification.json")
+        r = JSON3.read(read(joinpath(@__DIR__, f), String))
+        got = Dict(String(k) => String(v) for (k, v) in pairs(r[:code_sha256]))
+        @test sort(collect(keys(got))) == sort(collect(keys(want)))
+        for (k, v) in want
+            @test get(got, k, "<absent from $f>") == v
+        end
+        @test String(r[:parent][:manifest_sha256]) == SHIPPED["parent_manifest_sha256"]
+        @test String(r[:parent][:snapshot]) == SHIPPED["parent_snapshot"]
+    end
+    ctl = JSON3.read(read(joinpath(@__DIR__, "control_verification.json"), String))
+    @test collect(String.(ctl[:expected_red])) == CtlTest.EXPECTED_RED
+    # The mutation receipt is data-free and binds only the module and the suite it mutated.
+    mut = JSON3.read(read(joinpath(@__DIR__, "mutation_verification.json"), String))
+    @test String(mut[:module_sha256]) == sha256_file(joinpath(@__DIR__, "BindingBenchmark.jl"))
+    @test String(mut[:suite_sha256]) == sha256_file(joinpath(@__DIR__, "test_numerics.jl"))
+end
+
 end # setup
