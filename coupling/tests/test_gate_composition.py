@@ -26,6 +26,7 @@ pinned heating tally through the real, live repo code -- specific_energy_per_sou
 from __future__ import annotations
 
 import ast
+import pytest
 import sys
 import json
 from pathlib import Path
@@ -196,7 +197,10 @@ def _modules_that_produce_the_fixture() -> set[Path]:
     while neither verification job fires. The closure over first-party
     imports is the inventory; a base directory is added to
     `_FIRST_PARTY_BASES`, not a module name."""
-    seen: set[Path] = set()
+    # THE ENTRY POINT IS ITSELF A PRODUCER. Seeding only the frontier returned the
+    # script's imports and not the script, so an edit to the generator's own body
+    # could omit it from both filters while this closure reported nothing missing.
+    seen: set[Path] = {_REGEN.relative_to(_REPO)}
     frontier = [_REGEN.relative_to(_REPO)]
     while frontier:
         here = frontier.pop()
@@ -205,6 +209,25 @@ def _modules_that_produce_the_fixture() -> set[Path]:
                 seen.add(dep)
                 frontier.append(dep)
     return seen
+
+
+# THE BUILD SPECIFICATIONS ARE INPUTS TOO. The verification job installs `contract` and
+# `coupling[dev]` editably, so a dependency pin or a package-data rule in either manifest
+# changes the generating run without touching a single producer module.
+_BUILD_SPECS = ("coupling/pyproject.toml", "contract/pyproject.toml")
+
+
+def _fixture_inputs() -> set[str]:
+    """Every repo-relative path whose change alters the generating run: the transitive
+    producer closure, the regeneration entry point included, plus the build specs."""
+    return {p.as_posix() for p in _modules_that_produce_the_fixture()} | set(_BUILD_SPECS)
+
+
+def _paths_missing_from_triggers(required: set[str], triggers: dict) -> dict[str, list[str]]:
+    """Per path-filtered event, the required inputs its `paths:` list does not name."""
+    return {event: sorted(p for p in required
+                          if p not in set(triggers.get(event, {}).get("paths", [])))
+            for event in ("push", "pull_request")}
 
 
 def _workflow_triggers() -> dict:
@@ -242,15 +265,38 @@ def test_every_fixture_producing_module_triggers_verification():
         f"only found {sorted(map(str, producers))}; the import walk is not "
         "resolving the modules it is supposed to check")
 
-    for event in ("push", "pull_request"):
-        listed = set(triggers.get(event, {}).get("paths", []))
-        missing = sorted(p.as_posix() for p in producers
-                         if p.as_posix() not in listed)
+    for event, missing in _paths_missing_from_triggers(_fixture_inputs(), triggers).items():
         assert not missing, (
-            f"{_REGEN.name} imports {missing}, so a change to any of them "
+            f"the generating run reads {missing}, so a change to any of them "
             f"changes the real tally -- but {_WORKFLOW.name}'s `{event}:` "
             "paths filter does not list them, so verification would not run "
             "and the committed fixture would go stale while CI stayed green.")
+
+
+def test_the_entry_point_is_in_its_own_closure():
+    """The closure used to seed only its frontier with the generator, so the returned
+    set held everything the generator imports and not the generator. Seed the frontier
+    alone again and this fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    assert _REGEN.relative_to(_REPO).as_posix() in producers, sorted(producers)
+
+
+@pytest.mark.parametrize("event", ["push", "pull_request"])
+@pytest.mark.parametrize("path", ["coupling/scripts/regenerate_golden_tally.py", *_BUILD_SPECS])
+def test_removing_a_required_input_from_one_trigger_is_caught(event, path):
+    """KNOWN-BAD: the real parsed workflow with ONE required path dropped from ONE event.
+    The guard must name exactly that event and that path -- a closure without its entry
+    point, or an input list without the manifests, could not. The two lists are copied
+    separately on purpose: in the parsed YAML they are one anchored object, and a
+    deepcopy keeps them shared, so removing from one would remove from both."""
+    real = _workflow_triggers()
+    triggers = {e: {"paths": list(real[e]["paths"])} for e in ("push", "pull_request")}
+    assert path in triggers[event]["paths"], "the real workflow must list it: that is the premise"
+    triggers[event]["paths"].remove(path)
+    missing = _paths_missing_from_triggers(_fixture_inputs(), triggers)
+    assert missing[event] == [path], missing
+    other = "pull_request" if event == "push" else "push"
+    assert missing[other] == [], missing
 
 
 def test_relative_imports_are_part_of_the_closure():

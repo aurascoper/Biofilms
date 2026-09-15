@@ -56,6 +56,11 @@ on:
       # The doc stays listed: it still carries the nuclear-data identity.
       - "environment.yml"
       - "coupling/scripts/regenerate_golden_tally.py"
+      # The build specifications the job installs editably: a pin or a
+      # package rule in either changes the generating run with no producer
+      # module touched. test_gate_composition.py requires both here.
+      - "coupling/pyproject.toml"
+      - "contract/pyproject.toml"
       - "coupling/tests/fixtures/golden_tally_water_phantom.json"
       # The fixture-producing modules, per the control test named above.
       - "coupling/scripts/openmc_nested_pilot.py"
