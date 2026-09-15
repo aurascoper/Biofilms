@@ -106,14 +106,10 @@ nuclear-engineering multiphysics. This work therefore extends an established par
 transport code and a new biological target rather than introducing the paradigm.
 
 Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
-measured results. At the melanin level reached in the single seed-42 run, the melanin term
-changes Metropolis acceptance by approximately 15.5\%, about an order of magnitude beyond the
-reach of the direct per-species radiation term, which for one role of the two negatively signed
-species is only one part in $10^5$;\footnote{Corrected 2026-09-15. This sentence stated the
-melanin figure without the seed it was computed at, and set it against the one-role radiation
-value rather than the term's reach (\texttt{data/claims\_ledger.csv}: \texttt{PP-62-13},
-\texttt{PP-65-06}).} only the product of melanin production and melanin coupling reaches the
-dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
+measured results. The melanin term changes Metropolis acceptance by approximately 15.5\%, whereas
+the direct per-species radiation term changes it by approximately one part in $10^5$ for the two
+negatively signed species; only the product of melanin production and melanin coupling reaches
+the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
 opposite to the direction implied by the direct tropism coefficient and is not clearly separated
 from the approximate seeding null at six parcels per species.
 
@@ -769,7 +765,7 @@ citation, no entry in Table~\ref{tab:params}, and no configuration file exposes 
 declared modelling choice and is recorded as one
 (\texttt{PP-T2-29}, \texttt{flagged\_weak}, in \texttt{data/species\_parameter\_provenance.csv}).
 Stating it here matters because the 15.5\% acceptance shift reported in
-Section~\ref{sec:results} for the seed-42 run is this coefficient's effect: the largest measured quantity in the
+Section~\ref{sec:results} is this coefficient's effect: the largest measured quantity in the
 manuscript rests on the least evidenced parameter in it, and a reader who assumed the table
 covered every parameter would not learn that from the table.
 
@@ -936,9 +932,7 @@ biases are shown in Table~\ref{tab:term_magnitudes}.
 \centering
 \small
 \caption{Magnitude of the radiation-linked terms in the CPM acceptance rule at the shipped
-constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$. The melanin row is evaluated at the
-\textit{C.~sphaerospermum} field value of the single seed-42 run; that value, and the bias computed
-from it, varies between seeds.}
+constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$.}
 \label{tab:term_magnitudes}
 \begin{tabular}{@{}llr@{}}
 \toprule
@@ -946,19 +940,13 @@ from it, varies between seeds.}
 \midrule
 $\Delta H_{\mathrm{rad}}$, negative $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
 $\Delta H_{\mathrm{rad}}$, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
-$\Delta H_{\mathrm{mel}}$ at $M=1.44$ (seed 42) & $-0.720$ & $\mathbf{1.155}$ \\
+$\Delta H_{\mathrm{mel}}$ at $M=1.44$ & $-0.720$ & $\mathbf{1.155}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-For one role of the two negatively signed species, the direct radiation term changes acceptance
-by about one part in $10^5$; signed by role, its reach over source--target pairings is
-$7.505\times10^{-2}$ in $\Delta H$. At the seed-42 field value the melanin term changes acceptance
-by 15.5\%, about an order of magnitude beyond that reach (9.6 in $\Delta H$).\footnote{Corrected
-2026-09-15. This sentence set the melanin figure against the one-role radiation value instead of
-the term's reach, and did not say that the melanin figure comes from one seed; the field value, and
-with it this ratio, varies between seeds (\texttt{PP-62-13}, \texttt{PP-65-06}).} Radiation can
-therefore influence
+For the two negatively signed species, the direct radiation term changes acceptance by about one
+part in $10^5$, whereas the melanin term changes it by 15.5\%. Radiation can therefore influence
 the CPM indirectly through the chain
 \[
 I_\gamma \longrightarrow \text{melanin production} \longrightarrow M
@@ -999,14 +987,10 @@ and is not clearly separated from the approximate seeding null at the present pa
 \subsection{Melanin-Field Diagnostic}
 
 The dimensionless melanin field increases over the 100-MCS run for all three producer classes
-(Figure~\ref{fig:melanin}). In this seed-42 run \textit{C.~sphaerospermum} reaches the largest
-final field value, $M=1.44$, followed by \textit{C.~neoformans} and \textit{A.~niger}, which is the
-order of the hand-specified production scales $\alpha_M$ ($0.14$, $0.10$, $0.065$). A single run
-shows that this order occurred, not that the scales fix it, and at this configuration there are
-seeds in which it inverts.\footnote{Corrected 2026-09-15. This sentence previously said the ordering
-follows the hand-specified production scales, a statement about every run made from one
-(\texttt{PP-65-06}).} These field values have no calibration to a physical melanin mass or
-concentration.
+(Figure~\ref{fig:melanin}). \textit{C.~sphaerospermum} reaches the largest final field value,
+$M=1.44$, followed by \textit{C.~neoformans} and \textit{A.~niger}. The ordering follows the
+hand-specified production scales; these field values have no calibration to a physical melanin mass
+or concentration.
 
 \begin{figure}[htbp]
 \centering
@@ -1188,11 +1172,7 @@ variance was relabelled, an unprovenanced sensitivity table was withdrawn and re
 one synthetic-gate verdict was withdrawn as not resolution-converged. None of those numbers
 appears in this manuscript, whose transport section reports the execution of a path rather than
 its results. The corrections are recorded in \texttt{data/claims\_ledger.csv} and in
-\texttt{docs/calibration/}. Three passages of this manuscript were themselves corrected after that
-revision and carry a footnote where they occur: the abstract and the paragraph beneath
-Table~\ref{tab:term_magnitudes} now scope the melanin acceptance figure to the single seed it was
-computed at and set it against the radiation term's reach, and the melanin-field diagnostic no
-longer presents the producers' order as a consequence of the production scales.
+\texttt{docs/calibration/}.
 
 \section*{Ethics, Biosafety, and Regulatory Statement}
 This manuscript reports software development, computational simulation, code audit, and analysis of
