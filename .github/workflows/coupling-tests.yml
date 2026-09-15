@@ -81,6 +81,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run the merge gate's negative controls
         run: scripts/test_preflight_merge.sh
+      - name: Run the review watcher's negative controls
+        # The watcher only observes; these prove it never reads an error as
+        # "no reviews", never returns a partial page, and keeps what it last
+        # saw when the service goes away.
+        run: python3 scripts/test_watch_pr_reviews.py
 
   calibration-unit:
     # Calibration contracts and harnesses: numpy/pytest only, no transport
