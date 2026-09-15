@@ -91,6 +91,9 @@ if "reviewThreads(" in joined:
         out(conn("reviewThreads", [resolved], more=True))
     out(conn("reviewThreads", [resolved, thread]))
 if "comments(" in joined:
+    if S == "usage_limit":
+        out(conn("comments", [{"author": {"login": CODEX}, "createdAt": "2026-09-15T05:40:58Z",
+            "body": "You have reached your Codex usage limits for code reviews. You can see your limits in the [Codex usage dashboard](https://chatgpt.com/codex/cloud/settings/usage).\\nTo continue using code reviews, you can upgrade your account or add credits to your account."}]))
     if S == "comment_finding":
         out(conn("comments", [{"author": {"login": CODEX}, "createdAt": "2026-09-14T03:00:00Z",
             "body": "https://github.com/o/r/blob/%s/f.py#L9-L9\n" % HEAD[:12] + badge("P2") + "Comment-form finding**"}]))
