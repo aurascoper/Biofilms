@@ -146,6 +146,13 @@ def _grid_shape(extent_um, pitch_um) -> tuple:
     shape = []
     for axis, extent in enumerate(extent_um):
         exact = float(extent) / float(pitch_um)
+        # A DENORMAL PITCH passes the finite check above and overflows here:
+        # 24 / 5e-324 is inf, and int(round(inf)) raised OverflowError past the
+        # ladder's typed except. Refused under the same type, by name.
+        if not math.isfinite(exact):
+            raise NonTilingPitchError(
+                f"pitch {pitch_um} is too small to tile axis {axis} of extent "
+                f"{extent}: the voxel count overflows")
         n = int(round(exact))
         if n < 1 or abs(exact - n) > 1e-9:
             raise NonTilingPitchError(

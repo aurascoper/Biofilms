@@ -283,3 +283,34 @@ def test_a_refused_pitch_does_not_break_the_convergence_tail():
                 == rl.coarsest_passing(without, observable)), (
             f"inserting a refused pitch changed {observable}; a rung that is "
             "not a view of the object must not enter the tail")
+
+
+def test_a_denormal_pitch_is_refused_under_the_typed_error():
+    """5e-324 is positive and finite, so it passed the first check, and 24/5e-324
+    overflowed: int(round(inf)) raised OverflowError past the ladder's except."""
+    import sys
+    from pathlib import Path
+
+    from biofilm_calibration.spatial.synthetic import NonTilingPitchError
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    for pitch in (5e-324, 1e-310):
+        with pytest.raises(NonTilingPitchError, match="too small"):
+            PhysicalSpheres().rasterize(pitch)
+    rows = rl.run_ladder(PhysicalSpheres(), [5e-324, 1.6], rl.load_tolerances())
+    assert "skipped" in rows[0] and "skipped" not in rows[1], rows
+
+
+@pytest.mark.parametrize("bad", ["3.2,,1.6", "3.2,1.6,", "", "soon,1.6"])
+def test_a_malformed_pitch_list_is_refused_by_name(tmp_path, bad):
+    """A blank or non-numeric token raised an anonymous ValueError from float()."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    with pytest.raises(SystemExit, match="--pitches"):
+        rl.main(["--outdir", str(tmp_path / "out"), "--pitches", bad])
+    assert not (tmp_path / "out" / "rasterization_ladder.json").exists()
