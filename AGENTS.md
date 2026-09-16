@@ -54,6 +54,23 @@ an unreachable milestone and a correctly-withheld milestone print the same
 thing, so nothing ever looks wrong. `authorization_criteria` was unreachable
 for one release and nobody could have noticed by reading its output.
 
+**A truncated page is an unrecognised incompleteness, and a count is the same
+kind of claim as a lookup.** Three instances here, inside eleven days, across
+three different actors: a `grep` piped through `head -8` reported a phrase absent
+because eight fixture hits came first; the merge gate's comments query went
+unpaginated while `--paginate` advanced a different connection, so a finding
+thirty comments back vanished and the gate cleared; and `reviewThreads(first:50)`
+returned nothing for a pull request holding 91 threads, two of them open. Each
+result was short of the truth and was read as zero. **A query that can page must
+assert it reached the end before its result is used as a count** — read
+`pageInfo { hasNextPage }` and check it, rather than assuming one page was all.
+
+Its control is easy to get wrong in one specific way, and was: every pagination
+test here asserted that something on page *two* was reached, so a reader that
+keeps paging but drops page *one* satisfies all of them.
+`test_threads_spanning_two_pages_are_all_counted` puts unresolved threads on both
+pages and asserts the reported total.
+
 ### 4. The producer declares semantics; the consumer must not assume them
 
 `cell_id == 0` is empty space. `generation == 0` is a founder. The renderer
