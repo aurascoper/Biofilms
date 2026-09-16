@@ -1,0 +1,16 @@
+name,country,latitude,longitude,stage,capacity_mw,status,source
+Atacama,Chile,-23.50,-68.25,lithium,0,operating,USGS
+Greenbushes,Australia,-33.85,116.05,lithium,0,operating,USGS
+Hombre Muerto,Argentina,-25.35,-66.85,lithium,0,operating,USGS
+Silver Peak,United States,37.75,-117.63,lithium,0,operating,USGS
+Kolwezi,DRC,-10.72,25.47,cobalt,0,operating,USGS
+Tenke Fungurume,DRC,-10.60,26.20,cobalt,0,operating,USGS
+Sorowako,Indonesia,-2.53,121.35,nickel,0,operating,USGS
+Sudbury,Canada,46.49,-81.01,nickel,0,operating,USGS
+Tesla Giga Nevada,United States,39.54,-119.20,gigafactory,35,operating,company
+Tesla Giga Shanghai,China,30.87,121.80,gigafactory,50,operating,company
+CATL Ningde,China,26.66,119.52,gigafactory,100,operating,company
+LG Wroclaw,Poland,51.10,17.03,gigafactory,65,operating,company
+Northvolt Skelleftea,Sweden,64.75,20.95,gigafactory,16,operating,company
+Redwood Materials,United States,39.53,-119.75,recycling,0,operating,company
+Li-Cycle Rochester,United States,43.15,-77.61,recycling,0,operating,company

@@ -1,0 +1,107 @@
+name,country,country_long,capacity_mw,latitude,longitude,primary_fuel,commissioning_year,owner,generation_gwh_2013
+Three Mile Island,USA,United States of America,852,40.1537,-76.6986,Nuclear,1974,Exelon,0
+Palo Verde,USA,United States of America,3937,33.3884,-112.8611,Nuclear,1986,Arizona Public Service,0
+Grand Coulee,USA,United States of America,6809,47.9561,-118.9853,Hydro,1942,US Bureau of Reclamation,0
+Hoover Dam,USA,United States of America,2080,36.0161,-114.7375,Hydro,1936,US Bureau of Reclamation,0
+Taichung,TWN,Taiwan,5824,24.2119,120.4817,Coal,1991,Taipower,0
+Datang Tuoketuo,CHN,China,6720,40.1994,111.3603,Coal,2003,Datang International,0
+Jaitapur,IND,India,9900,17.1750,73.3200,Nuclear,2021,NPCIL,0
+Vindhyachal,IND,India,4760,24.0950,82.6700,Coal,1987,NTPC,0
+Sihwa Lake,KOR,South Korea,254,37.3167,126.5833,Tidal,2011,KOWACO,0
+Shin-Kori,KOR,South Korea,7200,35.3200,129.3000,Nuclear,2011,KHNP,0
+Fukushima Daini,JPN,Japan,4400,37.3167,141.0333,Nuclear,1982,TEPCO,0
+Kashiwazaki-Kariwa,JPN,Japan,7965,37.4290,138.6060,Nuclear,1985,TEPCO,0
+Gansu Wind Farm,CHN,China,7965,40.0000,97.0000,Wind,2010,China Longyuan,0
+Alta Wind,USA,United States of America,1548,35.0200,-118.3200,Wind,2010,Terra-Gen,0
+Ivanpah,USA,United States of America,392,35.5700,-115.4700,Solar,2014,BrightSource,0
+Bhadla Solar Park,IND,India,2245,27.5400,72.9300,Solar,2017,ACME Solar,0
+Benban Solar Park,EGY,Egypt,1650,24.4600,32.8600,Solar,2019,Benban Consortium,0
+Olkiluoto,FIN,Finland,1600,61.2400,21.4700,Nuclear,1979,TVO,0
+Flamanville,FRA,France,1600,49.5400,-1.8800,Nuclear,1986,EDF,0
+Hinkley Point C,GBR,United Kingdom,3260,51.2100,-3.1300,Nuclear,2023,EDF,0
+Itaipu,BRA,Brazil,14000,-25.4100,-54.5900,Hydro,1984,Itaipu Binacional,0
+Three Gorges,CHN,China,22500,30.8200,111.0000,Hydro,2003,CTG,0
+Xiluodu,CHN,China,13860,28.2600,103.6500,Hydro,2014,CTG,0
+Guri,VEN,Venezuela,10235,7.7700,-62.9000,Hydro,1986,CVG,0
+Tucurui,BRA,Brazil,8370,-3.8300,-49.6500,Hydro,1984,Eletronorte,0
+Surgut-2,RUS,Russia,5597,61.2800,73.5000,Gas,1985,Unipro,0
+Jebel Ali,ARE,United Arab Emirates,2000,25.0100,55.0700,Gas,1991,DEWA,0
+Hassi R'Mel,ALG,Algeria,150,32.9000,3.3000,Solar,2011,NEAL,0
+Ouarzazate,MAR,Morocco,510,31.0000,-6.8600,Solar,2016,MASEN,0
+Kruonis,LTU,Lithuania,900,54.8000,24.2500,Hydro,1992,Litgrid,0
+Dinorwig,GBR,United Kingdom,1728,53.1200,-4.1100,Hydro,1984,Engie,0
+Bath County,USA,United States of America,3003,38.2100,-79.8000,Hydro,1985,Dominion,0
+Ludington,USA,United States of America,1872,43.8900,-86.4400,Hydro,1973,Consumers Energy,0
+Raccoon Mountain,USA,United States of America,1532,35.0500,-85.4000,Hydro,1978,TVA,0
+Helms,USA,United States of America,1212,37.0500,-119.1800,Hydro,1984,PG&E,0
+Castaic,USA,United States of America,1566,34.5900,-118.6000,Hydro,1973,LADWP,0
+San Luis,USA,United States of America,424,37.0300,-121.0800,Hydro,1968,USBR,0
+Coyote Springs,USA,United States of America,120,38.8700,-121.0800,Gas,1995,Calpine,0
+La Paloma,USA,United States of America,1048,35.3000,-119.1000,Gas,2001,Calpine,0
+Moss Landing,USA,United States of America,1022,36.8000,-121.7800,Gas,2002,Dynegy,0
+Diablo Canyon,USA,United States of America,2257,35.2100,-120.8600,Nuclear,1985,PG&E,0
+San Onofre,USA,United States of America,2254,33.3700,-117.5500,Nuclear,1968,SCE,0
+Comanche Peak,USA,United States of America,2418,32.3000,-97.7900,Nuclear,1990,Luminant,0
+South Texas Project,USA,United States of America,2700,28.8000,-96.4500,Nuclear,1988,STP Nuclear,0
+Vogtle,USA,United States of America,4536,33.1400,-81.7600,Nuclear,1987,Georgia Power,0
+Watts Bar,USA,United States of America,2338,35.6000,-84.7900,Nuclear,1996,TVA,0
+Seabrook,USA,United States of America,1246,42.9000,-70.8700,Nuclear,1990,NextEra,0
+Millstone,USA,United States of America,2098,41.3100,-72.1700,Nuclear,1975,Dominion,0
+Calvert Cliffs,USA,United States of America,1735,38.4300,-76.4400,Nuclear,1975,Exelon,0
+Limerick,USA,United States of America,2268,40.2300,-75.5900,Nuclear,1986,Exelon,0
+Peach Bottom,USA,United States of America,2268,39.7600,-76.2100,Nuclear,1974,Exelon,0
+Susquehanna,USA,United States of America,2529,41.0900,-76.1500,Nuclear,1983,Talen,0
+Nine Mile Point,USA,United States of America,1907,43.5200,-76.4100,Nuclear,1969,Exelon,0
+Fitzpatrick,USA,United States of America,852,43.5300,-76.4000,Nuclear,1975,Exelon,0
+Ginna,USA,United States of America,582,43.2800,-77.3100,Nuclear,1970,Exelon,0
+Indian Point,USA,United States of America,2050,41.2700,-73.9500,Nuclear,1974,Entergy,0
+Oyster Creek,USA,United States of America,636,39.8100,-74.2000,Nuclear,1969,Exelon,0
+Hope Creek,USA,United States of America,1172,39.4600,-75.5400,Nuclear,1986,PSEG,0
+Salem,USA,United States of America,2268,39.4600,-75.5400,Nuclear,1977,PSEG,0
+Beaver Valley,USA,United States of America,1816,40.6200,-80.4300,Nuclear,1976,FirstEnergy,0
+Perry,USA,United States of America,1240,41.8000,-81.1400,Nuclear,1987,FirstEnergy,0
+Davis-Besse,USA,United States of America,894,41.6000,-83.0900,Nuclear,1978,FirstEnergy,0
+Fermi,USA,United States of America,1134,41.9600,-83.2600,Nuclear,1988,DTE,0
+Palisades,USA,United States of America,805,42.3200,-86.3100,Nuclear,1971,Entergy,0
+Cook,USA,United States of America,2300,41.9700,-86.5600,Nuclear,1975,Indiana Michigan,0
+Dresden,USA,United States of America,1800,41.3900,-88.2700,Nuclear,1970,Exelon,0
+LaSalle,USA,United States of America,2300,41.2500,-88.6800,Nuclear,1984,Exelon,0
+Braidwood,USA,United States of America,2300,41.2400,-88.2300,Nuclear,1988,Exelon,0
+Byron,USA,United States of America,2300,42.0700,-89.2800,Nuclear,1985,Exelon,0
+Clinton,USA,United States of America,1065,40.1700,-88.8400,Nuclear,1987,Exelon,0
+Quad Cities,USA,United States of America,1800,41.7200,-90.3200,Nuclear,1973,Exelon,0
+Duane Arnold,USA,United States of America,601,42.1000,-91.7800,Nuclear,1975,NextEra,0
+Monticello,USA,United States of America,671,45.3300,-93.6200,Nuclear,1971,Xcel,0
+Prairie Island,USA,United States of America,1100,44.6200,-92.6300,Nuclear,1973,Xcel,0
+Point Beach,USA,United States of America,1020,44.2800,-87.5400,Nuclear,1970,NextEra,0
+Kewaunee,USA,United States of America,556,44.3400,-87.5400,Nuclear,1974,Dominion,0
+Columbia,USA,United States of America,1100,46.4700,-119.3300,Nuclear,1984,Energy Northwest,0
+Grand Gulf,USA,United States of America,1400,33.0600,-91.0400,Nuclear,1985,Entergy,0
+River Bend,USA,United States of America,974,30.7500,-91.3300,Nuclear,1986,Entergy,0
+Waterford,USA,United States of America,1168,29.9900,-90.4700,Nuclear,1985,Entergy,0
+Turkey Point,USA,United States of America,1390,25.4400,-80.3300,Nuclear,1972,FPL,0
+St. Lucie,USA,United States of America,1670,27.3500,-80.2500,Nuclear,1976,FPL,0
+Crystal River,USA,United States of America,860,28.9500,-82.7000,Nuclear,1977,Duke,0
+Brunswick,USA,United States of America,1870,33.9600,-78.0100,Nuclear,1977,Duke,0
+Shearon Harris,USA,United States of America,900,35.6300,-78.9500,Nuclear,1987,Duke,0
+McGuire,USA,United States of America,2258,35.4400,-80.9500,Nuclear,1981,Duke,0
+Catawba,USA,United States of America,2258,35.0500,-81.0700,Nuclear,1985,Duke,0
+Oconee,USA,United States of America,2538,34.8000,-82.9000,Nuclear,1973,Duke,0
+H.B. Robinson,USA,United States of America,700,34.4000,-80.1600,Nuclear,1971,Duke,0
+Summer,USA,United States of America,1000,34.3000,-81.2000,Nuclear,1984,SCE&G,0
+North Anna,USA,United States of America,1940,38.0600,-77.7900,Nuclear,1978,Dominion,0
+Surry,USA,United States of America,1600,37.1600,-76.7000,Nuclear,1972,Dominion,0
+Pilgrim,USA,United States of America,685,41.9500,-70.5800,Nuclear,1972,Entergy,0
+Vermont Yankee,USA,United States of America,620,42.7800,-72.5100,Nuclear,1972,Entergy,0
+Yankee Rowe,USA,United States of America,180,42.7000,-72.9200,Nuclear,1961,Yankee Atomic,0
+Big Rock Point,USA,United States of America,67,45.3600,-84.8100,Nuclear,1962,Consumers Energy,0
+Rancho Seco,USA,United States of America,913,38.3500,-121.1200,Nuclear,1975,Sacramento Municipal,0
+Trojan,USA,United States of America,1130,46.0400,-122.8800,Nuclear,1976,Portland General,0
+Humboldt Bay,USA,United States of America,65,40.7400,-124.2100,Nuclear,1963,PG&E,0
+Zion,USA,United States of America,1040,42.4500,-87.8300,Nuclear,1973,Exelon,0
+Fort Calhoun,USA,United States of America,478,41.5200,-95.9200,Nuclear,1973,OPPD,0
+Cooper,USA,United States of America,801,40.3600,-95.6400,Nuclear,1974,NPPD,0
+Wolf Creek,USA,United States of America,1160,38.2400,-95.7000,Nuclear,1985,Wolf Creek Nuclear,0
+Callaway,USA,United States of America,1190,38.7600,-91.7800,Nuclear,1984,Ameren,0
+Arkansas One,USA,United States of America,1671,35.3100,-93.2300,Nuclear,1974,Entergy,0
+Palo Verde,USA,United States of America,3937,33.3900,-112.8600,Nuclear,1986,APS,0

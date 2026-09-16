@@ -394,3 +394,11 @@ calibration/*.egg-info/
 # was swept into a commit once by `git add -A` after being explicitly left
 # out of the one before it.
 preprint/*.pdf
+
+# geolocator market bar cache (regenerable via python3 -m geolocator.market backfill)
+geolocator/data/market_bars.sqlite
+
+# fetched reference imagery — runtime cache, re-fetchable from NASA GIBS.
+# Large binary reference data gets an explicit distribution decision, not a
+# silent commit.
+geolocator/cache/

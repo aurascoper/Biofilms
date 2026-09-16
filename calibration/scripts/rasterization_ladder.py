@@ -202,7 +202,25 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     args.outdir.mkdir(parents=True, exist_ok=True)
-    pitches = [float(p) for p in args.pitches.split(",")]
+    # EVERY TOKEN IS A NUMBER, OR THE LIST IS REFUSED BY NAME. `float('')` raised
+    # an anonymous ValueError for "3.2,,1.6", a trailing comma or an empty
+    # argument -- the defect subvoxel_refinement.parse_ratios closes for --ratios.
+    tokens = [t.strip() for t in args.pitches.split(",")]
+    try:
+        pitches = [float(t) for t in tokens] if all(tokens) else []
+    except ValueError:
+        pitches = []
+    if not pitches:
+        raise SystemExit(f"--pitches {args.pitches!r}: expected a comma-separated "
+                         "list of numbers with no empty entries")
+    # A PITCH WITH NO JSON FORM IS REFUSED HERE, BY NAME. The raw list is
+    # echoed into the report and written with `allow_nan=False`, so NaN or
+    # inf ran the whole ladder and then crashed in `json.dumps` with no
+    # report written -- past the typed skip row `_grid_shape` gives them.
+    # Zero and negatives serialise, so they still become named skip rows.
+    if not all(math.isfinite(p) for p in pitches):
+        raise SystemExit(f"--pitches {args.pitches!r}: every pitch must be a "
+                         "finite number; NaN and inf have no place in the report")
     tolerances = load_tolerances()
 
     specs = {"slab": PhysicalSlab(), "spheres": PhysicalSpheres()}

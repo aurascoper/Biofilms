@@ -185,6 +185,35 @@ def test_campaign_readiness_is_separate_from_config_readiness(requirements):
     assert not verdicts[status.SWEEP_READY][0]
 
 
+def test_readiness_judges_authorization_on_the_date_it_is_handed(requirements):
+    """THE VERDICT AND THE CRITERIA IT PRINTS MUST BE JUDGED ON ONE DATE.
+
+    `main` passes an injected `today` to the criteria print and `readiness`
+    recomputed the same criteria on the real date, so a caller evaluating a
+    pinned historical or future date could get a blocker the printed criteria
+    did not show, and the readiness verdict was untestable for expiry.
+    """
+    from test_approval import SOURCES, row
+    from datetime import date
+
+    s = status.spatial_report.evaluate(
+        status.DATA / "spatial",
+        REPO / "config" / "reference_d_spatial_acceptance.toml")
+    m = status.material_report.evaluate(
+        status.DATA / "materials",
+        REPO / "config" / "reference_d_material_acceptance.toml")
+
+    def blockers(today):
+        return status.readiness(requirements, s.verdict, m.openmc,
+                                status.declared_binding(), [row()], SOURCES,
+                                today=today)[status.AUTHORIZED][1]
+
+    # row() is valid from 2026-06-01 and expires 2027-06-01
+    assert blockers(date(2026, 8, 16)) == []
+    assert any("expired" in b for b in blockers(date(2027, 7, 1))), \
+        blockers(date(2027, 7, 1))
+
+
 def test_authorization_cannot_be_reached_without_a_baseline_row():
     """CAMPAIGN_READY requires the institutional verdict, so the two can never
     disagree — which is the point of deriving one from the other rather than
@@ -219,6 +248,12 @@ def test_a_valid_approval_meets_every_criterion():
     ("culturing_start_date", "2026-05-01"),
     ("is_target_system", "false"),
     ("scope_hash", " "),
+    ("strain_identities", ";"),
+    ("strain_identities", "D. radiodurans R1, C. neoformans H99"),
+    ("growth_medium", "TBD"), ("temperature_C", "pending"), ("pH", "unknown"),
+    ("oxygen_condition", "TBD"), ("substrate_or_membrane", "TBD"),
+    ("biofilm_age_h", "TBD"), ("flow_condition", "pending"),
+    ("irradiation", "unknown"),
 ])
 def test_every_refusal_reaches_a_criterion(field, bad):
     """THE NEGATIVE CONTROL THE MAPPING NEVER HAD.
@@ -249,6 +284,14 @@ def test_every_refusal_reaches_a_criterion(field, bad):
     assert unmet, (
         f"breaking {field!r} refuses at the gate but leaves all criteria met. "
         "The milestone reads AUTHORIZED over a live refusal.")
+    # AND IT REACHES A NAMED CRITERION. An unmapped refusal is appended as an
+    # UNMAPPED row, so `unmet` is non-empty either way: without this the test
+    # could not tell a mapped refusal from one that lands nowhere, which is the
+    # failure its docstring says it catches.
+    unmapped = [c for c in unmet if c.startswith("UNMAPPED")]
+    assert not unmapped, (
+        f"breaking {field!r} refuses at the gate but reaches no named "
+        f"criterion: {unmapped}")
 
 
 def test_criteria_with_no_consumer_are_named(requirements):
@@ -447,3 +490,29 @@ def test_no_gate_reads_the_suspended_isotherm_proposal():
     for row in rows:
         assert ",false," in row or row.rstrip().endswith(",false"), (
             f"every row must carry authoritative_for_campaign = false: {row[:60]}")
+
+
+def _registry_read_failing_with(exc_type, monkeypatch):
+    """Make only the sources.csv read in main() fail, with the given exception."""
+    from biofilm_calibration import schema
+    real = schema.read_table
+
+    def read_table(path, *args, **kwargs):
+        if Path(path).name == "sources.csv":
+            raise exc_type("column document_type: 'datasheet' not in vocabulary")
+        return real(path, *args, **kwargs)
+    monkeypatch.setattr(schema, "read_table", read_table)
+
+
+def test_a_registry_that_fails_to_load_is_refused_not_read_as_empty(monkeypatch):
+    """A registry that failed to parse became [], and criterion 8 then printed
+    exactly what a correctly withheld approval prints (rule 3)."""
+    _registry_read_failing_with(ValueError, monkeypatch)
+    with pytest.raises(SystemExit, match="sources.csv could not be read"):
+        status.main([])
+
+
+def test_an_absent_registry_is_empty_and_the_report_says_so(monkeypatch, capsys):
+    _registry_read_failing_with(FileNotFoundError, monkeypatch)
+    assert status.main([]) == 0
+    assert "sources.csv is absent" in capsys.readouterr().out

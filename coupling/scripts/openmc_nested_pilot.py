@@ -772,6 +772,22 @@ def refuse_partial_publish(publish, stopped_early) -> None:
             "larger --budget-seconds, or drop --publish to write under --outdir.")
 
 
+def worst_case_budget(budgets: dict) -> VarianceBudget:
+    """The per-term maximum over scenarios, and ZERO when there are none.
+
+    A budget that expired before the first draw reaches `_report` with no
+    records, so `budgets` is empty and a bare `max()` raised `ValueError`
+    before the budget document was written. The `if not records` return and
+    the stopped-early publication refusal below it were unreachable for
+    exactly the run they exist to describe. Module level so the empty case can
+    be exercised without openmc.
+    """
+    return VarianceBudget(**{k: max((b[k] for b in budgets.values()),
+                                    default=0.0)
+                             for k in ("transport", "numerics",
+                                       "calibration", "model_form")})
+
+
 def _report(records, debiased, args, runs, histories, sp_bytes, wall,
             raytrace_wall,
             stopped_early, base, snapshot) -> int:
@@ -890,9 +906,7 @@ def _report(records, debiased, args, runs, histories, sp_bytes, wall,
                    if eff(lambda r, f=f, s=s: r["mesh_factor"] == f
                           and r["scenario"] == s).size}},
         }
-    budget = VarianceBudget(**{k: max(b[k] for b in budgets.values())
-                               for k in ("transport", "numerics",
-                                         "calibration", "model_form")})
+    budget = worst_case_budget(budgets)
 
     # THE RAW METRIC'S NOISE FLOOR, still measured and still reported — but now
     # as a DIAGNOSTIC rather than as the significance test. `noise_floor` runs

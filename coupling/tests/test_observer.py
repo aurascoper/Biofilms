@@ -487,6 +487,44 @@ def test_an_all_background_species_layer_draws_instead_of_crashing(tmp_path):
     assert plotter is not None
 
 
+def test_the_display_plan_dict_carries_the_absence_contract():
+    """`as_dict` IS THE PLAN'S PORTABLE FORM, and it dropped both new fields.
+
+    `background` and `occupancy_from` reached the dataclass and not the dict,
+    so any caller persisting or transporting a plan through the public method
+    lost the producer's declaration silently. The dict must say what the
+    object says.
+    """
+    layer = observer.DisplayLayer(
+        "generation", "cpm_labels", "dimensionless", "categorical", True, "",
+        "", "scalar", background=UNDECLARED, occupancy_from="cell_id")
+    d = layer.as_dict()
+    assert d["occupancy_from"] == "cell_id"
+    assert d["background"] is UNDECLARED
+    assert observer.DisplayLayer("x", "g", "u", "categorical", True, "", "",
+                                 "scalar", background=None).as_dict()[
+        "background"] is None
+
+
+def test_a_background_none_layer_draws_every_cell(tmp_path):
+    """`background=None` IS A STATEMENT, so the picture must honour it: every
+    cell, including value 0, is drawn. The branch used to lean on pyvista's
+    unvalued `threshold`, whose keep-everything behaviour is a library default
+    and not this module's contract; now it draws the image unfiltered, and
+    this pins the count so a filter reintroduced by either route shows."""
+    path = tmp_path / "gen.h5"
+    write_bundle(path, [LATTICE],
+                 [Layer("generation", "cpm_labels", "dimensionless",
+                        "categorical", np.zeros((4, 4, 4), np.int32),
+                        background=None)],
+                 [], provenance={"reference_system_id": "synthetic",
+                                 "target_calibration": False,
+                                 "evidence_policy": "synthetic",
+                                 "openmc_version": "0.15.3"})
+    plotter = observer.plot_layer(path, "generation")
+    assert plotter.mesh.n_cells == 64, plotter.mesh.n_cells
+
+
 def test_a_categorical_layer_must_declare_what_absence_means():
     """OMISSION MUST NOT ACQUIRE A SEMANTICS.
 

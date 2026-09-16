@@ -65,6 +65,41 @@ const JACC_PORT_PATH = joinpath(REPO, "biofilms_potts_jacc.jl")
         end
         @test ran
 
+        # THE PORT'S COPY OF THE BASIS GATE, EXERCISED.  Until now the JACC
+        # copy of `_assert_basis_gate` had no control of any kind: deleting its
+        # four refusal lines left every suite green, and its own message claimed
+        # `tests/radiodialysis_basis_gate.jl` asserted it, which never loads this
+        # file. The serial copy's controls say nothing about this one.
+        gate = Base.eval(JaccPort, :_assert_basis_gate)
+        @test Base.invokelatest(gate, 1.0, false, false) === nothing   # standalone default
+        @test Base.invokelatest(gate, 0.065, true, true) === nothing   # the one exemption
+        @test_throws ErrorException Base.invokelatest(gate, 0.065, false, false)
+        @test_throws ErrorException Base.invokelatest(gate, 0.065, false, true)
+        # The provenance collision: refused on provenance, at a value that is
+        # otherwise the allowed default, and the message must say so rather than
+        # printing "refusing at X_total = 1.0 ... only 1.0 is allowed".
+        collision = try
+            Base.invokelatest(gate, 1.0, false, true); ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("RADIODIALYSIS: BLOCKED", collision)
+        @test occursin("basis_from_occupancy = true", collision)
+
+        # AND THE TWO COPIES ARE ONE FUNCTION.  A gate that exists in one program
+        # and silently not in its GPU twin is the failure this pins: the serial
+        # suite would stay green while `run_coupled` integrated on a basis the
+        # repository refuses. Compared as text because they are genuinely two
+        # files; if they must diverge, that is a decision to argue for here.
+        function _gate_source(path)
+            src = read(path, String)
+            i = findfirst("function _assert_basis_gate", src)
+            @test i !== nothing
+            src[first(i):last(findnext("\nend\n", src, last(i)))]
+        end
+        @test _gate_source(JACC_PORT_PATH) ==
+              _gate_source(joinpath(REPO, "biofilms_potts.jl"))
+
         # The substep guard must exist in BOTH ports and use the same rule.
         # Without it the JACC port took a single raw forward-Euler step while
         # the serial port substepped, so they would diverge silently the moment

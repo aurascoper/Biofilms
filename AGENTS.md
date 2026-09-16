@@ -54,6 +54,23 @@ an unreachable milestone and a correctly-withheld milestone print the same
 thing, so nothing ever looks wrong. `authorization_criteria` was unreachable
 for one release and nobody could have noticed by reading its output.
 
+**A truncated page is an unrecognised incompleteness, and a count is the same
+kind of claim as a lookup.** Three instances here, inside eleven days, across
+three different actors: a `grep` piped through `head -8` reported a phrase absent
+because eight fixture hits came first; the merge gate's comments query went
+unpaginated while `--paginate` advanced a different connection, so a finding
+thirty comments back vanished and the gate cleared; and `reviewThreads(first:50)`
+returned nothing for a pull request holding 91 threads, two of them open. Each
+result was short of the truth and was read as zero. **A query that can page must
+assert it reached the end before its result is used as a count** — read
+`pageInfo { hasNextPage }` and check it, rather than assuming one page was all.
+
+Its control is easy to get wrong in one specific way, and was: every pagination
+test here asserted that something on page *two* was reached, so a reader that
+keeps paging but drops page *one* satisfies all of them.
+`test_threads_spanning_two_pages_are_all_counted` puts unresolved threads on both
+pages and asserts the reported total.
+
 ### 4. The producer declares semantics; the consumer must not assume them
 
 `cell_id == 0` is empty space. `generation == 0` is a founder. The renderer
@@ -125,6 +142,45 @@ Any number this repository has published and later found wrong gets **all** of:
 
 A correction that only changes the number teaches nobody why it was wrong, and
 this repository has now corrected its own corrections twice.
+
+## Registering a question
+
+The rule above is about a number this repository published and later found
+wrong. This one is about a question it asked and never wrote down.
+
+**An open question stated in prose gets a row in `data/claims_ledger.csv` when it
+is asked, not when it is answered.**
+
+It needs no new machinery, and inventing some would miss the point. `status =
+needs_verification` is already one of the eight pinned verdicts and already means
+exactly this; `required_to_fix` already holds what would settle it. RM-KR-07 is
+the worked example, registering `mean r/R = 0.65` as open because "a multi-seed
+run COULD resolve this one either way - which is why it stays
+needs_verification" (quoted with its own hyphen). The rule is only that the row
+is written at the moment of asking.
+
+The case it comes from is MEL-N40-02. A write-up asked, publicly and in
+falsifiable form, whether a melanin ordering that held 11 of 16 times at N = 20
+would still hold at the preprint's own N = 40 six-parcel configuration. It asked
+three times, in one HTML file, on one unmerged branch. A grep for its wording
+over every local and remote ref returned that file and nothing else: no row, no
+doc, no pull-request body.
+
+**That is an absence claim with no scope wearing different clothes.** Its
+durability was the durability of one file. Delete it, abandon the branch, or move
+the post somewhere this repository does not track, and the question is gone with
+no trace that it was ever asked, while the work it was asking about carries on.
+
+It applies **regardless of the answer**. That question came back 16 of 16,
+confirming the hypothesis it was asked about, and registering it was still right:
+a question is worth recording while it is open, and a question nobody else can
+find was never open to anyone else.
+
+The asymmetry with the correction rule is the whole reason this one is separate.
+A wrong number announces itself eventually — something recomputes it, or a guard
+fires on it. An unregistered question announces nothing, ever. **Nothing
+recomputes a question.**
+
 
 ## The suites
 

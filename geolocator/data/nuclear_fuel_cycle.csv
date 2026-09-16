@@ -1,0 +1,25 @@
+name,country,latitude,longitude,stage,capacity_mw,status,source
+McArthur River,Canada,57.7600,-105.0500,uranium_mine,0,operating,IAEA/WNA
+Cigar Lake,Canada,58.2800,-104.5000,uranium_mine,0,operating,IAEA/WNA
+Olympic Dam,Australia,-30.4400,136.8700,uranium_mine,0,operating,IAEA/WNA
+Ranger,Australia,-12.6900,132.9200,uranium_mine,0,closed,IAEA/WNA
+Husab,Namibia,-23.0000,15.0000,uranium_mine,0,operating,IAEA/WNA
+Rossing,Namibia,-22.6700,14.9700,uranium_mine,0,operating,IAEA/WNA
+Inkai,Kazakhstan,45.0000,66.0000,uranium_mine,0,operating,IAEA/WNA
+Tortkuduk,Kazakhstan,45.5000,66.5000,uranium_mine,0,operating,IAEA/WNA
+Akouta,Niger,18.7000,5.6000,uranium_mine,0,operating,IAEA/WNA
+Arlit,Niger,18.7400,7.3700,uranium_mine,0,operating,IAEA/WNA
+Urenco Capenhurst,United Kingdom,53.2600,-2.9500,enrichment,15000,operating,WNA
+Urenco Almelo,Netherlands,52.3600,6.6600,enrichment,15000,operating,WNA
+Urenco Gronau,Germany,52.2100,7.0400,enrichment,1800,operating,WNA
+Orano Georges Besse,France,44.3300,4.6000,enrichment,7500,operating,WNA
+CNNC Enrichment,China,39.0000,116.0000,enrichment,13000,operating,WNA
+Rosatom Enrichment,Russia,56.0000,60.0000,enrichment,36000,operating,WNA
+La Hague Reprocessing,France,49.6800,-1.8800,reprocessing,0,operating,WNA
+Rokkasho Reprocessing,Japan,40.9700,141.2500,reprocessing,0,operating,WNA
+Mayak Reprocessing,Russia,55.7100,60.8000,reprocessing,0,operating,WNA
+Sellafield Reprocessing,United Kingdom,54.4200,-3.5000,reprocessing,0,operating,WNA
+Yucca Mountain Waste,United States,36.8500,-116.4300,waste_storage,0,proposed,DOE
+Onkalo Waste,Finland,61.2400,21.4700,waste_storage,0,operating,Posiva
+WIPP Waste,United States,32.3700,-103.7900,waste_storage,0,operating,DOE
+Gorleben Waste,Germany,53.0400,11.3600,waste_storage,0,closed,BMU
