@@ -14,10 +14,11 @@
 # knows the difference between a thread that was addressed and one that was
 # ignored. This does.
 #
-# It also refuses a STALE review: if the newest Codex review names a commit
+# It also refuses a STALE review: if the newest review coverage names a commit
 # that is no longer the head, the findings describe code that has since been
 # rewritten, and their silence means nothing. Push, wait for the re-review,
-# run this again.
+# run this again. What counts as coverage, and until when, is block 1 below and
+# docs/review_coverage_decision.md.
 #
 # Usage:  scripts/preflight_merge.sh <pr-number>
 # Exit:   0 nothing outstanding · 1 unresolved findings, stale review, or no
@@ -50,7 +51,7 @@ query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
       title
       headRefOid
       reviews(last:20) {
-        nodes { author { login } submittedAt state body }
+        nodes { author { login } authorAssociation submittedAt state body commit { oid } }
       }
       reviewThreads(first:100, after:$endCursor) {
         pageInfo { hasNextPage endCursor }
@@ -80,7 +81,7 @@ query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
     pullRequest(number:$pr) {
       comments(first:100, after:$endCursor) {
         pageInfo { hasNextPage endCursor }
-        nodes { author { login } createdAt body }
+        nodes { author { login } authorAssociation createdAt body }
       }
     }
   }
@@ -113,31 +114,192 @@ fail=0
 # in this script. Take whichever surface is NEWER.
 # A DISMISSED review was withdrawn from the record by a maintainer. It is not
 # coverage, and the finding scan below does not read it either.
-reviewed="$(jq -r '
-  ( [ .reviews.nodes[]
-      | select(.author.login == "chatgpt-codex-connector")
-      | select((.state // "") != "DISMISSED")
-      | {at: .submittedAt, body: .body} ]
-    + [ (.comments.nodes // [])[]
-      | select(.author.login == "chatgpt-codex-connector")
-      | {at: .createdAt, body: .body} ] )
-  | sort_by(.at) | last // {body:""} | .body
-  | ( capture("Reviewed commit:\\*{0,2}\\s*`?(?<sha>[0-9a-f]{7,40})`?").sha
-      // capture("/blob/(?<sha>[0-9a-f]{7,40})/").sha
-      // "" )
-' <<<"$PRJ" 2>/dev/null || echo "")"
+#
+# THREE SOURCES, AND ONE OF THEM EXPIRES. Codex declined on its usage limit from
+# 2026-09-15 and Copilot's automatic review went silent on 2026-09-13, so a gate
+# that counted Codex alone refused every head for a reason that says nothing
+# about whether anyone read the code. docs/review_coverage_decision.md records
+# what was accepted before, what is accepted now, and why.
+#   Codex        unchanged.
+#   Copilot      a review by copilot-pull-request-reviewer; its commit is the
+#                review's own.
+#   self-review  a comment or review body by an owner, member or collaborator
+#                carrying a `review-coverage: <sha>` line and its findings, each
+#                with a disposition. Counted until SELF_REVIEW_EXPIRES, refused
+#                by name after it: a lowering with no date is permanent.
+# A candidate that names no commit is coverage from no source. The newest one
+# that names a commit decides.
+CODEX_LOGIN="chatgpt-codex-connector"
+COPILOT_LOGIN="copilot-pull-request-reviewer"
+SELF_REVIEW_EXPIRES="2026-10-15"
+TODAY="${PREFLIGHT_TODAY:-$(date -u +%F)}"
+
+JQ_DEFS='
+def entries:
+  [ (.reviews.nodes // [])[]
+    | select((.state // "") != "DISMISSED" and (.state // "") != "PENDING")
+    | {kind: "review body", at: .submittedAt, body: (.body // ""),
+       login: (.author.login // ""), assoc: (.authorAssociation // ""),
+       oid: (.commit.oid // "")} ]
+  + [ (.comments.nodes // [])[]
+    | {kind: "comment", at: .createdAt, body: (.body // ""),
+       login: (.author.login // ""), assoc: (.authorAssociation // ""), oid: ""} ];
+
+def codex_sha:
+  (.body | capture("Reviewed commit:\\*{0,2}\\s*`?(?<s>[0-9a-f]{7,40})`?").s)
+  // (.body | capture("/blob/(?<s>[0-9a-f]{7,40})/").s)
+  // "";
+
+def may_self_review:
+  .login != $codex and .login != $copilot
+  and (.assoc | IN("OWNER", "MEMBER", "COLLABORATOR"));
+
+# null when the body carries no review-coverage line; otherwise the commit it
+# names, its findings, and everything wrong with it.
+def coverage:
+  (.body | split("\n") | map(sub("\r$"; ""))) as $l
+  # A FENCE HIDES WHAT IS INSIDE IT. Quoting the format, or quoting someone
+  # else another coverage comment, must not certify a head; a collaborator who
+  # pastes the documented example with a real sha in it would otherwise clear
+  # the gate without reading anything. A line is inside a fence when an odd
+  # number of fence lines precede it. Bodies are small, so the quadratic scan is
+  # the readable one.
+  | [ range(0; $l | length)
+      | ([ $l[0:.][] | select(test("^\\s*(```|~~~)")) ] | length) % 2 == 1 ] as $fenced
+  | [ range(0; $l | length)
+      | select(($l[.] | test("^review-coverage:")) and ($fenced[.] | not)) ] as $ms
+  | if ($ms | length) == 0 then null else
+      $ms[0] as $m
+    | (($l[$m] | capture("^review-coverage:\\s*(?<s>[0-9a-f]{7,40})\\s*$").s) // "") as $sha
+    | ([ range(0; $l | length)
+         | select(($l[.] | test("^findings:")) and ($fenced[.] | not)) ] | first) as $h
+    # THE SECTION ENDS AT THE FIRST BLANK LINE, so ordinary prose underneath is
+    # not read as findings -- and everything inside it must be one, because a
+    # finding the parser skips is a finding nobody enforces.
+    | (if $h == null then []
+       else ([ $l[($h + 1):] | to_entries[] | select(.value | test("^\\s*$")) | .key ] | first) as $stop
+            | (if $stop == null then $l[($h + 1):] else $l[($h + 1):($h + 1 + $stop)] end)
+       end) as $section
+    # ANY MARKDOWN BULLET, at any indent. Keying on "- " alone dropped an
+    # indented sub-item and a `*` bullet silently: the reviewer wrote the
+    # finding down, and the gate cleared over it.
+    | [ $section[] | select(test("^\\s*[-*+] ")) ] as $items
+    | [ $section[] | select((test("^\\s*[-*+] ") | not) and (test("^\\s*$") | not)) ] as $strays
+    | ($h != null and ($l[$h] | test("^findings:\\s*none\\s*$"))) as $none
+    | ([ $l | to_entries[]
+         | select((.value | test("^scope:\\s*[^;\\s][^;]*;\\s*checklist:\\s*\\S"))
+                  and ($fenced[.key] | not)) ] | length > 0) as $scope
+    # \b after the disposition: "fixedd" used to parse as "fixed" with the
+    # stray letter as its reference, which satisfied the check that a fixed
+    # finding says where.
+    | [ $items[]
+        | (capture("^\\s*[-*+] (?<sev>P[0-9]) (?<disp>open|fixed|deferred)\\b(?<ref>.*?):\\s+(?<title>\\S.*)$")
+           | .ref |= ((. // "") | gsub("^\\s+|\\s+$"; "")))
+          // {bad: .} ] as $parsed
+    | { sha: $sha,
+        # More than one marker is ambiguous, and the first one winning silently
+        # let a quoted example decide what was covered. Reported wherever it sits.
+        report_always: (($ms | length) > 1),
+        findings: [ $parsed[] | select(has("bad") | not) ],
+        errors: [
+          (if ($ms | length) > 1 then "it carries \($ms | length) review-coverage lines; keep one" else empty end),
+          (if $sha == "" then "its review-coverage line names no commit (7 to 40 hex digits)" else empty end),
+          (if $h == null then "it has no findings: section" else empty end),
+          (if $h != null and ($none | not) and ($items | length) == 0
+             then "its findings: section lists nothing; write findings: none beside a scope: line"
+             else empty end),
+          (if $none and ($items | length) > 0 then "it says findings: none and then lists findings" else empty end),
+          (if $none and ($scope | not)
+             then "findings: none needs a scope: line naming files and a checklist" else empty end),
+          ($strays[] | "a line in the findings section is not a finding: \(.)"),
+          ($parsed[] | select(has("bad")) | "a finding line does not parse: \(.bad)"),
+          ($parsed[] | select(has("bad") | not) | select(.disp != "open" and .ref == "")
+             | "\(.sev) \(.disp) does not say where: \(.title)")
+        ] }
+    end;
+
+def self_reviews:
+  [ entries[] | select(may_self_review) | . as $e | coverage as $c
+    | select($c != null) | $e + {cov: $c} ];
+'
+jqc() {  # every program here shares JQ_DEFS and its arguments
+  jq -r --arg codex "$CODEX_LOGIN" --arg copilot "$COPILOT_LOGIN" \
+        --arg today "$TODAY" --arg expires "$SELF_REVIEW_EXPIRES" \
+        --arg head "$HEAD" "$JQ_DEFS$1" <<<"$PRJ"
+}
+
+# NO 2>/dev/null. A coverage query that cannot run is an unknown, not "no
+# review" and not "current"; the same reasoning as block 1b.
+if ! cov="$(jqc '
+  ( [ entries[] | select(.login == $codex) | {source: "Codex", at, sha: codex_sha} ]
+  + [ entries[] | select(.login == $copilot and .kind == "review body")
+      | {source: "Copilot", at, sha: .oid} ]
+  + (if $today <= $expires then
+       [ self_reviews[] | select((.cov.errors | length) == 0)
+         | {source: "self-review by \(.login)", at, sha: .cov.sha} ]
+     else [] end) )
+  | map(select(.sha != "")) as $named
+  # A CANDIDATE NAMING THE HEAD IS BETTER EVIDENCE ABOUT THE HEAD than a newer
+  # one naming something else. Taking the newest unconditionally reported STALE
+  # while Copilot covered the head, and no push could clear it.
+  | (($named | map(select(.sha as $s | $head | startswith($s))) | sort_by(.at // "") | last)
+     // ($named | sort_by(.at // "") | last) // {source: "", sha: ""})
+  | "\(.source)\t\(.sha)"
+')"; then
+  printf '  COULD NOT READ REVIEW COVERAGE: the query failed.\n'
+  printf '  Treating that as unknown, not as clean.\n'
+  exit 1
+fi
+source="${cov%%$'\t'*}"
+reviewed="${cov#*$'\t'}"
+
+# What was NOT counted, and why, is printed rather than silently dropped. A
+# malformed coverage comment that names the head fails the gate: it is a claim of
+# review that cannot be read, and an unreadable claim is not a clean one.
+if ! notices="$(jqc '
+  ( entries[] | select(.login != $codex and .login != $copilot)
+    | select(may_self_review | not) | select(coverage != null)
+    | "NOT COUNTED\t\(.kind) by \(.login) (author association \(if .assoc == "" then "unknown" else .assoc end))" ),
+  ( if $today > $expires and (self_reviews | length) > 0
+      then "EXPIRED\t\(self_reviews | length)" else empty end ),
+  ( if $today <= $expires then
+      self_reviews[] | select((.cov.errors | length) > 0)
+      | . as $e | .cov.sha as $s
+      | select(($e.cov.report_always // false) or $s == "" or ($head | startswith($s)))
+      | "MALFORMED\t\(.kind) by \(.login)\t\(.cov.errors | join("; "))"
+    else empty end )
+')"; then
+  printf '  COULD NOT READ REVIEW COVERAGE COMMENTS: the query failed.\n'
+  printf '  Treating that as unknown, not as clean.\n'
+  exit 1
+fi
+while IFS=$'\t' read -r what who detail; do
+  case "$what" in
+    "NOT COUNTED")
+      printf '  NOT COUNTED: a review-coverage %s.\n' "$who"
+      printf '  Only an owner, member or collaborator can cover a head.\n' ;;
+    EXPIRED)
+      printf '  SELF-REVIEW COVERAGE EXPIRED %s: %s review-coverage comment(s) not counted.\n' \
+             "$SELF_REVIEW_EXPIRES" "$who"
+      printf '  See docs/review_coverage_decision.md.\n' ;;
+    MALFORMED)
+      printf '  MALFORMED COVERAGE COMMENT (%s): %s\n' "$who" "$detail"
+      fail=1 ;;
+  esac
+done <<<"$notices"
 
 if [[ -z "$reviewed" ]]; then
-  printf '  NO CODEX REVIEW FOUND on this pull request.\n'
+  printf '  NO REVIEW COVERAGE FOUND on this pull request: no Codex review, Copilot\n'
+  printf '  review or self-review coverage comment names a commit.\n'
   printf '  A merge here is unreviewed, not approved.\n'
   fail=1
 elif [[ "${HEAD:0:${#reviewed}}" != "$reviewed" ]]; then
-  printf '  STALE REVIEW: newest Codex review covers %s, head is %s.\n' \
-         "${reviewed:0:10}" "${HEAD:0:10}"
+  printf '  STALE REVIEW: the newest coverage (%s) covers %s, head is %s.\n' \
+         "$source" "${reviewed:0:10}" "${HEAD:0:10}"
   printf '  Its findings describe code that has since changed.\n'
   fail=1
 else
-  printf '  Codex reviewed %s — current.\n' "${reviewed:0:10}"
+  printf '  %s reviewed %s — current.\n' "$source" "${reviewed:0:10}"
 fi
 
 # ---- 1b. findings outside review threads ------------------------------------
@@ -193,6 +355,38 @@ if [[ -n "$outside_findings" ]]; then
     printf '  OPEN  %-8s (%s, no thread) %s\n' "$sev" "$kind" "$title"
     fail=1
   done <<<"$outside_findings"
+fi
+
+# ---- 1c. findings a self-review coverage comment lists for this head --------
+# Every finding carries its disposition. `open` blocks until a push moves the
+# head, exactly like a Codex finding outside a thread; `fixed` and `deferred`
+# are the reviewer's record and are printed, not enforced. Every well-formed
+# coverage comment that names the head is read, so a disposition is changed by
+# editing the comment.
+if [[ ! "$TODAY" > "$SELF_REVIEW_EXPIRES" ]]; then
+  if ! listed="$(jqc '
+    self_reviews[] | select((.cov.errors | length) == 0)
+    | .cov.sha as $s | select($head | startswith($s))
+    | .cov.findings[] | [.sev, .disp, .title, .ref] | @tsv
+  ')"; then
+    printf '  COULD NOT READ REVIEW-COVERAGE FINDINGS: the query failed.\n'
+    printf '  Treating that as unknown, not as clean.\n'
+    exit 1
+  fi
+  if [[ -n "$listed" ]]; then
+    printf '\n  REVIEW-COVERAGE FINDINGS on this head:\n\n'
+    # ref is LAST: tab is whitespace to `read`, so an empty field in the middle
+    # would collapse and shift the title into it.
+    while IFS=$'\t' read -r sev disp title ref; do
+      [[ -z "$sev" ]] && continue
+      if [[ "$disp" == open ]]; then
+        printf '  OPEN  %-8s (self-review, no thread) %s\n' "$sev" "$title"
+        fail=1
+      else
+        printf '  %-8s %-3s %s — %s\n' "$disp" "$sev" "$ref" "$title"
+      fi
+    done <<<"$listed"
+  fi
 fi
 
 # ---- 2. unresolved threads, by severity ------------------------------------

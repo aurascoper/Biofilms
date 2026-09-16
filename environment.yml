@@ -5,7 +5,8 @@
 # `/root` cross-sections path and the incomplete paths filter both happened.
 # Three hand-maintained copies of one fact drift, and the copy that drifts is
 # the one nobody is looking at. Both workflows now read this file, and a test
-# asserts docs/openmc_stack.md quotes it verbatim rather than restating it.
+# asserts docs/openmc_stack.md names THIS file, and that the openmc version the
+# doc tabulates equals the pin here. Nothing asserts the doc omits the list.
 #
 # WHY THE ENVS MUST NOT DIVERGE: CI regenerates
 # coupling/tests/fixtures/golden_tally_water_phantom.json and diffs it against
