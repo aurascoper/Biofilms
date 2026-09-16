@@ -219,8 +219,11 @@ def decide(effect_draws, budget: VarianceBudget, policy: ThresholdPolicy, *,
                   tier=policy.tier, variance=budget.as_dict(),
                   dominant_variance=budget.dominant,
                   target_calibration=policy.target_calibration)
-    if draws.size == 0:
-        return S0Verdict(NOT_EVALUATED, "no finite effect draws", **common)
+    if draws.size < 2:
+        reason = ("no finite effect draws" if draws.size == 0 else
+                   "one finite effect draw: no degrees of freedom, and the "
+                   "quantile bounds collapse to that single value")
+        return S0Verdict(NOT_EVALUATED, reason, **common)
 
     tail = 1.0 - policy.credibility
     low = float(np.quantile(draws, tail))
