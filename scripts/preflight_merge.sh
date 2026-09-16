@@ -136,7 +136,8 @@ TODAY="${PREFLIGHT_TODAY:-$(date -u +%F)}"
 
 JQ_DEFS='
 def entries:
-  [ (.reviews.nodes // [])[] | select((.state // "") != "DISMISSED")
+  [ (.reviews.nodes // [])[]
+    | select((.state // "") != "DISMISSED" and (.state // "") != "PENDING")
     | {kind: "review body", at: .submittedAt, body: (.body // ""),
        login: (.author.login // ""), assoc: (.authorAssociation // ""),
        oid: (.commit.oid // "")} ]
@@ -157,20 +158,51 @@ def may_self_review:
 # names, its findings, and everything wrong with it.
 def coverage:
   (.body | split("\n") | map(sub("\r$"; ""))) as $l
-  | ([ $l | to_entries[] | select(.value | test("^review-coverage:")) | .key ] | first) as $m
-  | if $m == null then null else
-      (($l[$m] | capture("^review-coverage:\\s*(?<s>[0-9a-f]{7,40})\\s*$").s) // "") as $sha
-    | ([ $l | to_entries[] | select(.value | test("^findings:")) | .key ] | first) as $h
-    | (if $h == null then [] else [ $l[($h + 1):][] | select(startswith("- ")) ] end) as $items
+  # A FENCE HIDES WHAT IS INSIDE IT. Quoting the format, or quoting someone
+  # else another coverage comment, must not certify a head; a collaborator who
+  # pastes the documented example with a real sha in it would otherwise clear
+  # the gate without reading anything. A line is inside a fence when an odd
+  # number of fence lines precede it. Bodies are small, so the quadratic scan is
+  # the readable one.
+  | [ range(0; $l | length)
+      | ([ $l[0:.][] | select(test("^\\s*(```|~~~)")) ] | length) % 2 == 1 ] as $fenced
+  | [ range(0; $l | length)
+      | select(($l[.] | test("^review-coverage:")) and ($fenced[.] | not)) ] as $ms
+  | if ($ms | length) == 0 then null else
+      $ms[0] as $m
+    | (($l[$m] | capture("^review-coverage:\\s*(?<s>[0-9a-f]{7,40})\\s*$").s) // "") as $sha
+    | ([ range(0; $l | length)
+         | select(($l[.] | test("^findings:")) and ($fenced[.] | not)) ] | first) as $h
+    # THE SECTION ENDS AT THE FIRST BLANK LINE, so ordinary prose underneath is
+    # not read as findings -- and everything inside it must be one, because a
+    # finding the parser skips is a finding nobody enforces.
+    | (if $h == null then []
+       else ([ $l[($h + 1):] | to_entries[] | select(.value | test("^\\s*$")) | .key ] | first) as $stop
+            | (if $stop == null then $l[($h + 1):] else $l[($h + 1):($h + 1 + $stop)] end)
+       end) as $section
+    # ANY MARKDOWN BULLET, at any indent. Keying on "- " alone dropped an
+    # indented sub-item and a `*` bullet silently: the reviewer wrote the
+    # finding down, and the gate cleared over it.
+    | [ $section[] | select(test("^\\s*[-*+] ")) ] as $items
+    | [ $section[] | select((test("^\\s*[-*+] ") | not) and (test("^\\s*$") | not)) ] as $strays
     | ($h != null and ($l[$h] | test("^findings:\\s*none\\s*$"))) as $none
-    | ([ $l[] | select(test("^scope:\\s*[^;\\s][^;]*;\\s*checklist:\\s*\\S")) ] | length > 0) as $scope
+    | ([ $l | to_entries[]
+         | select((.value | test("^scope:\\s*[^;\\s][^;]*;\\s*checklist:\\s*\\S"))
+                  and ($fenced[.key] | not)) ] | length > 0) as $scope
+    # \b after the disposition: "fixedd" used to parse as "fixed" with the
+    # stray letter as its reference, which satisfied the check that a fixed
+    # finding says where.
     | [ $items[]
-        | (capture("^- (?<sev>P[0-9]) (?<disp>open|fixed|deferred)(?<ref>.*?):\\s+(?<title>\\S.*)$")
+        | (capture("^\\s*[-*+] (?<sev>P[0-9]) (?<disp>open|fixed|deferred)\\b(?<ref>.*?):\\s+(?<title>\\S.*)$")
            | .ref |= ((. // "") | gsub("^\\s+|\\s+$"; "")))
           // {bad: .} ] as $parsed
     | { sha: $sha,
+        # More than one marker is ambiguous, and the first one winning silently
+        # let a quoted example decide what was covered. Reported wherever it sits.
+        report_always: (($ms | length) > 1),
         findings: [ $parsed[] | select(has("bad") | not) ],
         errors: [
+          (if ($ms | length) > 1 then "it carries \($ms | length) review-coverage lines; keep one" else empty end),
           (if $sha == "" then "its review-coverage line names no commit (7 to 40 hex digits)" else empty end),
           (if $h == null then "it has no findings: section" else empty end),
           (if $h != null and ($none | not) and ($items | length) == 0
@@ -179,6 +211,7 @@ def coverage:
           (if $none and ($items | length) > 0 then "it says findings: none and then lists findings" else empty end),
           (if $none and ($scope | not)
              then "findings: none needs a scope: line naming files and a checklist" else empty end),
+          ($strays[] | "a line in the findings section is not a finding: \(.)"),
           ($parsed[] | select(has("bad")) | "a finding line does not parse: \(.bad)"),
           ($parsed[] | select(has("bad") | not) | select(.disp != "open" and .ref == "")
              | "\(.sev) \(.disp) does not say where: \(.title)")
@@ -205,7 +238,12 @@ if ! cov="$(jqc '
        [ self_reviews[] | select((.cov.errors | length) == 0)
          | {source: "self-review by \(.login)", at, sha: .cov.sha} ]
      else [] end) )
-  | map(select(.sha != "")) | sort_by(.at) | (last // {source: "", sha: ""})
+  | map(select(.sha != "")) as $named
+  # A CANDIDATE NAMING THE HEAD IS BETTER EVIDENCE ABOUT THE HEAD than a newer
+  # one naming something else. Taking the newest unconditionally reported STALE
+  # while Copilot covered the head, and no push could clear it.
+  | (($named | map(select(.sha as $s | $head | startswith($s))) | sort_by(.at // "") | last)
+     // ($named | sort_by(.at // "") | last) // {source: "", sha: ""})
   | "\(.source)\t\(.sha)"
 ')"; then
   printf '  COULD NOT READ REVIEW COVERAGE: the query failed.\n'
@@ -226,7 +264,8 @@ if ! notices="$(jqc '
       then "EXPIRED\t\(self_reviews | length)" else empty end ),
   ( if $today <= $expires then
       self_reviews[] | select((.cov.errors | length) > 0)
-      | .cov.sha as $s | select($s == "" or ($head | startswith($s)))
+      | . as $e | .cov.sha as $s
+      | select(($e.cov.report_always // false) or $s == "" or ($head | startswith($s)))
       | "MALFORMED\t\(.kind) by \(.login)\t\(.cov.errors | join("; "))"
     else empty end )
 ')"; then

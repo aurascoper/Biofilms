@@ -16,7 +16,7 @@ or stale.
 
 | source | what counts | its findings |
 |---|---|---|
-| Codex | unchanged | a badge in a body that names the head blocks; threads block |
+| Codex | as before, except that a body naming no commit is no longer the newest word | a badge in a body that names the head blocks; threads block |
 | Copilot | a review by `copilot-pull-request-reviewer` whose commit is the head | arrive as review threads, which block |
 | Self-review | a comment or review body by an owner, member or collaborator, with a `review-coverage:` line and its findings | `open` blocks; `fixed <sha>` and `deferred <where>` do not |
 
@@ -31,11 +31,20 @@ findings:
 - P2 open: <title>
 ```
 
-`findings: none` is accepted only beside a `scope:` line that names both files and a checklist.
+The findings section ends at the first blank line, so ordinary prose below it is not read as a
+finding. `findings: none` is accepted only beside a `scope:` line that names both files and a
+checklist. The template above is a template: `<sha>` has to be replaced, or the gate refuses the
+comment. A marker inside a fenced block or a quoted reply is not read at all, so quoting this file,
+or someone else's coverage comment, certifies nothing.
+
 When a coverage comment names the head, the gate refuses it by name if it:
+- carries more than one `review-coverage:` line;
+- names no commit, or one that is not 7 to 40 hex digits;
 - has no findings section;
 - lists nothing;
+- says `none` and then lists findings;
 - says `none` without a scope;
+- carries a line inside the findings section that is not a finding;
 - carries a finding line the gate cannot parse;
 - fixes or defers a finding without saying where.
 
@@ -45,8 +54,11 @@ comment.
 
 ## Why
 
-Codex began declining on its usage limit on 2026-09-15 at 05:40 UTC. Copilot's automatic review,
-turned on by the `base` ruleset, has posted nothing since 2026-09-13 at 23:43 UTC. A gate that
+Codex has declined on its usage limit continuously since 2026-09-15 at 05:40 UTC. The same decline
+appears earlier, on #23 at 2026-09-03T06:11Z and on #24 at 2026-09-06T13:45Z, each followed by
+later Codex reviews, so 05:40 is when it stopped coming back rather than the first refusal.
+Copilot's automatic review, turned on by the `base` ruleset, has posted nothing since 2026-09-13 at
+23:43 UTC. A gate that
 counted only Codex refused every head, for a reason that says nothing about whether anyone read
 the code. The cause is a subscription lapse, not a judgment of Codex's value.
 
@@ -56,7 +68,8 @@ had no way to count it.
 ## What did not change
 
 - Every unresolved review thread blocks, whoever opened it.
-- A review of a commit that is no longer the head is stale, whichever source posted it.
+- A review of a commit that is no longer the head is stale, whichever source posted it. Among
+  candidates, one naming the head wins over a newer one that does not.
 - `scripts/watch_pr_reviews.py` observes Codex only and authorizes nothing. It keeps reporting
   `service_unavailable` while the gate accepts a substitute.
 

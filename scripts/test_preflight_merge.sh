@@ -421,6 +421,204 @@ verdict "a Copilot review of the head is coverage" 0 $? "Copilot reviewed"
 self_fixture "routine chatter, no marker" OWNER "$(COPILOT_REVIEW 0000000000000000)"
 verdict "a Copilot review of an older commit is stale" 1 $? "STALE REVIEW"
 
+# ---------------------------------------------------------------------------
+# THE PATHS A FIRST PASS LEFT UNCONTROLLED. Two reviews of the commit above
+# found six defects inside the new code and nine paths with no control at all --
+# including the `fail=1` that makes a malformed coverage comment block, which
+# could be deleted with every control still green. Each one below is the input
+# that fails when its line is removed.
+printf '\n  coverage comments — every path, and every way to write one wrong\n  %s\n' \
+       "──────────────────────────────────────────"
+
+c_node() {  # $1 body, $2 association (OWNER), $3 login (aurascoper), $4 createdAt
+  printf '{"author":{"login":"%s"},"authorAssociation":"%s","createdAt":"%s","body":%s}' \
+         "${3:-aurascoper}" "${2:-OWNER}" "${4:-2026-09-15T20:00:00Z}" "$(json_str "$1")"
+}
+r_codex() {  # $1 sha, $2 submittedAt
+  printf '{"author":{"login":"chatgpt-codex-connector"},"authorAssociation":"NONE","submittedAt":"%s","state":"COMMENTED","body":%s}' \
+         "${2:-2026-09-15T18:00:00Z}" "$(json_str "**Reviewed commit:** \`$1\`")"
+}
+r_copilot() {  # $1 commit oid, $2 submittedAt, $3 state
+  printf '{"author":{"login":"copilot-pull-request-reviewer"},"authorAssociation":"NONE","submittedAt":"%s","state":"%s","body":"## Pull request overview","commit":{"oid":"%s"}}' \
+         "${2:-2026-09-15T10:00:00Z}" "${3:-COMMENTED}" "$1"
+}
+r_self() {  # $1 body, $2 state, $3 submittedAt as JSON (null for a draft)
+  printf '{"author":{"login":"aurascoper"},"authorAssociation":"OWNER","submittedAt":%s,"state":"%s","body":%s}' \
+         "${3:-\"2026-09-15T20:00:00Z\"}" "${2:-COMMENTED}" "$(json_str "$1")"
+}
+nodes() { local IFS=,; printf '[%s]' "$*"; }
+run_gate() {  # $1 comments array, $2 reviews array
+  cat >"$TMP/fixture.json" <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"fixture","headRefOid":"$HEAD_SHA",
+  "reviews":{"nodes":${2:-[]}},"comments":{"nodes":${1:-[]}},
+  "reviewThreads":{"nodes":[]}
+}}}}
+JSON
+  PREFLIGHT_TODAY="${TODAY_OVERRIDE:-2026-09-15}" PREFLIGHT_FIXTURE="$TMP/fixture.json" "$GATE" 1 >"$TMP/out" 2>&1
+}
+
+# THE ONE THAT PINNED NOTHING. Deleting the fail=1 behind MALFORMED left all 34
+# controls green, because each took its exit from the ABSENCE of coverage. Beside
+# a current Codex review there is no absence, and an unreadable claim of review
+# has to refuse on its own.
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE")")" "$(nodes "$(r_codex "$HEAD_SHA")")"
+verdict "a malformed comment blocks beside current Codex coverage" 1 $? "MALFORMED COVERAGE COMMENT"
+
+# A finding line the parser cannot read is reported, never dropped.
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P1: forgot the disposition")")"
+verdict "a finding line that does not parse blocks, named" 1 $? "does not parse"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P1 fixedd: a misspelling is not a disposition")")"
+verdict "a misspelled disposition blocks" 1 $? "does not parse"
+
+# Inside the section everything is a finding; below it, prose is prose.
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+see the other pull request
+- P2 open: something")")"
+verdict "prose inside the findings section blocks" 1 $? "is not a finding"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none
+
+- see also the other pull request")")"
+verdict "a bullet below the section is prose, not a finding" 0 $? ""
+
+# EVERY MARKDOWN BULLET. Keying on "- " dropped an indented sub-item and a star
+# bullet: the reviewer wrote the finding down and the gate cleared over it.
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P1 fixed 71a5c90: a real one
+  - P1 open: the indented finding this control names")")"
+verdict "an indented open finding blocks" 1 $? "the indented finding this control names"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+* P2 open: the starred finding this control names")")"
+verdict "a starred open finding blocks" 1 $? "the starred finding this control names"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
++ P3 deferred docs/x.md: a plus bullet is a bullet")")"
+verdict "a plus bullet parses as a finding" 0 $? "deferred"
+
+# One marker per body. The first winning silently let a quoted example decide.
+run_gate "$(nodes "$(c_node "For reference:
+review-coverage: ffffffffffff
+
+And the real one:
+review-coverage: $HEAD_SHA
+$SCOPE
+findings: none")")"
+verdict "two markers in one body block, by name" 1 $? "review-coverage lines"
+
+# Quoting the format, or somebody else's comment, certifies nothing.
+run_gate "$(nodes "$(c_node "The shape is:
+
+\`\`\`
+review-coverage: $HEAD_SHA
+$SCOPE
+findings: none
+\`\`\`")")"
+verdict "a marker inside a fence is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+# ...and that has to be the MARKER's own fence check. With the findings section
+# outside the fence, the body is otherwise complete, so only the marker line's
+# fence awareness stands between a quoted sha and a certified head.
+run_gate "$(nodes "$(c_node "Here is the marker I will use:
+
+\`\`\`
+review-coverage: $HEAD_SHA
+\`\`\`
+
+$SCOPE
+findings: none")")"
+verdict "a fenced marker beside an unfenced findings section is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+run_gate "$(nodes "$(c_node "> review-coverage: $HEAD_SHA
+> findings: none")")"
+verdict "a quoted marker is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+
+# A draft review is a review nobody submitted.
+run_gate "[]" "$(nodes "$(r_self "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none" PENDING null)")"
+verdict "a PENDING draft review is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+
+# Evidence about the head beats newer evidence about something else.
+run_gate "[]" "$(nodes "$(r_copilot "$HEAD_SHA" 2026-09-15T10:00:00Z)" "$(r_codex 0000000000 2026-09-15T12:00:00Z)")"
+verdict "coverage of the head is not masked by a newer stale review" 0 $? "Copilot reviewed"
+
+# The deliberate change, pinned: a body naming no commit is not the newest word.
+run_gate "$(nodes "$(c_node "Codex has hit its usage limit." NONE chatgpt-codex-connector 2026-09-15T19:00:00Z)")" \
+         "$(nodes "$(r_codex "$HEAD_SHA" 2026-09-15T18:00:00Z)")"
+verdict "a Codex comment naming no commit does not mask its own review" 0 $? "Codex reviewed"
+
+# Block 1c terminates, exactly as block 1b does: push, and the finding goes.
+run_gate "$(nodes "$(c_node "review-coverage: 0000000000
+$SCOPE
+findings:
+- P2 open: an open finding on a commit that is gone")")" "$(nodes "$(r_codex "$HEAD_SHA")")"
+verdict "an open finding on an older sha stops blocking" 0 $? ""
+
+# The error clauses that nothing covered.
+run_gate "$(nodes "$(c_node "review-coverage: nothexatall
+$SCOPE
+findings: none")")"
+verdict "a marker naming no commit blocks, by name" 1 $? "names no commit"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:")")"
+verdict "an empty findings section blocks, by name" 1 $? "lists nothing"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none
+- P2 open: contradicting the none above")")"
+verdict "none followed by findings blocks, by name" 1 $? "and then lists findings"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+scope: ; checklist: AGENTS.md
+findings: none")")"
+verdict "a scope line naming no files blocks" 1 $? "needs a scope: line"
+
+# The notice is printed, not merely implied by a refusal elsewhere.
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none" NONE passer-by)")" "$(nodes "$(r_codex "$HEAD_SHA")")"
+verdict "an outsider marker is reported as not counted" 0 $? "NOT COUNTED"
+
+# Past the date, a self-review covers nothing and enforces nothing.
+TODAY_OVERRIDE=2026-10-16 run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P2 open: an expired open finding")")" "$(nodes "$(r_codex "$HEAD_SHA")")"
+verdict "after expiry a self-review finding is not enforced" 0 $? "EXPIRED"
+
+# Correct behaviours that nothing pinned. A review withdrawn from the record is
+# not coverage from either source, and a later clean comment does not cancel an
+# earlier open finding: every coverage comment naming the head is read, so a
+# disposition changes by editing the comment that carries it.
+run_gate "[]" "$(nodes "$(r_self "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none" DISMISSED)")"
+verdict "a dismissed review carrying a marker is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+run_gate "[]" "$(nodes "$(r_copilot "$HEAD_SHA" 2026-09-15T10:00:00Z DISMISSED)")"
+verdict "a dismissed Copilot review is not coverage" 1 $? "NO REVIEW COVERAGE FOUND"
+run_gate "$(nodes "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings:
+- P2 open: the earlier comment still says open" OWNER aurascoper 2026-09-15T20:00:00Z)" \
+          "$(c_node "review-coverage: $HEAD_SHA
+$SCOPE
+findings: none" OWNER aurascoper 2026-09-15T21:00:00Z)")"
+verdict "a later clean comment does not cancel an earlier open finding" 1 $? "the earlier comment still says open"
+
 printf '  %s\n' "──────────────────────────────────────────"
 if (( fail )); then printf '  FAILED\n\n'; exit 1; fi
 printf '  all pass\n\n'
