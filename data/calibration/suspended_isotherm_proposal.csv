@@ -1,0 +1,70 @@
+# suspended_isotherm_proposal — PREPARATORY, NOT AUTHORITATIVE.
+#
+# A phase-one biosorption isotherm on SUSPENDED, inactivated biomass, drafted
+# before the measurement exists. It is deliberately a SEPARATE FILE from
+# data/calibration/materials/bulk_measurements.csv, which is an authoritative
+# input and not a planning worksheet, and from reference_d_requirements.csv,
+# which is the register of inputs the live emitter contract actually demands.
+#
+# WHY IT IS NOT A ROW IN reference_d_requirements.csv. That table is
+# cross-checked against required_fields() in BOTH directions: a field the
+# emitter requires and the table omits is a failure, AND so is a row naming a
+# field the emitter does not require. A suspended-isotherm capacity has no
+# config_key in the live contract, so a row here would break the check that
+# keeps protocol and code from drifting.
+#
+# NOTHING HERE CAN CLEAR A GATE. Every row carries
+# authoritative_for_campaign = false, and a test asserts no gate reads this
+# table — the same isolation reference_d_condition_proposal.csv has.
+#
+# THE NUMBER IS BLOCKED TWICE OVER, FOR UNRELATED REASONS. Both are recorded
+# BEFORE the measurement, so neither surfaces after it exists:
+#
+#   1. NO COUPON. D-RHOWET requires "paired wet mass and hydrated volume on
+#      the SAME coupon"; D-BLANK a matched blank coupon; D-DRY dry mass on the
+#      same coupons. bulk_measurements.csv is built around coupon_id,
+#      imaged_area_cm2, weighed_area_cm2 and scaling_method. Suspended biomass
+#      has no coupon, so a suspended measurement has no expressible row there.
+#
+#   2. NO UNITS IN THE SOLVER. biofilms_radiodialysis.R:161 is
+#      `c_ext = 1.0  # external contaminant concentration (normalised)`. A
+#      q_max in mg/g needs rho_dry — itself a prior until phase-two hydrated
+#      volume exists — AND a reference concentration that exists nowhere in
+#      this repository, before it can enter the transport equations at all.
+#
+# So this isotherm is a BOUND AND A STARTING VALUE for capacity, never the
+# D-RHOWET measurement and never a solver input as measured. Suspended and
+# biofilm biomass differ in EPS composition, surface charge and accessible
+# binding sites; the gap between them is itself measurable in phase two, and
+# is the reason phase two is interpretable at all — equilibrium capacity known
+# independently, the difference attributable to transport.
+#
+# EPISTEMIC INHERITANCE. X_max = q_max * rho_dry multiplies a
+# suspended-MEASURED value by a biofilm-density PRIOR. The product inherits
+# the weaker class and is a prior, not a measurement. Recording it as measured
+# would be the units error material_basis_contract.md exists to prevent.
+#
+# ORDER OF OPERATIONS, and the first step is the one most easily skipped:
+#   1. DETECTABILITY against the blank. D-REPLICATES: "a mass under the
+#      blank's noise is a SUBSTRATE problem, not a replicate problem, and no
+#      number of replicates fixes it."
+#   2. CV of the wet/dry ratio across replicates of one biomass. If that is
+#      20%, the normaliser is not usable and knowing so is worth more than a
+#      standardised number nobody can reproduce.
+#   3. Replicate count, sized from the measured variance. Only now.
+#
+# IMAGING DOES NOT ESCAPE THE PROTOCOL QUESTION. D-RHOWET refuses cells_only
+# outright — "the volume must enclose what the balance weighed" — and a z-stack
+# segmented on a cell stain IS cells_only. Confocal qualifies only as
+# whole_biofilm_envelope, or with a declared pore_volume_fraction.
+#
+# k_ads IS NOT DERIVABLE FROM b. b is thermodynamic: at equilibrium it is the
+# RATIO k_ads/k_des, and a ratio gives neither rate. An isotherm alone yields
+# q_max and b; a rate constant needs timed sampling of the same vial. Either
+# the assay includes a kinetic run or k_ads is typed an unmeasured prior.
+#
+# Blank cells mean NOT SUPPLIED. They are never read as measured.
+proposal_id,phase,biomass_state,biomass_source,viability,species_or_consortium,sample_basis,assay_type,measured_quantity,units,fitted_parameters,kinetic_sampling,reference_concentration_basis,blocked_by,intended_use,epistemic_class,status,authoritative_for_campaign,notes
+SI-01,phase_one,suspended,house_material_existing,inactivated,,suspended_culture_no_coupon,equilibrium_isotherm,q_e,mg_per_g_dry,"q_max; b",not_planned,none_declared,"no_coupon_for_D-RHOWET; no_units_in_solver",bound_and_starting_value,prior,awaiting_measurement,false,"Capacity at equilibrium, isolated from transport on purpose: a coupon measures D_eff and k_ads simultaneously and resolves neither. Species deliberately unset — ask which biomass the host lab already holds rather than naming one, which converts new work into use of existing material. Inactivated is standard in the biosorption literature since the mechanism is metabolically independent; whether that changes what D-APPROVAL requires is an institutional question and is not answered here."
+SI-02,phase_one,suspended,house_material_existing,inactivated,,suspended_culture_no_coupon,timed_kinetic,c_t,mg_per_L,k_ads,"t = 5,15,30,60 min",none_declared,"no_units_in_solver",rate_constant_for_sink_term,prior,not_planned,false,"REQUIRED ONLY IF the solver needs a rate rather than a capacity. b from SI-01 gives the ratio k_ads/k_des and therefore neither rate. Recorded so that omitting it is a declared choice: without this row's measurement, k_ads is an unmeasured prior and must be typed as one."
+SI-03,phase_two,biofilm_on_membrane,,,,coupon,diffusion_cell,D_eff,cm2_per_s,D_eff,not_planned,none_declared,awaits_upstream_SI-01,transport_separated_from_capacity,not_started,not_planned,false,"Interpretable only because SI-01 fixes equilibrium capacity independently; the difference is then attributable to transport rather than confounded with it. Also the first row whose sample basis could satisfy D-RHOWET, since it has a coupon."

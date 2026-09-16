@@ -51,8 +51,12 @@ on a criterion nothing compares against.
 
 **0.1 The one that is still open, and gates culturing itself.** Biosafety follows *strains*,
 not species — the consortium mixes BSL-1 organisms with *C. neoformans* at BSL-2 — so
-`biosafety_level_by_strain` is per-strain (`'SO:BSL1;CN:BSL2'`), never one level for the
-consortium. `institutional_approval_id` must precede culturing, and `is_target_system` must
+`biosafety_level_by_strain` is per-strain, never one level for the consortium, and it is
+keyed by the `strain_identities` entry **verbatim** (`'D. radiodurans R1:BSL1;
+C. neoformans H99:BSL2'`) rather than by an abbreviation. An abbreviation declares no
+relationship to a strain, so a mapping of the right shape and count could name no organism
+the row declares and still clear every criterion; the gate now refuses a key that is not a
+declared identifier, and a declared identifier with no key. `institutional_approval_id` must precede culturing, and `is_target_system` must
 be `true`: a surrogate exercises the harness and can never clear this gate. Nothing in this
 repository can supply it.
 

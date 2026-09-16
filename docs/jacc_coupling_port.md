@@ -72,6 +72,22 @@ by 11-21x at n = 1e3-1e5 and the arms converge to within 1.07-1.23x by n = 1e7.
 **The near-term work on this port is kernel structure, not more FLOPs**, and a
 larger device would not change that.
 
+## A Metal backend would need explicit Float32 conversion at the kernel boundary
+
+Not exercised today, and recorded here only as a forward-looking note: `Project.toml` has no
+`Metal.jl` dependency and no backend-selection code in this repository names a Metal target —
+only `ROCBackend` and `ThreadsBackend` are. If a Metal backend is ever added, it would need
+more than a `JACC.set_backend` call. `CPMParams`'s host-side fields (`T_cpm`, `β_ion`, `λ_V`,
+`I0`, `κ`, `D_M`, `dt_field`, `D_C`, `C_wall`, `α_M_species`, …) are declared `Float64`, and
+Metal does not execute `Float64` kernels — Apple GPUs support only 32-bit floating point.
+The device-resident arrays this port already keeps on device (`lat`, `vols`, `spec`, the
+ping-pong melanin/nutrient fields, and the coupling arrays listed above) are already `Float32`
+by the rule stated at the top of this document, so the array side is fine; the parameter side
+is not. Any Metal port would need an explicit `Float32` conversion at the point where these
+host `CPMParams` values cross into a kernel launch, not an implicit one — the same "producer
+declares, consumer must not assume" discipline `AGENTS.md` rule 4 states elsewhere, applied to
+a numeric type instead of a semantic sentinel.
+
 ## Ensemble observables that must remain statistically consistent
 
 Across matched seed ensembles (the existing CSV contract, extended):

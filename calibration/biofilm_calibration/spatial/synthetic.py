@@ -115,11 +115,53 @@ def graded_field(shape=(16, 16, 32), top: float = 0.9,
 # system, not a finer view of the same one. Rasterising a fixed analytic shape
 # has no such confound, which is exactly why it is the first study to run.
 
+import math
 from dataclasses import dataclass
 
 
+class NonTilingPitchError(ValueError):
+    """A pitch that does not tile the declared extent."""
+
+
 def _grid_shape(extent_um, pitch_um) -> tuple:
-    return tuple(max(1, int(round(float(e) / float(pitch_um)))) for e in extent_um)
+    """Voxel counts, REFUSING a pitch that does not tile the box exactly.
+
+    Rounding here would silently change the physical object. At pitch 3.2 the
+    24 um axis rounds to 8 voxels = 25.6 um, a 6.7% larger box, while the
+    closed-form truth still divides by the DECLARED 24 um -- so the reported
+    error would be dominated by a denominator that moved rather than by
+    rasterisation, which is the one thing the ladder exists to measure.
+
+    A ladder is meant to hold the object fixed and move only the sampling. A
+    pitch that cannot do that is not a coarser view of the same object.
+    """
+    # A PITCH IS A POSITIVE FINITE LENGTH, refused under the same type as a
+    # non-tiling one so the ladder names it as a skipped row. Zero divided by
+    # zero below, NaN reached `round()`, and neither was a NonTilingPitchError,
+    # so a bad `--pitches` entry crashed the run past the ladder's `except`.
+    if not (float(pitch_um) > 0.0 and math.isfinite(float(pitch_um))):
+        raise NonTilingPitchError(
+            f"pitch {pitch_um} is not a positive finite length and tiles "
+            "nothing")
+    shape = []
+    for axis, extent in enumerate(extent_um):
+        exact = float(extent) / float(pitch_um)
+        # A DENORMAL PITCH passes the finite check above and overflows here:
+        # 24 / 5e-324 is inf, and int(round(inf)) raised OverflowError past the
+        # ladder's typed except. Refused under the same type, by name.
+        if not math.isfinite(exact):
+            raise NonTilingPitchError(
+                f"pitch {pitch_um} is too small to tile axis {axis} of extent "
+                f"{extent}: the voxel count overflows")
+        n = int(round(exact))
+        if n < 1 or abs(exact - n) > 1e-9:
+            raise NonTilingPitchError(
+                f"pitch {pitch_um} does not tile axis {axis} of extent "
+                f"{extent}: {exact:.6g} voxels. Rounding would resize the box "
+                f"to {n * float(pitch_um):.6g} um while the analytic truth "
+                "still uses the declared extent")
+        shape.append(n)
+    return tuple(shape)
 
 
 @dataclass(frozen=True)
