@@ -93,6 +93,11 @@ if "reviewThreads(" in joined:
         if page2:
             out(conn("reviewThreads", [dict(thread, id="PRRT_2", path="page2.py")]))
         out(conn("reviewThreads", [resolved], more=True))
+    if S == "threads_both_pages":
+        if page2:
+            out(conn("reviewThreads", [dict(thread, id="PRRT_3", path="p2.py")]))
+        out(conn("reviewThreads", [dict(thread, id="PRRT_1", path="p1a.py"),
+                                   dict(thread, id="PRRT_2", path="p1b.py")], more=True))
     out(conn("reviewThreads", [resolved, thread]))
 if "comments(" in joined:
     if S == "usage_limit":
@@ -265,6 +270,33 @@ class WatcherControls(unittest.TestCase):
         rc, rec, _ = self.run_once("page2")
         self.assertEqual(rc, 0)
         self.assertEqual([t["path"] for t in rec["threads"]], ["page2.py"])
+
+    def test_threads_spanning_two_pages_are_all_counted(self):
+        """THE COUNT, NOT THE IDENTITY, and the case the scenario above cannot
+        reach. `page2` carries its only unresolved thread on page TWO, so a
+        reader that dropped page ONE would report it and pass. Here both pages
+        carry unresolved threads: the reported total is their sum, or a page
+        was lost. This is the assertion a `reviewThreads(first:50)` query
+        without pagination fails -- it returned nothing on a pull request
+        holding 91 threads, two of them open, and nothing contradicted it."""
+        rc, rec, _ = self.run_once("threads_both_pages")
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(rec["threads"]), 3)
+        self.assertEqual(sorted(t["path"] for t in rec["threads"]),
+                         ["p1a.py", "p1b.py", "p2.py"])
+
+    def test_the_fake_serves_unresolved_threads_on_page_one_too(self):
+        """The control on the control: page one alone is two, not three, so the
+        assertion above fails for a one-page reader instead of passing on a
+        subset of the truth."""
+        import subprocess
+        os.environ["FAKE_GH_SCENARIO"] = "threads_both_pages"
+        one = json.loads(subprocess.run(["gh", "api", "graphql", "-f", "query=reviewThreads("],
+                                        capture_output=True, text=True).stdout)
+        conn = one["data"]["repository"]["pullRequest"]["reviewThreads"]
+        self.assertTrue(conn["pageInfo"]["hasNextPage"])
+        self.assertEqual(len(conn["nodes"]), 2)
+        self.assertTrue(all(not n["isResolved"] for n in conn["nodes"]))
 
     def test_a_cursor_failure_yields_no_partial_findings(self):
         rc, rec, _ = self.run_once("cursor_fail")
