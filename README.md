@@ -174,7 +174,7 @@ Biofilms/
 │   │   └── schema.py              # shared status / evidence vocabulary
 │   ├── scripts/                   # vcholerae_pilot (surrogate), detectability_pilot,
 │   │                              #   emit_synthetic_reference_config, reference_d_status
-│   └── tests/                     # 14 modules, 237 tests collected
+│   └── tests/                     # 19 modules, 301 tests collected
 │
 ├── contract/                      # biofilm-contract (Python; NO dependencies)
 │   └── physical_contract/         # vocabulary, MaterialSpec, composition closure,
@@ -188,8 +188,8 @@ Biofilms/
 │   │                              #   feedback_uq, feedback_gate
 │   ├── scripts/                   # a0_sweep, synthetic_e2e, import_dose_field.jl
 │   ├── requirements.txt
-│   └── tests/                     # 14 unit modules + tests/integration/ (5, OpenMC-gated);
-│                                  #   122 collected (6 skip without OpenMC)
+│   └── tests/                     # 20 unit modules + tests/integration/ (5, OpenMC-gated);
+│                                  #   235 collected (6 modules skip without OpenMC)
 │
 ├── config/
 │   ├── coupling_template.toml                    # 21 REQUIRED-but-unset keys
@@ -771,22 +771,40 @@ Provenance ledger distribution (`data/parameter_provenance.csv`, 49 rows × 21 c
 julia --project=. tests/runtests.jl              # 135 passed, 0 failed (re-run 2026-08-15 at HEAD)
 julia --project=. biofilms_potts_jacc.jl --selftest
 
-pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 86 collected
-pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 173 collected
+pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 235 collected
+pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 301 collected
 ```
 
 The Julia figure is 2 + 34 + 57 + 42 across the four suites, re-run on this tree rather than quoted
 from `docs/branch_report.md`, which records the older 2026-08-13 branch-end figures and is stale on
 the Python counts.
 
-Run together in the coupling venv, the two Python suites give **259 passed, 4 skipped**
-(re-run 2026-08-15 at HEAD). All four skips are coupling modules that skip on `import openmc` in a
-bare venv — the three in `coupling/tests/integration/` plus `coupling/tests/test_model_build.py`.
+Run together in the coupling venv, the two Python suites give **534 passed, 6 skipped**
+(re-measured 2026-09-16: coupling 233, calibration 301). All six skips are coupling modules that
+skip on `import openmc` in a bare venv — the five in `coupling/tests/integration/` plus
+`coupling/tests/test_model_build.py`. This paragraph said 259 passed with four skips until
+2026-09-16, measured on 2026-08-15; two integration modules were added the same day and the
+counts were never re-measured. `coupling/tests/test_julia_interop.py`'s two tests additionally fail in a
+fresh worktree whose Julia project has no HDF5 installed — an environment gap here rather than a
+result, and not counted in the 534. Collection reports 235 + 301 = 536, because the six
+openmc-gated modules skip at import and are never collected.
 No calibration test skips: the pilot ND2 file is present on this machine, so `test_pilot.py` runs.
 The OpenMC integration tier is manual opt-in: activate the `openmc-biofilms`
 environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
 `.github/workflows/coupling-tests.yml` — `julia-tests`, `python-unit`, `calibration-unit`, and
-`openmc-integration` behind a `workflow_dispatch` input.
+`openmc-integration` behind a `workflow_dispatch` input. Real-data-backed verification of the
+golden-tally fixture (`coupling/tests/fixtures/golden_tally_water_phantom.json`) is a separate
+workflow, `.github/workflows/golden-tally-verification.yml`, triggered by `workflow_dispatch`
+by every `pull_request` touching a path that can change what the tally produces, and by a `push`
+touching one of those paths on `master`, `feat/**`, `ci/**` or `research/**` — a push on any other
+branch matches no trigger, which is why the `pull_request` half is the one that always applies.
+Those paths are the transitive closure of the modules the regeneration script imports, plus the
+two editable-install manifests, `environment.yml`, `docs/openmc_stack.md`, the fixture and the
+workflow itself. `coupling/tests/test_gate_composition.py`
+derives that closure from the script's own imports and fails when a path is missing from either
+trigger. An earlier version of this sentence said the fixture "only change[s] when" the
+OpenMC or nuclear-data version does, and named only `workflow_dispatch` and `push`; both halves
+were wrong, and the first told a maintainer to dismiss a drift caused by a producer edit.
 
 What the tests pin:
 
