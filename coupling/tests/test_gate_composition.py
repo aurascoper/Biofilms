@@ -38,6 +38,22 @@ from biofilm_openmc.feedback_uq import debiased_squared_effect
 from biofilm_openmc.synthetic_gate import (PASS_SYNTHETIC_GATE, ThresholdPolicy,
                                            VarianceBudget, decide)
 
+# PRODUCTION'S POLICY, NOT A BARE ONE. The draws below are `e_squared`, which
+# feedback_uq declares as `debiased_relative_l2_squared`; a default
+# ThresholdPolicy() is denominated in `relative_l2` and carries 0.10 / 0.02.
+# Comparing one against the other is the error decide() exists to refuse, and it
+# refuses only when the caller declares the metric. The first version of this
+# file passed neither the production policy nor the metric, and pinned
+# EFFECT_BELOW_THRESHOLD -- a verdict production's own policy does not produce.
+# The paths mirror what openmc_nested_pilot.py does for itself, so the bare
+# no-OpenMC tier can import it without calibration installed.
+_COUPLING = Path(__file__).resolve().parents[1]
+_ROOT = _COUPLING.parent
+for _p in (_COUPLING / "scripts", _ROOT / "calibration", _ROOT / "contract"):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+from openmc_nested_pilot import POLICY  # noqa: E402
+
 _FIXTURE = (Path(__file__).parent / "fixtures"
            / "golden_tally_water_phantom.json")
 
@@ -60,39 +76,54 @@ def _per_source_fields(label: str, mass: np.ndarray, heating_scale: float = 1.0)
     return out
 
 
-def _effect_draws(feedback_heating_scale: float = 1.0) -> np.ndarray:
-    """One e_squared per outer draw, exactly the shape decide() consumes."""
+def _effect_draws(feedback_heating_scale: float = 1.0):
+    """One e_squared per outer draw, with the metric the producer declares.
+
+    THE DECLARATION TRAVELS WITH THE NUMBERS. Returning the draws alone is what
+    let this file hand `e_squared` to a policy denominated in E; the consumer
+    has to read what the producer said it computed.
+    """
     baseline_fields = _per_source_fields("baseline", _MASS_B)
     feedback_fields = _per_source_fields("feedback", _MASS_F,
                                          feedback_heating_scale)
-    draws = []
+    draws, metrics = [], set()
     for o in range(_N_OUTER):
         lo, hi = o * _N_REP, (o + 1) * _N_REP
         effect = debiased_squared_effect(baseline_fields[lo:hi],
                                          feedback_fields[lo:hi],
                                          _MASS_B.ravel())
         draws.append(effect.e_squared)
-    return np.array(draws)
+        metrics.add(effect.metric_id)
+    assert len(metrics) == 1, f"the producer changed metric mid-run: {metrics}"
+    return np.array(draws), metrics.pop()
 
 
 def test_pinned_transport_composes_into_a_verdict():
     """The real seam: pinned heating -> dose -> debiased effect -> decide().
 
-    The measured effect is small (~0.0011): a x1.35 density increase raises
-    heating by ~26% but raises mass by 35%, so specific energy per kg barely
-    moves -- a real, unforced result, not tuned to land anywhere. Recorded
-    here as the pinned expectation, the same way `serial_seed42.csv` pins
-    what `validate_serial.jl` actually produces.
+    The measured effect is small (~0.0011 in E^2): a x1.35 density increase
+    raises heating by ~26% but raises mass by 35%, so specific energy per kg
+    barely moves -- a real, unforced result, not tuned to land anywhere.
+    Recorded here as the pinned expectation, the same way `serial_seed42.csv`
+    pins what `validate_serial.jl` actually produces.
+
+    Under production's POLICY that is EFFECT_DETECTED_BUT_NOT_PRACTICALLY_
+    IMPORTANT: the draws resolve above the practical floor (0.02^2 = 0.0004)
+    and sit entirely below the threshold (0.10^2 = 0.01). The verdict pinned
+    here until 2026-09-16 was EFFECT_BELOW_THRESHOLD, which this same fixture
+    produces only against a policy denominated in E rather than E^2.
     """
-    draws = _effect_draws()
+    draws, metric = _effect_draws()
     assert draws.shape == (_N_OUTER,)
     assert np.all(np.isfinite(draws))
     assert np.all(draws < 0.01), (
         f"effect_draws {draws} drifted far from the pinned expectation; "
         "regenerate the fixture only if OpenMC or the nuclear data changed")
 
-    verdict = decide(draws, VarianceBudget(transport=1e-4), ThresholdPolicy())
-    assert verdict.verdict == "EFFECT_BELOW_THRESHOLD", verdict.reason
+    verdict = decide(draws, VarianceBudget(transport=1e-4), POLICY,
+                     metric_id=metric)
+    assert verdict.verdict == "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT", \
+        verdict.reason
 
 
 def test_scaling_the_dose_changes_the_verdict():
@@ -105,17 +136,42 @@ def test_scaling_the_dose_changes_the_verdict():
     inert -- the gate-that-never-fires failure one level up from the seam
     this file exists to close.
     """
-    baseline_verdict = decide(_effect_draws(),
-                              VarianceBudget(transport=1e-4),
-                              ThresholdPolicy())
-    scaled_verdict = decide(_effect_draws(feedback_heating_scale=5.0),
-                            VarianceBudget(transport=1e-4),
-                            ThresholdPolicy())
+    base_draws, metric = _effect_draws()
+    scaled_draws, scaled_metric = _effect_draws(feedback_heating_scale=5.0)
+    baseline_verdict = decide(base_draws, VarianceBudget(transport=1e-4),
+                              POLICY, metric_id=metric)
+    scaled_verdict = decide(scaled_draws, VarianceBudget(transport=1e-4),
+                            POLICY, metric_id=scaled_metric)
 
     assert scaled_verdict.verdict != baseline_verdict.verdict, (
         "scaling the feedback dose 5x did not change the verdict -- the "
         "pipeline runs but the gate's output does not depend on its input")
     assert scaled_verdict.verdict == PASS_SYNTHETIC_GATE
+
+
+def test_a_policy_in_the_wrong_denomination_is_refused():
+    """THE CONTROL THE PINNED TEST WAS MISSING, and the reason it was wrong.
+
+    decide() refuses a threshold that is not denominated in the draws' own
+    metric -- but only when the caller declares that metric. Passing nothing is
+    silent, and silence is what produced the old pinned verdict. Both halves are
+    asserted here: declared, the mismatch is NOT_EVALUATED; undeclared, the same
+    numbers and the same policy produce a verdict that reads as a result.
+    """
+    draws, metric = _effect_draws()
+    assert POLICY.metric_id == metric, (
+        "production's policy is no longer denominated in the metric the "
+        "producer declares; the pinned verdict below is then meaningless")
+
+    refused = decide(draws, VarianceBudget(transport=1e-4), ThresholdPolicy(),
+                     metric_id=metric)
+    assert refused.verdict == "NOT_EVALUATED", refused.verdict
+    assert "not transferable" in refused.reason, refused.reason
+
+    silent = decide(draws, VarianceBudget(transport=1e-4), ThresholdPolicy())
+    assert silent.verdict == "EFFECT_BELOW_THRESHOLD", (
+        "the undeclared call no longer produces the old verdict, so this "
+        "control no longer reproduces the defect it exists for")
 
 
 _REPO = Path(__file__).resolve().parents[2]

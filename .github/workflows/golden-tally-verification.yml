@@ -180,8 +180,9 @@ jobs:
                          if "tests.integration." in tc.get("classname", "")
                          or "tests/integration/" in tc.get("file", "")]
           if not integration:
-              print("FAIL: no tests/integration/ testcases found in the JUnit "
-                    "record at all -- the tier did not run, not just skip")
+              print("FAIL: no tests/integration/ testcases appear in the JUnit "
+                    "record at all -- the tier did not run, or it was never "
+                    "collected, which a skip count alone cannot tell apart")
               sys.exit(1)
           skipped = [tc for tc in integration if tc.find("skipped") is not None]
           if skipped:
@@ -190,7 +191,25 @@ jobs:
                     f"tests were SKIPPED, not run: {names}. Nuclear-data "
                     "setup did not take effect -- this run means nothing.")
               sys.exit(1)
-          print(f"OK: {len(integration)} integration tests ran, none skipped.")
+          # ANY openmc-gated skip, not just the ones under tests/integration/.
+          # tests/test_model_build.py is gated on the same import and lives one
+          # directory up, so scoping this check to the integration package let it
+          # skip silently while the step reported success.
+          gated = []
+          for tc in tree.iter("testcase"):
+              sk = tc.find("skipped")
+              if sk is None:
+                  continue
+              why = f"{sk.get('message', '')} {sk.get('type', '')}".lower()
+              if "openmc" in why:
+                  gated.append(tc.get("file") or tc.get("classname") or tc.get("name"))
+          if gated:
+              print(f"FAIL: {len(gated)} test(s) still skipped on an openmc "
+                    f"import in this job: {sorted(set(gated))}. The transport "
+                    "env did not reach them.")
+              sys.exit(1)
+          print(f"OK: {len(integration)} integration tests ran, none skipped, "
+                "and nothing anywhere skipped on an openmc import.")
           PYEOF
 
       - name: Regenerate the golden tally and diff against the committed fixture
