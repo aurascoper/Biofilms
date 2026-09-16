@@ -182,7 +182,7 @@ Biofilms/
 │   │   └── schema.py              # shared status / evidence vocabulary
 │   ├── scripts/                   # vcholerae_pilot (surrogate), detectability_pilot,
 │   │                              #   emit_synthetic_reference_config, reference_d_status
-│   └── tests/                     # 19 modules, 420 tests collected
+│   └── tests/                     # 20 modules, 429 tests collected
 │
 ├── contract/                      # biofilm-contract (Python; NO dependencies)
 │   └── physical_contract/         # vocabulary, MaterialSpec, composition closure,
@@ -795,25 +795,30 @@ julia --project=. tests/runtests.jl              # 146 passed, 0 failed (re-run 
 julia --project=. biofilms_potts_jacc.jl --selftest
 
 pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 340 collected
-pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 420 collected
+pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 429 collected
 ```
 
 The Julia figure is 2 + 34 + 68 + 42 across the four suites, re-run on this tree rather than quoted
 from `docs/branch_report.md`, which records the older 2026-08-13 branch-end figures and is stale on
 the Python counts.
 
-Run together in the coupling venv, the two Python suites give **760 passed, 6 skipped**
-(measured 2026-09-16 on this merge: coupling 340, calibration 420). All six skips are coupling
-modules that skip on `import openmc` in a bare venv — the five in `coupling/tests/integration/`
-plus `coupling/tests/test_model_build.py`. Collection reports 340 + 420 = 760, because those six
-modules skip at import and are never collected. Three superseded figures have stood here: 259
-passed with four skips, measured 2026-08-15 and left unrevised after two integration modules were
-added the same day; 534 (coupling 233, calibration 301), which corrected it on master on
-2026-09-16; and 616, re-run 2026-08-24 on this branch. This merge brings both sides' tests
-together, so none of the three describes this tree, and the two collected counts above were stale
-on both sides before it. `coupling/tests/test_julia_interop.py`'s two tests are inside the 340
-here because this worktree's gitignored `Manifest.toml` has HDF5 installed; in a fresh worktree,
-whose Julia project has none, they fail instead — an environment gap, not a result.
+Run together in the coupling venv, the two Python suites collect **769 tests**
+(measured 2026-09-16 on this merge: coupling 340, calibration 429). In the worktree these were
+measured in, **767 pass and two fail**: `coupling/tests/test_julia_interop.py` requires HDF5, and
+that worktree has no `Manifest.toml`. Where a Julia project with HDF5 is installed, those two
+pass and the figure is 769 passed. The count is a property of the tree; the two failures are a
+property of the machine, and the two are reported separately for that reason.
+
+Six coupling modules skip on `import openmc` in a bare venv — the five in
+`coupling/tests/integration/` plus `coupling/tests/test_model_build.py`. Those six skip at import
+and never reach collection, so 340 + 429 = 769 excludes them. No calibration module skips.
+
+Four superseded figures have appeared in this paragraph. 259 passed with four skips, measured
+2026-08-15 and left unrevised after two integration modules were added the same day. 534 (coupling
+233, calibration 301) corrected that on master on 2026-09-16. 616 was re-run 2026-08-24 on an
+earlier branch. 760 (coupling 340, calibration 420) was measured on #12's merge earlier on
+2026-09-16, and this branch's one added calibration module superseded it nine tests later. Each
+was correct for the tree it was measured on and wrong for the next one.
 No calibration test skips: the pilot ND2 file is present on this machine, so `test_pilot.py` runs.
 The OpenMC integration tier is manual opt-in: activate the `openmc-biofilms`
 environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
@@ -890,8 +895,11 @@ integrator the `Project.toml` has never contained. Those claims are catalogued a
 in the claims ledger, 34 of them `delete`.
 
 **And the ledger is now enforced.** `calibration/tests/test_claims_ledger.py` asserts that no
-claim marked `delete` reappears in the manuscript. Until it existed, nothing in the repository
-checked the ledger at all.
+claim marked `delete` reappears in the document that carried it. Until it existed, nothing in
+the repository checked the ledger at all — and until 2026-08-28 it read only the manuscript,
+because it selected rows by `claim_id` prefix rather than by the `document` column each row
+declares. The 25 `delete` verdicts on other documents were unguarded by a test that could not
+have failed for them.
 
 Its real coverage is **20 of the 34**, and the other fourteen are named in the test output as
 still needing a human. An earlier version of this note said "30 of 34", which counted rows that
