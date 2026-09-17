@@ -131,18 +131,30 @@ def _seed(rep: int, state: str, paired: bool) -> int:
 
 
 def parse_ratios(text: str) -> list[int]:
-    """The comma-separated ratio list, sorted, with its two requirements checked by name.
+    """The comma-separated ratio list, sorted, with every requirement named.
 
-    Every ratio must be >= 1, and 1 must be present because it defines the common
-    Omega_b every finer ratio is evaluated on. Checking only the smallest element
-    conflated the two: "0,1,2" was refused for lacking ratio 1 (Copilot on #24).
+    THREE REQUIREMENTS, EACH REFUSED BY NAME, because two merges each fixed a
+    different one. (a) Every entry is an integer: `int()` over a raw `split(",")`
+    turned `''` into an IndexError one line later and `1,,4` into an anonymous
+    ValueError. (b) Every ratio is >= 1, so `1,0` cannot reach the divisor
+    arithmetic and `1,-1` cannot pass. (c) Ratio 1 is present, because it defines
+    the common Omega_b every finer ratio is evaluated on. Checking only the
+    smallest element conflated (b) and (c): "0,1,2" was refused for lacking
+    ratio 1 (Copilot on #24), which is why `1 not in ratios` replaced
+    `ratios[0] != 1` rather than joining it.
     """
-    ratios = sorted({int(r) for r in text.split(",")})
+    tokens = [t.strip() for t in text.split(",")]
+    try:
+        ratios = sorted({int(t) for t in tokens})
+    except ValueError:
+        raise SystemExit(
+            f"--ratios {text!r}: every entry must be an integer") from None
     bad = [r for r in ratios if r < 1]
     if bad:
-        raise SystemExit(f"ratios must be >= 1; got {bad}")
+        raise SystemExit(f"--ratios {text!r}: ratios must be >= 1; got {bad}")
     if 1 not in ratios:
-        raise SystemExit("ratio 1 is the reference grid and must be included")
+        raise SystemExit(
+            f"--ratios {text!r}: ratio 1 is the reference grid and must be included")
     return ratios
 
 
@@ -235,6 +247,7 @@ def main(argv=None) -> int:
     # Sorted so ratio 1 runs first: it defines the common Omega_b that every
     # finer ratio is then evaluated on.
     ratios = parse_ratios(args.ratios)
+
     refuse_non_divisor_ratios(ratios)
 
     import openmc

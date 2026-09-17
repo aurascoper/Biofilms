@@ -56,6 +56,11 @@ on:
       # The doc stays listed: it still carries the nuclear-data identity.
       - "environment.yml"
       - "coupling/scripts/regenerate_golden_tally.py"
+      # The build specifications the job installs editably: a pin or a
+      # package rule in either changes the generating run with no producer
+      # module touched. test_gate_composition.py requires both here.
+      - "coupling/pyproject.toml"
+      - "contract/pyproject.toml"
       - "coupling/tests/fixtures/golden_tally_water_phantom.json"
       # The fixture-producing modules, per the control test named above.
       - "coupling/scripts/openmc_nested_pilot.py"
@@ -64,6 +69,26 @@ on:
       - "coupling/biofilm_openmc/materials.py"
       - "coupling/biofilm_openmc/mesh.py"
       - "coupling/biofilm_openmc/model.py"
+      # THE CLOSURE, not the first hop. The inventory used to stop at the
+      # script's own imports, which is how `physical_contract` -- reached
+      # through config.py and model.py -- was never listed. It now walks every
+      # first-party import transitively, and these are what that reaches
+      # through the pilot's nuclear-data identity. Whether each one can move
+      # the water-phantom tally is not a judgment this list makes; a module
+      # the generating run executes is a fixture input.
+      - "contract/physical_contract/__init__.py"
+      - "coupling/biofilm_openmc/feedback_uq.py"
+      - "coupling/biofilm_openmc/fingerprint.py"
+      - "coupling/biofilm_openmc/lineage.py"
+      - "coupling/biofilm_openmc/snapshot.py"
+      - "coupling/biofilm_openmc/synthetic_gate.py"
+      # The calibration root and the implicit package initialisers, found by
+      # the closure once it resolved against `calibration` and returned every
+      # `__init__.py` it passes through (Codex, PR #12 at a29ecc0).
+      - "calibration/biofilm_calibration/__init__.py"
+      - "calibration/biofilm_calibration/joint_uncertainty.py"
+      - "calibration/biofilm_calibration/schema.py"
+      - "coupling/biofilm_openmc/__init__.py"
   # ANCHORED, not copied. Two hand-maintained path lists drift, and the one
   # that drifts is the one nobody watches -- here that would be the PR trigger,
   # the only one that fires before a merge.
@@ -155,8 +180,9 @@ jobs:
                          if "tests.integration." in tc.get("classname", "")
                          or "tests/integration/" in tc.get("file", "")]
           if not integration:
-              print("FAIL: no tests/integration/ testcases found in the JUnit "
-                    "record at all -- the tier did not run, not just skip")
+              print("FAIL: no tests/integration/ testcases appear in the JUnit "
+                    "record at all -- the tier did not run, or it was never "
+                    "collected, which a skip count alone cannot tell apart")
               sys.exit(1)
           skipped = [tc for tc in integration if tc.find("skipped") is not None]
           if skipped:
@@ -165,7 +191,25 @@ jobs:
                     f"tests were SKIPPED, not run: {names}. Nuclear-data "
                     "setup did not take effect -- this run means nothing.")
               sys.exit(1)
-          print(f"OK: {len(integration)} integration tests ran, none skipped.")
+          # ANY openmc-gated skip, not just the ones under tests/integration/.
+          # tests/test_model_build.py is gated on the same import and lives one
+          # directory up, so scoping this check to the integration package let it
+          # skip silently while the step reported success.
+          gated = []
+          for tc in tree.iter("testcase"):
+              sk = tc.find("skipped")
+              if sk is None:
+                  continue
+              why = f"{sk.get('message', '')} {sk.get('type', '')}".lower()
+              if "openmc" in why:
+                  gated.append(tc.get("file") or tc.get("classname") or tc.get("name"))
+          if gated:
+              print(f"FAIL: {len(gated)} test(s) still skipped on an openmc "
+                    f"import in this job: {sorted(set(gated))}. The transport "
+                    "env did not reach them.")
+              sys.exit(1)
+          print(f"OK: {len(integration)} integration tests ran, none skipped, "
+                "and nothing anywhere skipped on an openmc import.")
           PYEOF
 
       - name: Regenerate the golden tally and diff against the committed fixture

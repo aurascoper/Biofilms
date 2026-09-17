@@ -98,9 +98,11 @@ density_g_cm3 = {density}
 #
 # The precedent this fixture cites does exactly this: tests/fixtures/
 # serial_seed42.csv pins 5 decimals, and its header says a different Julia minor
-# version may legitimately change the bytes. ROUNDING IS THE TOLERANCE. Six
-# figures sits ~5 orders of magnitude below the noise, so nothing physical is
-# lost and the comparison stops depending on the last ulp.
+# version may legitimately change the bytes. WHAT ROUNDING BUYS, AND WHAT IT DOES
+# NOT. It drops the ulp-level digits, so the file stops asserting a precision the
+# tally does not have. It is NOT a tolerance scaled to the 27% Monte Carlo noise:
+# the comparison stays an exact `git diff --exit-code` at six significant
+# figures, so a build that differs in the sixth digit still turns the job red.
 SIGNIFICANT_FIGURES = 6
 
 
@@ -176,10 +178,13 @@ def main():
                 print(f"  [{completed}/{expected}] {label} outer={outer} "
                       f"rep={rep} seed={seed} done")
 
-    if completed != expected:
-        raise SystemExit(
-            f"only {completed}/{expected} runs completed -- refusing to "
-            "write a partial fixture over the committed one.")
+    # NO COUNT GUARD HERE, DELIBERATELY: there was one, and it could not fail.
+    # `completed` is incremented once per iteration of two fixed-length loops,
+    # so it always equalled `expected`, and a run that dies raises out of
+    # `_run_one` long before the check. What protects the committed fixture is
+    # that exception: every write happens below this point, so a partial run
+    # leaves the file exactly as it was.
+    assert completed == expected, "the loops above changed shape"
 
     import openmc
     fixture = {

@@ -159,6 +159,28 @@ def test_partial_results_may_not_replace_the_canonical_tables(
         assert pilot.refuse_partial_publish(publish, stopped) is None
 
 
+def test_a_budget_that_expires_before_the_first_draw_still_gets_a_budget_document():
+    """THE STOPPED-EARLY RECORD MUST SURVIVE A RUN WITH NO RECORDS.
+
+    With `records` empty, `budgets` is empty and the worst-case aggregate was
+    `max()` over nothing: `ValueError`, raised before the budget JSON that
+    carries `stopped_early` was written, so the `if not records` return and
+    the publication refusal after it could not be reached for the one run
+    they describe. The aggregate is zero over no scenarios, and the maximum
+    otherwise.
+    """
+    empty = pilot.worst_case_budget({})
+    assert empty.as_dict() == {"transport": 0.0, "numerics": 0.0,
+                               "calibration": 0.0, "model_form": 0.0}
+    two = pilot.worst_case_budget({
+        "a": {"transport": 1.0, "numerics": 5.0, "calibration": 0.0,
+              "model_form": 0.0},
+        "b": {"transport": 2.0, "numerics": 1.0, "calibration": 0.5,
+              "model_form": 0.0}})
+    assert two.as_dict() == {"transport": 2.0, "numerics": 5.0,
+                             "calibration": 0.5, "model_form": 0.0}
+
+
 # ------------------------------------ declaring significance with no test
 
 @pytest.mark.parametrize("df,expected", [
@@ -230,9 +252,17 @@ def test_a_ratio_that_cannot_share_the_mass_denominator_is_refused(
 @pytest.mark.parametrize("text, outcome", [
     ("1,2,4", [1, 2, 4]),
     ("4,1,2,2", [1, 2, 4]),
+    (" 1 , 2 ,4 ", [1, 2, 4]),
     ("0,1,2", "ratios must be >= 1"),
     ("-2,1", "ratios must be >= 1"),
     ("2,4", "ratio 1 is the reference grid"),
+    # THE MALFORMED CASES ARRIVED WITH MASTER AND ARRIVED WITHOUT A TEST.
+    # `int()` over a raw split turned "" into an IndexError one line later and
+    # "1,,4" into an anonymous ValueError. The merge that joined the two
+    # parsers would have shipped that behaviour with nothing proving it.
+    ("", "every entry must be an integer"),
+    ("1,,4", "every entry must be an integer"),
+    ("1,x,4", "every entry must be an integer"),
 ])
 def test_parse_ratios_checks_each_requirement_by_name(text, outcome):
     """Two requirements, two messages. Checking only the smallest element told a
@@ -333,6 +363,23 @@ def test_main_refuses_a_bad_ratio_before_it_imports_openmc(
                          "--ratios", ratios])
     assert not (tmp_path / "out").exists(), (
         "main() created its output directory before judging the ratios")
+
+
+@pytest.mark.parametrize("ratios", ["", "1,,4", "1,0", "1,-1", "a,1", "1,2.5"])
+def test_main_refuses_a_malformed_ratio_list_by_name(ratios, tmp_path):
+    """THE CHEAP REFUSAL MUST BE DETERMINISTIC, or it is not a refusal.
+
+    `--ratios ''` left the list empty and `ratios[0]` raised IndexError;
+    `1,,4` called `int('')`; `1,0` reached the divisor check and divided by
+    zero; `1,-1` was accepted. Each is a crash or a pass where the promise was
+    a named SystemExit before any import.
+    """
+    with pytest.raises(SystemExit, match="ratios"):
+        refinement.main(["--snapshot", str(tmp_path / "nope.h5"),
+                         "--config", str(tmp_path / "nope.toml"),
+                         "--outdir", str(tmp_path / "out"),
+                         "--ratios", ratios])
+    assert not (tmp_path / "out").exists()
 
 
 def test_main_accepts_the_ladder_the_study_actually_runs(tmp_path):

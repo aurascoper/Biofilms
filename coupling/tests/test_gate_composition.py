@@ -26,6 +26,8 @@ pinned heating tally through the real, live repo code -- specific_energy_per_sou
 from __future__ import annotations
 
 import ast
+import pytest
+import sys
 import json
 from pathlib import Path
 
@@ -35,6 +37,22 @@ from biofilm_openmc.dose import specific_energy_per_source
 from biofilm_openmc.feedback_uq import debiased_squared_effect
 from biofilm_openmc.synthetic_gate import (PASS_SYNTHETIC_GATE, ThresholdPolicy,
                                            VarianceBudget, decide)
+
+# PRODUCTION'S POLICY, NOT A BARE ONE. The draws below are `e_squared`, which
+# feedback_uq declares as `debiased_relative_l2_squared`; a default
+# ThresholdPolicy() is denominated in `relative_l2` and carries 0.10 / 0.02.
+# Comparing one against the other is the error decide() exists to refuse, and it
+# refuses only when the caller declares the metric. The first version of this
+# file passed neither the production policy nor the metric, and pinned
+# EFFECT_BELOW_THRESHOLD -- a verdict production's own policy does not produce.
+# The paths mirror what openmc_nested_pilot.py does for itself, so the bare
+# no-OpenMC tier can import it without calibration installed.
+_COUPLING = Path(__file__).resolve().parents[1]
+_ROOT = _COUPLING.parent
+for _p in (_COUPLING / "scripts", _ROOT / "calibration", _ROOT / "contract"):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+from openmc_nested_pilot import POLICY  # noqa: E402
 
 _FIXTURE = (Path(__file__).parent / "fixtures"
            / "golden_tally_water_phantom.json")
@@ -58,39 +76,54 @@ def _per_source_fields(label: str, mass: np.ndarray, heating_scale: float = 1.0)
     return out
 
 
-def _effect_draws(feedback_heating_scale: float = 1.0) -> np.ndarray:
-    """One e_squared per outer draw, exactly the shape decide() consumes."""
+def _effect_draws(feedback_heating_scale: float = 1.0):
+    """One e_squared per outer draw, with the metric the producer declares.
+
+    THE DECLARATION TRAVELS WITH THE NUMBERS. Returning the draws alone is what
+    let this file hand `e_squared` to a policy denominated in E; the consumer
+    has to read what the producer said it computed.
+    """
     baseline_fields = _per_source_fields("baseline", _MASS_B)
     feedback_fields = _per_source_fields("feedback", _MASS_F,
                                          feedback_heating_scale)
-    draws = []
+    draws, metrics = [], set()
     for o in range(_N_OUTER):
         lo, hi = o * _N_REP, (o + 1) * _N_REP
         effect = debiased_squared_effect(baseline_fields[lo:hi],
                                          feedback_fields[lo:hi],
                                          _MASS_B.ravel())
         draws.append(effect.e_squared)
-    return np.array(draws)
+        metrics.add(effect.metric_id)
+    assert len(metrics) == 1, f"the producer changed metric mid-run: {metrics}"
+    return np.array(draws), metrics.pop()
 
 
 def test_pinned_transport_composes_into_a_verdict():
     """The real seam: pinned heating -> dose -> debiased effect -> decide().
 
-    The measured effect is small (~0.0011): a x1.35 density increase raises
-    heating by ~26% but raises mass by 35%, so specific energy per kg barely
-    moves -- a real, unforced result, not tuned to land anywhere. Recorded
-    here as the pinned expectation, the same way `serial_seed42.csv` pins
-    what `validate_serial.jl` actually produces.
+    The measured effect is small (~0.0011 in E^2): a x1.35 density increase
+    raises heating by ~26% but raises mass by 35%, so specific energy per kg
+    barely moves -- a real, unforced result, not tuned to land anywhere.
+    Recorded here as the pinned expectation, the same way `serial_seed42.csv`
+    pins what `validate_serial.jl` actually produces.
+
+    Under production's POLICY that is EFFECT_DETECTED_BUT_NOT_PRACTICALLY_
+    IMPORTANT: the draws resolve above the practical floor (0.02^2 = 0.0004)
+    and sit entirely below the threshold (0.10^2 = 0.01). The verdict pinned
+    here until 2026-09-16 was EFFECT_BELOW_THRESHOLD, which this same fixture
+    produces only against a policy denominated in E rather than E^2.
     """
-    draws = _effect_draws()
+    draws, metric = _effect_draws()
     assert draws.shape == (_N_OUTER,)
     assert np.all(np.isfinite(draws))
     assert np.all(draws < 0.01), (
         f"effect_draws {draws} drifted far from the pinned expectation; "
         "regenerate the fixture only if OpenMC or the nuclear data changed")
 
-    verdict = decide(draws, VarianceBudget(transport=1e-4), ThresholdPolicy())
-    assert verdict.verdict == "EFFECT_BELOW_THRESHOLD", verdict.reason
+    verdict = decide(draws, VarianceBudget(transport=1e-4), POLICY,
+                     metric_id=metric)
+    assert verdict.verdict == "EFFECT_DETECTED_BUT_NOT_PRACTICALLY_IMPORTANT", \
+        verdict.reason
 
 
 def test_scaling_the_dose_changes_the_verdict():
@@ -103,17 +136,42 @@ def test_scaling_the_dose_changes_the_verdict():
     inert -- the gate-that-never-fires failure one level up from the seam
     this file exists to close.
     """
-    baseline_verdict = decide(_effect_draws(),
-                              VarianceBudget(transport=1e-4),
-                              ThresholdPolicy())
-    scaled_verdict = decide(_effect_draws(feedback_heating_scale=5.0),
-                            VarianceBudget(transport=1e-4),
-                            ThresholdPolicy())
+    base_draws, metric = _effect_draws()
+    scaled_draws, scaled_metric = _effect_draws(feedback_heating_scale=5.0)
+    baseline_verdict = decide(base_draws, VarianceBudget(transport=1e-4),
+                              POLICY, metric_id=metric)
+    scaled_verdict = decide(scaled_draws, VarianceBudget(transport=1e-4),
+                            POLICY, metric_id=scaled_metric)
 
     assert scaled_verdict.verdict != baseline_verdict.verdict, (
         "scaling the feedback dose 5x did not change the verdict -- the "
         "pipeline runs but the gate's output does not depend on its input")
     assert scaled_verdict.verdict == PASS_SYNTHETIC_GATE
+
+
+def test_a_policy_in_the_wrong_denomination_is_refused():
+    """THE CONTROL THE PINNED TEST WAS MISSING, and the reason it was wrong.
+
+    decide() refuses a threshold that is not denominated in the draws' own
+    metric -- but only when the caller declares that metric. Passing nothing is
+    silent, and silence is what produced the old pinned verdict. Both halves are
+    asserted here: declared, the mismatch is NOT_EVALUATED; undeclared, the same
+    numbers and the same policy produce a verdict that reads as a result.
+    """
+    draws, metric = _effect_draws()
+    assert POLICY.metric_id == metric, (
+        "production's policy is no longer denominated in the metric the "
+        "producer declares; the pinned verdict below is then meaningless")
+
+    refused = decide(draws, VarianceBudget(transport=1e-4), ThresholdPolicy(),
+                     metric_id=metric)
+    assert refused.verdict == "NOT_EVALUATED", refused.verdict
+    assert "not transferable" in refused.reason, refused.reason
+
+    silent = decide(draws, VarianceBudget(transport=1e-4), ThresholdPolicy())
+    assert silent.verdict == "EFFECT_BELOW_THRESHOLD", (
+        "the undeclared call no longer produces the old verdict, so this "
+        "control no longer reproduces the defect it exists for")
 
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -122,27 +180,110 @@ _WORKFLOW = (_REPO / ".github" / "workflows"
              / "golden-tally-verification.yml")
 
 
-def _modules_that_produce_the_fixture() -> set[Path]:
-    """Every first-party module `regenerate_golden_tally.py` imports, as
-    repo-relative paths. Walks the real AST -- including the function-local
-    imports inside `_run_one`, which is where all of them live -- so an
-    import added later is picked up without anyone remembering to."""
-    tree = ast.parse(_REGEN.read_text())
-    names: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module:
-            names.add(node.module)
-        elif isinstance(node, ast.Import):
-            names.update(a.name for a in node.names)
+# Every directory a first-party absolute import can resolve against. The pilot
+# puts `calibration` on sys.path and imports `biofilm_calibration` from it, so
+# the calibration root is a base like the others; leaving it out hid
+# joint_uncertainty.py from the closure.
+_FIRST_PARTY_BASES = ("coupling", "coupling/scripts", "contract", "calibration")
 
+
+def _first_party_imports(path: Path) -> set[Path]:
+    """The first-party modules one file imports, as repo-relative paths.
+    Walks the real AST, function-local imports included. A dotted name
+    resolves to `name.py` or to a package's `__init__.py`."""
+    tree = ast.parse(path.read_text())
     out: set[Path] = set()
-    for name in names:
-        parts = name.split(".")
-        for base in ("coupling", "coupling/scripts"):
-            candidate = _REPO / base / (Path(*parts).as_posix() + ".py")
-            if candidate.exists():
-                out.add(candidate.relative_to(_REPO))
+
+    def add(rel: Path, roots) -> None:
+        for root in roots:
+            for candidate in (root / (rel.as_posix() + ".py"),
+                              root / rel / "__init__.py"):
+                if candidate.exists():
+                    out.add(candidate.relative_to(_REPO))
+                    # IMPLICIT PACKAGE INITIALISERS EXECUTE TOO. Importing
+                    # `biofilm_openmc.config` runs `biofilm_openmc/__init__.py`
+                    # first, whether or not anything names it; every
+                    # `__init__.py` between the root and the module is part of
+                    # the generating run and belongs in the closure.
+                    for parent in candidate.relative_to(root).parents:
+                        init = root / parent / "__init__.py"
+                        if init.exists():
+                            out.add(init.relative_to(_REPO))
+
+    absolute_roots = [_REPO / b for b in _FIRST_PARTY_BASES]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.level:
+                # RELATIVE IMPORTS RESOLVE AGAINST THE IMPORTING PACKAGE.
+                # `from .snapshot import ...` has `module == "snapshot"` and
+                # `level == 1`; the first version skipped every node whose
+                # module was None and resolved the rest as absolute, so a
+                # relative dependency was invisible to the closure and could
+                # be absent from both workflow path lists while this passed.
+                pkg = path.parent
+                for _ in range(node.level - 1):
+                    pkg = pkg.parent
+                base, roots = Path(*node.module.split(".")) if node.module else Path(), [pkg]
+            else:
+                base, roots = Path(*node.module.split(".")), absolute_roots
+            if node.module:
+                add(base, roots)
+            # AN ALIAS MAY BE A SUBMODULE. `from biofilm_openmc import x`
+            # loads `biofilm_openmc.x` when x is a module; the walker used to
+            # record the package initialiser and stop, so a producer pulled
+            # in by name ran without being in either workflow filter. `add`
+            # keeps a name only when a file exists for it, so an attribute
+            # resolves to nothing and is ignored.
+            for alias in node.names:
+                add(base / alias.name, roots)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                add(Path(*alias.name.split(".")), absolute_roots)
     return out
+
+
+def _modules_that_produce_the_fixture() -> set[Path]:
+    """Every first-party module the regeneration script reaches, TRANSITIVELY.
+
+    The first version walked the script's own imports and nothing further, so
+    `physical_contract` -- imported by `biofilm_openmc.config` and `.model`,
+    which the script imports inside `_run_one` -- was never in the inventory,
+    and the trigger test could not know the workflow omitted it. A change to
+    the shared vocabularies or validation there alters the generating run
+    while neither verification job fires. The closure over first-party
+    imports is the inventory; a base directory is added to
+    `_FIRST_PARTY_BASES`, not a module name."""
+    # THE ENTRY POINT IS ITSELF A PRODUCER. Seeding only the frontier returned the
+    # script's imports and not the script, so an edit to the generator's own body
+    # could omit it from both filters while this closure reported nothing missing.
+    seen: set[Path] = {_REGEN.relative_to(_REPO)}
+    frontier = [_REGEN.relative_to(_REPO)]
+    while frontier:
+        here = frontier.pop()
+        for dep in _first_party_imports(_REPO / here):
+            if dep not in seen:
+                seen.add(dep)
+                frontier.append(dep)
+    return seen
+
+
+# THE BUILD SPECIFICATIONS ARE INPUTS TOO. The verification job installs `contract` and
+# `coupling[dev]` editably, so a dependency pin or a package-data rule in either manifest
+# changes the generating run without touching a single producer module.
+_BUILD_SPECS = ("coupling/pyproject.toml", "contract/pyproject.toml")
+
+
+def _fixture_inputs() -> set[str]:
+    """Every repo-relative path whose change alters the generating run: the transitive
+    producer closure, the regeneration entry point included, plus the build specs."""
+    return {p.as_posix() for p in _modules_that_produce_the_fixture()} | set(_BUILD_SPECS)
+
+
+def _paths_missing_from_triggers(required: set[str], triggers: dict) -> dict[str, list[str]]:
+    """Per path-filtered event, the required inputs its `paths:` list does not name."""
+    return {event: sorted(p for p in required
+                          if p not in set(triggers.get(event, {}).get("paths", [])))
+            for event in ("push", "pull_request")}
 
 
 def _workflow_triggers() -> dict:
@@ -180,15 +321,118 @@ def test_every_fixture_producing_module_triggers_verification():
         f"only found {sorted(map(str, producers))}; the import walk is not "
         "resolving the modules it is supposed to check")
 
-    for event in ("push", "pull_request"):
-        listed = set(triggers.get(event, {}).get("paths", []))
-        missing = sorted(p.as_posix() for p in producers
-                         if p.as_posix() not in listed)
+    for event, missing in _paths_missing_from_triggers(_fixture_inputs(), triggers).items():
         assert not missing, (
-            f"{_REGEN.name} imports {missing}, so a change to any of them "
+            f"the generating run reads {missing}, so a change to any of them "
             f"changes the real tally -- but {_WORKFLOW.name}'s `{event}:` "
             "paths filter does not list them, so verification would not run "
             "and the committed fixture would go stale while CI stayed green.")
+
+
+def test_the_entry_point_is_in_its_own_closure():
+    """The closure used to seed only its frontier with the generator, so the returned
+    set held everything the generator imports and not the generator. Seed the frontier
+    alone again and this fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    assert _REGEN.relative_to(_REPO).as_posix() in producers, sorted(producers)
+
+
+@pytest.mark.parametrize("event", ["push", "pull_request"])
+@pytest.mark.parametrize("path", ["coupling/scripts/regenerate_golden_tally.py", *_BUILD_SPECS])
+def test_removing_a_required_input_from_one_trigger_is_caught(event, path):
+    """KNOWN-BAD: the real parsed workflow with ONE required path dropped from ONE event.
+    The guard must name exactly that event and that path -- a closure without its entry
+    point, or an input list without the manifests, could not. The two lists are copied
+    separately on purpose: in the parsed YAML they are one anchored object, and a
+    deepcopy keeps them shared, so removing from one would remove from both."""
+    real = _workflow_triggers()
+    triggers = {e: {"paths": list(real[e]["paths"])} for e in ("push", "pull_request")}
+    assert path in triggers[event]["paths"], "the real workflow must list it: that is the premise"
+    triggers[event]["paths"].remove(path)
+    missing = _paths_missing_from_triggers(_fixture_inputs(), triggers)
+    assert missing[event] == [path], missing
+    other = "pull_request" if event == "push" else "push"
+    assert missing[other] == [], missing
+
+
+def test_relative_imports_are_part_of_the_closure():
+    """`biofilm_openmc.model` reaches `snapshot` as `from .snapshot import`,
+    which has no absolute module name. A walk that resolved only absolute
+    imports could not see it, so a relative-only dependency that changes the
+    fixture would be missing from both path lists while the trigger test
+    stayed green. Drop the `node.level` branch and this fails."""
+    deps = {p.as_posix() for p in _first_party_imports(
+        _REPO / "coupling" / "biofilm_openmc" / "model.py")}
+    assert "coupling/biofilm_openmc/snapshot.py" in deps, sorted(deps)
+
+
+def test_from_import_aliases_that_name_submodules_are_resolved(tmp_path, monkeypatch):
+    """`from biofilm_openmc import producer` LOADS `biofilm_openmc.producer`
+    when that name is a submodule, and so does `from .sub import leaf`. The
+    walker recorded the package initialiser and stopped, so a producer pulled
+    in by name entered the generating run without entering either workflow
+    filter. Each alias is now tried as a child module and kept when the file
+    exists; a name that resolves to no file is an attribute and is ignored.
+
+    KNOWN-BAD, on a throwaway tree so nothing is written into the repository:
+    a package with a child module and a nested package with a leaf, imported
+    only through from-import aliases. Disable the alias branch and this fails.
+    """
+    root = tmp_path / "coupling"
+    (root / "pkg" / "sub").mkdir(parents=True)
+    (root / "pkg" / "__init__.py").write_text("VALUE = 1\n")
+    (root / "pkg" / "child.py").write_text("")
+    (root / "pkg" / "sub" / "__init__.py").write_text("")
+    (root / "pkg" / "sub" / "leaf.py").write_text("")
+    (root / "pkg" / "user.py").write_text("from .sub import leaf\n")
+    (root / "main.py").write_text("from pkg import child, VALUE\n")
+    monkeypatch.setattr(sys.modules[__name__], "_REPO", tmp_path)
+    monkeypatch.setattr(sys.modules[__name__], "_FIRST_PARTY_BASES", ("coupling",))
+
+    absolute = {p.as_posix() for p in _first_party_imports(root / "main.py")}
+    assert "coupling/pkg/child.py" in absolute, sorted(absolute)
+    assert "coupling/pkg/__init__.py" in absolute, sorted(absolute)
+    assert not [p for p in absolute if "VALUE" in p], sorted(absolute)
+
+    relative = {p.as_posix() for p in _first_party_imports(root / "pkg" / "user.py")}
+    assert "coupling/pkg/sub/leaf.py" in relative, sorted(relative)
+    assert "coupling/pkg/sub/__init__.py" in relative, sorted(relative)
+
+
+def test_the_calibration_root_is_part_of_the_closure():
+    """`openmc_nested_pilot.py` puts `calibration` on sys.path and imports
+    `biofilm_calibration.joint_uncertainty`, the correlated-draw sampler the
+    pilot's outer draws come from. With the calibration root missing from
+    `_FIRST_PARTY_BASES` the module resolved nowhere and was silently absent
+    from the closure and the workflow. Drop "calibration" from the bases and
+    this fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    assert "calibration/biofilm_calibration/joint_uncertainty.py" in producers, \
+        sorted(producers)
+
+
+def test_implicit_package_initialisers_are_part_of_the_closure():
+    """Importing any `biofilm_openmc.*` module executes
+    `coupling/biofilm_openmc/__init__.py`; nothing names it, so a walk over
+    named imports never returned it. Disable the initialiser rule in `add`
+    and this fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    for init in ("coupling/biofilm_openmc/__init__.py",
+                 "calibration/biofilm_calibration/__init__.py"):
+        assert init in producers, sorted(producers)
+
+
+def test_the_shared_contract_package_is_a_fixture_producer():
+    """THE INVENTORY MUST SEE THROUGH ONE IMPORT. `regenerate_golden_tally.py`
+    never names `physical_contract`; `biofilm_openmc.config` and `.model` do,
+    and both are imported inside `_run_one`. A walk that stopped at the
+    script's own imports listed neither the package nor, therefore, the
+    workflow's omission of it. Remove "contract" from `_FIRST_PARTY_BASES`
+    and this fails; remove the path from the workflow and the trigger test
+    above fails."""
+    producers = {p.as_posix() for p in _modules_that_produce_the_fixture()}
+    assert "contract/physical_contract/__init__.py" in producers, sorted(producers)
+    assert "coupling/biofilm_openmc/config.py" in producers, sorted(producers)
 
 
 def test_a_pull_request_can_reach_this_workflow_at_all():
@@ -292,11 +536,20 @@ def test_the_transport_environment_has_exactly_one_spec():
 
     doc = _STACK_DOC.read_text()
     assert "environment.yml" in doc, "the doc must name the single spec"
-    # The version pin is the thing worth restating nowhere: if it appears in
-    # the doc, the doc can disagree with the file about which OpenMC is pinned.
-    assert "openmc=0.15.3" not in doc, (
-        "docs/openmc_stack.md restates the pinned version, which is a fourth "
-        "copy of environment.yml's contents -- name the file instead")
+    # THE DOC'S RESOLVED TABLE MUST AGREE WITH THE PIN. This asserted only
+    # that the literal `openmc=0.15.3` was absent, while the table two
+    # paragraphs down still said `| openmc | 0.15.3 |`: bump the pin in
+    # environment.yml and the doc goes stale with the check green. Read both
+    # and require the same version, whatever it is.
+    pinned = [str(d) for d in spec["dependencies"]
+              if re.split(r"[=<>!~ ]", str(d))[0].strip() == "openmc"]
+    assert len(pinned) == 1 and "=" in pinned[0], pinned
+    pin = pinned[0].split("=", 1)[1].strip()
+    table = re.findall(r"^\|\s*openmc\s*\|\s*([^|]+?)\s*\|", doc, re.M)
+    assert table, "docs/openmc_stack.md no longer tabulates the resolved openmc"
+    assert table == [pin], (
+        f"docs/openmc_stack.md tabulates openmc {table} while environment.yml "
+        f"pins {pin}; the doc is stale against the single spec")
 
 
 def test_the_installed_vtk_satisfies_pyvistas_own_requirement():

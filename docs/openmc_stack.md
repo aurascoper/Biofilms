@@ -94,8 +94,9 @@ nothing hides from the report.
 `coupling/tests/fixtures/golden_tally_water_phantom.json` pins 12 REAL OpenMC
 runs (2 outer draws x 3 replicates x {baseline, feedback}, water-phantom
 geometry, feedback density x1.35 — the same `DENSITY_SCALE` lever
-`openmc_nested_pilot.py` already uses) — the raw per-source heating tally,
-not anything derived from it. `coupling/tests/test_gate_composition.py`
+`openmc_nested_pilot.py` already uses) — the raw per-source heating tally and
+its standard deviation, plus the exact-CSG masses those runs used
+(`phantom_mass_kg`), which is what the replay needs and nothing a gate derived. `coupling/tests/test_gate_composition.py`
 replays the pin through the real `specific_energy_per_source ->
 debiased_squared_effect -> decide()` chain in the ordinary (no-OpenMC) test
 tier, closing the one seam nothing else in this repo tests: a gate decision
@@ -103,11 +104,16 @@ made from something a tally actually produced, not from hand-fabricated
 `numpy` arrays.
 
 Regenerate with `coupling/scripts/regenerate_golden_tally.py` under this
-env (needs `OPENMC_CROSS_SECTIONS`, same as everything else here). It
-refuses to overwrite the committed fixture unless all 12 runs complete,
-matching `openmc_nested_pilot.py`'s `writes_canonical_tables` /
-`refuse_partial_publish` guard. Legitimately changes only if OpenMC or the
-nuclear-data library changes — the fixture header records both — which is
-what `.github/workflows/golden-tally-verification.yml` regenerates and
-diffs against on exactly that trigger, same compare-only-in-CI discipline
-as `tests/contract_csv.jl` for the serial fixture.
+env (needs `OPENMC_CROSS_SECTIONS`, same as everything else here). A run that dies
+part-way raises before any write, so a partial run leaves the committed fixture
+untouched. It carries no count guard for that: one was written, and it could not
+fail, because the counter advanced once per iteration of fixed-length loops. Legitimately changes when OpenMC or the
+nuclear-data library changes — the fixture header records both — and when
+any module that produces the tally changes: the script's first-party import
+closure (`biofilm_openmc` config, model, mesh, materials, dose, the pilot's
+nuclear-data identity, and the shared `physical_contract` package). That
+closure is the `paths:` list of `.github/workflows/golden-tally-verification.yml`,
+which regenerates and diffs on any of them, same compare-only-in-CI
+discipline as `tests/contract_csv.jl` for the serial fixture. An earlier
+version of this sentence said only the first two could change it, which told
+a maintainer to ignore a valid drift.
