@@ -7,6 +7,19 @@
 A mechanistic modelling framework for a seven-species biofilm community under ionising radiation,
 plus the calibration and transport machinery that decides what the framework is allowed to claim.
 
+![Seven-species consortium, MCS 4 to 400](assets/consortium_400mcs.gif)
+
+**The consortium, 100 frames from MCS 4 to MCS 400.** A 20 × 20 × 20 lattice, with 1,633 of 8,000
+sites occupied at the last frame. Colours name the seven species, in the order `biofilms_potts.jl`
+declares them. `viewer/paraview_species.py` rendered the frames from snapshots stamped `039b7a2`.
+
+Axes count lattice sites, not lengths. The pitch is `D-PITCH`, still `awaiting_measurement`, and
+the snapshots record `physical_time_s` as `NaN`. Accumulated dose is zero in every frame. So this
+run shows the Cellular Potts model under its static radial field alone, with no transport coupling.
+
+The snapshots do not record the seed, because their `config_toml` is empty. Read the animation as a
+picture of the mechanism, not as a reproducible case.
+
 Four things run. A **3D Cellular Potts model** (`biofilms_potts.jl`) evolves biomass parcels on a
 cylindrical lattice under a four-term Metropolis acceptance functional — adhesion, volume, radiation
 and melanin — with a static radial radiation field and a genuinely two-way melanin field. A
@@ -19,19 +32,26 @@ attributes that dose to lineage labels. A **calibration layer** (`calibration/`)
 currently refuses to emit a single physical unit.
 
 ```julia
-julia --project=. biofilms_potts.jl    # coupled CPM + radiodialysis, N = 40, 100 MCS, seed 42
+julia --project=. biofilms_potts.jl --no-radiolysis  # CPM only, N = 60, 200 MCS, seed 42
 ```
 
-(That command has one open defect — see [Dependencies](#dependencies).)
+**The coupled entry point does not run.** `julia --project=. biofilms_potts.jl` (no flag) calls
+`main_coupled()`, which refuses on its first Monte Carlo step with `RADIODIALYSIS: BLOCKED`,
+because the coupled loop marks its biomass basis as an occupancy mean and the gate refuses that
+basis. That refusal is deliberate and is pinned by `tests/radiodialysis_basis_gate.jl`; it is not
+a bug to be cleared by acknowledging the gate. See
+[Radiodialysis membrane transport](#radiodialysis-membrane-transport).
 
 The framework is **uncalibrated**. Its parameters are literature priors and declared model inputs.
 No lattice pitch, no seconds-per-Monte-Carlo-step and no material density has been selected, and no
 output has been compared to a measurement of a target system. Every simulation number below is
 reported in the dimensionless model units it was computed in.
 
-On the manuscript's status: two web searches on 2026-08-15 found **no record of a bioRxiv posting**,
-and no DOI appears anywhere in the repository. Its own final section is titled "Notation Fixes
-Required Before Submission". Treat it as unposted — that is a search result, not proof.
+On the manuscript's status: web searches on both 2026-08-15 and 2026-08-24 found **no record of a
+bioRxiv posting**, and no DOI appears anywhere in the repository. Treat it as unposted — that is a
+search result, not proof. (Its predecessor, the superseded `modeling_radiotrophic_fitness.md`, had
+a closing "Notation Fixes Required Before Submission" section; the current, revised
+`.tex` — the source of record — has no such section and no unresolved notation issues.)
 
 ---
 
@@ -158,7 +178,8 @@ Biofilms/
 ├── validate_serial.jl             # Serial-vs-JACC statistical comparison
 ├── export_checkpoint.jl           # HDF5 checkpoint / transport-snapshot export
 ├── scoby_3d.jl                    # empty (0 bytes)
-├── Project.toml, Manifest.toml, LocalPreferences.toml
+├── Project.toml                   # Manifest.toml and LocalPreferences.toml exist locally
+│                                  # but are gitignored — a clone resolves its own
 │
 ├── calibration/                   # biofilm-calibration (Python, numpy-only)
 │   ├── biofilm_calibration/
@@ -174,7 +195,7 @@ Biofilms/
 │   │   └── schema.py              # shared status / evidence vocabulary
 │   ├── scripts/                   # vcholerae_pilot (surrogate), detectability_pilot,
 │   │                              #   emit_synthetic_reference_config, reference_d_status
-│   └── tests/                     # 14 modules, 237 tests collected
+│   └── tests/                     # 20 modules, 429 tests collected
 │
 ├── contract/                      # biofilm-contract (Python; NO dependencies)
 │   └── physical_contract/         # vocabulary, MaterialSpec, composition closure,
@@ -188,8 +209,8 @@ Biofilms/
 │   │                              #   feedback_uq, feedback_gate
 │   ├── scripts/                   # a0_sweep, synthetic_e2e, import_dose_field.jl
 │   ├── requirements.txt
-│   └── tests/                     # 14 unit modules + tests/integration/ (5, OpenMC-gated);
-│                                  #   122 collected (6 skip without OpenMC)
+│   └── tests/                     # 22 unit modules + tests/integration/ (5, OpenMC-gated);
+│                                  #   340 collected (6 modules skip without OpenMC)
 │
 ├── config/
 │   ├── coupling_template.toml                    # 21 REQUIRED-but-unset keys
@@ -230,10 +251,12 @@ Biofilms/
 │
 ├── tests/                         # runtests.jl, contract_csv.jl, deterministic_radiation.jl,
 │                                  #   genealogy_tests.jl, checkpoint_io_tests.jl, fixtures/
-├── preprint/                      # .tex (source of record), .md (revised derivative),
+├── preprint/                      # .tex (source of record; no .md derivative exists in the
+│                                  #   tree — the superseded .md is git history only),
 │                                  #   figures/ (4 × PDF + PNG). The built .pdf was REMOVED:
 │                                  #   it was a pre-revision build carrying withdrawn claims
-├── assets/                        # preview_bioreactor_3d.png, preview_radiodialysis.png
+├── assets/                        # preview_bioreactor_3d.png, preview_radiodialysis.png,
+│                                  #   consortium_400mcs.gif (embedded at the top)
 ├── kmeans_species_trajectory (1).gif, biofilm_dynamics_7_species.gif   # embedded below
 ├── Citations.md                   # predates data/sources.csv, unmaintained
 └── .github/workflows/             # coupling-tests.yml (4 jobs)
@@ -376,7 +399,7 @@ acceptance); **the radiation field is static** after `init_radiation!` and nothi
 it; **the nutrient field is written and never read** by the dynamics.
 
 ```julia
-julia --project=. biofilms_potts.jl                 # coupled CPM + radiodialysis
+julia --project=. biofilms_potts.jl                 # coupled — REFUSES at MCS 1, see below
 julia --project=. biofilms_potts.jl --no-radiolysis # CPM only
 ```
 
@@ -384,12 +407,26 @@ Run provenance, both branches: the coupled default is `N = 40`, 6 parcels per sp
 seed 42. `--no-radiolysis` runs `main()`, which is `N = 60`, **8** parcels per species, **200** MCS,
 seed 42. All reported numbers below come from the coupled `N = 40` run.
 
-**Two stale stdout banners are an open defect.** `biofilms_potts.jl:1088` and `:1529` both print
-`H = H_adh + H_vol + H_rad + H_pair + H_mel` — five terms, where the acceptance path has four and
-`H_pair` is a diagnostic. `:1541` prints `Ḋ(R)=%.1f Gy/s` for a quantity that is a dimensionless
-placeholder and for which `seconds_per_mcs` is `NaN`. Nothing enforces agreement between the banners
-and the code, which is why they drifted; a reader who trusts the terminal is told two things this
-README refuses.
+**That coupled run can no longer be executed as documented.** `run_simulation_coupled` sets
+`basis_from_occupancy` on its first installer tick, and `main_coupled()` builds its
+`RadiolysisParams` without `basis_gate_ack`, so `step_radiolysis!` raises `RADIODIALYSIS: BLOCKED`
+at MCS 1 and neither the membrane report nor the figure export is reached. The numbers below
+therefore come from a run that predates the gate, and re-running them is blocked on measuring the
+biomass basis (`D-XRED`), not on a code change. The acknowledgement is reserved for
+`validate_serial.jl`, which records no radiodialysis quantity; acking `main_coupled` would print a
+membrane report computed on the basis the gate refuses.
+`tests/radiodialysis_basis_gate.jl` pins the refusal, and the ack census in the same file fails if
+an acknowledgement is added here. `julia --project=. biofilms_potts_jacc.jl [seeds]` refuses the
+same way and for the same reason: `run_coupled` defaults to `RadiolysisParams()`.
+
+**Fixed:** the two stale stdout banners (`main()` at `biofilms_potts.jl:1088`,
+`main_coupled()` at `:1540`) used to print `H = H_adh + H_vol + H_rad + H_pair + H_mel` — five
+terms, where the acceptance path has four and `H_pair` is a diagnostic — and `:1552` used to print
+`Ḋ(R)=%.1f Gy/s` for a quantity that is a dimensionless placeholder and for which
+`seconds_per_mcs` is `NaN`. Both now state the true four-term acceptance path and label the
+`Ḋ(R)` value as a placeholder rather than a physical rate. Nothing enforces agreement between the
+banners and the code beyond the fix itself, so re-check them if the Hamiltonian terms or the
+dose-rate handling change again.
 
 **Fig 1 — radial mean position by species over 100 MCS** (N = 40, 6 parcels/species, seed 42). The
 plotted observable is the mean parcel distance from the cylinder axis, in lattice units normalised by
@@ -768,25 +805,52 @@ Provenance ledger distribution (`data/parameter_provenance.csv`, 49 rows × 21 c
 ## Tests
 
 ```bash
-julia --project=. tests/runtests.jl              # 135 passed, 0 failed (re-run 2026-08-15 at HEAD)
+julia --project=. tests/runtests.jl              # 146 passed, 0 failed (re-run 2026-08-24 at HEAD)
 julia --project=. biofilms_potts_jacc.jl --selftest
 
-pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 86 collected
-pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 173 collected
+pip install -e "coupling[dev]"    && (cd coupling    && pytest -rs tests)   # 340 collected
+pip install -e "calibration[dev]" && (cd calibration && pytest -rs tests)   # 429 collected
 ```
 
-The Julia figure is 2 + 34 + 57 + 42 across the four suites, re-run on this tree rather than quoted
+The Julia figure is 2 + 34 + 68 + 42 across the four suites, re-run on this tree rather than quoted
 from `docs/branch_report.md`, which records the older 2026-08-13 branch-end figures and is stale on
 the Python counts.
 
-Run together in the coupling venv, the two Python suites give **259 passed, 4 skipped**
-(re-run 2026-08-15 at HEAD). All four skips are coupling modules that skip on `import openmc` in a
-bare venv — the three in `coupling/tests/integration/` plus `coupling/tests/test_model_build.py`.
+Run together in the coupling venv, the two Python suites collect **769 tests**
+(measured 2026-09-16 on this merge: coupling 340, calibration 429). In the worktree these were
+measured in, **767 pass and two fail**: `coupling/tests/test_julia_interop.py` requires HDF5, and
+that worktree has no `Manifest.toml`. Where a Julia project with HDF5 is installed, those two
+pass and the figure is 769 passed. The count is a property of the tree; the two failures are a
+property of the machine, and the two are reported separately for that reason.
+
+Six coupling modules skip on `import openmc` in a bare venv — the five in
+`coupling/tests/integration/` plus `coupling/tests/test_model_build.py`. Those six skip at import
+and never reach collection, so 340 + 429 = 769 excludes them. No calibration module skips.
+
+Four superseded figures have appeared in this paragraph. 259 passed with four skips, measured
+2026-08-15 and left unrevised after two integration modules were added the same day. 534 (coupling
+233, calibration 301) corrected that on master on 2026-09-16. 616 was re-run 2026-08-24 on an
+earlier branch. 760 (coupling 340, calibration 420) was measured on #12's merge earlier on
+2026-09-16, and this branch's one added calibration module superseded it nine tests later. Each
+was correct for the tree it was measured on and wrong for the next one.
 No calibration test skips: the pilot ND2 file is present on this machine, so `test_pilot.py` runs.
 The OpenMC integration tier is manual opt-in: activate the `openmc-biofilms`
 environment, set `OPENMC_CROSS_SECTIONS`, then run the coupling suite. CI is
 `.github/workflows/coupling-tests.yml` — `julia-tests`, `python-unit`, `calibration-unit`, and
-`openmc-integration` behind a `workflow_dispatch` input.
+`openmc-integration` behind a `workflow_dispatch` input (API tier only; no nuclear data, so
+the five `tests/integration/` modules still skip there). Real-data-backed verification of the
+golden-tally fixture (`coupling/tests/fixtures/golden_tally_water_phantom.json`) is a separate
+workflow, `.github/workflows/golden-tally-verification.yml`, triggered by `workflow_dispatch`
+by every `pull_request` touching a path that can change what the tally produces, and by a `push`
+touching one of those paths on `master`, `feat/**`, `ci/**` or `research/**` — a push on any other
+branch matches no trigger, which is why the `pull_request` half is the one that always applies.
+Those paths are the transitive closure of the modules the regeneration script imports, plus the
+two editable-install manifests, `environment.yml`, `docs/openmc_stack.md`, the fixture and the
+workflow itself. `coupling/tests/test_gate_composition.py`
+derives that closure from the script's own imports and fails when a path is missing from either
+trigger. An earlier version of this sentence said the fixture "only change[s] when" the
+OpenMC or nuclear-data version does, and named only `workflow_dispatch` and `push`; both halves
+were wrong, and the first told a maintainer to dismiss a drift caused by a producer edit.
 
 What the tests pin:
 
@@ -845,8 +909,11 @@ integrator the `Project.toml` has never contained. Those claims are catalogued a
 in the claims ledger, 34 of them `delete`.
 
 **And the ledger is now enforced.** `calibration/tests/test_claims_ledger.py` asserts that no
-claim marked `delete` reappears in the manuscript. Until it existed, nothing in the repository
-checked the ledger at all.
+claim marked `delete` reappears in the document that carried it. Until it existed, nothing in
+the repository checked the ledger at all — and until 2026-08-28 it read only the manuscript,
+because it selected rows by `claim_id` prefix rather than by the `document` column each row
+declares. The 25 `delete` verdicts on other documents were unguarded by a test that could not
+have failed for them.
 
 Its real coverage is **20 of the 34**, and the other fourteen are named in the test output as
 still needing a human. An earlier version of this note said "30 of 34", which counted rows that
@@ -856,7 +923,7 @@ guard is calibrated against the pre-revision manuscript recovered from git histo
 at least 18 of the deleted claims there, because a guard that cannot find known-bad input is not a
 guard, and the first version of it detected 12.
 
-DOI archiving is an author action: `preprint-v1` is the tag to archive, and enabling Zenodo
+DOI archiving is an author action: `preprint-v1.2.1` is the tag to archive (`preprint-v1` marks version 1.0 at 5ccadac), and enabling Zenodo
 requires the account owner.
 
 Figures are generated by `biofilms_potts.jl` below its split marker. The `.tex` includes them
@@ -909,16 +976,28 @@ implementation, and neither they nor it bear on the biofilm work.
 
 **Julia 1.12** — the tested version; the CSV golden fixture pins the RNG stream to it.
 
-`Project.toml [deps]` is exactly `AMDGPU`, `HDF5`, `JACC`. `HDF5` is required by
-`export_checkpoint.jl`; `JACC` (with `AMDGPU`) by `biofilms_potts_jacc.jl`.
+`Project.toml [deps]` is `AMDGPU`, `CairoMakie`, `HDF5`, `JACC`. `HDF5` is required by
+`export_checkpoint.jl`; `JACC` (with `AMDGPU`) by `biofilms_potts_jacc.jl`; `CairoMakie` by the
+figure-export path in `biofilms_potts.jl` (below the `#  13. Figure export` split marker — the
+sandbox module the splitters build has hard-coded imports that never consult `Project.toml`, so
+this declaration only fixes `Pkg.instantiate()`, not what the split marker's own sandbox imports).
 
-**Open defect: `CairoMakie` is undeclared.** `biofilms_potts.jl:1874` does `using CairoMakie` at top
-level, below the `#  13. Figure export` split marker, so
-`julia --project=. biofilms_potts.jl` **fails at that line** unless CairoMakie happens to be present
-in the default environment. That is a missing dependency declaration, not a design choice: the
-split-marker rule constrains only what appears *above* the marker, and the sandbox module the
-splitters build has hard-coded imports that never consult `Project.toml`. Until it is declared, run
-the simulation from an environment that also has CairoMakie.
+**Fixed:** `CairoMakie` was previously undeclared, so the figure-export path failed at its
+`using CairoMakie` line unless CairoMakie happened to already be present in the default
+environment. It is now declared in `Project.toml`.
+
+That fix does **not** make `julia --project=. biofilms_potts.jl` run. An earlier version of this
+paragraph said it did, naming the dependency as "that command's previous open defect" — it was
+one defect of two, and the command now stops earlier, at the `RADIODIALYSIS: BLOCKED` refusal on
+MCS 1 described in [Radiodialysis membrane transport](#radiodialysis-membrane-transport). The
+export path is reachable through `--no-radiolysis`, which is what the declaration unblocks.
+
+That is a **declaration, not a lock.** `Manifest.toml` is gitignored (`.gitignore:377`), so a
+clean checkout has no resolved dependency graph and `Pkg.instantiate()` resolves versions afresh
+against whatever the registry offers that day. An earlier version of this line said CairoMakie
+was "resolved in `Manifest.toml`" — true of the working tree it was written in, and false of
+every clone, which is the same shape of error as an absence claim that names only the one place
+someone looked.
 
 **R** — `deSolve`, `shiny`, `plotly`, `ggplot2`, `dplyr`, `MASS`, `class` (the last two for
 `reactor_decision_tree.R`).

@@ -1,0 +1,64 @@
+# species_parameter_provenance — Table 2 (preprint/...tex, \label{tab:params}) reshaped into a
+# queryable per-row file, so "which results depend on weakly-supported priors" is a query
+# instead of a careful read. This is NOT an independent audit: every field here is mechanically
+# reshaped from data/claims_ledger.csv rows PP-T2-01 through PP-T2-29, which remain the source
+# of truth (evidence quotes, code locations, full reasoning). If the two ever disagree, the
+# ledger is right and this file is stale — regenerate it, do not hand-edit around a mismatch.
+#
+# UNIQUENESS KEY: claim_id (cross-reference into data/claims_ledger.csv).
+#
+# classification is a deterministic function of each row's EXISTING status/evidence_basis in
+# claims_ledger.csv, not a fresh judgement call. Four rules, checked in this order, and the
+# first that matches WINS — the predicates overlap (a row can be both status=delete and
+# manuscript-flagged), so precedence is stated here explicitly rather than left to rule order
+# in whatever code regenerates this file:
+#   1. status == delete            -> delete_pending   (checked first; wins outright)
+#   2. manuscript-flagged row      -> flagged_weak      (the two A. niger rows the preprint's
+#                                                         own prose names as weakly supported,
+#                                                         plus the untabulated melanin-coupling
+#                                                         term PP-T2-29)
+#   3. evidence_basis == derived   -> literature_derived (an estimate derived by a stated rule,
+#                                                          e.g. Stokes-Einstein from a diameter —
+#                                                          not a value read directly off a paper)
+#   4. otherwise                   -> literature_prior
+# also_flagged_weak is TRUE whenever rule 2's predicate holds, REGARDLESS of which rule actually
+# won — so a row where rule 1 (delete_pending) wins over rule 2 still records that it was also
+# manuscript-flagged. No row in the current table hits that overlap (the two delete rows,
+# PP-T2-25/26, are not manuscript-flagged), but the column exists so the fact is never silently
+# lost if a future row does.
+#
+# citation_keys are the manuscript's own \cite{} keys for that row (preamble table only; PP-T2-27
+# through PP-T2-29 are meta-rows about the table itself, not single citations).
+# status/evidence_basis are copied verbatim from claims_ledger.csv for readers who want the raw
+# ledger vocabulary without a second lookup.
+#
+claim_id,parameter,symbol,species,range,units,biological_basis,citation_keys,status,evidence_basis,classification,also_flagged_weak
+PP-T2-01,Diffusion coefficient,D_s,C. neoformans,0.01-0.10,um^2/s,"Passive Brownian diffusion, ~5 um yeast",berg1993,requalify,derived,literature_derived,false
+PP-T2-02,Diffusion coefficient,D_s,D. radiodurans,0.05-0.50,um^2/s,"Small coccoid (~1.5 um); higher D from size",slade2011,requalify,derived,literature_derived,false
+PP-T2-03,Diffusion coefficient,D_s,B. subtilis,0.10-1.00,um^2/s,"Rod-shaped motile cells; active motility augments D",guttenplan2013,requalify,declared,literature_prior,false
+PP-T2-04,Diffusion coefficient,D_s,C. sphaerospermum,0.005-0.05,um^2/s,"Filamentous hyphae; low effective diffusion",shunk2022,requalify,declared,literature_prior,false
+PP-T2-05,Diffusion coefficient,D_s,A. niger,0.005-0.05,um^2/s,"Filamentous; comparable to C. sphaerospermum",dadachova2008,requalify,declared,literature_prior,false
+PP-T2-06,Diffusion coefficient,D_s,S. oneidensis,0.10-0.80,um^2/s,"Facultative anaerobe, rod-shaped, flagellated",heidelberg2002,requalify,declared,literature_prior,false
+PP-T2-07,Motility coefficient,mu_s,C. neoformans,0.00-0.05,um/s,"Non-motile yeast; residual drift from EPS flow",dadachova2007,requalify,declared,literature_prior,false
+PP-T2-08,Motility coefficient,mu_s,D. radiodurans,0.00-0.01,um/s,Non-motile coccus,slade2011,requalify,declared,literature_prior,false
+PP-T2-09,Motility coefficient,mu_s,B. subtilis,15-45,um/s,"Flagellum-driven; ~25 um/s at 30 C",guttenplan2013,requalify,primary_literature,literature_prior,false
+PP-T2-10,Motility coefficient,mu_s,C. sphaerospermum,0.00-0.005,um/s,"Hyphal extension; 0.1-5 um/min tip growth",shunk2022,requalify,declared,literature_prior,false
+PP-T2-11,Motility coefficient,mu_s,S. oneidensis,10-40,um/s,"Polar flagellum; comparable to E. coli",heidelberg2002,requalify,declared,literature_prior,false
+PP-T2-12,Ionizing radiation sensitivity,beta_s_ion,C. neoformans,1e-5 to 1e-4,Gy^-1,"Melanised; LD10 ~2-5 kGy","dadachova2007,dadachova2008",requalify,derived,literature_derived,false
+PP-T2-13,Ionizing radiation sensitivity,beta_s_ion,D. radiodurans,5e-6 to 5e-5,Gy^-1,"D10 ~12 kGy; most radioresistant organism known","slade2011,daly2009",requalify,derived,literature_derived,false
+PP-T2-14,Ionizing radiation sensitivity,beta_s_ion,B. subtilis,1e-3 to 5e-3,Gy^-1,"Spore D10 ~1-2 kGy; vegetative ~0.2-0.6 kGy",nicholson2000,requalify,derived,literature_derived,false
+PP-T2-15,Ionizing radiation sensitivity,beta_s_ion,C. sphaerospermum,1e-5 to 1e-4,Gy^-1,"Melanised Chernobyl isolate; approx. C. neoformans","zhdanova2000,shunk2022",requalify,derived,literature_derived,false
+PP-T2-16,Ionizing radiation sensitivity,beta_s_ion,A. niger,5e-5 to 5e-4,Gy^-1,"Melanised; less resistant than Chernobyl isolates",dadachova2008,requalify,derived,flagged_weak,true
+PP-T2-17,Ionizing radiation sensitivity,beta_s_ion,S. oneidensis,5e-2 to 1e-1,Gy^-1,"D10 ~0.07 kGy; extremely radiosensitive",daly2009,requalify,derived,literature_derived,false
+PP-T2-18,Melanin production rate,alpha_M,C. neoformans,0.05-0.15,ug cell^-1 Gy^-1,"Substrate-dependent; enhanced by radiation",dadachova2007,needs_calibration,declared,literature_prior,false
+PP-T2-19,Melanin production rate,alpha_M,C. sphaerospermum,0.08-0.20,ug cell^-1 Gy^-1,"Constitutively melanised; high production rate","zhdanova2000,shunk2022",needs_calibration,declared,literature_prior,false
+PP-T2-20,Melanin production rate,alpha_M,A. niger,0.03-0.10,ug cell^-1 Gy^-1,DHN-melanin pathway,dadachova2008,needs_calibration,declared,flagged_weak,true
+PP-T2-21,Carrying capacity,K_s,C. neoformans,1e4-1e6,cells mm^-3,Yeast biofilm under nutrient-rich conditions,dadachova2007,needs_calibration,declared,literature_prior,false
+PP-T2-22,Carrying capacity,K_s,D. radiodurans,1e5-1e7,cells mm^-3,Dense tetrads; high packing efficiency,slade2011,needs_calibration,declared,literature_prior,false
+PP-T2-23,Carrying capacity,K_s,B. subtilis,1e5-1e7,cells mm^-3,Dense biofilm with EPS matrix,guttenplan2013,needs_calibration,declared,literature_prior,false
+PP-T2-24,Carrying capacity,K_s,S. oneidensis,1e5-1e7,cells mm^-3,Planktonic and biofilm modes,heidelberg2002,needs_calibration,declared,literature_prior,false
+PP-T2-25,Phase-locking frequency,omega_s,All species,0.01-1.0,rad hr^-1,Circadian/ultradian metabolic oscillation,"kuramoto1984,acebron2005",delete,declared,delete_pending,false
+PP-T2-26,Noise intensity,sigma_s,All species,0.001-0.05,(declared dimensionless),Thermal and demographic stochasticity,campillo2017,delete,declared,delete_pending,false
+PP-T2-27,(table header claim),n/a,(six species named in header),n/a,species,"Biologically justified parameter ranges for the six primary modeled species, derived from published experimental data",n/a,requalify,declared,literature_prior,false
+PP-T2-28,(whole-table precision claim),n/a,(all 26 rows),n/a,rows,Two-significant-figure precision on every interval endpoint,n/a,restate,declared,literature_prior,false
+PP-T2-29,Melanin-coupling coefficient (untabulated),0.5 in compute_delta_H,RADIOTROPIC species,0.5,dimensionless,"Hard-coded H_melanin coefficient; the most consequential parameter in the model and absent from Table 2 and every config file",n/a,needs_calibration,declared,flagged_weak,true

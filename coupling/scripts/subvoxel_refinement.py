@@ -130,6 +130,55 @@ def _seed(rep: int, state: str, paired: bool) -> int:
     return 7000 + rep + (0 if paired or state == "baseline" else 500_000)
 
 
+def parse_ratios(text: str) -> list[int]:
+    """The comma-separated ratio list, sorted, with every requirement named.
+
+    THREE REQUIREMENTS, EACH REFUSED BY NAME, because two merges each fixed a
+    different one. (a) Every entry is an integer: `int()` over a raw `split(",")`
+    turned `''` into an IndexError one line later and `1,,4` into an anonymous
+    ValueError. (b) Every ratio is >= 1, so `1,0` cannot reach the divisor
+    arithmetic and `1,-1` cannot pass. (c) Ratio 1 is present, because it defines
+    the common Omega_b every finer ratio is evaluated on. Checking only the
+    smallest element conflated (b) and (c): "0,1,2" was refused for lacking
+    ratio 1 (Copilot on #24), which is why `1 not in ratios` replaced
+    `ratios[0] != 1` rather than joining it.
+    """
+    tokens = [t.strip() for t in text.split(",")]
+    try:
+        ratios = sorted({int(t) for t in tokens})
+    except ValueError:
+        raise SystemExit(
+            f"--ratios {text!r}: every entry must be an integer") from None
+    bad = [r for r in ratios if r < 1]
+    if bad:
+        raise SystemExit(f"--ratios {text!r}: ratios must be >= 1; got {bad}")
+    if 1 not in ratios:
+        raise SystemExit(
+            f"--ratios {text!r}: ratio 1 is the reference grid and must be included")
+    return ratios
+
+
+def refuse_non_divisor_ratios(ratios) -> None:
+    """EVERY RATIO MUST DIVIDE THE FINEST, checked before any transport.
+
+    The mass denominator is raytraced once at the finest ratio and coarsened by
+    `finest // ratio`; integer division silently gives step 1 for a ratio like 3
+    under a finest of 4, pairing a 4x mass array with a 3x tally. The mismatch
+    surfaces only when dose conversion combines them -- after the raytrace and
+    the histories have been paid for.
+
+    MODULE LEVEL SO IT CAN BE TESTED. It lived in `main()` below `import
+    openmc`, which put the only protection against that expensive late failure
+    out of reach of every suite that runs here.
+    """
+    bad = [r for r in ratios if ratios[-1] % r]
+    if bad:
+        raise SystemExit(
+            f"ratios {bad} do not divide the finest ratio {ratios[-1]}: the "
+            "shared mass denominator is coarsened by finest // ratio, so a "
+            "non-divisor pairs mismatched arrays and fails only after transport")
+
+
 def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
                   config, openmc_version) -> None:
     """Assemble the multi-grid bundle from what this run already computed.
@@ -143,15 +192,20 @@ def _write_bundle(args, snapshot, grids, layers, lattice_grid, common_mask,
 
     labels = [
         Layer("cell_id", "cpm_labels", "dimensionless", "categorical",
-              snapshot.cell_id.astype(np.int32),
+              snapshot.cell_id.astype(np.int32), background=0,
               note="a computational biomass PARCEL id, never an organism"),
         Layer("lineage_id", "cpm_labels", "dimensionless", "categorical",
-              snapshot.lineage_id.astype(np.int32)),
+              snapshot.lineage_id.astype(np.int32),
+              occupancy_from="cell_id"),
         Layer("generation", "cpm_labels", "dimensionless", "categorical",
               snapshot.generation.astype(np.int32),
-              note="generation 0 is a founder, not a missing value"),
+              occupancy_from="cell_id",
+              note="generation 0 is a founder AND the zero-fill for empty "
+                   "lattice sites, so no background VALUE can separate them; "
+                   "cell_id is what says which voxels hold biomass"),
         Layer("omega_b", "cpm_labels", "dimensionless", "boolean",
               np.asarray(common_mask, dtype=bool), derivation=None,
+              background=0,   # False is outside the region, not a value in it
               note="the metric's region: biomass volume fraction >= 0.5, "
                    "positive mass, above the dose floor. No uncertainty cut - "
                    "a statistical criterion on a region definition makes the "
@@ -183,6 +237,19 @@ def main(argv=None) -> int:
                          "ratio is already in memory here")
     args = ap.parse_args(argv)
 
+    # REFUSE BEFORE THE IMPORT, not after it. This validation used to sit below
+    # `import openmc` and below `load_snapshot`, so a bad ratio was discovered
+    # only once the heavy stack was up -- and, in the bare tier, not at all,
+    # because the import fails first and the refusal is never reached. Parsing
+    # the ratios needs nothing but the argument string, so it happens here and
+    # the ordering is what makes the guard cheap.
+    #
+    # Sorted so ratio 1 runs first: it defines the common Omega_b that every
+    # finer ratio is then evaluated on.
+    ratios = parse_ratios(args.ratios)
+
+    refuse_non_divisor_ratios(ratios)
+
     import openmc
 
     from biofilm_openmc.model import build_biofilm_cylinder_model
@@ -193,11 +260,6 @@ def main(argv=None) -> int:
                                  kind=BIOFILM_CYLINDER)
     snapshot = load_snapshot(args.snapshot)
     n = snapshot.cell_id.shape[0]
-    # Sorted so ratio 1 runs first: it defines the common Omega_b that every
-    # finer ratio is then evaluated on.
-    ratios = sorted({int(r) for r in args.ratios.split(",")})
-    if ratios[0] != 1:
-        raise SystemExit("ratio 1 is the reference grid and must be included")
 
     started = time.perf_counter()
     runs = total_histories = statepoint_bytes = 0
@@ -349,6 +411,7 @@ def main(argv=None) -> int:
                         native=False, authoritative_for_quantitation=False,
                         source_grid_id="cpm_labels",
                         derivation="display_resampling",
+                        background=0,   # cell_id semantics survive upsampling
                         note="for overlay only. Exact here, since the lattice "
                              "is piecewise constant, but marked unquotable "
                              "because the DIRECTION is what the rule keys on"))

@@ -17,7 +17,13 @@
 #                       cpm_kinematic | biological_response | not_evaluated
 #   system_provenance   published_replica | certified_component | engineered_composite | declared
 #   evidence_basis      direct_measurement | assay_certificate | manufacturer_datasheet |
-#                       primary_literature | evaluated_nuclear_data | derived | declared | synthetic
+#                       primary_literature | evaluated_nuclear_data | proxy | derived |
+#                       declared | synthetic
+#                       The full set is physical_contract.PARAMETER_EVIDENCE_BASIS; this
+#                       comment listed eight of its nine and omitted `proxy` until
+#                       2026-09-13. NO BLANK. Unlike the claims ledger, a value's basis has
+#                       no null: there is no `absent` here and no meaning for an empty
+#                       cell, and parameter_evidence_problems refuses one.
 #   required_for_stage  transport | dosimetry | cpm_feedback | membrane_feedback | none
 #   sensitivity_rank    high | medium | low | unknown   (all unknown until the resolution sweep)
 #

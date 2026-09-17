@@ -169,6 +169,23 @@ def test_a_threshold_chosen_after_the_results_is_refused():
     assert decide(_draws(0.4, 0.01), VarianceBudget(), late).verdict == "NOT_EVALUATED"
 
 
+def test_a_single_draw_refuses_even_with_a_large_effect():
+    """A one-draw run has no degrees of freedom, so it must not pass, however
+    large the lone effect is. Before this test, `decide()` only refused an
+    EMPTY draws array; a single-element array skipped that guard entirely and
+    fell straight through to the quantile comparison, where `np.quantile`
+    collapses to the one value at every quantile — so a large enough draw
+    still cleared the threshold. That is a real PR #12 finding: a one-draw run
+    could print `PASS_SYNTHETIC_GATE` right next to
+    `distinguishable_from_zero: False`, because that flag is computed
+    separately later and never revises the verdict `decide()` already set.
+    """
+    single = decide(np.array([0.40]), VarianceBudget(transport=1e-4), POLICY)
+    assert single.verdict == "NOT_EVALUATED"
+    assert single.verdict != PASS_SYNTHETIC_GATE
+    assert "degrees of freedom" in single.reason
+
+
 # --- the machine-readable artifact --------------------------------------
 
 def test_verdict_json_is_nan_free_and_schema_valid():
