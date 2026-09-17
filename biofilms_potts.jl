@@ -1518,10 +1518,21 @@ function _assert_basis_gate(X_total::Float64, ack::Bool = false,
     # two different gated bases and requiring byte-identical CSV.  Widen this
     # exemption and that test is what should stop you.
     ack && return nothing
+    # NAME WHAT WAS REFUSED.  Stating only X_total made the provenance collision
+    # read as a contradiction: a state whose basis came from occupancy but whose
+    # mean landed on 1.0 was refused with "refusing at X_total = 1.0 ... only
+    # X_total == 1.0 is allowed".  Value and provenance are two different
+    # reasons to refuse and the message now says which one fired.
+    why = from_occupancy ?
+        "The basis is an occupancy mean (basis_from_occupancy = true), so " *
+        "X_total = $X_total is not the standalone default even when it " *
+        "equals 1.0. Provenance is what is refused here, not the value." :
+        "Only the standalone default X_total == 1.0 is allowed here; " *
+        "this state supplied X_total = $X_total."
     error("""
-        RADIODIALYSIS: BLOCKED -- refusing to integrate at X_total = $X_total.
+        RADIODIALYSIS: BLOCKED -- refusing to integrate.
 
-        Only the standalone default X_total == 1.0 is allowed here.
+        $why
 
         A coupled basis reaches this path as mean(compute_radial_biomass(...)):
         one species' occupied sites over all interior sites, which is
@@ -1531,8 +1542,10 @@ function _assert_basis_gate(X_total::Float64, ack::Bool = false,
         uptake_rate_of().
 
         This refusal is deliberate and is asserted by
-        tests/radiodialysis_basis_gate.jl. Removing it to let a coupled run
-        proceed re-opens the defect the gate names; repair the quantity first.
+        tests/radiodialysis_basis_gate.jl for the serial path and by
+        tests/jacc_port_tests.jl for the JACC port's copy of this function.
+        Removing it to let a coupled run proceed re-opens the defect the gate
+        names; repair the quantity first.
         """)
 end
 

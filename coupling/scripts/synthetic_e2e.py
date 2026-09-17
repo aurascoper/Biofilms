@@ -111,8 +111,11 @@ def _write_viewer_bundle(args, cfg, snapshot, dose, dose_lattice, sd_lattice,
     pitch = cfg.voxel_pitch_cm
     origin = tuple(float(v) for v in cfg.origin_cm)
     extent = biofilm_mesh_extent_cm(cfg, n)
-    dim = resolve_mesh_dimension((n, n, n), cfg.mesh_coarsening_factor,
-                                 getattr(cfg, "mesh_refinement_factor", 1))
+    # THE SAME DIMENSION THE RUN USED. This resolved with
+    # `mesh_refinement_factor` while `main` resolved without it, so the bundle
+    # could declare a grid twice as fine as the field it carried; refinement
+    # is refused at the top of `main`, and this says so by taking one factor.
+    dim = resolve_mesh_dimension((n, n, n), cfg.mesh_coarsening_factor)
     dose_spacing = tuple(e / d for e, d in zip(extent, dim))
 
     lattice_grid = Grid("cpm_labels", (n, n, n), origin, (pitch, pitch, pitch))
@@ -176,12 +179,27 @@ def main(argv=None) -> int:
     ap.add_argument("--verdict", type=Path)
     args = ap.parse_args(argv)
 
+    # REFUSE REFINEMENT BEFORE THE IMPORT AND BEFORE ANY OUTPUT. The model
+    # builder honours `mesh_refinement_factor`, so a config declaring 2 gave
+    # the tally twice the bins of the mass array built beside it and
+    # `extract_heating` failed on the size mismatch after the histories were
+    # spent; the bundle writer then resolved its own dimension WITH the factor
+    # and described a shape the run never produced. This runner is the base
+    # resolution by construction; the refinement study is
+    # subvoxel_refinement.py, as `drivers.scan` already says for its path.
+    cfg = load_transport_config(args.config, kind=BIOFILM_CYLINDER)
+    if cfg.mesh_refinement_factor > 1:
+        raise SystemExit(
+            f"[transport.mesh] refinement_factor = {cfg.mesh_refinement_factor} "
+            "is not supported by synthetic_e2e: this runner tallies at the "
+            "base resolution and its mass, attribution and bundle paths assume "
+            "it. Use coupling/scripts/subvoxel_refinement.py for a refined tally")
+
     import openmc
 
     args.outdir.mkdir(parents=True, exist_ok=True)
     dose_config_path = args.dose_config or args.config.with_suffix(".dosimetry.toml")
 
-    cfg = load_transport_config(args.config, kind=BIOFILM_CYLINDER)
     dose_cfg = load_dose_rate_config(dose_config_path, kind=BIOFILM_CYLINDER)
     snapshot = load_snapshot(args.snapshot)
     n = snapshot.cell_id.shape[0]

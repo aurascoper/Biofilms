@@ -25,11 +25,31 @@ const SITE_LAYERS = [
   { id: 'battery',   name: 'Battery Cycle',  icon: '▮' },
   { id: 'gridcoin',  name: 'Gridcoin/BOINC', icon: '◈' },
   { id: 'stars',     name: 'Star Systems',   icon: '✦' },
+  // mw: false -- this layer carries no MW figure (capacity_mw is null for every county),
+  // so the Min MW filter does not apply to it and the HUD must not report it in MW.
+  { id: 'agri_overlay', name: 'Agri Overlay', icon: '🌾', mw: false },
 ];
+
+/** Whether a layer's items carry a capacity in MW. Non-MW layers are neither filtered
+ *  nor summed by the MW controls: an MW predicate over a null is a statement about a
+ *  quantity the layer does not have. */
+export const hasCapacity = (id) => SITE_LAYERS.find((l) => l.id === id)?.mw !== false;
+
+// Marker size is normalised per layer, and the magnitude is layer-specific: the agri
+// overlay sizes from the NDVI anomaly instead of being drawn at the minimum radius.
+function magnitude(id, p) {
+  if (id === 'agri_overlay') return Math.abs(p.extra?.ndvi?.z ?? 0);
+  return p.capacity_mw || 0;
+}
 
 export function createSiteSystem({ markerRoot, manager, onRender }) {
   const groups = {};
   const features = {};
+  // Per-layer generation, bumped on invalidation, and the ids with a request in flight.
+  // A fetch that started before an invalidation must not land after the retry and
+  // restore the old dataset; a poll must not start a second request beside one in flight.
+  const generation = {};
+  const inflight = new Set();
   const health = { freshness: {} };
   let markers = [];
 
@@ -38,19 +58,67 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
     markerRoot.add(groups[id]);
   });
 
+  /** Drop a layer's cached features when the poll says its source changed, so the next
+   *  render refetches. `ensureFetched` caches on first fetch; without this a layer
+   *  fetched while its source was missing stayed empty, and a routine export update
+   *  stayed invisible, until a page reload. A layer's first appearance in the health map
+   *  (absent, then present) is its initial change. A layer the map has never reported --
+   *  absent on both sides, as when the health request has failed since page load -- has
+   *  no OBSERVED change: counting it as changed deleted the cache and refetched every
+   *  enabled layer, up to 5,000 markers rebuilt, on every failed poll. The first fetch
+   *  still follows a stored baseline: boot() runs it inside the first poll. */
+  function invalidateChanged(before, after) {
+    // Over the site layers, not the cache keys: a layer whose first fetch is still in
+    // flight has no cache entry, and iterating the cache never bumped its generation, so
+    // the old request passed the guard and cached a stale response.
+    return SITE_LAYERS.map(({ id }) => id).filter((id) => {
+      const a = before[id]; const b = after[id];
+      if (!a && !b) return false;     // never reported: nothing observed to have changed
+      if (!a || !b) return true;      // first appearance, or a source that vanished
+      return a.fingerprint !== b.fingerprint || a.status !== b.status;
+    }).map((id) => { delete features[id]; generation[id] = (generation[id] || 0) + 1; return id; });
+  }
+
+  /** The two freshness fields site rendering reads, for the site layers only. The full
+   *  map also carries market_bars, whose age_s is recomputed on every request, so
+   *  comparing it whole re-rendered every marker on every poll. */
+  const siteFreshness = (fresh) => SITE_LAYERS.map(({ id }) =>
+    [id, fresh?.[id]?.status, fresh?.[id]?.fingerprint]);
+
   async function pollHealth() {
+    const before = { ...(health.freshness || {}) };
     try {
       const r = await fetch('/api/health', { cache: 'no-store' });
       Object.assign(health, await r.json());
     } catch { /* the panel will show what it last knew */ }
+    const after = health.freshness || {};
+    invalidateChanged(before, after);
     manager.refresh();
+    // Refetch every enabled layer whose entry is absent: the ones just invalidated, and
+    // any whose last fetch failed. A failed fetch leaves no entry, so every poll is a
+    // retry; the one-shot refetch that used to hang off `changed` alone could not recover
+    // from a transient failure until the source changed again.
+    if (enabled().some((id) => !(id in features) && !inflight.has(id))) await refreshAndRender();
+    // The HUD reads freshness only during a render. A poll that changed freshness but
+    // invalidated nothing (the first poll, whose ids the previous poll had not reported)
+    // must still re-render, or an enabled layer that is unavailable from page load reads
+    // 0 MW until the next poll or a user action.
+    else if (JSON.stringify(siteFreshness(before)) !== JSON.stringify(siteFreshness(after))) render();
   }
 
   async function ensureFetched(id) {
-    if (id in features) return;
-    const r = await fetch(`/api/plants?layer=${id}&limit=${PLANT_LIMIT}`, { cache: 'no-store' });
-    if (!r.ok) { features[id] = []; return; }
-    features[id] = (await r.json()).features;
+    if (id in features || inflight.has(id)) return;
+    const gen = generation[id] || 0;
+    inflight.add(id);
+    // A failed fetch is not cached: the entry stays absent and the next poll retries.
+    // Storing [] here made a transient non-2xx look like an empty layer until reload.
+    try {
+      const r = await fetch(`/api/plants?layer=${id}&limit=${PLANT_LIMIT}`, { cache: 'no-store' });
+      if (!r.ok) return;
+      const got = (await r.json()).features;
+      // Discard a response that predates the latest observed source state.
+      if ((generation[id] || 0) === gen) features[id] = got;
+    } catch { /* left absent; retried on the next poll */ } finally { inflight.delete(id); }
   }
 
   const enabled = () => SITE_LAYERS.map((l) => l.id).filter((id) => manager.isEnabled(id));
@@ -77,19 +145,20 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
 
     const fuel = document.getElementById('fuel-filter')?.value || '';
     const minCap = parseFloat(document.getElementById('min-cap')?.value) || 0;
-    const shown = activeFeatures().filter(([, f]) =>
-      (!fuel || f.properties.color_key === fuel) && (f.properties.capacity_mw || 0) >= minCap);
+    const shown = activeFeatures().filter(([id, f]) =>
+      (!fuel || f.properties.color_key === fuel) &&
+      (!hasCapacity(id) || (f.properties.capacity_mw || 0) >= minCap));
 
     // Normalise per layer: a 4-degree grid cell and a single mine are not comparable.
     const maxCap = {};
     shown.forEach(([id, f]) => {
-      maxCap[id] = Math.max(maxCap[id] || 1, f.properties.capacity_mw || 0);
+      maxCap[id] = Math.max(maxCap[id] || 1, magnitude(id, f.properties));
     });
 
     shown.forEach(([id, f]) => {
       const p = f.properties;
       const isStar = id === 'stars';
-      const size = isStar ? 0.05 : (0.004 + 0.03 * Math.sqrt((p.capacity_mw || 0) / maxCap[id]));
+      const size = isStar ? 0.05 : (0.004 + 0.03 * Math.sqrt(magnitude(id, p) / maxCap[id]));
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(size, 8, 8),
         new THREE.MeshBasicMaterial({ color: new THREE.Color(p.color || '#BDC3C7') }));
@@ -106,7 +175,7 @@ export function createSiteSystem({ markerRoot, manager, onRender }) {
       markers.push(mesh);
     });
 
-    onRender?.(shown, features, enabled());
+    onRender?.(shown, features, enabled(), health.freshness || {});
   }
 
   async function refreshAndRender() {

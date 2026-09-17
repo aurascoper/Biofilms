@@ -204,9 +204,21 @@ pooled(A, E, rows) = parity_stats(vec(sum(A[rows, :], dims = 1)),
             # Stationarity before any pooled number is believed: an
             # initialization transient and a persistent bias are different
             # findings and only the second is a decomposition artifact.
+            #
+            # Asserted SEPARATELY, not as `s1.V < V_MAX && s2.V < V_MAX`. Identical
+            # pass/fail, but Julia prints no operand values for a `&&` compound, so a
+            # failure named neither the offending half nor its number -- and which half
+            # drifts is the finding. Pooled V can stay under threshold while a half-window
+            # exceeds it, because averaging over the whole trajectory brings a windowed
+            # excursion back under the line; none of that is recoverable from a compound
+            # failure. Which half drifts under concurrent execution is NOT stated here:
+            # the single-run attribution to the second half was withdrawn once replicates
+            # put the excursions in either half or neither (diagnostics/volume_conflict/
+            # README.md, "Replicates per configuration"). See parity_halves.jl there.
             h = size(A, 1) ÷ 2
             s1 = pooled(A, E, 1:h); s2 = pooled(A, E, h+1:size(A, 1))
-            @test s1.V < V_MAX && s2.V < V_MAX
+            @test s1.V < V_MAX
+            @test s2.V < V_MAX
         end
 
         # Reported, not asserted: below V_MAX the imbalance is not attributable

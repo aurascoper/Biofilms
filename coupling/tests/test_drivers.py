@@ -208,6 +208,48 @@ def test_water_phantom_scan_needs_no_snapshot(tmp_path, monkeypatch):
     assert sorted(calls) == ["baseline", "denser"]
 
 
+def test_the_preflight_mass_is_reused_not_recomputed(tmp_path, monkeypatch):
+    """THE PREFLIGHT PAID FOR THE MASS ARRAYS; THE LOOP MUST NOT PAY AGAIN.
+
+    `scan()` evaluated `mass_of` on every configuration up front to refuse a
+    bad refinement cheaply, discarded each array, then called `mass_of` again
+    per transport and a third time for the report. Mesh-sized allocations,
+    twice over, before and after the expensive run. One evaluation per
+    configuration is the bound; the spy counts.
+    """
+    from biofilm_openmc import drivers
+    from biofilm_openmc.config import WATER_PHANTOM, load_transport_config
+
+    from conftest import WATER_PHANTOM_CONFIG
+
+    base = load_transport_config(WATER_PHANTOM_CONFIG, kind=WATER_PHANTOM)
+    denser = load_transport_config(
+        WATER_PHANTOM_CONFIG.replace("density_g_cm3 = 1.0",
+                                     "density_g_cm3 = 1.2"),
+        kind=WATER_PHANTOM)
+
+    real_ops = drivers._problem_ops
+    mass_calls = []
+
+    def counting_ops(snapshot, nuclear_data_id):
+        build, mass_of, hash_of = real_ops(snapshot, nuclear_data_id)
+
+        def counted(cfg):
+            mass_calls.append(cfg)
+            return mass_of(cfg)
+        return build, counted, hash_of
+
+    monkeypatch.setattr(drivers, "_problem_ops", counting_ops)
+    _stub_build_model(monkeypatch)
+    drivers.scan(None, base, {"denser": denser},
+                 _fake_runner_factory(12, []), tmp_path,
+                 effect_threshold=0.05, dose_floor_Gy_s=0.0,
+                 nuclear_data_id="test", openmc_version="fake",
+                 stage="transport")
+    assert len(mass_calls) == 2, (
+        f"mass_of ran {len(mass_calls)} times for two configurations")
+
+
 def test_coarsening_changes_the_mesh_and_the_field_shape(tmp_path, snapshot,
                                                          monkeypatch):
     """Coarsening moves resolution only: the field comes back smaller while the

@@ -14,6 +14,8 @@ thr.Scalars = ["CELLS", "species"]
 thr.LowerThreshold = 1; thr.UpperThreshold = 7
 view = GetActiveViewOrCreate("RenderView")
 view.ViewSize = [1400, 1000]; view.Background = [1, 1, 1]; view.OrientationAxesVisibility = 1
+view.UseColorPaletteForBackground = 0   # else ParaView 6 paints its palette grey over Background
+view.OrientationAxesLabelColor = [0, 0, 0]
 disp = Show(thr, view)
 disp.SetRepresentationType("Surface With Edges"); disp.EdgeColor = [0.2, 0.2, 0.2]
 ColorBy(disp, ("CELLS", "species"))
@@ -23,6 +25,7 @@ lut.Annotations = [s for k in sorted(COLORS) for s in (str(k), LABELS[k])]
 lut.IndexedColors = [c for k in sorted(COLORS) for c in COLORS[k]]
 disp.SetScalarBarVisibility(view, True)
 bar = GetScalarBar(lut, view); bar.Title = "species"; bar.ComponentTitle = ""
+bar.TitleColor = [0, 0, 0]; bar.LabelColor = [0, 0, 0]   # palette text is white; invisible on the white background
 view.ResetCamera(); cam = GetActiveCamera(); cam.Azimuth(35); cam.Elevation(25); view.ResetCamera()
 text = Text(Text="MCS 30"); tdisp = Show(text, view); tdisp.FontSize = 28; tdisp.Color = [0, 0, 0]
 scene = GetAnimationScene(); scene.UpdateAnimationUsingDataTimeSteps()

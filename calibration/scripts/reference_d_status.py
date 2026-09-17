@@ -195,6 +195,10 @@ def authorization_criteria(baseline, sources=None, *, today=None):
         "strain_identities": 1,
         "biosafety_level_by_strain": 1,
         "approval_scope_hash": 2,            # unset: nothing binds the row
+        # filler in a growth condition that enters the scope digest
+        "growth_medium": 2, "temperature_C": 2, "pH": 2, "oxygen_condition": 2,
+        "substrate_or_membrane": 2, "biofilm_age_h": 2, "flow_condition": 2,
+        "irradiation": 2,
         "containment_facility": 3,
         "risk_assessment_reference": 4,
         "institutional_approval_id": 5,
@@ -235,7 +239,8 @@ def authorization_criteria(baseline, sources=None, *, today=None):
 
 
 def readiness(requirements, spatial_verdict, material_verdict,
-              binding, baseline=(), sources=()) -> dict[str, tuple[bool, list[str]]]:
+              binding, baseline=(), sources=(), *,
+              today=None) -> dict[str, tuple[bool, list[str]]]:
     """The four thresholds, which gate different things and must not be one
     flag. Institutional authorization gates culturing; a campaign can be ready
     while a config is not; a config can be ready while the sweep has not run."""
@@ -253,7 +258,10 @@ def readiness(requirements, spatial_verdict, material_verdict,
     # Count against what was actually judged, not against the constant: an
     # unmapped refusal appends a row, and "10 of 9 unmet" would read as a bug in
     # the reporter rather than as the gap in the criteria that it is.
-    judged = authorization_criteria(baseline, sources)
+    # ON THE DATE THE CALLER JUDGED, not the real one: `main` prints the
+    # criteria for an injected `today` and this recomputed them on the clock,
+    # so the two could disagree about expiry and the verdict was untestable.
+    judged = authorization_criteria(baseline, sources, today=today)
     authorized_blockers = [c for c, ok in judged if not ok]
     if authorized_blockers:
         campaign_blockers.append(
@@ -443,10 +451,24 @@ def main(argv=None) -> int:
     # BIOFILM_SWEEP_READY is false by construction until measurements exist.
     from biofilm_calibration.schema import read_table as _read
     from biofilm_calibration.acquisition import BASELINE_CONDITION as _BC
-    try:
-        baseline = _read(REPO / "data" / "calibration" / "baseline_condition.csv", _BC)
-    except Exception:
-        baseline = []
+
+    def _load(path, table_schema):
+        # AN ABSENT TABLE IS AN EMPTY ONE, SAID OUT LOUD. ANY OTHER FAILURE IS NOT.
+        # Both reads below used to catch every exception and substitute [], so a
+        # registry that failed to parse left criterion 8 unmet with a report
+        # byte-identical to a correctly withheld approval -- AGENTS.md rule 3, an
+        # unreadable file and an unregistered approval printing the same thing.
+        try:
+            return _read(path, table_schema)
+        except FileNotFoundError:
+            print(f"\n  {path.relative_to(REPO)} is absent; judged as an empty table")
+            return []
+        except Exception as exc:
+            raise SystemExit(
+                f"{path.relative_to(REPO)} could not be read, so the institutional "
+                f"criteria cannot be judged: {exc}") from exc
+
+    baseline = _load(REPO / "data" / "calibration" / "baseline_condition.csv", _BC)
     # WITHOUT THIS THE MILESTONE CAN NEVER PASS. `approval.problems` resolves
     # approval_source_id against this registry, so omitting it reports every
     # approval as unregistered and criterion 8 stays unmet for a perfectly valid
@@ -454,10 +476,7 @@ def main(argv=None) -> int:
     # one that cannot fail and rather worse, since it blocks a legitimate
     # campaign with no way to tell why.
     from biofilm_calibration.spatial.schema import SOURCES as _SRC
-    try:
-        sources = _read(REPO / "data" / "calibration" / "spatial" / "sources.csv", _SRC)
-    except Exception:
-        sources = []
+    sources = _load(REPO / "data" / "calibration" / "spatial" / "sources.csv", _SRC)
 
     # AN APPROVAL EXPIRES, so this verdict depends on when it is asked. That is
     # correct and it must be visible: printing the date makes a verdict that
@@ -469,7 +488,7 @@ def main(argv=None) -> int:
 
     for verdict, (reached, blockers) in readiness(
             requirements, spatial.verdict, material.openmc, binding,
-            baseline, sources).items():
+            baseline, sources, today=today).items():
         print(f"  {verdict:<46} {'YES' if reached else 'no'}")
         for b in blockers:
             print(f"      - {b}")

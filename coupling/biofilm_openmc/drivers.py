@@ -193,8 +193,11 @@ def scan(snapshot: Snapshot | None, base_config: TransportConfig,
     # avoid. Evaluating it up front on every config makes the rejection cheap
     # and, for the configs that are fine, costs one array construction that the
     # loop would build anyway.
-    for _name, _cfg in {"baseline": base_config, **scenarios}.items():
-        mass_of(_cfg)
+    # AND KEEP WHAT THE PREFLIGHT BUILT. These arrays were computed here,
+    # discarded, and rebuilt once per transport and once more for the report:
+    # mesh-sized allocations paid three times. One evaluation per config.
+    masses = {_name: mass_of(_cfg)
+              for _name, _cfg in {"baseline": base_config, **scenarios}.items()}
 
     per_source: dict[str, PerSourceResult] = {}   # transport hash -> field
     results: dict[str, object] = {}
@@ -205,7 +208,7 @@ def scan(snapshot: Snapshot | None, base_config: TransportConfig,
         hashes[name] = th
         if th not in per_source:
             sp = runner(build(cfg), name)
-            per_source[th] = per_source_from_statepoint(sp, mass_of(cfg))
+            per_source[th] = per_source_from_statepoint(sp, masses[name])
 
         key = th if stage == "transport" else dose_state_hash(
             th, cfg.photons_per_second)
@@ -226,7 +229,7 @@ def scan(snapshot: Snapshot | None, base_config: TransportConfig,
             particles=cfg.particles, seed=cfg.seed)
 
     # Mass at MESH resolution, matching the field the metrics compare.
-    mass = mass_of(base_config)
+    mass = masses["baseline"]
     metrics = {name: compare_fields(results["baseline"], res, mass,
                                     dose_floor_Gy_s)
                for name, res in results.items() if name != "baseline"}

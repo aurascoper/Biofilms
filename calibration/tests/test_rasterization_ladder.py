@@ -158,6 +158,53 @@ def test_a_pitch_that_does_not_tile_the_extent_is_refused():
             assert n * pitch == pytest.approx(extent)
 
 
+@pytest.mark.parametrize("pitch", [0.0, -1.6, float("nan"), float("inf")])
+def test_a_pitch_that_is_not_a_positive_length_is_refused_by_name(pitch):
+    """THE SAME TYPED REFUSAL FOR EVERY PITCH THAT CANNOT TILE ANYTHING.
+
+    `--pitches` accepts any float. Zero divided the extent by zero, NaN reached
+    `round()` and raised something else, and either escaped the ladder's
+    `except NonTilingPitchError`, so a bad pitch in the list crashed the run
+    instead of becoming a named `skipped` row like 3.2 does.
+    """
+    import sys
+    from pathlib import Path
+
+    from biofilm_calibration.spatial.synthetic import NonTilingPitchError
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    with pytest.raises(NonTilingPitchError, match="positive finite"):
+        PhysicalSpheres().rasterize(pitch)
+    rows = rl.run_ladder(PhysicalSpheres(), [pitch, 1.6], rl.load_tolerances())
+    assert "skipped" in rows[0] and "skipped" not in rows[1], rows
+
+
+def test_the_cli_writes_a_named_skip_for_zero_and_refuses_nan_by_name(tmp_path):
+    """THE PROMISE HAS TO SURVIVE SERIALISATION. `_grid_shape` refuses NaN by
+    name, but `main()` echoes the raw `--pitches` list into the document and
+    writes it with `allow_nan=False`, so `--pitches nan` crashed in
+    `json.dumps` after the ladder had run, with no report at all. A pitch
+    that has no JSON form is refused at the parse, by name; zero, which has
+    one, reaches the typed skip row and the report."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    with pytest.raises(SystemExit, match="--pitches"):
+        rl.main(["--outdir", str(tmp_path / "nan"), "--pitches", "nan,1.6"])
+    assert not (tmp_path / "nan" / "rasterization_ladder.json").exists()
+
+    rl.main(["--outdir", str(tmp_path / "zero"), "--pitches", "0,1.6"])
+    import json
+    doc = json.loads((tmp_path / "zero" / "rasterization_ladder.json").read_text())
+    rows = doc["systems"]["spheres"]["rows"]
+    assert rows[0]["pitch_um"] == 0.0 and "skipped" in rows[0], rows[0]
+    assert "skipped" not in rows[1], rows[1]
+
+
 def test_the_default_ladder_actually_exercises_the_skip_it_promises():
     """A REFUSAL THAT IS NEVER REACHED IS NOT A REFUSAL.
 
@@ -236,3 +283,34 @@ def test_a_refused_pitch_does_not_break_the_convergence_tail():
                 == rl.coarsest_passing(without, observable)), (
             f"inserting a refused pitch changed {observable}; a rung that is "
             "not a view of the object must not enter the tail")
+
+
+def test_a_denormal_pitch_is_refused_under_the_typed_error():
+    """5e-324 is positive and finite, so it passed the first check, and 24/5e-324
+    overflowed: int(round(inf)) raised OverflowError past the ladder's except."""
+    import sys
+    from pathlib import Path
+
+    from biofilm_calibration.spatial.synthetic import NonTilingPitchError
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    for pitch in (5e-324, 1e-310):
+        with pytest.raises(NonTilingPitchError, match="too small"):
+            PhysicalSpheres().rasterize(pitch)
+    rows = rl.run_ladder(PhysicalSpheres(), [5e-324, 1.6], rl.load_tolerances())
+    assert "skipped" in rows[0] and "skipped" not in rows[1], rows
+
+
+@pytest.mark.parametrize("bad", ["3.2,,1.6", "3.2,1.6,", "", "soon,1.6"])
+def test_a_malformed_pitch_list_is_refused_by_name(tmp_path, bad):
+    """A blank or non-numeric token raised an anonymous ValueError from float()."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rasterization_ladder as rl
+
+    with pytest.raises(SystemExit, match="--pitches"):
+        rl.main(["--outdir", str(tmp_path / "out"), "--pitches", bad])
+    assert not (tmp_path / "out" / "rasterization_ladder.json").exists()

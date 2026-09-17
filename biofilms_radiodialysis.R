@@ -58,6 +58,33 @@ radiodialysis_rhs <- function(t, y, parms) {
     Nr    <- length(r_grid)
     dr    <- r_grid[2] - r_grid[1]
 
+    # The weights are CACHED in parms while geom is declared separately, and
+    # nothing tied the two together: bc_coef dispatched on geom while the
+    # interior rows consumed whatever weights the list happened to carry.  A
+    # caller editing a default_parms() result to geom = "slab" and supplying
+    # k_L got a plausible HYBRID -- slab boundary, cylindrical diffusion --
+    # instead of a refusal (Codex on f49fe94).  Same defect as the bc_coef
+    # dispatch, one layer down: validating half a contract proves nothing.
+    #
+    # Validated, not silently recomputed.  Recomputing would quietly discard
+    # what the caller wrote and hide the mistake; refusing names it (rule 3).
+    # Node 1 is NA in both by construction, so it is excluded.
+    #
+    # geom is checked FIRST so an unrecognised value gets this function's named
+    # refusal rather than face_weights()'s generic stopifnot one line later.
+    if (!(geom %in% c("slab", "cylindrical")))
+      stop("radiodialysis_rhs(): unsupported geom ", sQuote(geom),
+           ". Supported: 'slab', 'cylindrical'.  An unrecognised geometry ",
+           "must refuse, not fall through to one of them.", call. = FALSE)
+    .w <- face_weights(r_grid, geom)
+    if (!isTRUE(all.equal(w_plus[-1],  .w$w_plus[-1])) ||
+        !isTRUE(all.equal(w_minus[-1], .w$w_minus[-1])))
+      stop("radiodialysis_rhs(): cached face weights do not match geom = ",
+           sQuote(geom), ". The parameter list declares one geometry and ",
+           "carries another's weights, which would assemble a hybrid ",
+           "operator. Rebuild it with default_parms() or slab_parms() rather ",
+           "than editing geom in place.", call. = FALSE)
+
     c_vec <- y[seq_len(Nr)]
     s_vec <- y[Nr + seq_len(Nr)]
     m_val <- y[2 * Nr + 1]

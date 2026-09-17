@@ -25,6 +25,8 @@ import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from physical_contract import PARAMETER_EVIDENCE_BASIS
+
 # Shared provenance vocabulary. Kept here, not duplicated per branch, so that
 # "ready" means the same thing in the spatial and material ledgers.
 # `unsupported_by_current_model` is deliberately distinct from `blocked`. A
@@ -39,10 +41,10 @@ STATUS = frozenset({"ready", "provisional", "blocked", "unresolved",
 # inferred, so a new status cannot silently fall through the check.
 NO_VALUE_STATUSES = frozenset({"blocked", "unresolved",
                                "unsupported_by_current_model"})
-EVIDENCE_BASIS = frozenset({
-    "direct_measurement", "manufacturer_datasheet", "primary_literature",
-    "derived", "declared", "proxy", "synthetic", "unresolved",
-})
+# One object with the contract package and the parameter-ledger test, so the
+# three cannot drift. `unresolved` was in this set until 2026-09-06; it is a
+# STATUS (see STATUS above), no table used it as a basis, and it is gone.
+EVIDENCE_BASIS = PARAMETER_EVIDENCE_BASIS
 
 
 class SchemaError(ValueError):

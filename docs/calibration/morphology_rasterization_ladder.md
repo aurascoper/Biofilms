@@ -99,10 +99,9 @@ Coarsest pitch inside tolerance, and inside it at every finer pitch:
 > interface-area finding was stated as *0.41–0.51 across a 16× range*. Both
 > halves came from the withdrawn row: 0.41 is its error and 16× is 3.2 → 0.2.
 > Over the pitches that actually tile it is **0.467–0.510 across 8×** — a
-> *narrower* spread over a *shorter* range, so the conclusion is unchanged and
-> in fact slightly stronger, since the error moves less than was reported while
-> still refusing to fall. Withdrawing a row means auditing everything computed
-> from it, not only the row's own headline.
+> *narrower* spread over a *shorter* range, and the error still does not fall
+> with refinement. Withdrawing a row means auditing everything computed from
+> it, not only the row's own headline.
 
 Porosity needing a 2× finer pitch than biovolume is not a surprise — it is the
 `derived` tolerance doing its job. Porosity is `1 − biovolume`, so an equal

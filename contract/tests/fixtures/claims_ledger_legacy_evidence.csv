@@ -1,0 +1,210 @@
+# Rows of data/claims_ledger.csv that still store a pre-2026-09-06 evidence_basis
+# value. Keyed by (claim_id, stored_value). Generated from
+# physical_contract.LEGACY_CLAIM_EVIDENCE; test_evidence_basis.py asserts the
+# ledger's legacy rows equal this list in both directions. IT MAY NOT GROW.
+#
+# IT DOES NOT SHRINK WHEN A ROW IS SUPERSEDED, which is what this said until
+# 2026-09-12 and is not what the test does. legacy_pairs() reads EVERY ledger
+# row, superseded ones included, and the ledger's convention is additive -- a
+# superseding row is a NEW row, so the old row and its pair both remain. An
+# entry may be removed only when the corresponding stored pair is no longer
+# present in the ledger at all.
+#
+# ONE ENTRY WAS ADMITTED AFTER GENERATION, and it is named here rather than
+# folded in silently. GATE-06,code. The rule above is unchanged and this is not
+# a precedent for a legacy spelling written today: admission attached to this
+# exact (claim_id, stored_value) and to the date of the commit that introduced
+# it, not to the value having been found somewhere.
+#   introduced   3daef5f, 2026-08-29, "Ledger what the merge gate cannot tell
+#                apart, and stop sharing checkouts" -- EIGHT DAYS BEFORE the
+#                2026-09-06 cutoff, so the stored value is pre-cutoff and meets
+#                the membership criterion in the first paragraph.
+#   invisible    3daef5f is not an ancestor of 4f51fc4, where this file was
+#                generated. At 4f51fc4 the ledger held ZERO GATE-06 rows. The
+#                snapshot was taken from one branch's ledger; the ledger is a
+#                shared file.
+#   arrived      merge 9708a52, 2026-09-12, six days after generation.
+#
+# CENSUS, AND WHAT IT DOES AND DOES NOT SUPPORT. Taken 2026-09-12T20:07:22Z over
+# the 20 heads of refs/remotes/origin listed in the commit that added this
+# block, each at the SHA recorded there: the union of legacy pairs over those
+# heads is 174, this file is 174, and no entry here is carried by no head. That
+# supports "no further omissions among those heads at that time". It does NOT
+# support "none will appear": a head not enumerated, or a commit pushed after
+# that time, is outside it. There is no generator in the tree, so re-running it
+# is manual.
+claim_id,stored_value
+RM-E05-01,simulation_output
+RM-E04-01,simulation_output
+RM-E03-01,simulation_output
+RM-F03-01,simulation_output
+RM-G02-01,simulation_output
+RM-G04-01,simulation_output
+RM-G05-01,simulation_output
+RM-G07-01,simulation_output
+RM-G08-01,simulation_output
+RM-G09-01,simulation_output
+RM-G10-01,simulation_output
+RM-G11-01,simulation_output
+RM-H01-01,simulation_output
+RM-H03-01,simulation_output
+RM-H08-01,simulation_output
+RM-KR-01,simulation_output
+RM-KR-02,simulation_output
+RM-KR-03,simulation_output
+RM-KR-05,simulation_output
+RM-KR-06,simulation_output
+RM-KR-07,simulation_output
+RM-KR-08,simulation_output
+RM-KR-09,simulation_output
+RM-KR-10,simulation_output
+RM-KR-11,simulation_output
+RM-KR-12,simulation_output
+RM-CF-02,simulation_output
+RM-DEP-02,simulation_output
+PP-AB-02,simulation_output
+PP-AB-03,simulation_output
+PP-AB-04,simulation_output
+PP-5-10,simulation_output
+PP-5-11,simulation_output
+PP-5-12,simulation_output
+PP-61-02,simulation_output
+PP-61-03,simulation_output
+PP-65-01,simulation_output
+PP-65-02,simulation_output
+PP-65-03,simulation_output
+PP-65-04,simulation_output
+PP-65-05,simulation_output
+PP-65-06,simulation_output
+PP-65-07,simulation_output
+PP-65-08,simulation_output
+PP-66-01,simulation_output
+PP-66-02,simulation_output
+PP-66-05,simulation_output
+PP-66-06,simulation_output
+PP-66-07,simulation_output
+PP-66-10,simulation_output
+PP-66-11,simulation_output
+PP-75-01,simulation_output
+PP-FIG-02,simulation_output
+NEWS-MEL-01,simulation_output
+NEWS-MEL-02,simulation_output
+NEWS-VCH-02,simulation_output
+NEWS-VCH-03,simulation_output
+PILOT-NF-01,simulation_output
+PILOT-NF-02,simulation_output
+PILOT-NUM-01,simulation_output
+PILOT-LEV-02,simulation_output
+PILOT-OMEGA-01,simulation_output
+PILOT-COST-01,simulation_output
+PILOT-DEBIAS-01,simulation_output
+PILOT-NF-03,simulation_output
+PILOT-LEV-03,simulation_output
+PILOT-COST-02,simulation_output
+REFINE-02,simulation_output
+REFINE-03,simulation_output
+REFINE-06,simulation_output
+VIEWER-02,simulation_output
+REFINE-08,simulation_output
+GATE-POOL-01,simulation_output
+GATE-SE-01,simulation_output
+GATE-RATIO-01,simulation_output
+LADDER-01,simulation_output
+LADDER-02,simulation_output
+LADDER-03,simulation_output
+LADDER-04,simulation_output
+OBS-01,code
+REFD-05,code
+LADDER-05,code
+VIEW-03,code
+VIEW-04,code
+GATE-01,code
+VIEW-05,code
+GATE-02,code
+PILOT-07,code
+VIEW-06,code
+TEST-01,code
+GATE-03,code
+DRV-02,code
+PILOT-08,code
+REFINE-09,code
+VIEW-07,code
+REFD-06,code
+VIEW-08,code
+TEST-02,code
+REFD-07,code
+PILOT-09,code
+PILOT-10,code
+REFINE-10,code
+GATE-04,code
+REFD-08,code
+GATE-05,code
+GATE-06,code
+REFD-09,code
+REFD-10,code
+PILOT-11,code
+PILOT-12,code
+VIEW-09,code
+VIEW-10,code
+VIEW-11,code
+LADDER-06,simulation_output
+RDX-PKG-01,code
+VIEW-12,code
+VIEW-13,code
+LADDER-07,code
+FIG-01,simulation_output
+FIG-02,simulation_output
+FIG-03,simulation_output
+FIG-04,code_inspection
+HOFFMAN-01,literature
+HOFFMAN-02,literature
+HOFFMAN-03,literature
+HOFFMAN-04,repository_policy
+HOFFMAN-05,repository_policy
+PP-V11-01,repository_policy
+PP-V11-02,literature
+PP-V11-04,repository_policy
+HOFFMAN-06,literature
+HOFFMAN-09,repository_policy
+HOFFMAN-10,code
+HOFFMAN-11,none
+HOFFMAN-12,literature
+HOFFMAN-13,literature
+HOFFMAN-14,literature
+HOFFMAN-15,literature
+HOFFMAN-16,literature
+PP-26-01,literature
+PP-26-02,code
+PP-26-03,literature
+PP-26-04,code
+PP-26-05,code
+PP-V11-05,code
+SURR-01,repository_policy
+PP-62-04,code
+PP-62-05,code
+PP-62-06,code
+PP-62-07,code
+PP-62-08,code
+JACC-PAR-01,code
+JACC-PAR-02,code
+JACC-PAR-03,code
+JACC-PAR-04,code
+JACC-PAR-05,code
+JACC-PAR-06,code
+FIG-05,simulation_output
+FIG-06,code_inspection
+FIG-07,code
+PP-62-09,code
+PP-62-10,code
+PP-62-11,code
+PP-62-12,code
+PP-62-13,code
+PP-71-03,code
+PP-CONC-01,code
+PP-AB-05,code
+PP-DAM-01,code
+FIG-08,literature
+FIG-09,literature
+FIG-10,literature
+PP-DEFF-01,code
+PP-SORP-01,simulation_output
