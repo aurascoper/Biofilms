@@ -14,8 +14,11 @@ applied to its own output.
 ```sh
 julia diagnostics/melanin_ensemble/sweep.jl /tmp/sweep.csv      # 16 seeds, about 11 s
 julia diagnostics/melanin_ensemble/analyse.jl /tmp/sweep.csv
-julia diagnostics/melanin_ensemble/test_statistics.jl           # 90 assertions, no data
+julia diagnostics/melanin_ensemble/test_statistics.jl           # 150 assertions, no data file
 julia --project=diagnostics/melanin_ensemble diagnostics/melanin_ensemble/figure.jl   # the N=40 figure
+
+julia diagnostics/melanin_ensemble/parcel_sweep.jl /tmp/parcel.csv --seeds 42:297   # 256 seeds, about 2 min
+julia diagnostics/melanin_ensemble/parcel_sweep.jl --compare /tmp/parcel.csv theirs.csv
 ```
 
 `figure.jl` needs CairoMakie, which the root `Project.toml` does not declare; this
@@ -69,15 +72,45 @@ one pooled number for both would be wrong in opposite directions.
 ## What the observable is
 
 Mean melanin over **occupied sites**, read straight from `take_snapshot`
-(`biofilms_potts.jl:857`). Every occupied voxel contributes one term, so this is already
-volume-weighted: a parcel of 200 sites carries 200 times the weight of a parcel of 1.
+(`biofilms_potts.jl:1049`). Every occupied voxel contributes one term, so this is already
+volume-weighted: a parcel of 200 sites counts 200 times a parcel of 1.
 
-The mean of **per-parcel means**, weighting each parcel equally, is a different quantity and
-is computed nowhere in this repository. Worth knowing that `mean_r` in the *same function*
-uses that other convention, so one snapshot carries two observables weighted two ways.
+The mean of **per-parcel means**, weighting each parcel equally, is a different quantity.
+`parcel_melanin.jl` computes it, under the name `mel_parcel`. Worth knowing that `mean_r`
+in the *same function* uses that other convention, so one snapshot reports two observables
+weighted two ways.
+
+*Corrected 2026-09-17:* this section stated that the per-parcel mean "is computed nowhere
+in this repository". That was true when written and is false now. The line reference moved
+as well: `take_snapshot` is at line 1049, and this file said 857.
 
 `alpha_M` is a declared input. Agreement with it is a statement about how reliably one
 trajectory displays an input, and says nothing about whether the input is right.
+
+## Two implementations agree on both estimators, at two time points
+
+F. Fink's Odin port computes `mel_parcel` and supplied 35,840 rows over seeds 42 to 297.
+`parcel_sweep.jl` was run against that file twice, reading at MCS 100 and at MCS 400.
+
+| read at | rows compared | volume | ncells | mel_site | mel_parcel |
+|---|---|---|---|---|---|
+| MCS 100 | 1,792 | 1792 of 1792 | 1792 of 1792 | 1792 of 1792 | 1792 of 1792 |
+| MCS 400 | 1,792 | 1792 of 1792 | 1792 of 1792 | 1792 of 1792 | 1792 of 1792 |
+
+Agreement is exact six-decimal string equality. The worst absolute difference on either
+melanin column is 0.000e+00.
+
+**What was not compared.** Their file covers 20 MCS values and these runs read two of them.
+So 3,584 of 35,840 rows were checked and 32,256 were not. This is a result about MCS 100
+and MCS 400, not about the whole file.
+
+**The comparison refuses a one-digit difference.** Changing the last decimal place of a
+single `mel_parcel` value out of 1,792 makes `--compare` exit non-zero and name that row.
+A comparison that cannot do that reads the same as one that always agrees.
+
+**Every seed checks itself before any of this.** `parcel_sweep.jl` recomputes `mel_site`
+from the lattice and requires exact equality with the model's own `mean_melanin`, along
+with the site and parcel counts. A misread lattice fails there, not in the comparison.
 
 ## A claim this sweep contradicts
 
@@ -99,5 +132,12 @@ model does.
 |---|---|
 | `sweep.jl` | runs the seeds, writes one row per (seed, mcs, species) |
 | `analyse.jl` | paired statistics, ordering counts, exact binomial sign test (ties leave the test) |
-| `test_statistics.jl` | 90 data-free assertions |
+| `parcel_melanin.jl` | both melanin estimators from one lattice visit; no model, no data |
+| `parcel_sweep.jl` | runs the seeds for `mel_parcel`, and compares two files by column |
+| `test_statistics.jl` | 150 assertions, none needing a data file |
 | `sweep_seeds42-57.csv`, `analysis.txt` | committed receipts of the run above |
+
+The assertion count rose from 114 to 150. Sixteen of the new ones cover the estimator, and
+twenty cover the producer and the comparison. The `test_statistics.jl` row read 90 before
+2026-09-17. That figure was already 24 short of what the file ran, so the rise is not 60
+assertions of new work.

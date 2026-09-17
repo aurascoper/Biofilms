@@ -10,6 +10,7 @@
 using Test, Statistics
 include(joinpath(@__DIR__, "analyse.jl"))
 include(joinpath(@__DIR__, "figure_text.jl"))
+include(joinpath(@__DIR__, "parcel_melanin.jl"))
 
 const SWEEP = joinpath(@__DIR__, "sweep.jl")
 sweep(out, args...) = success(pipeline(`$(Base.julia_cmd()) $SWEEP $out $args`; stdout = devnull, stderr = devnull))
@@ -260,6 +261,108 @@ end
     @test rank_title(3, 16) == "The published seed is the third smallest of 16"
     @test rank_title(12, 16) == "The published seed is the 12th smallest of 16"
     @test rank_title(2, 16) == "The published seed is the second smallest of 16"
+end
+
+@testset "parcel_melanin: two estimators, and the case where they differ" begin
+    # Two parcels of one species, of sizes 3 and 1. Site-weighted is (1+1+1+5)/4 = 2.0.
+    # Parcel-weighted is (1.0 + 5.0)/2 = 3.0. That gap is the reason the estimator exists.
+    lat = reshape(Int32[1, 1, 1, 2], 4, 1, 1)
+    mel = reshape([1.0, 1.0, 1.0, 5.0], 4, 1, 1)
+    r = parcel_means(lat, mel, Dict(1 => 1, 2 => 1), 1)
+    @test r.mel_site[1] ≈ 2.0
+    @test r.mel_parcel[1] ≈ 3.0
+    @test r.n_sites[1] == 4
+    @test r.n_parcels[1] == 2
+
+    # EQUAL PARCELS MAKE THE TWO AGREE, so a control built from them would pass against
+    # either estimator and prove nothing. The case above uses sizes 3 and 1 for that reason.
+    eq = parcel_means(reshape(Int32[1, 1, 2, 2], 4, 1, 1),
+                      reshape([1.0, 3.0, 5.0, 7.0], 4, 1, 1), Dict(1 => 1, 2 => 1), 1)
+    @test eq.mel_site[1] ≈ 4.0
+    @test eq.mel_parcel[1] ≈ 4.0
+
+    # An id on the lattice with no registry entry belongs to neither mean. That is
+    # take_snapshot's own rule, which tests haskey(state.cells, s) before it accumulates.
+    stale = parcel_means(reshape(Int32[1, 1, 1, 9], 4, 1, 1), mel, Dict(1 => 1), 1)
+    @test stale.mel_site[1] ≈ 1.0
+    @test stale.mel_parcel[1] ≈ 1.0
+    @test stale.n_sites[1] == 3
+
+    # Medium is 0 and wall is negative, and neither takes part. A species with no site
+    # reports 0.0, as the model does, rather than a NaN from a division by zero.
+    none = parcel_means(reshape(Int32[0, -1, 2, 2], 4, 1, 1), mel, Dict(2 => 2), 2)
+    @test none.mel_site[1] == 0.0
+    @test none.mel_parcel[1] == 0.0
+    @test none.n_parcels[1] == 0
+    @test none.mel_site[2] ≈ 3.0        # sites 3 and 4 hold melanin 1.0 and 5.0
+
+    # THIS EXPECTATION WAS WRONG THE FIRST TIME AND THE CODE WAS RIGHT. The draft asserted
+    # 4.0 for the line above. Two sites holding 1.0 and 5.0 average to 3.0, and the
+    # estimator said so. Recorded because a control that is merely green teaches nothing
+    # about which side was checked.
+
+    # Refusals: a melanin field of another shape, a species index outside the range, and a
+    # species count of zero. Each would otherwise average the wrong set of sites.
+    @test_throws ErrorException parcel_means(reshape(Int32[1], 1, 1, 1), mel, Dict(1 => 1), 1)
+    @test_throws ErrorException parcel_means(lat, mel, Dict(1 => 3, 2 => 1), 1)
+    @test_throws ErrorException parcel_means(lat, mel, Dict(1 => 1, 2 => 1), 0)
+end
+
+@testset "parcel_sweep.jl: the producer, its refusals, and the comparison's control" begin
+    # RUN AS A SUBPROCESS, NOT INCLUDED. parcel_sweep.jl defines `COLUMNS` and `main`, and
+    # analyse.jl, already included above this line, defines both names too. Including the
+    # two would redefine a constant. The sweep testset runs its own producer this way.
+    dir = mktempdir()
+    PARCEL = joinpath(@__DIR__, "parcel_sweep.jl")
+    parcel(args...) = success(pipeline(`$(Base.julia_cmd()) $PARCEL $args`;
+                                       stdout = devnull, stderr = devnull))
+
+    # N = 20 with two parcels is sweep.jl's own default size. Smaller than that the MODEL
+    # refuses, not this file: at N = 8 with one parcel per species Random raises
+    # "collection must be non-empty" inside mcs_step!, and sweep.jl fails there identically.
+    out = joinpath(dir, "tiny.csv")
+    @test parcel(out, "--seeds", "42,43", "--n", "20", "--parcels", "2", "--at", "4")
+
+    lines = [l for l in eachline(out) if !startswith(l, "#") && !isempty(strip(l))]
+    @test lines[1] == "seed,mcs,species,volume,ncells,mel_site,mel_parcel"
+    @test length(lines) == 1 + 2 * 7          # the header, then seven species per seed
+    body = [split(l, ",") for l in lines[2:end]]
+    @test all(parse(Int, r[2]) == 4 for r in body)
+    @test sort(unique(parse(Int, r[1]) for r in body)) == [42, 43]
+    @test sort(unique(parse(Int, r[3]) for r in body)) == collect(1:7)
+    @test all(parse(Float64, r[6]) >= 0 for r in body)
+    @test all(parse(Float64, r[7]) >= 0 for r in body)
+    # Six decimals, which is the precision the other implementation prints. A string
+    # comparison between the two files means nothing unless both sides print the same way.
+    @test all(length(split(String(r[7]), ".")[2]) == 6 for r in body)
+
+    # Refusals, each before the model loads and before the destination opens.
+    @test !parcel(out, "--seeds", "42", "--n", "20", "--parcels", "2", "--at", "4")
+    for (name, args) in (("dup", ("--seeds", "42,42")),
+                         ("empty", ("--seeds", "57:42")),
+                         ("at0", ("--seeds", "42", "--at", "0")))
+        p = joinpath(dir, "$name.csv")
+        @test !parcel(p, args..., "--n", "20", "--parcels", "2")
+        @test !isfile(p)
+    end
+
+    # THE COMPARISON'S OWN NEGATIVE CONTROL. A tool that cannot report a difference reads
+    # exactly like one that always agrees, and the cross-implementation result rests on
+    # this tool alone. One digit in the last decimal place has to be enough to refuse.
+    @test parcel("--compare", out, out)
+    row = lines[2]
+    f = split(row, ",")
+    digit = f[7][end] == '0' ? '1' : '0'
+    bumped = join([f[1:6]; f[7][1:end-1] * string(digit)], ",")
+    @test bumped != row
+    mutated = joinpath(dir, "mutated.csv")
+    write(mutated, replace(read(out, String), row => bumped))
+    @test !parcel("--compare", mutated, out)
+
+    # A file missing a column is refused rather than read by position.
+    short = joinpath(dir, "short.csv")
+    write(short, "seed,mcs,species,volume,ncells,mel_site\n42,4,3,1,1,1.0\n")
+    @test !parcel("--compare", short, out)
 end
 
 end
