@@ -19,6 +19,15 @@ def read_vti(path):
     nx, ny, nz = ext[1] - ext[0], ext[3] - ext[2], ext[5] - ext[4]   # CELL counts
     marker = raw.index(b"_", raw.index(b"<AppendedData")) + 1
 
+    # Geometry attributes. These were parsed by nobody, so a caller could not compare a
+    # source frame's declared Origin/Spacing against what it was about to write -- and a
+    # writer that hard-codes 0/1 would silently relabel a frame declaring anything else.
+    # Returned under reserved `_vti_*` keys: they come from the reader, not from the
+    # file's own <FieldData>.
+    def _triple(name, default):
+        m = re.search(name + r'="([^"]+)"', head)
+        return tuple(float(v) for v in m.group(1).split()) if m else default
+
     arrays = {}
     for m in re.finditer(r'<DataArray type="(\w+)" Name="(\w+)"[^>]*offset="(\d+)"', head):
         dtype, name, off = _DT[m.group(1)], m.group(2), int(m.group(3))
@@ -27,9 +36,23 @@ def read_vti(path):
         # VTK writes x fastest; order="F" gives [x, y, z] indexing.
         arrays[name] = buf.reshape((nx, ny, nz), order="F") if buf.size == nx*ny*nz else buf
 
+    # FieldData strings are <Array type="String"> -- NOT <DataArray> -- and in this
+    # exporter they are appended, not inline. Matching only <DataArray> returned {} and
+    # lost every provenance string without saying so.
     fields = {}
     fd = re.search(r"<FieldData>(.*?)</FieldData>", head, re.S)
     if fd:
-        for m in re.finditer(r'<(?:DataArray|Array) type="(\w+)" Name="(\w+)"[^>]*>(.*?)</', fd.group(1), re.S):
-            fields[m.group(2)] = m.group(3).strip()
+        for m in re.finditer(r'<Array type="String" Name="(\w+)"[^>]*offset="(\d+)"', fd.group(1)):
+            off = int(m.group(2))
+            n = int(np.frombuffer(raw, np.uint64, count=1, offset=marker + off)[0])
+            # payload is NUL-terminated and n includes the terminator
+            fields[m.group(1)] = raw[marker + off + 8: marker + off + 8 + n].rstrip(b"\x00").decode("utf-8", "replace")
+        for m in re.finditer(r'<DataArray type="(\w+)" Name="(\w+)"[^>]*offset="(\d+)"', fd.group(1)):
+            dtype, off = _DT[m.group(1)], int(m.group(3))
+            n = int(np.frombuffer(raw, np.uint64, count=1, offset=marker + off)[0])
+            fields[m.group(2)] = np.frombuffer(raw, dtype, count=n // dtype().itemsize,
+                                               offset=marker + off + 8)[0]
+    fields["_vti_origin"] = _triple("Origin", None)
+    fields["_vti_spacing"] = _triple("Spacing", None)
+    fields["_vti_whole_extent"] = tuple(ext)
     return arrays, fields, (nx, ny, nz)

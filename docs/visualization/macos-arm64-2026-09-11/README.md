@@ -346,3 +346,119 @@ thresholds that array and the rendered counts match the run's own endpoint exact
 endpoint can differ by a qualifier that lives only in the producer's docstring. Reproducing a
 published number through a second, independent path is what surfaced it — the agreement check
 was worth more than the render.
+
+
+## Decay reference — the smallest defensible isotope addition
+
+`decay_reference.py` puts species labels beside a **hypothetical** normalized activity
+distribution fading by the documented decay law, on a **frozen** consortium snapshot:
+
+```
+a(x, t) = a0(x) * 2^(-t / t_half),   t in DAYS
+```
+
+**It computes no binding and no dose.** No source term, no dose point kernel, no transport.
+
+**The geometry is frozen on purpose.** There is no established MCS-to-seconds conversion
+here — `seconds_per_mcs` ships `NaN` and the exporter refuses a physical pitch. Advancing
+biological rearrangement alongside isotope decay would introduce that mapping silently as
+an assumption. Freezing the snapshot keeps the isotope clock independent, in days, and
+answerable. The `.pvd` time key is **days**, and it is not MCS.
+
+**`a0(x)` is an input, never a result.** The default is uniform over the 4,888 occupied
+interior voxels of the frozen frame, normalized to sum to 1 — chosen for being obviously
+arbitrary. No measurement supports it, and the receipt says so in the artifact itself.
+
+### The half-life: audit closed, sourced
+
+`sources/Lu-177.lara.txt` is the LNHB/DDEP evaluated table, retrieved 2026-09-11, committed,
+and pinned by sha256 in both the code and `sources/PROVENANCE.md`. Verbatim:
+
+```
+Half-life (d)        ; 6.6443     ; 0.0009
+Decay constant (1/s) ; 1.20743E-6 ; 0.00016E-6
+Daughter(s) ; (B-) ; Hf-177 ; 100
+Reference ; CEA/LNE-LNHB - 2025
+```
+
+Version **CEA/LNE-LNHB - 2025**, evaluators M.A. Kellett and X. Mougeot (LNE-LNHB, Palaiseau).
+
+An earlier revision used 6.6443 d because it was the self-consistent partner of the plan's
+decay constant — the plan gave **6.647 d** in its decay equation, and only 6.6443 d reproduces
+the stated λ. That was arithmetic, and the code carried a standing confirmation requirement
+saying so. **Both values are now read from the table rather than inferred**, λ is the table's
+figure rather than recomputed, and the uncertainties (±0.0009 d, ±0.00016e-6 /s) are carried
+for the first time. **6.647 d is not the evaluated value.**
+
+The audit also confirmed the plan's Phase 1b constants, which had been pinned from memory:
+γ 112.95005 keV at 6.223 ± 0.032 % and 208.3661 keV at 10.425 ± 0.035 %; `Q- ; 496.8` against
+a stated β⁻ Emax of 497 keV; and the daughter, Hf-177, stable.
+
+**A sourced constant is not an isotope identity.** The source-term gate stands, the material
+path is still elemental rather than isotopic, and this file still computes no binding and no
+dose. `a0(x)` remains a declared hypothetical.
+
+Verified: 41 frames, 0 to 20 d in 0.5 d steps; `max |Σa(x,t) − 2^(−t/T)| = 1.1e-16`; total
+activity at t=0 is exactly 1.0; ParaView reads 41 timesteps and all 14 field-data entries.
+
+### Three ways to write a .vti that fails silently
+
+All three were hit writing this, and each produces a file that looks fine and is not.
+
+1. **`<FieldData>` is a sibling of `<Piece>`, not a child.** Inside `<Piece>`, ParaView
+   reports **zero field-data entries** with no error — provenance that simply is not there.
+2. **`NumberOfTuples` is mandatory on `FieldData` and only there.** `CellData` infers its
+   tuple count from the extent; `FieldData` has no extent to infer from, so without it VTK
+   reads zero tuples and drops the array.
+3. **A `String` array's payload is NUL-terminated and the `UInt64` byte count includes the
+   terminator.** Omitting it does not merely lose that string — it desynchronises the whole
+   appended section, and VTK then reads **zero cells from the entire file**, silently.
+   Confirmed against the exporter's own output, where `units` is `b"lattice\x00"` with a
+   declared length of 8.
+
+Trap 3 is why `vti_read.py` now strips the terminator: it had been decoding `units` as
+`"lattice "` and every provenance string with a trailing NUL. The fix does not touch cell
+arrays, and `component_overlap.json` is byte-for-byte unchanged across it — checked, not
+assumed.
+
+### The refusals, each demonstrated
+
+The writer originally had none of these.
+
+| Refusal | What it replaces |
+|---|---|
+| the frame's embedded `mcs` must equal `--mcs` **exactly and integrally** | `int(round(emb)) != frozen_mcs` accepted a frame declaring `mcs = 0.25` as MCS 0 — `round()` masked the disagreement it existed to detect |
+| declared **Origin and Spacing** must match what the writer emits | only `coordinate_index_base` was compared, which is not geometry; the reader did not return Origin/Spacing at all, so a frame declaring `Origin 10,20,30 / Spacing 2,3,4` was silently relabelled to `0,0,0 / 1,1,1` |
+| the source must be a **registered artifact whose bytes match the manifest** | the receipt recorded the source's own sha256, which captures what was read rather than validating it |
+| with `--receipt`, `derived_manifest.json` must match a **frozen** hash | a manifest beside its own data is not an authority — a consistently tampered clone regenerates it for free |
+| the **output directory must be empty** | an earlier revision refused only artifacts beginning with the stem, while its own comment claimed to refuse any existing run destination; a directory holding a different run was accepted and written into |
+| `--days` an integer multiple of `--step`; `--step` finite and positive; `--days` finite and non-negative | `int(days/step)+1` truncated the requested endpoint, and neither argument was validated |
+| emitted timesteps **unique and strictly increasing** | six-decimal rounding made `--days 0.000002 --step 0.0000004` write six distinct files advertising `[0, 0, 1e-6, 1e-6, 2e-6, 2e-6]` — a `.pvd` with duplicate timesteps and no complaint |
+
+Filenames are the **frame index**, not the formatted time, so a name can never collide.
+
+### Demonstrated
+
+| probe | result |
+|---|---|
+| frame declaring `mcs = 0.25`, `--mcs 0` | refused — "must sit at an integer MCS" |
+| frame declaring `Origin 10,20,30 / Spacing 2,3,4` | refused, naming both the declared and emitted values |
+| one bit flipped in the source frame | refused — does not match its manifest hash |
+| **consistent tamper** (bytes *and* manifest regenerated) | **accepted unpinned; refused with `--receipt`** |
+| output directory containing one unrelated file | refused |
+| `--step 0` | refused |
+| `--receipt /nope.json` | refused |
+| `--days 0.3 --step 0.1` | 4 frames, endpoint included (was 3) |
+| `--days 0.000002 --step 0.0000004` | 6 frames, **6 distinct strictly-increasing timesteps** |
+| `--step 1e-15` | refused — finer than the emitted representation |
+
+The consistent-tamper row is the same clone-safe property the verifiers carry, now in the
+writer: an unpinned run trusts the manifest sitting beside the data, and a manifest beside its
+own data is exactly what a tamperer rewrites.
+
+The receipt binds by content, not by name: sha256 of the source frame, of every `.vti` and of
+the `.pvd`, the source's `git_sha` and `parent_manifest_sha256`, the manifest hash it was
+validated against, the receipt that pinned it, and the declared Origin/Spacing.
+
+The `.vti` frames are regenerable and not committed; `decay_reference_receipt.json` carries the
+per-frame metrics and the hashes.
