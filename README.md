@@ -7,6 +7,19 @@
 A mechanistic modelling framework for a seven-species biofilm community under ionising radiation,
 plus the calibration and transport machinery that decides what the framework is allowed to claim.
 
+![Seven-species consortium, MCS 4 to 400](assets/consortium_400mcs.gif)
+
+**The consortium, 100 frames from MCS 4 to MCS 400.** A 20 × 20 × 20 lattice, with 1,633 of 8,000
+sites occupied at the last frame. Colours name the seven species, in the order `biofilms_potts.jl`
+declares them. `viewer/paraview_species.py` rendered the frames from snapshots stamped `039b7a2`.
+
+Axes count lattice sites, not lengths. The pitch is `D-PITCH`, still `awaiting_measurement`, and
+the snapshots record `physical_time_s` as `NaN`. Accumulated dose is zero in every frame. So this
+run shows the Cellular Potts model under its static radial field alone, with no transport coupling.
+
+The snapshots do not record the seed, because their `config_toml` is empty. Read the animation as a
+picture of the mechanism, not as a reproducible case.
+
 Four things run. A **3D Cellular Potts model** (`biofilms_potts.jl`) evolves biomass parcels on a
 cylindrical lattice under a four-term Metropolis acceptance functional — adhesion, volume, radiation
 and melanin — with a static radial radiation field and a genuinely two-way melanin field. A
@@ -242,7 +255,8 @@ Biofilms/
 │                                  #   tree — the superseded .md is git history only),
 │                                  #   figures/ (4 × PDF + PNG). The built .pdf was REMOVED:
 │                                  #   it was a pre-revision build carrying withdrawn claims
-├── assets/                        # preview_bioreactor_3d.png, preview_radiodialysis.png
+├── assets/                        # preview_bioreactor_3d.png, preview_radiodialysis.png,
+│                                  #   consortium_400mcs.gif (embedded at the top)
 ├── kmeans_species_trajectory (1).gif, biofilm_dynamics_7_species.gif   # embedded below
 ├── Citations.md                   # predates data/sources.csv, unmaintained
 └── .github/workflows/             # coupling-tests.yml (4 jobs)
