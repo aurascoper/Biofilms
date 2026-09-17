@@ -91,9 +91,10 @@ Mechanical and non-deferrable items only. The section-by-section revision is §3
 3. **New subsection** (`§2.5` / `sec:radiotrophy_status`) recording that radiotrophy is not
    established for any of the seven modelled species, quoting the audit's four verdicts.
 4. **Results correction.** The radial stratification is **melanin-mediated**, not `β_ion`-mediated:
-   `ΔH_rad` biases Metropolis acceptance by 1.000010 for the radiotropic species against 1.155 for
-   `ΔH_mel` at the observed `M = 1.44`. New table `tab:term_magnitudes`. Radiation still reaches
-   the dynamics, indirectly, via `melanin_drive`.
+   `ΔH_rad` biases Metropolis acceptance by 1.000010 for the radiotropic species against 1.134 to
+   1.292 for `ΔH_mel` over `M = 1.26` to `2.56` across seeds 42–297. New table
+   `tab:term_magnitudes`. Radiation still drives the dynamics, indirectly, via `melanin_drive`.
+   Corrected 2026-09-17: this line read 1.155 at the observed `M = 1.44`, which is seed 42 alone.
 5. **Computational Methods rewritten** to describe the code that exists. The old section named
    `DifferentialEquations.jl`, `JuMP.jl`, `Ipopt`, `Agents.jl`, `PlotlyJS.jl`, Sobol indices and
    Morris screening; a case-insensitive grep for each returns zero files outside the preprint

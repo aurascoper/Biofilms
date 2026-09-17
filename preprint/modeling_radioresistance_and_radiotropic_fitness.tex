@@ -106,7 +106,7 @@ nuclear-engineering multiphysics. This work therefore extends an established par
 transport code and a new biological target rather than introducing the paradigm.
 
 Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
-measured results. The melanin term changes Metropolis acceptance by approximately 15.5\%, whereas
+measured results. The melanin term changes Metropolis acceptance by 13.4\% to 29.2\% across 256 seeds, whereas
 the direct per-species radiation term reaches $7.505\times10^{-2}$ in $\Delta H$ (a 1.5\% acceptance bias), about ten
 times smaller than the melanin term rather than four orders smaller; only the product of melanin production and melanin
 coupling reaches the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
@@ -940,7 +940,7 @@ row --- is the coefficient through which radiation actually reaches the CPM dyna
 citation, no entry in Table~\ref{tab:params}, and no configuration file exposes it. It is a
 declared modelling choice and is recorded as one
 (\texttt{PP-T2-29}, \texttt{flagged\_weak}, in \texttt{data/species\_parameter\_provenance.csv}).
-Stating it here matters because the 15.5\% acceptance shift reported in
+Stating it here matters because the 13.4\% to 29.2\% acceptance shift reported in
 Section~\ref{sec:results} is this coefficient's effect: the largest measured quantity in the
 manuscript rests on the least evidenced parameter in it, and a reader who assumed the table
 covered every parameter would not learn that from the table.
@@ -1122,21 +1122,26 @@ look like $5\times10^{-5}$. The rows are single roles; the reach of the term is 
 $\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
 $\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
 $\Delta H_{\mathrm{rad}}$, target \emph{loses}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $\mathbf{-7.5\times10^{-2}}$ & $\mathbf{1.0151}$ \\
-$\Delta H_{\mathrm{mel}}$ at $M=1.44$ & $-0.720$ & $\mathbf{1.155}$ \\
+$\Delta H_{\mathrm{mel}}$ over 256 seeds, $M=1.26$ to $2.56$ & $-1.281$ to $-0.630$ & $\mathbf{1.134}$ to $\mathbf{1.292}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 For the two negatively signed species \emph{occupying} a site, the direct radiation term changes
-acceptance by about one part in $10^5$, whereas the melanin term changes it by 15.5\%. That
+acceptance by about one part in $10^5$, which is not that term's reach, whereas the melanin term
+changes it by 13.4\% to 29.2\% across seeds 42--297. That
 comparison is between one role of one pair of species and the melanin term, and it does not bound
 $\Delta H_{\mathrm{rad}}$: the third row is the same term at $1.5\times10^{3}$ times the magnitude
-and in the acceptance-favouring direction, smaller than the melanin term by a factor of $9.6$ in
+and in the acceptance-favouring direction, smaller than the melanin term by a factor of $8.39$ to
+$17.06$ in
 $\Delta H$ rather than by four orders. \emph{Corrected again, version 1.2:} this sentence read
 ``fifteen times'' when first written, which is the acceptance-bias ratio computed against a reach of
 $5\times10^{-2}$ --- a value appearing nowhere in this paper. The correction to this paragraph was
 applied twice at different times, and the pre-pairwise ratio survived inside the sentence whose other
-half had already been fixed. Radiation can therefore influence
+half had already been fixed. \emph{Corrected a third time, 2026-09-17:} the shift read 15.5\% and
+the factor read $9.6$. Both came from seed 42 alone. An independent Odin port ran seeds 42--297 at
+the same configuration, and $M$ spans $1.2596$ to $2.5613$ there, with seed 42's $1.437157$ the
+31st lowest of the 256. Radiation can therefore influence
 the CPM indirectly through the chain
 \[
 I_\gamma \longrightarrow \text{melanin production} \longrightarrow M
@@ -1264,7 +1269,9 @@ and is not clearly separated from the approximate seeding null at the present pa
 
 The dimensionless melanin field increases over the 100-MCS run for all three producer classes
 (Figure~\ref{fig:melanin}). \textit{C.~sphaerospermum} reaches the largest final field value,
-$M=1.44$, followed by \textit{C.~neoformans} and \textit{A.~niger}. The ordering follows the
+$M=1.44$ at seed 42, followed by \textit{C.~neoformans} and \textit{A.~niger}. Over seeds 42--297
+that value spans $1.26$ to $2.56$, and the ordering is \emph{corrected}: it fails in 19 of the 256
+seeds, so it does not simply follow the
 hand-specified production scales; these field values have no calibration to a physical melanin mass
 or concentration.
 
@@ -1336,7 +1343,7 @@ The implemented programs support a narrower conclusion than the full PSDE specif
 Langevin models demonstrate stochastic spatial grouping under chosen drift and interaction rules;
 they do not demonstrate radiation-enhanced growth or survival. The CPM term audit establishes that,
 within its radiation-derived pathway, the melanin term exceeds the direct species-specific
-radiation term by about an order of magnitude in $\Delta H$ ($9.6$), not by several. The single-seed radial output does not establish a
+radiation term by about an order of magnitude in $\Delta H$ ($8.39$ to $17.06$ across 256 seeds), not by several. The single-seed radial output does not establish a
 radiotropic pattern, because its direction conflicts with the direct coefficient and its magnitude
 is not separated from the seeding null. The radiodialysis solvers establish a reproducible numerical
 solution of the stated semi-discrete equations, but the coupled Julia path does not yet possess a
