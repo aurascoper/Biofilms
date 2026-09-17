@@ -112,8 +112,15 @@ end
 RETRACTED_WORD_ALLOWED = Dict(
     # comments that deny the property, naming it to deny it; a path to the audit document
     # whose filename carries the word; the vocabulary itself; this file's own controls
+    # the ontology bridge's vocabulary and that vocabulary's own control, added with #24.
+    # PHENOMENA names the manuscript's five phenomenon words in order to govern them, and
+    # test_ontology_bridge.py passes one as known-bad input to assert a blank endpoint is
+    # refused. Both are the categories named above, not new assertions of the property.
     "radiotroph" => ["biofilms_3d.R", "biofilms_potts.jl", "biofilms_radiodialysis.R",
-                     "calibration/tests/test_claims_ledger.py", "tests/manuscript_claims_tests.jl"],
+                     "calibration/tests/test_claims_ledger.py",
+                     "contract/physical_contract/__init__.py",
+                     "contract/tests/test_ontology_bridge.py",
+                     "tests/manuscript_claims_tests.jl"],
 )
 # every other term: only the vocabulary declares it
 retracted_allowed(term) = get(RETRACTED_WORD_ALLOWED, term, ["calibration/tests/test_claims_ledger.py"])
