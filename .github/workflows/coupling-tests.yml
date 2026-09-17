@@ -32,6 +32,9 @@ jobs:
         run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
       - name: Run Julia test suite
         run: julia --project=. tests/runtests.jl
+      - name: Run the melanin-ensemble diagnostic suite
+        # No project: it loads biofilms_potts.jl through the split-marker sandbox.
+        run: julia diagnostics/melanin_ensemble/test_statistics.jl
       # The binding benchmark carries its own environment. Its data-free suites and the
       # mutation harness run here so they cannot regress behind a green tests/runtests.jl.
       - name: Instantiate the binding benchmark environment
@@ -79,6 +82,8 @@ jobs:
         # be eight silent skips that hid three real defects; the only skips
         # that should remain here are the openmc ones.
         run: cd coupling && xvfb-run -a pytest -rs tests
+      - name: Run the payload-census diagnostic suite
+        run: python3 diagnostics/payload_census/test_census.py
 
   merge-gate:
     # The gate that refuses a merge over unresolved review findings. It is a

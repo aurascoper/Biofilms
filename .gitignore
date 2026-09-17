@@ -405,6 +405,8 @@ geolocator/data/market_bars.sqlite
 # silent commit.
 geolocator/cache/
 
+# The figure environment pins the CairoMakie that rendered the committed PNG.
+!diagnostics/melanin_ensemble/Manifest.toml
 # The binding benchmark carries its own environment; the lockfile is part of its receipt.
 !diagnostics/binding_benchmark/Manifest.toml
 # Rendered lattice exports (export_vti.jl); regenerate from snapshots, never commit

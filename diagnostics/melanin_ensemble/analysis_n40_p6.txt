@@ -1,0 +1,41 @@
+sweep sweep_n40_p6_seeds42-57.csv, MCS 100, 16 seeds
+
+  seed        CS        CN        AN   ordering
+    42     1.437     0.973     0.939   alpha_M
+    43     1.488     1.082     1.082   alpha_M
+    44     1.718     1.644     0.830   alpha_M
+    45     1.771     1.295     0.972   alpha_M
+    46     1.701     1.430     0.729   alpha_M
+    47     1.393     1.097     1.087   alpha_M
+    48     2.187     1.387     0.785   alpha_M
+    49     1.737     1.296     0.912   alpha_M
+    50     1.587     1.167     0.901   alpha_M
+    51     1.599     1.204     0.988   alpha_M
+    52     1.721     1.106     0.946   alpha_M
+    53     1.548     1.296     0.825   alpha_M
+    54     1.604     1.550     1.041   alpha_M
+    55     1.354     1.188     0.770   alpha_M
+    56     2.044     1.009     0.827   alpha_M
+    57     1.365     1.054     0.937   alpha_M
+
+per species, marginal:
+  CS  alpha_M 0.140   mean 1.641   sd 0.231   range 1.354 - 2.187   C. sphaerospermum
+  CN  alpha_M 0.100   mean 1.236   sd 0.193   range 0.973 - 1.644   C. neoformans
+  AN  alpha_M 0.065   mean 0.911   sd 0.109   range 0.729 - 1.087   A. niger
+
+seeds displaying the full alpha_M ordering: 16 of 16
+
+pairwise, paired within seed:
+  CS - CN   mean +0.405
+      paired sd of the difference   0.253   <- needs no independence assumption
+      if the two were independent   0.301   (pooled sd 0.213, separation 1.90)
+      within-run correlation        +0.299   -> pooling overstates the uncertainty
+      16 of 16 seeds in the alpha_M direction, exact two-sided sign test p = 3.052e-05
+  CN - AN   mean +0.326
+      paired sd of the difference   0.248   <- needs no independence assumption
+      if the two were independent   0.222   (pooled sd 0.157, separation 2.08)
+      within-run correlation        -0.287   -> pooling UNDERSTATES the uncertainty
+      16 of 16 seeds in the alpha_M direction, exact two-sided sign test p = 3.052e-05
+
+The ordering is an input. These numbers describe how reliably one trajectory
+displays it, and say nothing about whether the input is correct.
