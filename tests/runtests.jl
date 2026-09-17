@@ -20,6 +20,10 @@ end
 
 const SR = load_serial()
 
+# After load_serial(): the layout fixture builds its parent snapshots with the real
+# exporter, which takes SR. test_numerics and the census do not care where this sits.
+include("signal_field_tests.jl")
+
 @testset "Biofilms serial contract" begin
     include("contract_csv.jl")
 end

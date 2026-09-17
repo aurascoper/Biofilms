@@ -1,0 +1,13 @@
+# Declared numerical illustration, not molecule-specific production measurements.
+schema_version = 1
+basis = "declared"
+molecule = "unassigned generic signal"
+production = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+diffusion = 0.2
+decay = 0.1
+spacing = 1.0
+max_dt = 0.5
+threshold = 5.0
+source_timing = "occupancy at MCS k held over [k,k+1)"
+physical_conversion = "blocked: D-PITCH and D-TIMESERIES"
+acceptance_coupling = false
