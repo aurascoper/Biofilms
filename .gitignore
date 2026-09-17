@@ -376,6 +376,7 @@ FodyWeavers.xsd
 # Machine-local Julia state (JACC is dev-pathed; backend is a local preference)
 Manifest.toml
 !viewer/Manifest.toml
+!diagnostics/inert_signal/Manifest.toml
 LocalPreferences.toml
 
 # Python coupling env/artifacts
@@ -406,6 +407,8 @@ geolocator/cache/
 
 # The figure environment pins the CairoMakie that rendered the committed PNG.
 !diagnostics/melanin_ensemble/Manifest.toml
+# The binding benchmark carries its own environment; the lockfile is part of its receipt.
+!diagnostics/binding_benchmark/Manifest.toml
 # Rendered lattice exports (export_vti.jl); regenerate from snapshots, never commit
 *.vti
 *.pvd

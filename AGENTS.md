@@ -563,6 +563,45 @@ fires on it. An unregistered question announces nothing, ever. **Nothing
 recomputes a question.**
 
 
+## Registering a question
+
+The rule above is about a number this repository published and later found
+wrong. This one is about a question it asked and never wrote down.
+
+**An open question stated in prose gets a row in `data/claims_ledger.csv` when it
+is asked, not when it is answered.**
+
+It needs no new machinery, and inventing some would miss the point. `status =
+needs_verification` is already one of the eight pinned verdicts and already means
+exactly this; `required_to_fix` already holds what would settle it. RM-KR-07 is
+the worked example, registering `mean r/R = 0.65` as open because "a multi-seed
+run COULD resolve this one either way - which is why it stays
+needs_verification" (quoted with its own hyphen). The rule is only that the row
+is written at the moment of asking.
+
+The case it comes from is MEL-N40-02. A write-up asked, publicly and in
+falsifiable form, whether a melanin ordering that held 11 of 16 times at N = 20
+would still hold at the preprint's own N = 40 six-parcel configuration. It asked
+three times, in one HTML file, on one unmerged branch. A grep for its wording
+over every local and remote ref returned that file and nothing else: no row, no
+doc, no pull-request body.
+
+**That is an absence claim with no scope wearing different clothes.** Its
+durability was the durability of one file. Delete it, abandon the branch, or move
+the post somewhere this repository does not track, and the question is gone with
+no trace that it was ever asked, while the work it was asking about carries on.
+
+It applies **regardless of the answer**. That question came back 16 of 16,
+confirming the hypothesis it was asked about, and registering it was still right:
+a question is worth recording while it is open, and a question nobody else can
+find was never open to anyone else.
+
+The asymmetry with the correction rule is the whole reason this one is separate.
+A wrong number announces itself eventually — something recomputes it, or a guard
+fires on it. An unregistered question announces nothing, ever. **Nothing
+recomputes a question.**
+
+
 ## The suites
 
 Four, and they are separate because they answer different questions.

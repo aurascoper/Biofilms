@@ -35,6 +35,16 @@ jobs:
       - name: Run the melanin-ensemble diagnostic suite
         # No project: it loads biofilms_potts.jl through the split-marker sandbox.
         run: julia diagnostics/melanin_ensemble/test_statistics.jl
+      # The binding benchmark carries its own environment. Its data-free suites and the
+      # mutation harness run here so they cannot regress behind a green tests/runtests.jl.
+      - name: Instantiate the binding benchmark environment
+        run: julia --project=diagnostics/binding_benchmark -e 'import Pkg; Pkg.instantiate()'
+      - name: Binding benchmark, data-free suites
+        run: |
+          julia --project=diagnostics/binding_benchmark diagnostics/binding_benchmark/test_numerics.jl
+          julia --project=diagnostics/binding_benchmark diagnostics/binding_benchmark/test_setup.jl
+      - name: Binding benchmark, mutation controls
+        run: julia --project=diagnostics/binding_benchmark diagnostics/binding_benchmark/mutation_controls.jl "$RUNNER_TEMP/binding_mutations"
 
   python-unit:
     # The Python suite contains Julia/HDF5 orientation round-trip tests.
