@@ -1,3 +1,5 @@
+SUPERSEDED: 2026-08-15 — the record of how the v1.1 revision was planned; its "still open" entries are history, not status.
+
 # Preprint revision plan
 
 > **SUPERSEDED — kept as the record of how the revision was planned.** The revision it plans has
@@ -170,7 +172,7 @@ versus predicted radioactive decay" — there are no measured decay data in any 
 decay code in the repository. Withdrawn; the constant-background premise, which is what the rest of
 the paper actually uses, is kept.
 
-**Provenance fixes.** The `audit2026` / [41] entry cited the audit at revision `f4e8dbf`, which
+**Provenance fixes.** The `audit2026` entry — written here as "[41]" until 2026-09-01, when it was found to be entry #61 and the number was dropped in favour of the key — cited the audit at revision `f4e8dbf`, which
 predates the audit's own commits; now `904b9a4` / `a03bc32` at repository revision `5d1b777`. §5's
 "six cells per species" now reads "six biomass parcels", with the parcel semantics stated.
 
@@ -213,8 +215,9 @@ Ordered as before, by how much a reader is misled if the item is left.
 5. ~~**Symplectic integration.**~~ **CLOSED** in the verification pass — demoted to stated design
    intent in §3.4 and §7.1. Implementing it remains future work, listed in §7.5.
 6. ~~**`H_pair`.**~~ **CLOSED.** Methods states a four-term Hamiltonian, matching `compute_delta_H`
-   (adhesion, volume, radiation, melanin). Note the CPM's own stdout banner still prints the
-   five-term string — a **code** defect, still open.
+   (adhesion, volume, radiation, melanin). The CPM's own stdout banner previously printed the
+   five-term string; **fixed 2026-08-24** — both banners (`biofilms_potts.jl:1088`, `:1540`) now
+   state the true four-term path, and the `Ḋ(R)` placeholder print (`:1552`) is labelled as such.
 7. ~~**The radiodialysis results (§6.6).**~~ **CLOSED** in the verification pass. The underlying
    units defect at `biofilms_potts.jl:1341-1342` and `:1445-1446`, and the hard-coded `X_red = 0.3`
    labelled "(Shewanella proxy)", are **code** defects and remain open. `RADIODIALYSIS: BLOCKED`
@@ -243,14 +246,20 @@ Ordered as before, by how much a reader is misled if the item is left.
 
 ### Still open, in one place
 
-- Rebuild the PDF (§1.1) and regenerate the `.md` (item 11) — both need tooling absent here.
-- Rename both sources to `modeling_radioresistance_and_radiotropic_fitness.*`, as its own commit
-  with no content change (§1.2).
-- Resolve the posting status with the authors and state it once (§1.3).
-- Item 10 closes with the regeneration.
-- Three **code** defects surfaced by this revision and deliberately not fixed in a manuscript pass:
-  the five-term stdout banner, the radiodialysis units at `biofilms_potts.jl:1341-1342` / `:1445-1446`,
-  and the hard-coded `X_red = 0.3`.
+- Rebuild the PDF (§1.1) and regenerate the `.md` (item 11) — both still need tooling absent
+  on this machine (`pandoc`, `pdflatex`; re-checked 2026-08-24). Item 10 closes with the
+  regeneration.
+- ~~Rename both sources to `modeling_radioresistance_and_radiotropic_fitness.*`~~ **DONE.**
+  `preprint/modeling_radioresistance_and_radiotropic_fitness.tex` is the current filename; the
+  `.md` derivative doesn't exist in the tree at all (blocked on the same tooling as above).
+- ~~Resolve the posting status with the authors~~ **CHECKED, still unposted.** Web searches on
+  2026-08-15 and 2026-08-24 both found no bioRxiv record and no DOI. Stated in `README.md`.
+- Two **code** defects remain open, deliberately not fixed in this pass: the radiodialysis
+  units at `biofilms_potts.jl` (site-fraction values in concentration slots feeding the
+  materialization gate — see `README.md`'s "Radiodialysis membrane transport" section) and the
+  hard-coded `X_red = 0.3` at `biofilms_potts.jl:1194`. Both sit adjacent to the retained
+  `m`-vs-`P_eff` STOP CONDITION, which is an author modeling decision, not a mechanical fix.
+  (The five-term stdout banner previously listed here is fixed — see item 6 above.)
 
 ## 4. Citations added in this pass
 

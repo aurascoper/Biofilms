@@ -375,6 +375,7 @@ MigrationBackup/
 FodyWeavers.xsd
 # Machine-local Julia state (JACC is dev-pathed; backend is a local preference)
 Manifest.toml
+!viewer/Manifest.toml
 LocalPreferences.toml
 
 # Python coupling env/artifacts
@@ -390,6 +391,11 @@ calibration/*.egg-info/
 *.tif
 *.tiff
 
+# Built preprint. The .tex is the source; the PDF is a build artifact and
+# was swept into a commit once by `git add -A` after being explicitly left
+# out of the one before it.
+preprint/*.pdf
+
 # geolocator market bar cache (regenerable via python3 -m geolocator.market backfill)
 geolocator/data/market_bars.sqlite
 
@@ -400,3 +406,7 @@ geolocator/cache/
 
 # The figure environment pins the CairoMakie that rendered the committed PNG.
 !diagnostics/melanin_ensemble/Manifest.toml
+# Rendered lattice exports (export_vti.jl); regenerate from snapshots, never commit
+*.vti
+*.pvd
+*.pvsm

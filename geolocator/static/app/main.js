@@ -6,10 +6,11 @@ import { installTokens, BAND_STATUS, FEED } from './tokens.js';
 import { createGlobe } from './globe.js';
 import { createImageryLayer, imageryCredit } from './imagery.js';
 import { createLayerManager, fmtAge } from './layerManager.js';
-import { createSiteSystem, createBandSystem, PLANT_LIMIT } from './layers.js';
+import { createSiteSystem, createBandSystem, PLANT_LIMIT, hasCapacity } from './layers.js';
 import { createLatticePanel, createLatticeLayer } from './hud/latticePanel.js';
 import { createDetectionOverlay } from './hud/detectionOverlay.js';
 import { createStyleChain } from './postprocess.js';
+import { boot } from './boot.js';
 
 installTokens();
 
@@ -31,7 +32,7 @@ manager.register(imageryLayer);
 const sites = createSiteSystem({
   markerRoot: globe.markerRoot,
   manager,
-  onRender: (shown, features, enabled) => { updateStats(shown, features, enabled); renderLegend(shown); },
+  onRender: (shown, features, enabled, freshness) => { updateStats(shown, features, enabled, freshness); renderLegend(shown); },
 });
 sites.modules.forEach((m) => manager.register(m));
 
@@ -51,10 +52,21 @@ manager.finalize();
 manager.buildTogglePanel($('layer-panel'));
 
 /* ── HUD readouts ─────────────────────────────────────────────────────────── */
-function updateStats(shown, features, enabled) {
-  const cap = shown.reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
+function updateStats(shown, features, enabled, freshness = {}) {
+  // Applicability comes from the ENABLED layers that actually have data, the sum from
+  // the SHOWN features: an MW layer whose filters match nothing reads "0 MW", a
+  // selection of non-MW layers only reads n/a, and so does an enabled MW layer whose
+  // source is unavailable (worldgrid with its JSON missing serves an empty payload
+  // and reports `unavailable`), which deciding from the ids alone showed as 0 MW.
+  // A layer counts only once its fetch has completed (a cache entry exists): with the
+  // request in flight, or failed while health is nominal, there is nothing to sum and
+  // "0 MW" would be a claim about data not yet seen.
+  const mwApplies = enabled.some((id) => hasCapacity(id) && id in features &&
+    (features[id].length > 0 || freshness[id]?.status !== 'unavailable'));
+  const cap = shown.filter(([id]) => hasCapacity(id))
+    .reduce((a, [, f]) => a + (f.properties.capacity_mw || 0), 0);
   $('stat-count').textContent = shown.length.toLocaleString();
-  $('stat-cap').textContent = Math.round(cap).toLocaleString();
+  $('stat-cap').textContent = mwApplies ? `${Math.round(cap).toLocaleString()} MW` : 'n/a';
   // The fetch limit used to truncate power from 34,936 to 5,000 with no notice.
   const trunc = enabled.filter((id) => (features[id] || []).length >= PLANT_LIMIT);
   const el = $('stat-trunc');
@@ -129,13 +141,21 @@ function bandTip(p) {
   return html;
 }
 
+/** Feature text comes from data files, two of them cross-repository exports; the tooltip
+ *  is built as HTML, so every interpolated value is escaped. `&` first, or the entities
+ *  it produces would be re-escaped. */
+const esc = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 function siteTip(p) {
-  let html = `<div class="t-name">${p.name}</div>
-    <div class="t-row">${p.color_key}${p.country ? ' · ' + p.country : ''}</div>`;
-  if (p.capacity_mw) html += `<div class="t-row">${p.capacity_mw.toLocaleString()} MW</div>`;
+  const country = p.country ? ' · ' + esc(p.country) : '';
+  let html = `<div class="t-name">${esc(p.name)}</div>
+    <div class="t-row">${esc(p.color_key)}${country}</div>`;
+  if (p.capacity_mw) html += `<div class="t-row">${esc(p.capacity_mw.toLocaleString())} MW</div>`;
   if (p.extra && p.extra.distance_ly)
-    html += `<div class="t-row">${p.extra.distance_ly} ly · ${p.extra.star_type || ''}</div>`;
-  if (p.note) html += `<div class="t-row">${p.note}</div>`;
+    html += `<div class="t-row">${esc(p.extra.distance_ly)} ly · ${esc(p.extra.star_type || '')}</div>`;
+  if (p.note) html += `<div class="t-row">${esc(p.note)}</div>`;
   return html;
 }
 
@@ -187,13 +207,6 @@ let last = performance.now();
 $('fuel-filter').addEventListener('change', sites.render);
 $('min-cap').addEventListener('change', sites.render);
 
-sites.refreshAndRender();
-sites.pollHealth();
-setInterval(sites.pollHealth, 15000);
-bandsys.load();
-latticeLayer.update();
-setInterval(latticeLayer.update, latticeLayer.refreshInterval);
-
 let powerProvenance = '';
 
 /* Attribution is a licence condition, not decoration: it is rendered from the
@@ -203,18 +216,27 @@ function renderProvenance() {
     .filter(Boolean).join('   ·   ');
 }
 
-fetch('/api/layers', { cache: 'no-store' })
-  .then((r) => r.json())
-  .then((d) => {
-    const power = d.layers.find((l) => l.id === 'power') || {};
-    // vintage is a WRI release ("1.3.0"), retrieved_at is a date. Slicing the
-    // first as if it were the second is how this line briefly read
-    // "retrieved 1.3.0".
-    powerProvenance =
-      `WRI Global Power Plant Database v${power.vintage || '?'} · CC BY 4.0 · ` +
-      `retrieved ${power.retrieved_at || '—'} · ${(power.count || 0).toLocaleString()} plants`;
-    renderProvenance();
-  })
-  .catch(() => {});
+/** The `/api/layers` request behind the attribution line. Started by boot() beside the
+ *  other independent work; nothing waits on it. */
+function loadProvenance() {
+  return fetch('/api/layers', { cache: 'no-store' })
+    .then((r) => r.json())
+    .then((d) => {
+      const power = d.layers.find((l) => l.id === 'power') || {};
+      // vintage is a WRI release ("1.3.0"), retrieved_at is a date. Slicing the
+      // first as if it were the second is how this line briefly read
+      // "retrieved 1.3.0".
+      powerProvenance =
+        `WRI Global Power Plant Database v${power.vintage || '?'} · CC BY 4.0 · ` +
+        `retrieved ${power.retrieved_at || '—'} · ${(power.count || 0).toLocaleString()} plants`;
+      renderProvenance();
+    })
+    .catch(() => {});
+}
 
-imageryLayer.update();
+// Bands, lattice, attribution and imagery do not depend on site freshness and start
+// now. The first health response still seeds the freshness baseline before the first
+// site fetch -- that fetch runs inside pollHealth, after the baseline is stored -- and
+// only the poll interval waits on it. Awaiting the poll at top level held everything
+// below it behind a provider timeout that had nothing to do with those panels.
+boot({ sites, bandsys, latticeLayer, imageryLayer, loadProvenance });

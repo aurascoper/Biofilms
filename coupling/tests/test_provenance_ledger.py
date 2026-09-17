@@ -18,6 +18,7 @@ import csv
 from pathlib import Path
 
 import pytest
+from physical_contract import PARAMETER_EVIDENCE_BASIS
 
 from biofilm_openmc.config import (FIELD_SPECS, MODEL_KINDS, STAGES,
                                    BIOFILM_CYLINDER, known_keys,
@@ -36,9 +37,7 @@ MAPPING = {"mapped", "unmapped", "unsupported"}
 COMPAT = {"direct", "requires_transform", "unsupported"}
 PROVENANCE = {"published_replica", "certified_component", "engineered_composite",
               "declared"}
-EVIDENCE = {"direct_measurement", "assay_certificate", "manufacturer_datasheet",
-            "primary_literature", "evaluated_nuclear_data", "derived",
-            "declared", "synthetic"}
+EVIDENCE = PARAMETER_EVIDENCE_BASIS   # one object, shared with calibration
 DISTRIBUTION = {"point", "discrete_lines", "uniform", "lognormal", "n/a", ""}
 RANK = {"high", "medium", "low", "unknown"}
 STAGE_VALUES = set(STAGES) | {"none"}

@@ -13,7 +13,16 @@
 #  motivates the per-species magnitudes below; it is not what the term computes.
 #
 #  Maps the paper's Hamiltonian (Eq. 2, Section 3.3) to CPM energy:
-#    H_CPM = H_adhesion + H_volume + H_radiation + H_pairwise + H_melanin
+#    H_CPM = H_adhesion + H_volume + H_radiation + H_melanin
+#
+#  FOUR TERMS, NOT FIVE. compute_delta_H_terms returns (adh, vol, rad, mel) and
+#  compute_delta_H sums exactly those. total_pairwise_energy IS real, but it is
+#  called from take_snapshot alone and never enters Metropolis acceptance, so
+#  nothing in the simulation minimises it -- it records mutualistic-pair
+#  proximity under adhesion, not a selected-for outcome. Listing it here as a
+#  term of H_CPM was claims_ledger row RM-G04-01 (verdict restate); that verdict
+#  was applied to README and not to this comment, because the ledger guard
+#  resolves a row's `document` column and nothing reads source comments.
 #
 #  Coupled fields (melanin, nutrient, radiation) updated each MCS
 #  per Eq. 7 (melanin RD) and Eq. 5 (radiation field).
@@ -496,12 +505,23 @@ function site_adhesion(lattice, cells, J, x, y, z, N)
 end
 
 """
-Compute ΔH for a proposed copy: source site (sx,sy,sz) copies into target (tx,ty,tz).
-Only recomputes terms affected by the single-site change.
-Returns the total energy change ΔH.
+    compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+
+The four Hamiltonian contributions to a copy attempt, separately.
+
+THIS FUNCTION IS THE OLD BODY OF `compute_delta_H`, WHICH ALREADY COMPUTED ALL
+FOUR AND THEN DISCARDED THEM on its return line. Nothing new is calculated here.
+`compute_delta_H` now sums this in the same order it used to add them, so the
+scalar it returns is bit-identical by construction rather than by luck — same
+operands, same associativity, same result.
+
+It is split rather than retyped because three callers outside this file want the
+scalar, and one of them is `biofilms_potts_jacc.jl`'s cross-implementation check
+against the parallel port. Changing what that reads to prove a rendering point
+would be trading a real guard for a picture.
 """
-function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
-                          tx::Int, ty::Int, tz::Int)
+function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
+                               tx::Int, ty::Int, tz::Int)
     lat = state.lattice
     cells = state.cells
     J = state.J
@@ -576,25 +596,166 @@ function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
         ΔH_mel += 0.5 * M_local  # losing a melanin-rich site costs
     end
 
-    return ΔH_adh + ΔH_vol + ΔH_rad + ΔH_mel
+    return (adh = ΔH_adh, vol = ΔH_vol, rad = ΔH_rad, mel = ΔH_mel)
+end
+
+"""
+Compute ΔH for a proposed copy: source site (sx,sy,sz) copies into target (tx,ty,tz).
+Only recomputes terms affected by the single-site change.
+Returns the total energy change ΔH.
+
+Unchanged in value, type and summation order; it now adds up
+`compute_delta_H_terms` instead of four locals with the same names.
+"""
+function compute_delta_H(state::CPMState, sx::Int, sy::Int, sz::Int,
+                         tx::Int, ty::Int, tz::Int)
+    t = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+    return t.adh + t.vol + t.rad + t.mel
 end
 
 # ============================================================
 #  6. Monte Carlo Step (MCS)
 # ============================================================
 
+# ------------------------------------------------------------------
+#  Which term drove an accepted move
+# ------------------------------------------------------------------
+
+# Order matches `compute_delta_H_terms`' fields and the layer's colour key.
+const DRIVER_LABELS = (:none, :adh, :vol, :rad, :mel, :multiple, :contingent)
+
+const DRIVER_NONE       = 0x01
+const DRIVER_MULTIPLE   = 0x06
+const DRIVER_CONTINGENT = 0x07
+
+"""
+    decisive_label(terms, ΔH, u, T) -> UInt8
+
+Which single term, if any, DECIDED an accepted move — by counterfactual, on the
+uniform that was actually drawn.
+
+A term is decisive when removing it flips the outcome. That is answered here by
+arithmetic on `u` and never by consulting a generator: drawing again would
+advance the stream and break the byte contract, a second generator would make
+the answer stochastic and add a seed to declare, and a probability threshold
+would invent a constant. All three fabricate something.
+
+THE TWO ACCEPTANCE BRANCHES PRODUCE DISJOINT LABEL SETS, which is worth stating
+because it is not obvious and it is what makes `contingent` a category rather
+than a patch:
+
+  * `ΔH <= 0` — accepted outright, `u` is NaN because no draw was taken. Removing
+    a term can raise ΔH above zero, and what would have happened then needs a
+    number nobody drew. No term here can be shown to flip the move to REJECT;
+    it can only remove the certainty. So this branch yields `none` or
+    `contingent`, never a named term.
+  * `ΔH > 0` — a draw exists, so every counterfactual is decidable and nothing
+    is contingent. Only a term that HELPED (ΔH_t < 0) can be decisive: removing
+    a term that hurt lowers ΔH and the move stays accepted. So this branch
+    yields `none`, one of the four, or `multiple`.
+
+`none` is the informative cell in both branches, not the empty one: it says the
+SUM drove the move and no single term owns it. Given §6.2's ~1.5e4 separation
+between the melanin and direct-radiation terms it is expected to be common, and
+it must not be drawn as background.
+"""
+function decisive_label(terms, ΔH::Float64, u::Float64, T::Float64)
+    if ΔH <= 0
+        # Would removing any single term have cost this move its certainty?
+        for v in (terms.adh, terms.vol, terms.rad, terms.mel)
+            ΔH - v > 0 && return DRIVER_CONTINGENT
+        end
+        return DRIVER_NONE
+    end
+    found = 0x00
+    for (i, v) in enumerate((terms.adh, terms.vol, terms.rad, terms.mel))
+        ΔH′ = ΔH - v
+        # The move was accepted, so `u < exp(-ΔH/T)`. Without this term it is
+        # accepted iff ΔH′ <= 0 or `u` still clears the new, smaller threshold.
+        still = ΔH′ <= 0 || u < exp(-ΔH′ / T)
+        if !still
+            found == 0x00 || return DRIVER_MULTIPLE
+            found = UInt8(i + 1)          # 0x02..0x05, past DRIVER_NONE
+        end
+    end
+    return found == 0x00 ? DRIVER_NONE : found
+end
+
+"""
+Per-voxel tally of which term drove each accepted move.
+
+ACCEPTED MOVES ONLY, and deliberately: an attempted-move tally answers "where
+did the sampler look", which is uniform by construction and says nothing about
+the dynamics. `n_accepted` is DERIVED by summing the labels rather than counted
+alongside them, so there is one source for it and not two that can disagree.
+"""
+struct DriverCounts
+    counts::Array{Int32, 4}   # (N, N, N, length(DRIVER_LABELS))
+end
+
+DriverCounts(N::Int) = DriverCounts(zeros(Int32, N, N, N, length(DRIVER_LABELS)))
+
+@inline function record_driver!(d::DriverCounts, x::Int, y::Int, z::Int,
+                                label::UInt8)
+    d.counts[x, y, z, Int(label)] += Int32(1)
+    return nothing
+end
+
+n_accepted(d::DriverCounts) = dropdims(sum(d.counts, dims = 4), dims = 4)
+
+"""
+Modal label per voxel, 0 where no move was ever accepted there.
+
+0 IS NOT `none`. "The sum drove every move here" and "nothing happened here" are
+different statements and must not share a colour; `none` is a result and 0 is an
+absence. Ties go to the lower label index, which is stated rather than left to
+whatever `argmax` happens to do.
+"""
+function modal_driver(d::DriverCounts)
+    N = size(d.counts, 1)
+    out = zeros(UInt8, N, N, N)
+    @inbounds for z in 1:N, y in 1:N, x in 1:N
+        best = 0; best_n = 0
+        for k in 1:length(DRIVER_LABELS)
+            c = d.counts[x, y, z, k]
+            if c > best_n
+                best_n = c; best = k
+            end
+        end
+        out[x, y, z] = UInt8(best)
+    end
+    return out
+end
+
 """
 Perform one Monte Carlo Step = N³ attempted copy operations.
 Standard CPM Metropolis dynamics (Section 3.4 analog → stochastic accept/reject).
+
+`on_proposal`, when given, is called as `on_proposal(terms, ΔH)` for every
+EVALUATED proposal -- after the site pair survives the skip conditions and the
+energy is computed, and before the acceptance draw. It is the producer for the
+per-proposal ΔH_rad statistics quoted in §6.2; without it those numbers came
+from an uncommitted rewrite of this file and nobody could re-run them, which is
+PP-62-11's defect and is why this hook exists rather than a scratch script.
+
+IT MUST NOT CONSULT `rng`. The hook is called before the draw, so a closure that
+touches the generator moves the trajectory; `tests/rad_proposals_tests.jl` pins
+the shipped harness inert against the bare path with a different-seed control.
+
+`on_accepted(event)` observes each accepted copy AFTER the decision and BEFORE
+mutation. The immutable event contains values only, never a state or RNG
+reference. Linear sites are Julia xyz indices, 1-based; proposal_index counts
+all N^3 attempts, including skipped attempts. The observer must be inert.
 """
-function mcs_step!(state::CPMState, rng::AbstractRNG)
+function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
+                   on_proposal = nothing, on_accepted = nothing)
     p = state.params
     N = p.N
     lat = state.lattice
     n_attempts = N^3
     state.current_mcs += 1
 
-    for _ in 1:n_attempts
+    for proposal_index in 1:n_attempts
         # 1. Pick random source site inside cylinder
         sx = rand(rng, 1:N)
         sy = rand(rng, 1:N)
@@ -625,16 +786,42 @@ function mcs_step!(state::CPMState, rng::AbstractRNG)
         end
 
         # 4. Compute ΔH
-        ΔH = compute_delta_H(state, sx, sy, sz, tx, ty, tz)
+        terms = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+        ΔH = terms.adh + terms.vol + terms.rad + terms.mel
+
+        # Evaluated, not attempted: the skip conditions above have already
+        # rejected same-cell and medium-into-medium pairs, and the denominator
+        # the paper reports is this one.
+        on_proposal === nothing || on_proposal(terms, ΔH)
 
         # 5. Metropolis acceptance
-        accept = if ΔH <= 0
-            true
-        else
-            rand(rng) < exp(-ΔH / p.T_cpm)
+        #
+        # `u` IS NaN WHEN NO DRAW WAS TAKEN, and that is a fact about the
+        # acceptance rule rather than a missing value: at ΔH <= 0 the move is
+        # accepted outright and the generator is never consulted. The ternary
+        # evaluates only its taken branch, so `rand` is called exactly where it
+        # was before and the stream is untouched. Keeping `u` is what lets a
+        # counterfactual be answered by arithmetic instead of a second draw.
+        u = ΔH <= 0 ? NaN : rand(rng)
+        accept = ΔH <= 0 ? true : u < exp(-ΔH / p.T_cpm)
+
+        if accept && driver !== nothing
+            record_driver!(driver, tx, ty, tz,
+                           decisive_label(terms, ΔH, u, p.T_cpm))
         end
 
         if accept
+            if on_accepted !== nothing
+                on_accepted((mcs = state.current_mcs,
+                    proposal_index = proposal_index,
+                    donor_site = LinearIndices(lat)[sx, sy, sz],
+                    recipient_site = LinearIndices(lat)[tx, ty, tz],
+                    donor_id = σ_s, recipient_id = σ_t,
+                    donor_species = species_of(σ_s, state.cells),
+                    recipient_species = species_of(σ_t, state.cells),
+                    adh = terms.adh, vol = terms.vol, rad = terms.rad,
+                    mel = terms.mel, delta_h = ΔH, draw = u))
+            end
             # Execute copy: target site gets source cell ID
             # Update volumes
             if σ_t > 0 && haskey(state.cells, Int(σ_t))
@@ -1090,7 +1277,7 @@ function main()
     println("="^72)
     println("  Cellular Potts Model — Radiotropic Biofilm System")
     println("  Based on Kinder & Faulkner (2026)")
-    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  Hamiltonian: H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("="^72)
     println()
 
@@ -1198,6 +1385,13 @@ Base.@kwdef struct RadiolysisParams
     X_total::Float64 = 1.0     # total dry-mass density (g cm⁻³)
     X_red::Float64 = 0.3       # metal-reducing fraction (Shewanella proxy)
 
+    # Basis gate acknowledgement.  false refuses any X_total != 1.0.
+    # Bool rather than a Symbol because this field is HDF5-serialised by
+    # export_checkpoint.jl and must survive a restart; the exemption is binary
+    # anyway, and WHICH sites hold it is pinned by the census test rather than
+    # by a symbol name.  See _assert_basis_gate.
+    basis_gate_ack::Bool = false
+
     # Membrane (Nafion / Donnan — Fox et al. 2009, Lara et al. 2023)
     P0::Float64 = 0.01         # baseline permeability (cm s⁻¹)
     alpha_P::Float64 = 0.02    # radiation-damage coefficient (Gy⁻¹)
@@ -1222,7 +1416,19 @@ mutable struct RadiolysisState
     m::Float64                # membrane integrity  m ∈ [0,1]
     t::Float64                # simulation time
     params::RadiolysisParams
+    # Sticky basis provenance.  NOT inferred from X_total: a coupled state can
+    # legitimately produce mean(X_tot) == 1.0 (every sampled interior site
+    # occupied), which would collide with the standalone default and slip the
+    # gate; and c/s are PATH-dependent, so once a step has run on an occupancy
+    # basis they stay gated even if X_total later returns to 1.0.  Rule 4: the
+    # producer that installs the basis declares it, and the flag never clears.
+    basis_from_occupancy::Bool
 end
+
+# Six-argument form: provenance defaults to false, so a standalone state is
+# unmarked and only the coupled installers set it.
+RadiolysisState(r_grid, c, s, m, t, params) =
+    RadiolysisState(r_grid, c, s, m, t, params, false)
 
 """
 Initialise RadiolysisState: clean interior, intact membrane.
@@ -1257,6 +1463,8 @@ R = 1.0 cm makes dt_rd = 0.5 genuinely unstable, and this guard is what absorbs
 it. `biofilms_potts_jacc.jl` carries the identical wrapper for the same reason.
 """
 function step_radiolysis!(rd::RadiolysisState, dt::Float64)
+    _assert_basis_gate(rd.params.X_total, rd.params.basis_gate_ack,
+                       rd.basis_from_occupancy)
     dr = rd.r_grid[2] - rd.r_grid[1]
     dt_stable = 0.4 * dr^2 / (2.0 * rd.params.D_eff)
     n_sub = max(1, ceil(Int, dt / dt_stable))
@@ -1264,6 +1472,81 @@ function step_radiolysis!(rd::RadiolysisState, dt::Float64)
     for _ in 1:n_sub
         _step_radiolysis_euler!(rd, dt_sub)
     end
+end
+
+"""
+    _assert_basis_gate(X_total)
+
+Refuse to integrate on a coupled biomass basis, EXPLICITLY.
+
+RADIODIALYSIS: BLOCKED gates the biomass basis fed into this coupling, and
+until now nothing here enforced it. The block was being done by an accident:
+`uptake = k_ads*X_total + k_red*X_red` is the pre-fraction additive form, which
+happens to misbehave at non-unit `X_total`, and that side effect was standing in
+for a guard. An accidental tripwire is not a gate -- it can be removed by
+someone tidying the arithmetic, leaving nothing to say the basis was blocked.
+
+So the refusal is stated. `X_total == 1.0` is the standalone default and stays
+allowed; anything else means a real basis was supplied, which is what the gate
+covers.
+
+WHY THE ARITHMETIC IS NOT ALSO FIXED. `biofilms_radiodialysis.R` now derives
+`X_red = f_red_active * X_total` (`uptake_rate_of()`), and mirroring that here
+would make this path *conformant*. It would not make it *correct*: the `X_red`
+reaching it is `red_cells[i] / counts[i]` (`compute_radial_biomass`), one
+species' occupied sites over ALL interior sites, which README.md:344 records as
+"neither a biomass fraction nor a reducer fraction". Conformant arithmetic over
+a quantity the repository has already refused is worse than visibly
+non-conformant arithmetic over the same one: the defect would stop being visible
+while staying just as gated. The arithmetic stays as a marker that this
+reconciliation is unfinished.
+
+Nor can the fraction be derived from parcel counts. Counts give a TAXONOMIC
+fraction, and `active_from_taxonomic()` refuses converting one to an
+active-reducer fraction without a measured activity fraction; `D-XRED` in
+`data/calibration/reference_d_requirements.csv` records that as blocked by this
+units error rather than by missing data.
+"""
+function _assert_basis_gate(X_total::Float64, ack::Bool = false,
+                            from_occupancy::Bool = false)
+    (X_total == 1.0 && !from_occupancy) && return nothing
+    # THE ONE EXEMPTION.  validate_serial.jl steps this path only to reproduce a
+    # bit-for-bit CPM trajectory, and records no radiodialysis quantity: its CSV
+    # carries CPM columns plus rd.m, whose ODE (dm/dt = -k_dam*Ddot_R*m) has no
+    # X_total or X_red in it.  That independence is not taken on trust -- it is
+    # asserted in tests/radiodialysis_basis_gate.jl by running the harness at
+    # two different gated bases and requiring byte-identical CSV.  Widen this
+    # exemption and that test is what should stop you.
+    ack && return nothing
+    # NAME WHAT WAS REFUSED.  Stating only X_total made the provenance collision
+    # read as a contradiction: a state whose basis came from occupancy but whose
+    # mean landed on 1.0 was refused with "refusing at X_total = 1.0 ... only
+    # X_total == 1.0 is allowed".  Value and provenance are two different
+    # reasons to refuse and the message now says which one fired.
+    why = from_occupancy ?
+        "The basis is an occupancy mean (basis_from_occupancy = true), so " *
+        "X_total = $X_total is not the standalone default even when it " *
+        "equals 1.0. Provenance is what is refused here, not the value." :
+        "Only the standalone default X_total == 1.0 is allowed here; " *
+        "this state supplied X_total = $X_total."
+    error("""
+        RADIODIALYSIS: BLOCKED -- refusing to integrate.
+
+        $why
+
+        A coupled basis reaches this path as mean(compute_radial_biomass(...)):
+        one species' occupied sites over all interior sites, which is
+        neither a biomass fraction nor a reducer fraction
+        (README.md:344). The uptake arithmetic here is also still the
+        pre-fraction additive form, unlike biofilms_radiodialysis.R's
+        uptake_rate_of().
+
+        This refusal is deliberate and is asserted by
+        tests/radiodialysis_basis_gate.jl for the serial path and by
+        tests/jacc_port_tests.jl for the JACC port's copy of this function.
+        Removing it to let a coupled run proceed re-opens the defect the gate
+        names; repair the quantity first.
+        """)
 end
 
 """
@@ -1471,8 +1754,11 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                            rd.c[end])
     push!(trajectory, cs0)
     print_snapshot(snap0)
-    @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
-            rd.t, rd.m, rp.P0 * exp(rp.alpha_P * rd.t * rp.Ddot_R),
+    # RATIO, NOT AN ABSOLUTE. P0 is an uncalibrated placeholder, so
+    # `P0 * exp(...)` carries its arbitrariness into a number that looks
+    # measured. P_eff/P0 is dimensionless and is what the manuscript reports.
+    @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f\n\n",
+            rd.t, rd.m, exp(rp.alpha_P * rd.t * rp.Ddot_R),
             rd.c[end], mean(rd.c))
 
     for mcs in 1:n_mcs
@@ -1492,6 +1778,7 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                 k_loss  = rp.k_loss,
                 X_total = mean(X_tot),
                 X_red   = mean(X_rd),
+                basis_gate_ack = rp.basis_gate_ack,
                 P0      = rp.P0,
                 alpha_P = rp.alpha_P,
                 k_dam   = rp.k_dam,
@@ -1499,6 +1786,10 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                 c_ext   = rp.c_ext,
                 dt_rd   = rp.dt_rd
             )
+            # Declared where the occupancy basis is INSTALLED, and never
+            # cleared: c and s are path-dependent from here on, so provenance
+            # cannot be re-derived from the current X_total (rule 4).
+            rd.basis_from_occupancy = true
         end
         step_radiolysis!(rd, rp.dt_rd)
 
@@ -1522,8 +1813,8 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
                                   mean(rd.c), mean(rd.s), rd.c[end])
             push!(trajectory, cs)
             print_snapshot(snap)
-            @printf("  [RD] t=%.1f  m=%.4f  P_eff=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
-                    rd.t, rd.m, P_eff_now, rd.c[end], mean(rd.c), mean(rd.s))
+            @printf("  [RD] t=%.1f  m=%.4f  P_eff/P0=%.5f  c_wall=%.4f  c_mean=%.4f  s_mean=%.4f\n\n",
+                    rd.t, rd.m, P_eff_now / rp.P0, rd.c[end], mean(rd.c), mean(rd.s))
         end
     end
 
@@ -1531,6 +1822,23 @@ function run_simulation_coupled(params::CPMParams, rp::RadiolysisParams,
 end
 
 # ---- Radiodialysis-coupled main -----------------------------
+
+"""
+    print_membrane_report(rp, rd, n_mcs)
+
+Print the membrane-integrity/permeability/dose summary. Split out of
+`main_coupled()` so it's testable without a full simulation run, and so a
+negative control can capture exactly what it prints: no fabricated physical
+units (Gy, cm/s) attached to a quantity this repository cannot calibrate —
+see docs/research/session_claims_2026-08-24_redteam.md and PR #12.
+"""
+function print_membrane_report(rp::RadiolysisParams, rd::RadiolysisState, n_mcs::Int)
+    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
+    @printf("  Final P_eff / P0 = %.4f  (dimensionless ratio, exact by construction from alpha_P·Ddot_R·dt_rd·n_MCS — not a measurement)\n",
+            exp(rp.alpha_P * rp.Ddot_R * rd.t))
+    @printf("  Final P_eff, absolute: not computed in this work (P0 = %.3g cm/s is a Nafion-117 literature prior, not a calibration)\n", rp.P0)
+    @printf("  D_cum (dimensionless placeholder) after %d MCS: %.1f  (no seconds_per_mcs conversion exists — not Gy)\n", n_mcs, rp.Ddot_R * rd.t)
+end
 
 """
     main_coupled()
@@ -1542,7 +1850,7 @@ function main_coupled()
     println("="^72)
     println("  CPM + Radiodialysis Membrane Transport (Coupled)")
     println("  Kinder & Faulkner (2026) — Equations (1)–(3)")
-    println("  H = H_adh + H_vol + H_rad + H_pair + H_mel")
+    println("  H = H_adh + H_vol + H_rad + H_mel  (H_pair is a diagnostic, not in the acceptance path)")
     println("  PDE: ∂c/∂t = ∇·(D ∇c) - uptake·c + k_des·s (cylindrical)")
     println("="^72)
     println()
@@ -1554,7 +1862,7 @@ function main_coupled()
             params.N, N_SPECIES, params.n_cells_per_species)
     @printf("  Radiolysis:   Nr=%d  D_eff=%.3g  P₀=%.3g  α=%.3g\n",
             rp.Nr, rp.D_eff, rp.P0, rp.alpha_P)
-    @printf("  Membrane:     Ḋ(R)=%.1f Gy/s  c_ext=%.2f  k_dam=%.3g\n\n",
+    @printf("  Membrane:     Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)  c_ext=%.2f  k_dam=%.3g\n\n",
             rp.Ddot_R, rp.c_ext, rp.k_dam)
 
     n_mcs = 100
@@ -1566,11 +1874,7 @@ function main_coupled()
 
     @printf("\n  Simulation completed in %.1f seconds.\n", elapsed)
     @printf("  Surviving cells: %d\n", length(state.cells))
-    @printf("  Final membrane integrity: m = %.4f\n", rd.m)
-    @printf("  Final P_eff = %.5f cm/s  (×%.1f baseline)\n",
-            rp.P0 * exp(rp.alpha_P * rp.Ddot_R * rd.t),
-            exp(rp.alpha_P * rp.Ddot_R * rd.t))
-    @printf("  Cumulative dose at membrane: %.1f Gy\n", rp.Ddot_R * rd.t)
+    print_membrane_report(rp, rd, n_mcs)
 
     # Contaminant uptake summary
     println("\n  CONTAMINANT UPTAKE SUMMARY")
@@ -1826,7 +2130,8 @@ function init_coupled_simulation(params::CPMParams, rp::RadiolysisParams;
     return CoupledSimulation(state, rd, contaminant, rng, 0, 0.0)
 end
 
-function advance_window!(sim::CoupledSimulation, n_mcs::Int)
+function advance_window!(sim::CoupledSimulation, n_mcs::Int;
+                         on_accepted = nothing)
     state = sim.state
     rd = sim.rd
     N = state.params.N
@@ -1834,7 +2139,7 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int)
         sim.mcs += 1
         mcs = sim.mcs
 
-        mcs_step!(state, sim.rng)
+        mcs_step!(state, sim.rng; on_accepted)
 
         if mcs % 10 == 1
             X_tot, X_rd = compute_radial_biomass(state, rd.params.Nr)
@@ -1843,8 +2148,13 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int)
                 Nr = rp.Nr, D_eff = rp.D_eff, k_ads = rp.k_ads,
                 k_red = rp.k_red, k_des = rp.k_des, k_loss = rp.k_loss,
                 X_total = mean(X_tot), X_red = mean(X_rd),
+                basis_gate_ack = rp.basis_gate_ack,
                 P0 = rp.P0, alpha_P = rp.alpha_P, k_dam = rp.k_dam,
                 Ddot_R = rp.Ddot_R, c_ext = rp.c_ext, dt_rd = rp.dt_rd)
+            # Declared where the occupancy basis is INSTALLED, and never
+            # cleared: c and s are path-dependent from here on, so provenance
+            # cannot be re-derived from the current X_total (rule 4).
+            rd.basis_from_occupancy = true
         end
         step_radiolysis!(rd, rd.params.dt_rd)
         radial_to_3d!(sim.contaminant, rd.c, rd.r_grid, state.interior, N)
@@ -1965,7 +2275,7 @@ function export_figures(trajectory::Vector{<:Any},
     ax1  = Axis(fig1[1,1],
                 xlabel      = "Monte Carlo Steps",
                 ylabel      = "Mean radial position  r / R",
-                title       = "Radial stratification — cylindrical CPM bioreactor",
+                title       = "Mean radial position — cylindrical CPM bioreactor",
                 titlesize   = 15,
                 xlabelsize  = 13,
                 ylabelsize  = 13,
@@ -2052,7 +2362,7 @@ function export_figures(trajectory::Vector{<:Any},
     ax2  = Axis(fig2[1,1],
                 xlabel    = "Monte Carlo Steps",
                 ylabel    = "Mean melanin field value at occupied sites",
-                title     = "Melanin accumulation — radiation-driven production",
+                title     = "Melanin field at occupied sites — dimensionless model units",
                 titlesize = 15,
                 xlabelsize = 13,
                 ylabelsize = 13)
@@ -2080,11 +2390,11 @@ function export_figures(trajectory::Vector{<:Any},
            labelsize    = 11,
            rowgap       = 4,
            framevisible = false,
-           title        = "Melanin producers\n(★ radiotropic)",
+           title        = "Melanin producers",
            titlesize    = 11)
     # Override first two labels to add star
     text!(ax2, mcs_vec[1], -0.05;
-          text = "★ C. neoformans, C. sphaerospermum drift toward the source (radiotropic)",
+          text = "Ordering follows the hand-specified alpha_M_species scales; not a measured quantity",
           fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
 
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)
@@ -2147,13 +2457,29 @@ function export_figures(trajectory::Vector{<:Any},
                 linestyle = :dash,
                 label     = "P_eff / P₀  permeability ratio")
 
-    # Key annotations
-    m_final   = m_vec[end]
+    # Key annotations.
+    #
+    # BOTH WERE PLACED AT x = 0.55*t_end FROM FINAL VALUES, AND COLLIDED. The
+    # two y-positions -- m_final + 0.05 = 0.829 on the left axis and
+    # Peff_final * 0.88 = 2.385 on the right -- are independent numbers on
+    # independently autoscaled axes, and they happened to map to the same 79% of
+    # plot height, so the two labels printed on top of each other and neither
+    # was readable. That is arithmetic, not a rendering fluke: it recurred on
+    # every regeneration.
+    #
+    # The fix separates them HORIZONTALLY, which makes the vertical coincidence
+    # moot however the axes rescale, and anchors each label to its own curve at
+    # its own x so it stays beside the line it describes rather than at a height
+    # derived from a value plotted somewhere else.
+    m_final    = m_vec[end]
     Peff_final = Peff_norm[end]
-    text!(ax3l, Float64(t_vec[end]) * 0.55, m_final + 0.05;
+    i_at(frac) = argmin(abs.(Float64.(t_vec) .- Float64(t_vec[end]) * frac))
+    i_m, i_p   = i_at(0.35), i_at(0.80)
+    Peff_span  = maximum(Peff_norm) - minimum(Peff_norm)
+    text!(ax3l, Float64(t_vec[i_m]), m_vec[i_m] + 0.04;
           text    = @sprintf("m = %.3f", m_final),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
-    text!(ax3r, Float64(t_vec[end]) * 0.55, Peff_final * 0.88;
+    text!(ax3r, Float64(t_vec[i_p]), Peff_norm[i_p] - 0.18 * Peff_span;
           text    = @sprintf("%.1f× baseline", Peff_final),
           fontsize = 10, color = colorant"#d62728", align = (:center, :top))
 
@@ -2222,7 +2548,7 @@ function export_figures(trajectory::Vector{<:Any},
           text    = @sprintf("c(R) = %.0f%% c_ext", c_wall_final * 100),
           fontsize = 10, color = colorant"#d62728", align = (:center, :bottom))
     text!(ax4l, Float64(t_vec[end]) * 0.55, c_mean_final + 0.04;
-          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% depleted)",
+          text    = @sprintf("c_mean = %.1f%% c_ext  (%.0f%% non-penetration)",
                              c_mean_final * 100, (1.0 - c_mean_final) * 100),
           fontsize = 10, color = colorant"#1f77b4", align = (:center, :bottom))
 

@@ -1,0 +1,70 @@
+{
+  "pvd": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/evidence/biofilm-signal-evidence/inert_signal/paraview/signal_trajectory.pvd",
+  "timesteps": 101,
+  "raytracing_props_zeroed": {
+    "view1": "EnableRayTracing=0",
+    "view2": "EnableRayTracing=0"
+  },
+  "signal_range": [
+    0.0,
+    9.0
+  ],
+  "cell_arrays": [
+    "species",
+    "cell_id",
+    "lineage_id",
+    "generation",
+    "interior_mask",
+    "radiation_cpm",
+    "melanin",
+    "accumulated_dose_Gy",
+    "signal",
+    "occupied_above_threshold"
+  ],
+  "layout_split": true,
+  "slice_z": 28.5,
+  "paraview": "(6, 1)",
+  "frames": {
+    "0": {
+      "species_png": "species_mcs000.png",
+      "signal_png": "signal_z28_mcs000.png",
+      "slice_signal_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "7": {
+      "species_png": "species_mcs007.png",
+      "signal_png": "signal_z28_mcs007.png",
+      "slice_signal_range": [
+        0.0,
+        4.877769
+      ]
+    },
+    "8": {
+      "species_png": "species_mcs008.png",
+      "signal_png": "signal_z28_mcs008.png",
+      "slice_signal_range": [
+        0.0,
+        5.297071
+      ]
+    },
+    "30": {
+      "species_png": "species_mcs030.png",
+      "signal_png": "signal_z28_mcs030.png",
+      "slice_signal_range": [
+        7e-06,
+        8.385141
+      ]
+    },
+    "100": {
+      "species_png": "species_mcs100.png",
+      "signal_png": "signal_z28_mcs100.png",
+      "slice_signal_range": [
+        5.6e-05,
+        8.903407
+      ]
+    }
+  },
+  "pvsm": "/Users/aurascoper/Developer/biofilms-paraview-mac-2026-09-11/viewing/biofilm_signal_views.pvsm"
+}

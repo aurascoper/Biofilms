@@ -1,0 +1,33 @@
+                                    Membrane damage and radiation-driven permeability
+
+
+                          1.0
+                                                  m = 0.779
+                                                                                                  2.5
+
+
+
+
+Membrane integrity m(t)
+                                                                                                  2.0
+
+
+                                                                                                        P_eff / P₀
+                                                                                                                     m(t) integrity
+                                                                            2.7× baseline
+
+                                                                                                                     P_eff / P₀ permeability
+                          0.5
+
+
+
+                                                                                                  1.5
+
+
+
+
+                                                                                                  1.0
+                          0.0
+                                0                           50                              100
+                                                     Monte Carlo Steps
+

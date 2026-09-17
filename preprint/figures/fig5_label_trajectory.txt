@@ -1,0 +1,42 @@
+                                                  CPM parcel-label trajectory
+                                   N = 40 | 42 initial parcels | seed 42 | coupled MersenneTwister run
+
+              (a) MCS 0                                                 (b) MCS 30                                                 (c) MCS 100
+
+
+
+
+        42 live parcels                                                 42 live parcels                                             42 live parcels
+
+
+                             (d) Parcel-ID transitions                                                           (e) Returns to initial parcel ID
+                    40                                                                                          40
+                                                              8                                                                                       4
+y (lattice sites)
+
+
+
+
+                                                                                            y (lattice sites)
+                                                              6                                                                                       3
+                                                                  count per site
+
+
+
+
+                                                                                                                                                          count per site
+                    20                                        4                                                 20                                    2
+
+                                                              2                                                                                       1
+
+                                                              0                                                                                       0
+                    0                                                                                            0
+                         0              20            40                                                             0            20            40
+                                  x (lattice sites)                                                                        x (lattice sites)
+
+                                 Maps: MCS 0-100, sampled every MCS; z = 20 (1-based). Grey: outside domain.
+
+
+                                     C. neoformans       C. sphaerospermum            A. niger                           O. intermedium
+                                     D. radiodurans      B. subtilis                  S. oneidensis
+

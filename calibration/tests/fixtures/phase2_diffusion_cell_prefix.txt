@@ -1,0 +1,42 @@
+Phase 2 — two-chamber diffusion cell
+Biofilm grown on a permeable support; transport read as receiver breakthrough
+
+
+                                                      biofilm on permeable support
+
+
+
+
+                                       Donor                                                  Receiver
+                             concentration held constant                                     held near zero
+                                                                                                                                              timed aliquots
+                                 one solute per run                               C(t) gives the breakthrough curve
+
+
+
+                                                                                                                                              metal to ICP; bromide to IC
+
+
+
+
+                          Both chambers stirred — unstirred boundary layers otherwise read as film resistance.
+
+
+
+Paired blank: bare support                                    Open choice: the tracer                                       What one run yields
+Identical cell and support, no biofilm,                       Bromide is size- and charge-excluded                          Breakthrough lag gives a lumped
+run alongside every measurement.                              from fine porosity. In Hanford sediments                      transport parameter, not a diffusivity
+Gives the support’s own resistance and                        tritiated water resolved intragranular                        alone: sorption retards it. Separating
+its wall sorption. Without it the result                      pore volume where bromide did not; an                         the two needs the partition coefficient
+is film plus support, not film.                               anionic EPS matrix is the same trap.                          from the Phase 1 suspended isotherm.
+
+Edge seal checked separately: a leak                          Tritiated water carries its own approval                      That ordering is why Phase 1 comes
+reads as fast transport.                                      burden. A question for Dr. Deng.                              first.
+
+
+
+
+What this number is not
+The film-scale effective diffusivity measured here is not the reactor-scale dispersion coefficient that currently carries the same name in radial_parms (1×10⁻³ cm² s⁻¹, about 43× water’s
+It is the quantity slab_parms carries as D_eff (1×10⁻⁵ cm² s⁻¹) — the one default in that file below water self-diffusivity.
+
