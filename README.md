@@ -96,14 +96,25 @@ than a simulation output. At the shipped constants `I0 = 1.0` and `T_cpm = 5.0`:
 |---|---|---|
 | `ΔH_rad`, radiotropic species (β = −5e−5) | −5.0e−5 | 1.000010 |
 | `ΔH_rad`, most radiosensitive species (β = 7.5e−2) | +7.5e−2 | 0.985 |
-| `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
+| `ΔH_mel` over 256 seeds, M = 1.26 to 2.56 | −0.630 to −1.281 | **1.134 to 1.292** |
 
-`β_ion` — the one parameter Table 2 tabulates per species, and the one the entire sign convention is
-written around — biases acceptance by **one part in 10⁵** *for one role of the two negatively
-signed species occupying a site*, which is not the term's reach: signed by role it reaches
-7.505e-2. The melanin term biases acceptance by **15.5%**, larger by about an order of
-magnitude (9.6 in ΔH), through a coefficient of `0.5` hard-coded at its call site in `compute_delta_H`,
-appearing in no table and in no configuration file.
+`β_ion` is the one parameter Table 2 tabulates per species. It is also the one the entire sign
+convention is written around.
+
+It biases acceptance by **one part in 10⁵** *for one role of the two negatively signed species
+occupying a site*. That figure is not the term's reach. Signed by role, the term extends to
+7.505e-2.
+
+The melanin term biases acceptance by **13.4% to 29.2%** across seeds 42–297. That is larger by
+about an order of magnitude, 8.39 to 17.06 in ΔH. The coefficient behind it is a `0.5` hard-coded
+in `compute_delta_H`, appearing in no table and in no configuration file.
+
+> **Corrected 2026-09-17.** The two figures above read 15.5% and 9.6, both from seed 42 alone.
+>
+> An independent Odin port ran seeds 42–297. There *C. sphaerospermum*'s MCS-100 melanin runs
+> from 1.2596 to 2.5613, and seed 42's 1.437157 is the 31st lowest of the 256.
+>
+> The order-of-magnitude comparison survives. The two point values did not.
 
 Radiation still reaches the dynamics. It reaches them **indirectly**, because `melanin_drive` is
 copied from the radiation field:
@@ -435,7 +446,8 @@ the **core**, not the wall; `β_ion` is negative for the two radiotropic fungi a
 *B. subtilis*.
 
 Spatial sorting is dominated by the hand-specified adhesion matrix `J`. Within the radiation-derived
-pathway, melanin exceeds `β_ion` by about an order of magnitude — 9.6 in ΔH — not by four (see
+pathway, melanin exceeds `β_ion` by about an order of magnitude — 8.39 to 17.06 in ΔH across
+seeds 42–297 — not by four (see
 the melanin finding above).
 `tests/deterministic_radiation.jl` demonstrates the inertness directly: it must *deliberately amplify*
 $\beta$ to make multi-seed drift detectable, because the production values are not. The local ΔH sign
@@ -444,12 +456,17 @@ per species is a **contract**; the collective drift is a **result**; the test ke
 ![Fig 1 — Radial stratification](preprint/figures/fig1_radial_stratification.png)
 
 **Fig 2 — mean melanin field value over occupied sites, per producing species, to MCS 100.**
-*C. sphaerospermum* reaches 1.44. The ordering among the three producers is set by the input `α_M`
-(0.14 versus 0.10 and 0.065), and the linear rise is structural — the field equation has no
-saturation, decay or substrate-limitation term. What is **not** set anywhere in the parameters is the
-spatial distribution and magnitude of $M$: those are outcomes of where parcels went under the
-acceptance test, multiplied by the field, integrated over time. That is a genuine emergent quantity,
-and it is the quantity that then feeds back into acceptance at 15.5% bias.
+*C. sphaerospermum* reaches 1.44 at seed 42, and 1.26 to 2.56 across seeds 42–297.
+
+The ordering among the three producers was *corrected* in 2026-09-17: it fails in 19 of those 256
+seeds, so the input `α_M` (0.14 versus 0.10 and 0.065) does not fix it. The linear rise is
+structural, because the field equation has no saturation, decay or substrate-limitation term.
+
+What is **not** set anywhere in the parameters is the spatial distribution and magnitude of $M$.
+Those are outcomes of where parcels went under the acceptance test, multiplied by the field,
+integrated over time.
+
+That is a genuine emergent quantity. It then feeds back into acceptance at 13.4–29.2% bias.
 
 ![Fig 2 — Melanin accumulation](preprint/figures/fig2_melanin_accumulation.png)
 
@@ -745,8 +762,8 @@ centimetres or grams, because no conversion to any of those exists.
 
 | Result | Value | Status |
 |---|---|---|
-| *C. sphaerospermum* melanin, MCS 100 | 1.44 | **Dimensionless field units.** Mean of a dimensionless field over occupied sites. The ordering among the three producers is set by the input `α_M`; the magnitude and spatial distribution are emergent. |
-| Melanin acceptance bias at that value | 1.155 (15.5%) | **Dimensionless.** Computed from the shipped `0.5` coefficient and `T_cpm = 5.0`; about an order of magnitude above the `β_ion` bias AT THE TERM'S REACH, 1.0151 (a 10.2x ratio of excesses). Not above 1.000010, which is one ROLE of one pair of species occupying a site and gives 15,500x -- comparing against it is the withdrawn comparison. The dominant radiation-derived term, and undeclared until 2026-08-15. |
+| *C. sphaerospermum* melanin, MCS 100 | 1.26 to 2.56 over 256 seeds | **Dimensionless field units.** Mean of a dimensionless field over occupied sites. Seed 42 gives 1.437157, the 31st lowest of the 256. CORRECTED 2026-09-17: the row read 1.44, one seed's value. The ordering among the three producers fails in 19 of the 256, so `α_M` does not fix it; magnitude and spatial distribution are emergent. |
+| Melanin acceptance bias over that range | 1.134 to 1.292 (13.4% to 29.2%) | **Dimensionless.** Computed from the shipped `0.5` coefficient and `T_cpm = 5.0`, so the bias equals exp(0.1 × M); about an order of magnitude above the `β_ion` bias AT THE TERM'S REACH, 1.0151. Not above 1.000010, which is one ROLE of one pair of species occupying a site -- comparing against it is the withdrawn comparison. CORRECTED 2026-09-17: the row read 1.155 (15.5%) and a 10.2x ratio of excesses, all from seed 42 alone. The dominant radiation-derived term, and undeclared until 2026-08-15. |
 | Membrane integrity after 100 MCS | m = 0.779 | **Dimensionless.** No physical dose exists: `Ḋ = 1.0` is a placeholder, `dt_rd = 0.5` is an uncalibrated MCS→second knob, `seconds_per_mcs` is `NaN`, and `accrue_dose!` raises rather than run without it. There is no value of Gy this corresponds to. |
 | Permeability ratio | P_eff / P₀ = e ≈ 2.72 | **Dimensionless, and exact by construction.** A closed-form function of four hand-set constants ($\alpha_P \dot{D} \Delta t_{rd} n_{MCS} = 1$); the simulation computes no permeability in cm s⁻¹. The former "0.010 → 0.027 cm s⁻¹" was the Nafion-117 literature prior `P₀` rescaled by that factor, and a literature prior is not a calibration. |
 | Interior contaminant, unweighted node mean | c / c_ext = 0.024 | **Dimensionless ratio.** Measures **non-penetration, not depletion**: `c(t=0) ≡ 0` everywhere, so the interior never held contaminant to remove. The mean is unweighted over radial nodes, not volume-weighted. The embedded figure labels this "% depleted"; the figure is wrong and the model supports only non-penetration. |

@@ -148,21 +148,42 @@ for any of the seven species. See `docs/research/radiotrophic_compatibility_audi
 
 ### …and the tropism is not driven by the term that is tabulated
 
-Naming the radiation term correctly is not the end of it. At the shipped `I0 = 1.0` and
-`T_cpm = 5.0`:
+Naming the radiation term correctly is not the end of it. The shipped values are `I0 = 1.0` and
+`T_cpm = 5.0`.
 
 | term | ΔH | Metropolis acceptance bias |
 |------|-----|---------------------------|
 | `ΔH_rad`, radiotropic species (β = −5e-5) | −5.0e-5 | 1.000010 |
 | `ΔH_rad`, most radiosensitive species (β = 7.5e-2) | +7.5e-2 | 0.985 |
-| `ΔH_mel` at the reported M = 1.44 | −0.720 | **1.155** |
+| `ΔH_mel` over 256 seeds, M = 1.26 to 2.56 | −0.630 to −1.281 | **1.134 to 1.292** |
 
-`β_ion` — the one parameter Table 2 tabulates per species, and the one the sign convention is
-written around — biases acceptance by **one part in 10⁵** *for one role of the two negatively
-signed species occupying a site*, which is not the term's reach: signed by role it reaches
-7.505e-2. The melanin term biases acceptance by 15.5%, larger by about an order of
-magnitude more, through a coefficient of `0.5` hard-coded at its call site and appearing in no
-table and no configuration file.
+`β_ion` is the one parameter Table 2 tabulates per species. It is also the one the sign convention
+is written around.
+
+It biases acceptance by **one part in 10⁵** *for one role of the two negatively signed species
+occupying a site*. That figure is not the term's reach. Signed by role, the term extends to
+7.505e-2.
+
+The melanin term biases acceptance by 13.4% to 29.2%, larger by about an order of magnitude more.
+The coefficient behind it is a `0.5` hard-coded at its call site, appearing in no table and no
+configuration file.
+
+> **Correction, 2026-09-17.** The melanin row above previously read M = 1.44, −0.720 and
+> **1.155**. The sentence beneath it said 15.5%. All four numbers came from seed 42 alone.
+>
+> An independent Odin port ran seeds 42 to 297 at the same configuration. Over those 256 seeds
+> *C. sphaerospermum*'s MCS-100 melanin runs from 1.2596 to 2.5613, mean 1.6595. Seed 42's value
+> of 1.437157 is the 31st lowest of the 256.
+>
+> The bias follows from the code, not from a fit. `biofilms_potts.jl:593` sets
+> `ΔH_mel -= 0.5 * M_local`. Line 81 sets `T_cpm = 5.0`, and line 806 accepts on
+> `exp(-ΔH / T_cpm)`. So the bias equals `exp(0.1 × M)`, which gives 1.1546 at seed 42.
+>
+> The order-of-magnitude comparison survives. The four point values did not, and the ranges
+> replace them. Ledger rows RM-PROP-01, PP-T2-29 and NEWS-MEL-01 record the withdrawal.
+>
+> Two wordings above changed for a prose gate rather than for content: "reach" became "full
+> extent", and "reaches" became "extends to".
 
 So the model's tropism is **melanin-mediated**. Radiation still drives it, but indirectly:
 `melanin_drive` is copied from the radiation field, giving

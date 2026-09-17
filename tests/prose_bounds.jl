@@ -38,6 +38,12 @@
 # be. What it establishes is that this particular class of defect -- a bound
 # asserted in prose that the coefficients contradict -- now has somewhere to
 # fail, for the one bound that has already failed once.
+#
+# THE SCOPE GREW ONCE, ON 2026-09-17, and saying so is cheaper than letting the
+# paragraph above go quietly stale. The melanin-ratio testset below also reads
+# README.md and docs/calibration/integration_contract.md, because one corrected
+# table row is published in all three files and a guard on the manuscript alone
+# leaves the other two free to drift.
 
 const TEX = joinpath(REPO, "preprint",
                      "modeling_radioresistance_and_radiotropic_fitness.tex")
@@ -195,9 +201,19 @@ end
     @test coupling !== nothing
     @test coupling ≈ 0.5
 
-    M_REPORTED = 1.44          # the melanin level Table 3's row is stated at
-    dH_mel = coupling * M_REPORTED
+    M_SEED42 = 1.44            # seed 42's melanin, which Table 3 once stated alone
+    dH_mel = coupling * M_SEED42
     @test dH_mel ≈ 0.720
+
+    # THE SEED RANGE IS DECLARED HERE, NOT MEASURED HERE. F. Fink's independent
+    # Odin port ran seeds 42--297 at this configuration and M spans 1.2596 to
+    # 2.5613 across them; seed 42's 1.437157 is the 31st lowest of the 256. That
+    # CSV is not in this repository, so these two bounds are INPUTS to this file,
+    # recorded in data/claims_ledger.csv row SEED42-SCOPE-01. Everything below
+    # them is still computed: a changed coupling, a changed β_ion and a wrong
+    # pair of endpoints in the prose each fail.
+    M_LO, M_HI = 1.2596, 2.5613
+    @test M_LO < M_SEED42 < M_HI
 
     βmax, βmin = maximum(p.β_ion), minimum(p.β_ion)
     reach = (max(0.0, βmax) + max(0.0, -βmin)) * p.I0
@@ -206,6 +222,12 @@ end
     ratio_bias = (exp(dH_mel / p.T_cpm) - 1) / (exp(reach / p.T_cpm) - 1)
     @test isapprox(ratio_dH,   9.6;  atol = 0.05)
     @test isapprox(ratio_bias, 10.2; atol = 0.05)
+
+    ratio_lo = coupling * M_LO / reach
+    ratio_hi = coupling * M_HI / reach
+    @test isapprox(ratio_lo,  8.39; atol = 0.05)
+    @test isapprox(ratio_hi, 17.06; atol = 0.05)
+    @test ratio_lo < ratio_dH < ratio_hi
 
     # ...and the two are NOT interchangeable, which is why each location names
     # its register. If they ever converge this assertion says so.
@@ -220,15 +242,54 @@ end
     #
     # Each location gets its own pattern AND the count is pinned, so a location
     # losing its phrasing fails rather than silently dropping out of the sweep.
+    #
+    # CORRECTED 2026-09-17, AND THE GUARD IS WHAT BROKE. The prose now states a
+    # range over 256 seeds, so the single-value patterns below matched nothing
+    # and this testset failed on a manuscript that had just been made right. A
+    # gate computed FROM a published number is a dependent of it, which is the
+    # audit step the correction rules already require and this file was not
+    # listed under. Each pattern now reads BOTH endpoints and pins both: one
+    # endpoint alone would accept "$8.39$ to $900$", and a containment test
+    # alone would accept "$1.0$ to $99.0$". The control below states both cases.
     dH_sites = [
-        ("6.2", r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in"),
-        ("7.1", r"radiation term by about an order of magnitude in \$\\Delta H\$ \(\$([0-9.]+)\$\)"),
+        ("6.2", r"smaller than the melanin term by a factor of \$([0-9.]+)\$ to\s+\$([0-9.]+)\$ in"),
+        ("7.1", r"radiation term by about an order of magnitude in \$\\Delta H\$ \(\$([0-9.]+)\$ to \$([0-9.]+)\$ across 256 seeds\)"),
     ]
     for (where, pat) in dH_sites
         hits = collect(eachmatch(pat, tex))
         @test length(hits) == 1              # the location exists, exactly once
         for h in hits
-            @test isapprox(parse(Float64, h[1]), ratio_dH; atol = 0.05)
+            @test isapprox(parse(Float64, h[1]), ratio_lo; atol = 0.05)
+            @test isapprox(parse(Float64, h[2]), ratio_hi; atol = 0.05)
+        end
+    end
+
+    # TABLE 3's ROW IS A DEPENDENT OF THE SAME CORRECTION, so it is checked here
+    # rather than left to the bare-number guard in calibration/, which can only
+    # ask whether seed 42's values are gone. All three columns must read in ONE
+    # seed order: M ascending, ΔH descending in sign, bias ascending. The first
+    # version of this row wrote the ΔH column backwards, so reading the table
+    # across paired M=1.26 with ΔH=-1.281, which is M=2.56's value.
+    table_row = r"\$\\Delta H_\{\\mathrm\{mel\}\}\$ over 256 seeds, \$M=([0-9.]+)\$ to \$([0-9.]+)\$ & \$-([0-9.]+)\$ to \$-([0-9.]+)\$ & \$\\mathbf\{([0-9.]+)\}\$ to \$\\mathbf\{([0-9.]+)\}\$"
+    md_row = r"\| `ΔH_mel` over 256 seeds, M = ([0-9.]+) to ([0-9.]+) \| −([0-9.]+) to −([0-9.]+) \| \*\*([0-9.]+) to ([0-9.]+)\*\* \|"
+
+    # README.md and the integration contract publish the same row, and grepping
+    # the ΔH value is what found the ordering defect in all three at once.
+    published_rows = [
+        (table_row, tex),
+        (md_row, read(joinpath(REPO, "README.md"), String)),
+        (md_row, read(joinpath(REPO, "docs", "calibration", "integration_contract.md"), String)),
+    ]
+    for (pat, text) in published_rows
+        rows = collect(eachmatch(pat, text))
+        @test length(rows) == 1
+        for r in rows
+            @test isapprox(parse(Float64, r[1]), M_LO; atol = 0.005)
+            @test isapprox(parse(Float64, r[2]), M_HI; atol = 0.005)
+            @test isapprox(parse(Float64, r[3]), coupling * M_LO; atol = 0.001)
+            @test isapprox(parse(Float64, r[4]), coupling * M_HI; atol = 0.001)
+            @test isapprox(parse(Float64, r[5]), exp(coupling * M_LO / p.T_cpm); atol = 0.001)
+            @test isapprox(parse(Float64, r[6]), exp(coupling * M_HI / p.T_cpm); atol = 0.001)
         end
     end
 
@@ -243,14 +304,42 @@ end
         # training case. The control is a DIFFERENT wrong ratio, plus the
         # correct one passing -- that pins an arithmetic relation instead of one
         # string, and the next half-correction will not land on fifteen either.
-        wrong = raw"smaller than the melanin term by a factor of $12.0$ in $\Delta H$"
-        parsed = match(r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in", wrong)
-        @test parsed !== nothing
-        @test !isapprox(parse(Float64, parsed[1]), ratio_dH; atol = 0.05)
+        pat = dH_sites[1][2]
 
-        right = raw"smaller than the melanin term by a factor of $9.6$ in $\Delta H$"
-        ok = match(r"smaller than the melanin term by a factor of \$([0-9.]+)\$ in", right)
-        @test isapprox(parse(Float64, ok[1]), ratio_dH; atol = 0.05)
+        # A range that brackets seed 42's 9.6 and is wrong at both ends. This is
+        # the case a containment test would have passed, which is why the
+        # endpoints are pinned instead.
+        wide = raw"smaller than the melanin term by a factor of $1.0$ to $99.0$ in $\Delta H$"
+        loose = match(pat, wide)
+        @test loose !== nothing
+        @test !isapprox(parse(Float64, loose[1]), ratio_lo; atol = 0.05)
+        @test !isapprox(parse(Float64, loose[2]), ratio_hi; atol = 0.05)
+
+        # One endpoint right and one wrong: the half-correction this file exists
+        # to catch, in its range form.
+        half = raw"smaller than the melanin term by a factor of $8.39$ to $12.0$ in $\Delta H$"
+        parsed = match(pat, half)
+        @test isapprox(parse(Float64, parsed[1]), ratio_lo; atol = 0.05)
+        @test !isapprox(parse(Float64, parsed[2]), ratio_hi; atol = 0.05)
+
+        # The pre-2026-09-17 single-value sentence no longer matches at all, so a
+        # silent revert to seed 42 fails at the count rather than at the value.
+        old = raw"smaller than the melanin term by a factor of $9.6$ in $\Delta H$"
+        @test match(pat, old) === nothing
+
+        right = raw"smaller than the melanin term by a factor of $8.39$ to $17.06$ in $\Delta H$"
+        ok = match(pat, right)
+        @test isapprox(parse(Float64, ok[1]), ratio_lo; atol = 0.05)
+        @test isapprox(parse(Float64, ok[2]), ratio_hi; atol = 0.05)
+
+        # Table 3's own defect, as the control for the row check: M and the bias
+        # ascending while ΔH descends, which pairs each M with the other one's
+        # ΔH. The row parses; the third cell is not M_LO's ΔH.
+        swapped = raw"$\Delta H_{\mathrm{mel}}$ over 256 seeds, $M=1.26$ to $2.56$ & $-1.281$ to $-0.630$ & $\mathbf{1.134}$ to $\mathbf{1.292}$"
+        back = match(table_row, swapped)
+        @test back !== nothing
+        @test !isapprox(parse(Float64, back[3]), coupling * M_LO; atol = 0.001)
+        @test isapprox(parse(Float64, back[3]), coupling * M_HI; atol = 0.001)
 
         # And fifteen, as a special case rather than as the test.
         @test !isapprox(15.41, ratio_bias; atol = 0.05)
