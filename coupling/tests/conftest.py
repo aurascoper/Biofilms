@@ -129,10 +129,15 @@ density_g_cm3 = 1.0
 """
 
 
-def make_snapshot_file(path, n=8, n_lineages=3, config_toml=""):
+def make_snapshot_file(path, n=8, n_lineages=3, config_toml="", cpm_seed=None,
+                       write_seed_attrs=True):
     """Write a synthetic transport snapshot in the JULIA storage layout:
     logical (x,y,z) arrays land in the file so h5py sees dims reversed —
-    exactly what export_checkpoint.jl produces."""
+    exactly what export_checkpoint.jl produces.
+
+    `write_seed_attrs=False` builds a file with no cpm_seed_source at all, which
+    is what every snapshot written before 2026-09-17 looks like. A test cannot
+    reach the reader's third state without it."""
     rng = np.random.default_rng(1)
     cell_id = np.zeros((n, n, n), dtype=np.int32)          # logical (x,y,z)
     # a few axis-asymmetric blobs so orientation errors are detectable
@@ -168,6 +173,10 @@ def make_snapshot_file(path, n=8, n_lineages=3, config_toml=""):
         f.attrs["physical_time_s"] = float("nan")
         f.attrs["label_state_hash"] = "0" * 64
         f.attrs["material_class_source"] = "absent" if not config_toml else "config"
+        if write_seed_attrs:
+            f.attrs["cpm_seed_source"] = "absent" if cpm_seed is None else "declared"
+            if cpm_seed is not None:
+                f.attrs["cpm_seed"] = int(cpm_seed)
         f["config_toml"] = config_toml
         put(f, "lattice/cell_id", cell_id)
         put(f, "lattice/species_id", species)

@@ -17,8 +17,13 @@ Axes count lattice sites, not lengths. The pitch is `D-PITCH`, still `awaiting_m
 the snapshots record `physical_time_s` as `NaN`. Accumulated dose is zero in every frame. So this
 run shows the Cellular Potts model under its static radial field alone, with no transport coupling.
 
-The snapshots do not record the seed, because their `config_toml` is empty. Read the animation as a
-picture of the mechanism, not as a reproducible case.
+The snapshots stamped `039b7a2` do not record the seed. Read the animation as a picture of the
+mechanism, not as a reproducible case.
+
+*Corrected 2026-09-17:* this paragraph gave the cause as an empty `config_toml`. That cause is
+wrong. A populated config declares `[transport] seed`, which is OpenMC's Monte Carlo seed and not
+the CPM run seed. Snapshots written from 2026-09-17 record `cpm_seed` and `cpm_seed_source`
+instead, alongside `cpm_params` and `rd_params`.
 
 Four things run. A **3D Cellular Potts model** (`biofilms_potts.jl`) evolves biomass parcels on a
 cylindrical lattice under a four-term Metropolis acceptance functional — adhesion, volume, radiation

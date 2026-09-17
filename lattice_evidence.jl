@@ -14,11 +14,16 @@ basis_gate_ack is justified ONLY for labelled CPM diagnostics. The uptake
 perturbation control exercises this factory and the production export. c/s
 remain blocked, including at MCS 0; restarting requires keeping that contract.
 """
+# ONE seed, named once. It was written twice as a bare 42: here, and again in the
+# run manifest's configuration block. Two independent literals that must agree is
+# how a manifest comes to state a seed the run did not use.
+const MANUSCRIPT_SEED = 42
+
 function manuscript_trajectory(SR)
     params = SR.CPMParams(N = 40, n_cells_per_species = 6, snapshot_interval = 20)
     rp = SR.RadiolysisParams(Nr = 40, Ddot_R = 1.0, c_ext = 1.0,
                             basis_gate_ack = true)
-    return SR.init_coupled_simulation(params, rp; seed = 42)
+    return SR.init_coupled_simulation(params, rp; seed = MANUSCRIPT_SEED)
 end
 
 filehash(p) = open(sha256, p) |> bytes2hex
@@ -80,8 +85,11 @@ function require_initial_inventory(info)
     return nothing
 end
 
-function write_snapshot(SR, sim, path, run_id; config = nothing)
-    export_transport_snapshot(SR, sim, path; config_toml_path = config)
+# `cpm_seed` defaults to nothing rather than to MANUSCRIPT_SEED. A default that
+# names a seed is a statement, and a caller that forgot would declare a seed the
+# run never used. The one caller below passes it.
+function write_snapshot(SR, sim, path, run_id; config = nothing, cpm_seed = nothing)
+    export_transport_snapshot(SR, sim, path; config_toml_path = config, cpm_seed)
     info = inventory(SR, sim)
     a = label_arrays(SR, sim)
     h5open(path, "r+") do f
@@ -192,7 +200,8 @@ function produce_run(SR, run_id; root = joinpath(ROOT, "out", "lattice_evidence"
     manifest = Dict{String,Any}("schema_version" => 1, "run_id" => run_id,
         "status" => "incomplete", "created_utc" => string(now(UTC)),
         "configuration" => Dict("N" => 40, "n_species" => 7, "initial_parcels" => 42,
-            "parcels_per_species" => 6, "seed" => 42, "rng_type" => string(typeof(sim.rng)),
+            "parcels_per_species" => 6, "seed" => MANUSCRIPT_SEED,
+            "rng_type" => string(typeof(sim.rng)),
             "mcs_start" => 0, "mcs_end" => N_MCS, "cadence_mcs" => 1,
             "cpm_parameters" => params_dict(sim.state.params), "rd_parameters" => params_dict(sim.rd.params)),
         "provenance" => source_provenance(), "gate" => Dict("c_s_analysis_blocked" => true,
@@ -209,7 +218,7 @@ function produce_run(SR, run_id; root = joinpath(ROOT, "out", "lattice_evidence"
     for mcs in 0:N_MCS
         mcs > 0 && SR.advance_window!(sim, 1; on_accepted = log)
         path = joinpath(dir, "snapshots", @sprintf("snap_mcs%06d.h5", mcs))
-        info = write_snapshot(SR, sim, path, run_id; config)
+        info = write_snapshot(SR, sim, path, run_id; config, cpm_seed = MANUSCRIPT_SEED)
         info["path"] = relpath(path, dir)
         push!(manifest["snapshots"], info)
         mcs % 20 == 0 && @printf("labelled trajectory: MCS %d/%d\n", mcs, N_MCS)

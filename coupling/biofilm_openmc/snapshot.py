@@ -58,6 +58,12 @@ class Snapshot:
     label_state_hash: str
     material_class_source: str
     config_toml: str
+    # The CPM run seed, which is NOT the [transport] seed a coupling config
+    # declares for OpenMC. Source is "declared", "absent" or "unrecorded".
+    # "unrecorded" means the file predates the field, which is not a statement
+    # by the writer. cpm_seed is None unless the source is "declared".
+    cpm_seed_source: str
+    cpm_seed: int | None
     attrs: dict
 
 
@@ -86,6 +92,25 @@ def load_snapshot(path) -> Snapshot:
                     f"orientation probe failed at (x,y,z)=({x},{y},{z}): "
                     f"expected {expect}, got {got} — axis order is broken, refusing to proceed")
 
+        # THREE states, not two. A file with no cpm_seed_source predates the
+        # field. Reading that silence as "absent" would turn a gap in the schema
+        # into a claim by the writer.
+        if "cpm_seed_source" in attrs:
+            seed_source = _as_str(attrs["cpm_seed_source"])
+            if seed_source not in ("declared", "absent"):
+                raise SnapshotError(
+                    f"unknown cpm_seed_source {seed_source!r}; expected 'declared' or 'absent'")
+        else:
+            seed_source = "unrecorded"
+        has_seed = "cpm_seed" in attrs
+        if seed_source == "declared" and not has_seed:
+            raise SnapshotError(
+                "cpm_seed_source is 'declared' but the file has no cpm_seed attribute")
+        if seed_source != "declared" and has_seed:
+            raise SnapshotError(
+                f"the file has a cpm_seed attribute but cpm_seed_source is {seed_source!r}")
+        cpm_seed = int(attrs["cpm_seed"]) if has_seed else None
+
         cells = {k: f[f"cells/{k}"][()] for k in f["cells"]}
         return Snapshot(
             cell_id=cell_id,
@@ -102,6 +127,8 @@ def load_snapshot(path) -> Snapshot:
             label_state_hash=_as_str(attrs["label_state_hash"]),
             material_class_source=_as_str(attrs["material_class_source"]),
             config_toml=_as_str(f["config_toml"][()]),
+            cpm_seed_source=seed_source,
+            cpm_seed=cpm_seed,
             attrs=attrs,
         )
 

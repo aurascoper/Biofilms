@@ -50,6 +50,38 @@ N = (12, 12, 12)
     fd = get_field_data(f)
     @test get_data(fd["mcs"])[1] == 2.0
     @test get_data(fd["cell_id_wall"])[1] == -1.0
+    # The snapshot above was written with no seed, so the .vti states the absent
+    # declaration. NaN pairs with it, as physical_time_s already does here.
+    @test vti_field_string(path, "cpm_seed_source") == "absent"
+    @test isnan(get_data(fd["cpm_seed"])[1])
+
+    @testset "a snapshot predating the seed attributes still exports, and says so" begin
+        # Every file written before 2026-09-17 has no cpm_seed_source at all.
+        # Requiring it would make this exporter throw on all of them, and
+        # skipping it would leave the .vti silent about which case it is.
+        old = joinpath(tmp, "old.h5")
+        cp(snap, old)
+        h5open(old, "r+") do g
+            delete_attribute(g, "cpm_seed_source")
+        end
+        stem_old = joinpath(tmp, "old_rt")
+        export_vti(old, stem_old)
+        pold = stem_old * ".vti"
+        @test vti_field_string(pold, "cpm_seed_source") == "unrecorded"
+        @test isnan(get_data(get_field_data(VTKFile(pold))["cpm_seed"])[1])
+    end
+
+    @testset "a declared seed reaches the .vti as a number" begin
+        # The other half of the control: absent, unrecorded and declared must
+        # produce three different field-data values, not one.
+        seeded = joinpath(tmp, "seeded.h5")
+        export_transport_snapshot(SR, sim, seeded; cpm_seed = 7)
+        stem_seed = joinpath(tmp, "seeded_rt")
+        export_vti(seeded, stem_seed)
+        pseed = stem_seed * ".vti"
+        @test vti_field_string(pseed, "cpm_seed_source") == "declared"
+        @test get_data(get_field_data(VTKFile(pseed))["cpm_seed"])[1] == 7.0
+    end
     h5open(snap, "r") do h
         for (ds, name) in SITE_ARRAYS
             src = read(h[ds])

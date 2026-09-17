@@ -25,6 +25,12 @@ using HDF5, WriteVTK
 const CARRIED_NUMERIC = ("schema_version", "coordinate_index_base", "cell_id_background",
                          "cell_id_wall", "mcs", "physical_time_s")
 const CARRIED_STRING = ("logical_axis_order", "dataset_axis_order_h5py", "git_sha")
+# Provenance a snapshot may predate. These two are read through `haskey`, because
+# requiring them would make this exporter throw on every file written before
+# 2026-09-17. An absent key is STATED as unrecorded rather than skipped: a field
+# missing from the .vti reads the same as a field nobody ever wrote.
+const OPTIONAL_STRING = ("cpm_seed_source",)
+const OPTIONAL_NUMERIC = ("cpm_seed",)
 const SITE_ARRAYS = (("lattice/cell_id", "cell_id"), ("lattice/lineage_id", "lineage_id"),
                      ("lattice/generation", "generation"), ("lattice/interior_mask", "interior_mask"),
                      ("fields/radiation_cpm", "radiation_cpm"), ("fields/melanin", "melanin"),
@@ -109,6 +115,14 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
         end
         for k in CARRIED_STRING
             vtk[k, VTKFieldData()] = String(read(a[k]))
+        end
+        for k in OPTIONAL_STRING
+            vtk[k, VTKFieldData()] = haskey(a, k) ? String(read(a[k])) : "unrecorded"
+        end
+        for k in OPTIONAL_NUMERIC
+            # NaN is this schema's own way to say "not configured", as
+            # `physical_time_s` already does. It pairs with cpm_seed_source.
+            vtk[k, VTKFieldData()] = haskey(a, k) ? Float64(read(a[k])) : NaN
         end
         save && vtk_save(vtk)
         return vtk

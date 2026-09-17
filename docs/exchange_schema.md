@@ -51,8 +51,10 @@ already cover, and world registration being what they do not.
 
 | Path | Type (logical shape) | Notes |
 |---|---|---|
-| `/` attrs | table above + `label_state_hash`, `mcs`, `physical_time_s` (NaN if unconfigured), `material_class_source` | `label_state_hash` = SHA-256 over cell/species/lineage/generation arrays |
-| `/config_toml` | string | raw coupling config embedded verbatim; `""` when exported unconfigured. Python re-validates and fails loudly |
+| `/` attrs | table above + `label_state_hash`, `mcs`, `physical_time_s` (NaN if unconfigured), `material_class_source`, `cpm_seed_source`, `cpm_seed` | `label_state_hash` = SHA-256 over cell/species/lineage/generation arrays |
+| `cpm_seed_source` attr | `"declared"` or `"absent"` | whether the writer was given the CPM run seed. A file with NO such attribute predates 2026-09-17, and a reader reports that third state as `unrecorded` rather than as `absent` |
+| `cpm_seed` attr | Int64, present only when declared | the CPM run seed. This is **not** the `[transport] seed` a coupling config declares for OpenMC, which defaults to 1 and means the Monte Carlo transport stream |
+| `/config_toml` | string | raw coupling config embedded verbatim; `""` when exported unconfigured. **No Python code reads this dataset.** *Corrected 2026-09-17:* this row said "Python re-validates and fails loudly". `drivers.py` takes its config as a separate argument, and nothing branches on the embedded copy |
 | `/lattice/cell_id` | Int32 (N,N,N) | 0 medium, −1 outside domain, >0 cell |
 | `/lattice/species_id` | Int32 (N,N,N) | 0 where no cell; 1..7 authoritative registry |
 | `/lattice/lineage_id` | Int32 (N,N,N) | 0 where no cell — **label array, never a material identity** |
@@ -66,11 +68,18 @@ already cover, and world registration being what they do not.
 | `/events/division/{...}` | Int64/Float64 columns | all 11 `DivisionEvent` fields |
 | `/events/death/{...}` | columns | all `DeathEvent` fields |
 | `/archive/{...}` | columns; `fate` as strings | archival cell table incl. extinct cells |
+| `/cpm_params/{...}` | one dataset per field | every `CPMParams` field, written individually; `_read_params` rebuilds the struct. Added 2026-09-17, so that a recorded seed names a run somebody can rebuild |
+| `/rd_params/{...}` | one dataset per field | every `RadiolysisParams` field, in the same shape |
 | `/orientation_probes` | Int64 (P, 4) | rows `[x, y, z, expected_cell_id]`, 0-based, ≥3 asymmetric points |
 
 **No material composition is asserted here.** Material classes are a *config-defined*
-mapping applied on the Python side from these label/field arrays; when the physical
-config is absent the model builder fails loudly (`material_class_source = "absent"`).
+mapping applied on the Python side from these label/field arrays. The config arrives as a
+separate argument to the model builder, from a TOML file.
+
+*Corrected 2026-09-17:* this paragraph said the model builder "fails loudly" when the
+physical config is absent, keyed on `material_class_source = "absent"`. No Python code
+branches on that attribute. Two tests assert it equals `"absent"`, which pins the
+unconfigured state rather than any refusal.
 This is what enforces "genealogy is a label, never a material" and keeps the class table
 out of hard-coded Julia.
 

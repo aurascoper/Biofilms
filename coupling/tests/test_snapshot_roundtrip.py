@@ -42,3 +42,60 @@ def test_lattice_order_semantics():
     assert lat.shape == (nz, ny, nx)
     for x, y, z in [(0, 0, 0), (2, 3, 4), (1, 2, 3)]:
         assert lat[z, ny - 1 - y, x] == a[x, y, z]
+
+
+# The CPM run seed. THREE states, because a file with no cpm_seed_source predates
+# the field, and that silence is not a statement by the writer.
+
+
+def test_a_declared_cpm_seed_is_read(tmp_path):
+    snap = load_snapshot(make_snapshot_file(tmp_path / "seeded.h5", cpm_seed=42))
+    assert snap.cpm_seed_source == "declared"
+    assert snap.cpm_seed == 42
+
+
+def test_a_writer_with_no_seed_declares_absent(tmp_path):
+    snap = load_snapshot(make_snapshot_file(tmp_path / "unseeded.h5"))
+    assert snap.cpm_seed_source == "absent"
+    assert snap.cpm_seed is None
+
+
+def test_a_file_predating_the_field_reads_as_unrecorded(tmp_path):
+    path = make_snapshot_file(tmp_path / "old.h5", write_seed_attrs=False)
+    snap = load_snapshot(path)
+    assert snap.cpm_seed_source == "unrecorded"
+    assert snap.cpm_seed is None
+
+
+def test_a_declaration_without_a_seed_is_refused(tmp_path):
+    path = make_snapshot_file(tmp_path / "bad_declared.h5", cpm_seed=7)
+    with h5py.File(path, "r+") as f:
+        del f.attrs["cpm_seed"]
+    with pytest.raises(SnapshotError, match="no cpm_seed attribute"):
+        load_snapshot(path)
+
+
+def test_a_seed_without_a_declaration_is_refused(tmp_path):
+    path = make_snapshot_file(tmp_path / "bad_absent.h5")
+    with h5py.File(path, "r+") as f:
+        f.attrs["cpm_seed"] = 7
+    with pytest.raises(SnapshotError, match="cpm_seed_source is 'absent'"):
+        load_snapshot(path)
+
+
+def test_an_unknown_seed_source_is_refused(tmp_path):
+    path = make_snapshot_file(tmp_path / "bad_source.h5")
+    with h5py.File(path, "r+") as f:
+        f.attrs["cpm_seed_source"] = "maybe"
+    with pytest.raises(SnapshotError, match="unknown cpm_seed_source"):
+        load_snapshot(path)
+
+
+def test_a_stray_seed_on_a_file_predating_the_field_is_refused(tmp_path):
+    # The control that proves "unrecorded" is not a free pass. A seed with no
+    # declaration beside it still refuses, whichever way the declaration is missing.
+    path = make_snapshot_file(tmp_path / "bad_old.h5", write_seed_attrs=False)
+    with h5py.File(path, "r+") as f:
+        f.attrs["cpm_seed"] = 7
+    with pytest.raises(SnapshotError, match="cpm_seed_source is 'unrecorded'"):
+        load_snapshot(path)
