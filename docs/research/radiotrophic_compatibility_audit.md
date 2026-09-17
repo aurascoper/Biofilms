@@ -231,6 +231,35 @@ description.
 | Malo 2018 | *C. neoformans* | cell-wall integrity retained in melanized cells at mid and max dose; non-melanized cells showed two failure morphologies | **melanized_radioprotective**, **radiation_responsive** | `radioresistant`: the survival clause refers to the group's prior work, not to a curve in this paper |
 | Averesch 2022 | *C. sphaerospermum* ATCC 11289 | 147 vs 151 CPM, n = 1 dish, p = 0.069; flight-versus-ground growth | **none_demonstrated** | see below |
 | Vasileiou 2020 | melanin in solution | Sr-90 beta transmission versus a cellulose control of matched elemental composition | **none_demonstrated** (a measured null) | `radiation_shielding`: the term requires transmitted radiation reduced *by biomass*, and there is no biomass and no melanin-specific reduction |
+| Robertson 2012 | *W. dermatitidis* 8656 (= *E. dermatitidis*) wild type and melanin-defective *wdpks1* | cell counts/CFU under 0.005–5 R/hr <sup>137</sup>Cs; cell size; RNA-seq (>3000 genes DE); intracellular O2− by DHE; CFU viability at 21 d and 1 month; carotenoid | **radiotrophic** — cell number measurably increased under exposure, measured here | `melanized_radioprotective`: **the increase appears in the albino *wdpks1* mutant too**, so the growth effect is reproduced and its attribution to melanin is not |
+
+**Robertson 2012, read in full on 2026-09-01** (PMC3490873; the abstract alone was read
+first, and it was not enough). Two things the abstract does not settle, both settled by the
+Results headings and text:
+
+- **The growth was measured in this paper, not restated.** The section is titled *"Low Dose
+  Ionizing Radiation Increases W. dermatitidis Growth Rate and Cell Size"*: three of four dose
+  rates between 0.005 and 0.5 R/hr produced *"at least 30% more cells"* than the unirradiated
+  control at 24 h, with growth inhibited at 5 R/hr. This is the Khajo 2011 distinction resolved
+  in the opposite direction — Khajo assumed protection from prior work, Robertson measured
+  growth here.
+- **The effect is not melanin-dependent.** At 0.03 R/hr the irradiated wild type grew
+  significantly more than its control, *"which agreed with the result reported by Dadachova et
+  al"* — but *"the increased cell number was also observed when the albino wdpks1 mutant was
+  irradiated"*. SOD2 induction is likewise reported *"in both the wild type and wdpks1 mutant"*.
+  What is melanin-dependent is transcriptional: ribosomal biogenesis and transporter genes.
+
+**And the effect is conditional on the growth environment**, which is the same confounder class
+§9.2 records: *"the enhanced growth was only observed when cells were grown in minimal media and
+under static conditions"*, abrogated in rich media or with shaking. A growth effect measured
+without stating medium and agitation is not interpretable, exactly as a melanin effect measured
+without culture age and density is not.
+
+It remains **not** a source for the isogenic *survival* nulls at §9.2, which are gamma, alpha,
+proton and deuteron survival contrasts in three other studies. Robertson's viability result
+(CFU at 21 days, irradiated better than non-irradiated in nutrient-poor medium) is a *positive*
+survival-under-starvation finding, not a melanin contrast.
+
 
 ### The ISS experiment, in detail
 

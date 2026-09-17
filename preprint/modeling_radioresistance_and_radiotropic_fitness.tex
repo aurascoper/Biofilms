@@ -79,12 +79,12 @@
   {\large\bfseries A Computational Framework, Implementation Audit,\\
    and One-Way Radiation-Transport Foundation}\\[14pt]
   {\normalsize
-    \textbf{Hunter Kinder}, B.A., M.A.T.L. --- Independent Researcher, Missouri, USA\\[2pt]
+    \textbf{Hunter Kinder}, B.A. --- Independent Researcher, Missouri, USA\\[2pt]
     \textbf{Brett Faulkner}, B.Sc. --- Independent Researcher\\[10pt]
   }
   {\small
     \textit{Preprint --- not peer reviewed}\\
-    \textit{Version 1.0 --- August 2026}
+    \textit{Version 1.2.1 --- September 2026}
   }
 \end{center}
 \vspace{4pt}
@@ -107,16 +107,16 @@ transport code and a new biological target rather than introducing the paradigm.
 
 Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
 measured results. The melanin term changes Metropolis acceptance by approximately 15.5\%, whereas
-the direct per-species radiation term changes it by approximately one part in $10^5$ for the two
-negatively signed species; only the product of melanin production and melanin coupling reaches
-the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
+the direct per-species radiation term reaches $7.505\times10^{-2}$ in $\Delta H$ (a 1.5\% acceptance bias), about ten
+times smaller than the melanin term rather than four orders smaller; only the product of melanin production and melanin
+coupling reaches the dynamics, so the two are not separately identifiable. A single-seed radial pattern runs
 opposite to the direction implied by the direct tropism coefficient and is not clearly separated
 from the approximate seeding null at six parcels per species.
 
 The boundaries are declared rather than discovered late. A proposed partial stochastic
 differential equation organises diffusion, directed motility, nutrient, radiation, melanin,
 interaction and forcing terms; it is a specification, and the four executed
-simulations---two Langevin models, the CPM, and a radial radiodialysis solver---realise only
+simulations---two Langevin models, the CPM, and a radial membrane-transport solver---realise only
 subsets of it. The CPM represents seven named species as computational biomass parcels rather
 than individual organisms, and has neither biomass growth nor a dose-dependent survival process,
 so the implemented phenotype is radiotropism and the model cannot test radiotrophy or
@@ -138,6 +138,7 @@ radiotropism; radioresistance; OpenMC; uncertainty quantification
 
 % ---- 1. Introduction -----------------------------------------
 \section{Introduction}
+\label{sec:intro}
 
 Microbial communities possess an extraordinary ability to adapt and survive under extreme
 environmental stressors, such as elevated radiation levels. Within such communities, melanized
@@ -167,10 +168,15 @@ exposure). A survival curve cannot calibrate a directional term, and a transcrip
 material density. Throughout this paper we use each word only for the endpoint it names. The model
 presented here expresses the first of the five, and the paper's title says so.
 
+The same test excludes as includes: a word enters this vocabulary only if the endpoint it names can
+be stated. \emph{Reasoning} has no statable endpoint in these systems and is therefore not used
+here.
+
 % ---- 2. Related Work -----------------------------------------
 \section{Related Work}
 
 \subsection{Melanized Fungi, Radioresistance, and the Contested Radiotrophy Claim}
+\label{sec:melanin_radiotrophy}
 
 The observation that melanized fungi colonise high-radiation environments prompted a proposal that
 melanin transduces ionizing radiation into metabolically usable energy. That proposal remains
@@ -192,6 +198,18 @@ field at 0.05~mGy~h$^{-1}$ rather than a photon field; the growth effects are si
 percentages in dry weight; and non-irradiated non-melanized cells grew better than non-irradiated
 melanized cells in the same experiment, so the melanized/albino contrast carries a baseline
 asymmetry present before any radiation was applied \cite{audit2026}.
+
+Robertson et al.\ \cite{robertson2012} returned to \textit{W.\ dermatitidis} in a
+$^{137}$Cs photon field rather than the $^{188}$Re beta arm. Three of four dose rates
+between $0.005$ and $0.5$~R~h$^{-1}$ produced at least 30\% more cells than the
+unirradiated control at 24~hours, and growth was inhibited at $5$~R~h$^{-1}$. At
+$0.03$~R~h$^{-1}$ --- $0.3$~mGy~h$^{-1}$ under the paper's own stated equivalence, six
+times the founding experiment's field --- the irradiated wild type grew significantly more
+than its control, agreeing with Dadachova. The same increase appeared in the
+melanin-defective \textit{wdpks1} mutant, and the effect was abrogated when cells were
+grown in rich media or with shaking. The growth result reproduces; its attribution to
+melanin does not, and what the experiment isolates is a growth condition rather than a
+pigment \cite{audit2026}.
 
 Shunk et al.\ \cite{shunk2022} cultivated \textit{C.\ sphaerospermum} aboard the International
 Space Station for 26 days, reporting a growth ratio of $1.21 \pm 0.37$-fold against the ground
@@ -229,32 +247,44 @@ non-melanized \textit{pks1} mutant across several ionising-radiation modalities 
 The mathematical modeling of biofilm communities has a rich history beginning with the
 foundational one-dimensional multispecies model of Wanner and Gujer \cite{wanner1986}, which
 coupled reaction-diffusion equations for substrate transport with biomass conservation laws to
-predict biofilm thickness and spatial species distributions. Xavier et al.\ \cite{xavier2005}
-extended this framework to multiple spatial dimensions, providing a deterministic continuum
-approach to heterogeneous biofilm development. Individual-based modeling approaches, exemplified
+predict biofilm thickness and spatial species distributions. Deterministic continuum treatments
+extended this framework to multiple spatial dimensions: Eberl et al.\ \cite{eberl2001} gave a
+spatio-temporal continuum model for biofilm development, and Alpkvist and Klapper
+\cite{alpkvist2007} a multidimensional multispecies formulation for heterogeneous biofilms.
+Xavier et al.\ \cite{xavier2005} is a different work --- a framework for multidimensional
+modelling of the activity and structure of multispecies biofilms, as its title states --- and
+the continuum description above was previously attributed to it in error. We do not
+characterise its method here beyond what that title says. Individual-based modeling
+approaches, exemplified
 by the iDynoMiCS platform of Lardon et al.\ \cite{lardon2011}, complement continuum models by
 resolving cell-level stochastic interactions. Cross-diffusion biofilm models have been analyzed
 by Sonner et al.\ \cite{sonner2015}, who established mathematical properties of volume-filling
-multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framework extends
-these precedents by incorporating radiation-dependent fitness terms and phase-locking dynamics
-that couple species interactions to external radiation fields, moving beyond the
-substrate-limited growth paradigms that dominate existing biofilm models.
+multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framework is specified to
+extend these precedents with radiation-dependent fitness terms and phase-locking dynamics
+coupling species interactions to external radiation fields, moving beyond the
+substrate-limited growth paradigms that dominate existing biofilm models. Both additions remain
+unexercised: Section~\ref{sec:psde} places the phase-locking adjustment among the four terms it
+classes as unrepresentable, and the fitness field is reported there as absent from this
+repository's simulation sources.
 
 \subsection{Hamiltonian and Stochastic Approaches in Theoretical Ecology}
 
 The application of Hamiltonian mechanics to ecological systems remains comparatively
 underexplored, despite the natural conservation laws that govern energy flow in ecosystems.
 Symplectic integration methods, which preserve the geometric structure of Hamiltonian flows,
-have been advocated for ecological modeling by Diele et al.\ \cite{diele2015} to ensure that
+have been advocated for ecological modeling by Diele and Marangi \cite{diele2015} to ensure that
 numerical solutions maintain essential qualitative dynamics. The Kuramoto model of coupled phase
 oscillators \cite{kuramoto1984} provides a well-established framework for synchronization
 phenomena in biological systems, from neural networks to circadian rhythms. Aceb\'r\'on et al.\
 \cite{acebron2005} reviewed the model as a paradigm for synchronization, noting its
 generalization to systems with time delays, frequency-weighted coupling, and heterogeneous
-interaction topologies. Our phase-locking kernel $\Gamma_s(t,\mathbf{x})$ draws directly on
-this tradition, extending it to multispecies microbial communities where species-level
-oscillatory dynamics in growth and resource acquisition couple through shared radiation and
-nutrient fields. The use of Langevin stochastic dynamics to describe microbial population
+interaction topologies. Blasius et al.\ \cite{blasius1999} treat phase synchronization in
+spatially extended ecological systems, which is the setting our phase-locking kernel
+$\Gamma_s(t,\mathbf{x})$ is written for: it is specified within this tradition, extended to
+multispecies microbial communities in which species-level oscillatory dynamics in growth and
+resource acquisition would couple through shared radiation and nutrient fields. It remains
+unexercised, and Section~\ref{sec:framework} places the phase-locking adjustment among the four
+terms it classes as unrepresentable. The use of Langevin stochastic dynamics to describe microbial population
 fluctuations follows naturally from the Fokker-Planck formalism and has been applied to
 competing microbial populations in chemostat systems \cite{campillo2017}, where stochastic
 differential equations revealed long-term competitive outcomes differing from deterministic
@@ -283,7 +313,9 @@ biological target, rather than introducing the paradigm itself.
 The practical motivation for modeling these communities lies in nuclear bioremediation.
 \textit{Shewanella oneidensis} MR-1 is a model dissimilatory metal-reducing bacterium capable
 of reducing soluble U(VI) to insoluble U(IV) via extracellular electron transfer through
-c-type cytochromes \cite{heidelberg2002,veeramani2011}. \textit{Ochrobactrum intermedium} AM7,
+c-type cytochromes \cite{heidelberg2002,veeramani2011}. \textit{Ochrobactrum intermedium} AM7
+--- reclassified in 2020 as \textit{Brucella intermedia}, and named under both here for the
+reason given in the Ethics statement ---
 isolated from soil near the Kakrapar Atomic Power Station in India, tolerates high concentrations
 of thorium and produces exopolysaccharides (EPS) that complex with Th(IV), offering a pathway
 toward bioremediation of actinide-contaminated environments \cite{shukla2020}. The combination
@@ -292,8 +324,8 @@ immobilize radionuclides suggests the possibility of engineered biofilm consorti
 remediation. The fitness landscape framework introduced by Wright \cite{wright1932} and
 formalized through the NK model of Kauffman \cite{kauffman1989} provides a conceptual foundation
 for understanding how epistatic interactions among species traits shape adaptation under
-radiation stress, a perspective that our Hamiltonian kNN decision tree operationalizes
-quantitatively.
+radiation stress. Our Hamiltonian kNN functional (Eq.~\ref{eq:knn}) is specified to carry
+that perspective quantitatively but remains unexercised, as Section~\ref{sec:results} records.
 
 \subsection{Radiotrophy Is Not Established for Any Species Modelled Here}
 \label{sec:radiotrophy_status}
@@ -314,9 +346,65 @@ The claim rests on a single 2007 paper covering two of the seven, and against it
 same-species report of no substantial melanin protection under gamma, a same-species negative
 melanin-pathway result at 1 and 3~kGy, a same-genus null growth result under a TLD-anchored
 $^{137}$Cs field, an isogenic null in \textit{A.\ niger} across three ionizing modalities
-(Section~2.1), and a formal energy-budget critique holding that the deposited energy is
+(Section~\ref{sec:melanin_radiotrophy}), and a formal energy-budget critique holding that the deposited energy is
 insufficient and the media carbon sufficient to account for the observed growth
 \cite{walberg2015}. ``Not demonstrated'' is not ``disproved'', and we state it as the former.
+
+\emph{Added in version 1.2:} a reader may reasonably ask what \emph{does} live in a spent fuel pool,
+given that the mechanism above is withdrawn. The answer is worth stating because it is repeatedly
+confused with the one this section rejects.
+
+Nothing feeds on the metal. Fe(II) released by a corroding surface is an electron donor for iron
+oxidisers, which is an energy source and not a carbon skeleton; neither alloy offers one. Organic carbon arrives from outside: a pool surface sits
+open to a staffed building, ion-exchange resins shed fragments under radiolysis, and refuelling
+introduces lubricants and decontamination chemicals. Demineralisation removes ions and passes
+neutral organics, so even makeup water carries carbon at parts per billion, which is a concentration
+oligotrophs work at. The primary production is done by organisms outside this model: radiolysis
+splits water into oxidants and H$_2$ together, hydrogen-oxidising bacteria fix CO$_2$ with that
+donor --- the indoor pond at Sellafield carries a stable hydrogen-driven microbiome, with
+\textit{Hydrogenophaga} among the taxa \cite{sellafield2020} --- and algal blooms develop in the
+same site's ponds under lighting \cite{sellafield2023}. The radiation field that makes a pool
+hostile is part of what makes it habitable.
+
+\textbf{This model resolves none of that.} A nutrient field exists on the lattice and is
+integrated by diffusion at every step, and the acceptance rule never consults it:
+\texttt{compute\_delta\_H\_terms} and \texttt{mcs\_step!} read the lattice, volumes, species,
+adhesion couplings, $\beta_{s,\mathrm{ion}}$ and melanin, and no nutrient term appears in either
+(enforced by \texttt{tests/manuscript\_claims\_tests.jl}). The model therefore does not resolve
+carbon as a driver of the trajectory. Neither does it treat carbon as an input arriving from
+outside: the field is there, it is integrated, and nothing in the acceptance path reads it. Nothing in this paragraph is a claim about the metabolism of the
+seven species modelled, and we make none --- two of them, \textit{S.\ oneidensis} and
+\textit{O.\ intermedium}, have documented or congeneric CO$_2$-fixing capability under conditions a
+pool does not supply, so a blanket statement about their carbon source would be wrong in the
+direction a reader could check.
+
+The distinction this paragraph exists to draw is between two things that sound alike.
+Radiolysis-fed chemolithotrophy is established and mechanistically ordinary, and it runs through
+water chemistry: microbes consume H$_2$ that radiation happened to produce. Radiotrophy as this
+paper uses the term is direct energy capture through melanin, with no such intermediate. Both can be
+described as radiation supplying the energy and only the first is demonstrated. This is a contrast
+and not a defence: it does not address the carbon-budget critique of \cite{walberg2015}, which
+concerns melanised fungi in culture and stands as stated.
+
+Two further pieces of the record cut the same way, and one of them is not a null result.
+Every other item cited here reports an absence: an isogenic knockout that made no
+difference, a shielding experiment that found none. \textbf{Turick et al.
+\cite{turick2011} is a positive measurement, and it runs opposite to the mechanism.}
+Using chronoamperometry, chronopotentiometry and cyclic voltammetry, they report that
+microbial melanin ``is continuously oxidized in the presence of gamma radiation,'' with
+sustained oxidation producing electric current and the effect most pronounced in the
+presence of a reductant. A mechanism that supplied reducing power to a cell would need
+radiation to \emph{reduce} melanin; the one direct measurement of gamma acting on melanin
+reports the opposite direction. We cite what that paper's abstract states and make no claim
+here about its apparatus or the magnitudes involved, neither of which we have read.
+
+And the proponents say as much. Casadevall et al. \cite{casadevall2017}, reviewing the
+energy-transduction hypothesis they originated, write that ``whereas some features of the
+way melanin-related energy transduction works can be discerned by linking various
+observations and circumstantial data, the mechanistic details remain to be discovered.''
+That review is otherwise affirmative about transduction, which is what makes the sentence
+useful: it is a concession from the position's own authors, and better support for ``not
+demonstrated'' than any of the nulls above.
 
 Radioresistance, by contrast, is well evidenced for several of the seven, and the
 $D_{10}$ values in Table~\ref{tab:params} are real measurements. Radiotropism has its own
@@ -374,6 +462,7 @@ $\Gamma_s(t,\mathbf{x})$ & Phase-locked kernel for species $s$ \\
 $\beta_{s,\mathrm{ion}}$ & Ionizing radiation coefficient. In the PSDE (Eq.~\ref{eq:psde}) a fitness-loss rate; in the CPM (Section~\ref{sec:methods}) a \emph{tropism} coefficient whose sign sets the direction of drift along the dose gradient. Magnitudes anchored to published $D_{10}$ radioresistance data (Table~\ref{tab:params}) \\
 $\alpha_{s,\mathrm{nir}}$ & Non-ionizing radiation coupling coefficient \\
 $\theta_s$          & Adaptive phase-locking coefficient \\
+$\omega_s$          & Phase frequency of species $s$ in $\phi_s(t)=\cos(\omega_s t-\theta_s)$ (Eq.~\ref{eq:adaptive}); no value is assigned, the adaptive term being unexercised (Section~\ref{sec:nutrient}) \\
 $\gamma_s$          & Gamma-radiation coupling coefficient in the adaptive-feedback term (Eq.~\ref{eq:adaptive}) \\
 $\Delta_s$          & Phase-locking synchronization deviation \\
 \bottomrule
@@ -381,6 +470,7 @@ $\Delta_s$          & Phase-locking synchronization deviation \\
 \end{table}
 
 \subsection{Partial Stochastic Differential Equation (PSDE) for Species Fitness}
+\label{sec:psde}
 
 The fitness of each species $s$ is governed by the following PSDE:
 \begin{align}
@@ -436,7 +526,7 @@ Four of the nine terms are additionally unrepresentable rather than merely unimp
 deterministic reaction $R_s$ is nutrient-dependent \emph{growth}, and the CPM has none:
 \texttt{state.nutrient} is written each step but never read by \texttt{compute\_delta\_H}, and
 \texttt{divide\_cell!} has no trigger. The phase-locking adjustment $\gamma_s\Delta_s$ depends on
-the $H_{\mathrm{kNN}}$ machinery of Section~3.8, which is specified and unexercised. The
+the $H_{\mathrm{kNN}}$ machinery of Section~\ref{sec:knn}, which is specified and unexercised. The
 non-ionising term $\alpha_{s,\mathrm{nir}}N$ and the external forcing $C_s$ have no counterpart in
 any state variable. Only diffusion, directed motility, noise and the ionising term have anything
 in the implemented models that corresponds to them, and even those correspond by analogy rather
@@ -493,8 +583,27 @@ carry the reflection direction across a cylindrical wall boundary --- but it is 
 full from the current position and forces at every step ($\dot{\mathbf{x}} = \mu\mathbf{F} +
 \boldsymbol{\xi}$, the defining property of the overdamped limit), never advanced by its own
 equation of motion, and so is not the persisted inertial degree of freedom a symplectic
-integrator requires; the word survives in a comment where the physics does not. Implementing
-genuine symplectic integration is listed in Section~\ref{sec:limitations}.
+integrator requires; the word survives in a comment where the physics does not.
+
+\emph{This subsection previously referred implementing symplectic integration to
+Section~\ref{sec:limitations} as future work. That cross-reference was dangling ---
+Section~\ref{sec:limitations} does not list it --- and the paragraph below explains why it
+should not be listed there either.}
+
+\emph{And the absence is appropriate, not merely factual --- which is the stronger claim and
+the one this paragraph should make.} At cell scale the regime is overdamped. Taking water
+($\rho = 10^{3}\,\mathrm{kg\,m^{-3}}$, $\eta = 10^{-3}\,\mathrm{Pa\,s}$), a cell of
+length $L = 1$--$10\,\mu$m moving at $U = 20\,\mu\mathrm{m\,s^{-1}}$ gives
+$\mathrm{Re} = \rho U L/\eta \approx 2\times10^{-5}$ to $2\times10^{-4}$, and even a
+$100\,\mu$m biofilm feature at that speed reaches only $2\times10^{-3}$. The inertial
+relaxation time $\tau_p = 2\rho a^{2}/(9\eta)$ is $5.6\times10^{-8}\,$s for
+$a = 0.5\,\mu$m and $2.2\times10^{-7}\,$s for $a = 1\,\mu$m --- roughly ten orders of
+magnitude below the timescales this model addresses, cell division among them. The length and
+speed are stated because $\mathrm{Re}$ is a property of the flow and not of the organism
+alone: a figure quoted without them is not reproducible. A persisted, independently-integrated
+momentum state would therefore inject dynamics the physical system does not have, so its
+absence is a correctness property rather than a gap awaiting work.
+\texttt{analysis/overdamped\_regime.py} reproduces every number in this paragraph.
 
 \subsection{Radiation Field Models}
 
@@ -547,13 +656,34 @@ A_s(t) = \gamma_s\,\phi_s(t) - \beta_{s,\mathrm{ion}}\,I_\gamma(t)
 where $\phi_s(t) = \cos(\omega_s t - \theta_s)$ is the phase-alignment function and $A_s(t)$ is
 the adaptive feedback driven by phase-locking and local radiation stress.
 
+\paragraph{The adaptive-feedback term is specification, not method.}
+A nutrient field is integrated at every step by \texttt{update\_nutrient!}, so this uptake law
+is not wholly unimplemented; the adaptive term $A_s(t)$ is the part that remains unexercised.
+Its phase-alignment factor requires a phase variable, and Section~\ref{sec:psde} places the
+phase-locking adjustment among the four terms it classes as unrepresentable, while the fitness
+field $F_s$ in the saturation factor is reported there as absent from this repository's
+simulation sources.
+
 \subsection{Hamiltonian kNN Decision Tree}
+\label{sec:knn}
 
 To model species transition probabilities modulated by neighbourhood phase states:
 \begin{equation}
 \label{eq:knn}
 H_{\mathrm{kNN}} = \frac{1}{\sigma_n}\sum_{j=1}^{n} P_{sj}(t)\,F_j(t,\mathbf{x})\,\Gamma_s(t,\mathbf{x})
 \end{equation}
+
+\paragraph{The name is a coinage, and it is not a description of the form.}
+\emph{kNN} names an operation defined by a distance metric, a ranking and a cutoff $k$.
+Eq.~\ref{eq:knn} has none of the three: it aggregates across the whole index range $j=1,\dots,n$
+under the weight $P_{sj}$, which makes it a phase-weighted neighbour sum rather than a selection
+among neighbours. It is likewise a single product with no split, so \emph{Decision Tree}
+describes nothing in the form either. Section~\ref{sec:intro} holds each word to the endpoint it
+names; that discipline was written for the five phenomenon terms, and it applies to method names
+on the same grounds. The established description of this expression is a phase-weighted
+neighbour sum over a transition matrix. $F_j$ is the fitness field of
+Section~\ref{sec:psde}, reported there as absent from this repository's simulation sources, so
+the quantity aggregated here is itself specified rather than implemented.
 
 \subsection{Radiation Damage and Resilience}
 
@@ -571,6 +701,23 @@ modalities \cite{audit2026}. Where melanin measurably mattered in an evolution e
 reduced mutation accumulation without altering survival --- an effect on damage that must not be
 generalised into a survival term.
 
+\emph{Two same-species results are cited here, and stating what they do not measure is the
+point.} Khajo et al.\ \cite{khajo2011} and Malo et al.\ \cite{malo2018} both concern
+melanin and ionizing radiation in \textit{Cryptococcus neoformans}, one of the seven species
+modelled. Neither performs the survival comparison. Khajo's endpoints are electron spin
+resonance, 263~nm absorbance, TBARS and $^{213}$Bi binding, and the protection its title
+names is carried over from prior work rather than measured there \cite{audit2026}. Malo's
+endpoint is cell-wall integrity morphology, and its survival clause likewise refers to the
+group's earlier results \cite{audit2026}.
+
+So they do not contradict the isogenic nulls, and the reason is the one this paper's
+vocabulary predicts: \emph{melanized radioprotective} and \emph{radioresistant} are
+different endpoints, and a damage or morphology result cannot stand against a survival
+result in either direction. That is the same rule as the sentence above --- an effect on
+damage must not be generalised into a survival term --- applied to evidence that appears to
+favour the assumption rather than to undercut it. The rule is not a device for discounting
+inconvenient results, so it is applied here in the direction that costs us the citation.
+
 \subsection{Biofilm Mechanical Properties}
 
 The EPS matrix is modelled as a Finite Extensible Nonlinear Elastic (FENE) entropic spring:
@@ -586,7 +733,23 @@ end-to-end distance.  Viscoelastic creep follows the Kelvin-Voigt model:
 \end{equation}
 with stress relaxation time $\tau = \eta/E$ governing biofilm restructuring dynamics.
 
-\subsection{Radiodialysis Membrane Transport}
+\paragraph{This subsection is specification, not method.} Nothing described here is
+implemented. No elastic, viscoelastic or mechanical term exists in any source file:
+\texttt{compute\_delta\_H\_terms} returns adhesion, volume, radiation and melanin and
+nothing else, so neither Eq.~\ref{eq:fene} nor Eq.~\ref{eq:kelvinvoigt} enters the
+acceptance rule or any equation of motion. The executed simulations carry no stress, no
+strain and no modulus.
+
+\emph{And a measured modulus could not enter the model as written.} The CPM Hamiltonian
+carries contact energies and a volume-constraint stiffness, not a bulk modulus in Pascals,
+and its clock is Monte Carlo steps rather than seconds, so a relaxation time $\tau$ in
+seconds has no place to land. A bench modulus would inform an immersed-boundary, particle,
+or continuum viscoelastic model --- a different model class from the one this work runs.
+This is recorded so that the specification is not read as a plan the present code could
+absorb by fitting coefficients. Corrects \texttt{claims\_ledger} row \texttt{PP-310-01},
+which recommended labelling this subsection as proposed rather than implemented.
+
+\subsection{Membrane Transport Under Radiation-Driven Permeability Change}
 \label{sec:radiodialysis}
 
 To model contaminant ingress through the bioreactor membrane under radiation-driven
@@ -687,7 +850,20 @@ needs $k_{\mathrm{ads}}$ needs timed sampling, or must carry it as an unmeasured
 once and never returning the composition field asserts
 $\partial\mu(\mathbf{r})/\partial c(\mathbf{r},t) \approx 0$, where $\mu$ is the local linear
 attenuation coefficient. That is a statement about what was computed, not about physics, and it
-is a reasonable simplification only while the sorbate is dilute and low-$Z$. For a high-$Z$
+is a reasonable simplification only while the sorbate is dilute and low-$Z$. \emph{The reason is the
+interaction rather than the chemistry, and it carries its own boundary.} At the photon energies
+of interest, attenuation through C, H, N and O is dominated by Compton scattering, which scales
+with electron density per unit volume and is insensitive to atomic number, so two light-element
+phases attenuate almost alike whatever their molecular identity. Hydrogen sharpens the point
+rather than softening it: it carries the highest electron count per unit mass of any element, so
+a hydrated organic phase and water converge instead of separating. The same mechanism fixes where
+the condition lapses, and that boundary is checkable without any measurement of this system:
+photoelectric absorption reasserts itself below roughly a few tens of keV for light elements, so
+the simplification holds in the present energy regime and fails beneath it --- a statement about
+the interaction rather than about this biofilm. The residual contrast between hydrated biomass
+and its medium is a separate quantity and is left unstated here, since obtaining it requires the
+water fraction and closed hydrated composition that Section~\ref{sec:limitations} lists among the
+measurements this work still lacks. For a high-$Z$
 sorbate such as uranium, a sink term that concentrates mass by design raises the local electron
 density and effective atomic number exactly where the model has put it, and the assumption is
 weakest precisely where the interesting behaviour is. \textbf{The resulting error is not
@@ -835,7 +1011,6 @@ Carrying cap. & $K_s$ & \textit{D.\ radiodurans}   & $10^5$--$10^7$ & cells mm$^
 Carrying cap. & $K_s$ & \textit{B.\ subtilis}      & $10^5$--$10^7$ & cells mm$^{-3}$ & Dense biofilm with EPS matrix & \cite{guttenplan2013} \\
 Carrying cap. & $K_s$ & \textit{S.\ oneidensis}    & $10^5$--$10^7$ & cells mm$^{-3}$ & Planktonic and biofilm modes & \cite{heidelberg2002} \\
 \midrule
-Phase-lock freq. & $\omega_s$ & All species & $0.01$--$1.0$   & rad hr$^{-1}$ & Circadian/ultradian metabolic oscillation & \cite{kuramoto1984,acebron2005} \\
 Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & Thermal and demographic stochasticity & \cite{campillo2017} \\
 \end{longtable}
 \end{landscape}
@@ -845,7 +1020,7 @@ Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & 
 \label{sec:methods}
 
 The repository contains four executed simulation programs: three in R and one in Julia. The PSDE
-in Section~3 is a proposed organising formalism and is not discretised by any of these programs.
+in Section~\ref{sec:framework} is a proposed organising formalism and is not discretised by any of these programs.
 No optimisation, Sobol analysis, or Morris screening was performed.
 
 \paragraph{Two-dimensional Langevin trajectories (\texttt{biofilms.R}).}
@@ -874,7 +1049,7 @@ The CPM core is implemented in Julia using standard-library numerical components
 AMDGPU support checkpoint exchange and the portability port, while CairoMakie is used for figure
 export. The lattice is cubic with a cylindrical biological domain. The reported coupled run uses
 $N=40$, six computational biomass parcels per species, and 100~MCS. One MCS is $N^3$ attempted copy
-operations. The active Metropolis rule contains four terms,
+operations, following the extended-Potts construction of Graner and Glazier \cite{graner1992}. The active Metropolis rule contains four terms,
 $H_{\mathrm{CPM}}=H_{\mathrm{adh}}+H_{\mathrm{vol}}+H_{\mathrm{rad}}+H_{\mathrm{mel}}$, at
 $T_{\mathrm{CPM}}=5.0$. The code has a manually invoked division primitive for lifecycle and
 lineage testing, but no growth law or automatic division trigger; it likewise contains no
@@ -923,6 +1098,7 @@ $H_{\mathrm{kNN}}$ remains specified but unexercised, and the thorium half-life 
 premise for treating the radiation field as static on the simulated timescale.
 
 \subsection{CPM Radiation-Linked Term Magnitudes}
+\label{sec:cpm_term_magnitudes}
 
 The CPM acceptance rule reveals a strong scale separation between its two radiation-derived terms.
 At the shipped $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$, their per-move energy changes and Metropolis
@@ -932,21 +1108,35 @@ biases are shown in Table~\ref{tab:term_magnitudes}.
 \centering
 \small
 \caption{Magnitude of the radiation-linked terms in the CPM acceptance rule at the shipped
-constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$.}
+constants $I_0=1.0$ and $T_{\mathrm{CPM}}=5.0$. \emph{Corrected, version 1.2:} the sign of
+$\Delta H_{\mathrm{rad}}$ is set by the role a cell plays as well as by $\beta_{s,\mathrm{ion}}$,
+and the third row --- a positively signed species \emph{vacating} a site --- was absent from
+version 1.1. Its omission is what made the largest acceptance-favouring radiation contribution
+look like $5\times10^{-5}$. The rows are single roles; the reach of the term is the extremum over
+\emph{pairings} of them, $7.505\times10^{-2}$, given in the text beneath Table~\ref{tab:decided_moves}.}
 \label{tab:term_magnitudes}
 \begin{tabular}{@{}llr@{}}
 \toprule
 \textbf{Term} & $\Delta H$ & \textbf{Acceptance bias} \\
 \midrule
-$\Delta H_{\mathrm{rad}}$, negative $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
-$\Delta H_{\mathrm{rad}}$, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
+$\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
+$\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
+$\Delta H_{\mathrm{rad}}$, target \emph{loses}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $\mathbf{-7.5\times10^{-2}}$ & $\mathbf{1.0151}$ \\
 $\Delta H_{\mathrm{mel}}$ at $M=1.44$ & $-0.720$ & $\mathbf{1.155}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-For the two negatively signed species, the direct radiation term changes acceptance by about one
-part in $10^5$, whereas the melanin term changes it by 15.5\%. Radiation can therefore influence
+For the two negatively signed species \emph{occupying} a site, the direct radiation term changes
+acceptance by about one part in $10^5$, whereas the melanin term changes it by 15.5\%. That
+comparison is between one role of one pair of species and the melanin term, and it does not bound
+$\Delta H_{\mathrm{rad}}$: the third row is the same term at $1.5\times10^{3}$ times the magnitude
+and in the acceptance-favouring direction, smaller than the melanin term by a factor of $9.6$ in
+$\Delta H$ rather than by four orders. \emph{Corrected again, version 1.2:} this sentence read
+``fifteen times'' when first written, which is the acceptance-bias ratio computed against a reach of
+$5\times10^{-2}$ --- a value appearing nowhere in this paper. The correction to this paragraph was
+applied twice at different times, and the pre-pairwise ratio survived inside the sentence whose other
+half had already been fixed. Radiation can therefore influence
 the CPM indirectly through the chain
 \[
 I_\gamma \longrightarrow \text{melanin production} \longrightarrow M
@@ -955,6 +1145,92 @@ I_\gamma \longrightarrow \text{melanin production} \longrightarrow M
 Only the product of the melanin-production scale and the melanin-coupling scale reaches the dynamics,
 so the two are not separately identifiable from this output. This comparison ranks only the two
 radiation-derived terms: hand-specified adhesion differences remain larger than both.
+
+\paragraph{The same ranking as a count of decided moves.}
+Table~\ref{tab:term_magnitudes} compares terms at a single move. The same comparison can be made
+over a run by asking, for each \emph{accepted} move, whether removing one term would have reversed
+it. The question is settled by arithmetic on the uniform variate the acceptance test already drew,
+so no additional randomness enters and the trajectory is unchanged; the byte-level serial contract
+is satisfied with the tally attached and without it.
+
+Two cases arise and they do not overlap. When $\Delta H \le 0$ the move is accepted outright and no
+variate is drawn, so removing a term can raise $\Delta H$ above zero but cannot be shown to reverse
+the move --- it removes the certainty, and the outcome would depend on a number that was never
+generated. These moves are recorded as \emph{contingent} rather than assigned to a term. When
+$\Delta H > 0$ a variate exists, every counterfactual is decidable, and only a term that lowered
+$\Delta H$ can be decisive, since removing one that raised it leaves the move accepted.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Share of accepted moves reversed by removing a single Hamiltonian term, at $N=40$, six
+parcels per species, seed 42. \emph{None} means no single term reverses the move and the sum
+carries it; \emph{contingent} is the $\Delta H \le 0$ case described above. Percentages are of
+accepted moves, not of attempts. \emph{Added in version 1.2:} the run is the CPM stepped directly
+with \texttt{Random.Xoshiro(seed)} and the melanin field updated each sweep, with no radiodialysis
+coupling --- \emph{not} \texttt{run\_simulation} or \texttt{run\_simulation\_coupled}, which seed
+\texttt{MersenneTwister} and give 14\,281 accepted moves at 100~MCS rather than 16\,037. Version 1.1
+recorded neither the generator nor that distinction, so the table could not be re-executed; it is
+now reproduced by \texttt{julia -{}-project=. decided\_moves.jl}, which compares its own output
+against the values printed here.}
+\label{tab:decided_moves}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Term removed} & \textbf{100 MCS} & \textbf{400 MCS} \\
+ & (16\,037 accepted) & (53\,603 accepted) \\
+\midrule
+none (the sum)                   & 38.56\% & 65.99\% \\
+$\Delta H_{\mathrm{adh}}$        &  7.53\% &  6.15\% \\
+$\Delta H_{\mathrm{vol}}$        &  4.43\% &  3.97\% \\
+$\Delta H_{\mathrm{rad}}$        & \textbf{0.00\%} & \textbf{0.00\%} \\
+$\Delta H_{\mathrm{mel}}$        &  0.01\% &  0.04\% \\
+more than one term               &  0.09\% &  0.13\% \\
+contingent                       & 49.39\% & 23.72\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{Corrected, version 1.2; see the correction note in the Software and Data Availability section.}
+The direct radiation term was the sole decisive term in one accepted move of 206\,042 across seeds
+42, 43 and 44 at 400~MCS (53\,603, 68\,465 and 83\,974 accepted moves respectively; Table~\ref{tab:decided_moves} shows seed 42) --- none under seeds 42 and 43, one under seed 44 --- and in none at
+100~MCS. That count is small, but it does \emph{not} follow from the one-part-in-$10^5$ row of
+Table~\ref{tab:term_magnitudes}, and the argument that it did was wrong.
+
+$\Delta H_{\mathrm{rad}}$ is signed by the \emph{role} a cell plays, not only by
+$\beta_{s,\mathrm{ion}}$: a source of species $s$ gaining a site contributes
+$+\beta_{s,\mathrm{ion}} I_\gamma$, and a target of species $t$ losing one contributes
+$-\beta_{t,\mathrm{ion}} I_\gamma$. A move is favoured when
+the total is negative, so a \emph{positively} signed species vacating a site favours acceptance
+exactly as much as a negatively signed one occupying it. A copy between two \emph{occupied}
+parcels carries both roles at once and contributes $(\beta_{s,\mathrm{ion}} - \beta_{t,\mathrm{ion}})
+I_\gamma$, so the reach is an extremum over source/target pairings rather than over species:
+$\max_{s,t}(\beta_{t,\mathrm{ion}} - \beta_{s,\mathrm{ion}})\,I_\gamma = 7.505\times10^{-2}$, which is
+$1.5\times10^{3}$ times the $5\times10^{-5}$ that version 1.1 of this paragraph claimed as a bound.
+Measured over the three $N=40$ runs, seeds 42, 43 and 44 at 400~MCS, of which Table~\ref{tab:decided_moves} shows seed 42 --- $3\,968\,838$ evaluated proposals
+--- $26.7\%$ carry
+$\Delta H_{\mathrm{rad}} < -5\times10^{-5}$, and the most acceptance-favouring value reached is
+$-7.5\times10^{-2}$, a vacating \emph{S.\ oneidensis} target with no occupied source. The pairwise
+extremum itself is attained but rare: a \emph{C.\ sphaerospermum} source copying into an
+\emph{S.\ oneidensis} target reaches $-7.505\times10^{-2}$ four times in $1\,298\,668$ proposals at
+$N=20$; the three $N=40$ runs behind Table~\ref{tab:decided_moves} do not reach it, which is why the
+single-role figure went unchallenged by the measurement that accompanied it.
+
+Recomputed on that basis, the expected number of accepted moves that removing
+$\Delta H_{\mathrm{rad}}$ alone would reverse is $16.7$ across the three seeds, against $0.26$ under
+the withdrawn bound; the measured number is $16$ (four, three and nine by seed). The reason the
+table nonetheless reports the term as decisive only once is \emph{absorption}, not absence: in
+fifteen of those sixteen an adhesion or volume term was independently decisive as well, so the move
+is labelled \emph{more than one term}. The defensible statement is that the direct radiation term
+could have decided sixteen accepted moves in 206\,042 and was rarely the only term that did, which
+is a weaker claim than the one this paragraph previously made and is the one the data supports. The
+melanin term reversed 23 moves in 53\,603. Neither figure is a measurement of anything outside this
+model's own acceptance arithmetic.
+
+The complement is the more useful number. Between 66\% and 77\% of accepted moves are reversed by
+removing no single term at all, so the dynamics are carried by the sum rather than owned by any
+component, and the per-voxel statistics are too thin to say more: at 400~MCS the median voxel that
+was written to at all received three accepted moves. A spatial map of which term dominates where is
+therefore not reported, and would be noise if it were.
 
 \subsection{Single-Seed Radial Diagnostic}
 \label{sec:cpm_results}
@@ -1048,14 +1324,15 @@ membrane state or CPM clock. This validates the implementation path, not the phy
 
 % ---- 7. Discussion -------------------------------------------
 \section{Discussion}
+\label{sec:discussion}
 
 \subsection{What the Implemented Models Establish}
 
 The implemented programs support a narrower conclusion than the full PSDE specification. The
 Langevin models demonstrate stochastic spatial grouping under chosen drift and interaction rules;
 they do not demonstrate radiation-enhanced growth or survival. The CPM term audit establishes that,
-within its radiation-derived pathway, the melanin term dominates the direct species-specific
-radiation term by several orders of magnitude. The single-seed radial output does not establish a
+within its radiation-derived pathway, the melanin term exceeds the direct species-specific
+radiation term by about an order of magnitude in $\Delta H$ ($9.6$), not by several. The single-seed radial output does not establish a
 radiotropic pattern, because its direction conflicts with the direct coefficient and its magnitude
 is not separated from the seeding null. The radiodialysis solvers establish a reproducible numerical
 solution of the stated semi-discrete equations, but the coupled Julia path does not yet possess a
@@ -1091,6 +1368,32 @@ mass concentration is required. Fixed-membrane one-way dosimetry is still meanin
 physical system is specified; dose-responsive membrane transport requires a separate constitutive
 and experimental programme.
 
+The regime in which those inputs are obtainable is not the one this paper's motivating sites
+occupy. Section~\ref{sec:planned_feedback} put the gap at about ten orders of magnitude: a
+reactor irradiation delivers of order $\mathrm{Gy}\,\mathrm{min}^{-1}$ and the environmental
+settings cited in Section~\ref{sec:intro} are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, so a sensitivity
+constant calibrated in one is not transferable to the other. Engineered nuclear facilities lie
+between them, and biofilms are documented there. Sarr\'{o} et al.\ submerged a bioreactor
+carrying stainless steel and titanium coupons in a spent nuclear fuel pool at a Spanish nuclear
+power plant, characterised the biofilm that developed on both materials, and measured its
+radioactivity by gamma-ray spectrometry: the biofilms retained radionuclides from the pool water,
+$^{60}$Co in particular \cite{sarro2007}. Karley et al.\ isolated six bacterial species from
+spent-fuel-pool water with $D_{10}$ values from 248~Gy to 2~kGy and biofilm-forming capability,
+and reported biofilm-mediated Co and Ni removal up to 3.8~$\mu$g per mg of biomass
+\cite{karley2018}; a later study of the same isolates --- among them \textit{B.\ subtilis}, one
+of the seven modelled here --- found that dead biomass also removed both ions, which is what a
+sorption rather than a metabolic mechanism predicts \cite{karley2023}.
+
+We record this as an observation about regime and available inputs, not as a proposed deployment.
+Three quantities the offline counterfactual requires --- a bounded geometry, a characterised
+source, and a measurable metal inventory in the biofilm --- are ordinarily available in such a
+facility and are not available at a contaminated field site. What this framework would compute
+there is the dose a biofilm on a surface receives and whether its presence perturbs the local
+field: the same one-way question posed above, with its inputs supplied rather than assumed.
+Whether the perturbation is large enough to matter is an empirical question, and nothing in this
+paper answers it. The model is unchanged by the observation; only the setting in which its inputs
+could be measured is.
+
 \subsection{Limitations and Future Directions}
 \label{sec:limitations}
 
@@ -1102,6 +1405,21 @@ model revision required before radiotrophy or radioresistance can be fitted. For
 elongation specifically, Section~\ref{sec:radiotrophy_status} names the adaptable machinery ---
 a Neighbour-Sensing- or VSC-style tip-growth term \cite{meskauskas2004,bartnickigarcia1989} ---
 rather than an unbounded open problem.
+
+Fluid flow and advection are absent as well, and the relation between these absences is more
+informative than a longer list would be. Flow reaches morphology through mechanics, so its
+absence is downstream of the missing mechanics rather than a separate gap; and a model with
+no growth generates no growth-induced stress for mechanics to act on, so the mechanical gap
+is in turn downstream of the growth one. The three are better read as one structural absence
+under three names than as three independent items. What that costs is stated rather than
+implied: this model has none of the three routes named above, and its spatial output is
+therefore directional redistribution of parcels in an imposed field rather than a morphology.
+Whether those three exhaust the routes is a question about the literature and not one this
+model answers.
+External review has argued that growth-induced stress is the dominant morphogen in still
+conditions; that claim is literature this work has not verified, is recorded as such in
+\texttt{docs/research/external\_reviews\_2026-08-31\_redteam.md}, and nothing here
+depends on it.
 
 \paragraph{Identifiability.}
 Only the product of the melanin-production scale and the melanin-coupling scale reaches the CPM
@@ -1137,8 +1455,9 @@ and finally the scientific offline feedback gate.
 This study separates a broad mathematical proposal from the smaller set of simulations that were
 actually executed. The active CPM represents seven species as computational biomass parcels and
 contains adhesion, volume, radiation and melanin terms. At the shipped constants, the melanin term
-is the dominant radiation-derived contribution to Metropolis acceptance, while the direct
-species-specific radiation term is negligible for the two negatively signed classes. The resulting
+is the dominant radiation-derived contribution to Metropolis acceptance, exceeding the direct
+species-specific radiation term by about an order of magnitude in $\Delta H$ rather than rendering it
+negligible. The resulting
 single-seed radial pattern is diagnostic rather than established: it is opposite to the direct-term
 direction and is not separated from the seeding null at six parcels per species.
 
@@ -1158,10 +1477,9 @@ whether plausible biological material changes are large enough to justify any on
 \section*{Software and Data Availability}
 All source code, configuration schemas, tests, provenance ledgers, and figure-generation materials
 are available in the public repository at
-\url{https://github.com/aurascoper/Biofilms}. The supporting repository revision for this
-manuscript is \texttt{c7539a9}, the parent of the commit that adds this manuscript to the
-repository: a document cannot cite the commit that contains it, so it names the revision it was
-prepared against. No new biological specimens or experimental measurements were generated.
+\url{https://github.com/aurascoper/Biofilms/tree/preprint-v1.2.1}. Version 1.0 was prepared against repository
+revision \texttt{c7539a9}; this revision is prepared against \texttt{4bf1ba9}. Each names the
+parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.
 
@@ -1169,10 +1487,57 @@ Readers should note that the repository has continued past this revision, and th
 numerical results published in it were subsequently corrected by the project's own review: a
 false-positive control that could not fail was replaced, a squared difference reported as a
 variance was relabelled, an unprovenanced sensitivity table was withdrawn and re-measured, and
-one synthetic-gate verdict was withdrawn as not resolution-converged. None of those numbers
-appears in this manuscript, whose transport section reports the execution of a path rather than
-its results. The corrections are recorded in \texttt{data/claims\_ledger.csv} and in
-\texttt{docs/calibration/}.
+one synthetic-gate verdict was withdrawn as not resolution-converged. The corrections are
+recorded in \texttt{data/claims\_ledger.csv} and in \texttt{docs/calibration/}.
+
+\emph{Correction, version 1.1: Figures~\ref{fig:radial} and~\ref{fig:melanin} have been replaced.} The versions distributed with
+version 1.0 carried claims inside the images that the surrounding text retracts. Figure~\ref{fig:melanin}
+annotated two species as ``radiotrophic (melanin-mediated energy gain)'' beneath a caption
+disowning radiation-derived energy production and against
+Section~\ref{sec:radiotrophy_status}; Figure~\ref{fig:radial} labelled a shaded band a ``radiotrophic niche'',
+and labelled it on the wrong side, since the imposed field is maximal on the axis. Three further
+in-plot strings asserted findings the text does not support: a title reading ``radial
+stratification'' where Section~\ref{sec:discussion} reports a single-seed diagnostic not separated from the seeding
+null, a title attributing melanin accumulation to radiation-driven production, and an annotation
+asserting drift toward the source when the run's own ordering runs the other way. No numerical
+value in either figure changed --- the underlying run is the same, and the mean radial positions
+and melanin values quoted in the captions are reproduced exactly --- and no other figure was
+regenerated. Figure~\ref{fig:contaminant} still carries a ``per cent depleted'' label that should read
+non-penetration, and is not regenerated here: its quantities are downstream of the gated biomass
+basis. Figure~\ref{fig:membrane} is not --- it plots $m(t)$ and $P_{\mathrm{eff}}/P_0$, neither of which reads that
+basis --- and it has now been rebuilt; see the version 1.2 note below. The defect was that the
+figure generator had been corrected two weeks earlier and the committed images had not, with no
+check able to detect the difference; this is recorded as \texttt{FIG-01} to \texttt{FIG-07} in the
+claims ledger.
+
+\emph{Correction, version 1.2: two items, one numerical and one in an image.}
+Section~\ref{sec:cpm_term_magnitudes} previously bounded the acceptance-favouring contribution of
+$\Delta H_{\mathrm{rad}}$ at $5\times10^{-5}$ and inferred from that bound that the term deciding
+no accepted move was analytically expected rather than an under-sampling artifact. The bound was
+wrong by a factor of $1.5\times10^{3}$: it enumerated only the source-gains-a-site role, and a
+positively signed species vacating a site favours acceptance by up to $7.5\times10^{-2}$. A second
+pass over the same paragraph, also in review, found that the replacement bound was still stated over
+\emph{species} when the quantity is an extremum over source/target \emph{pairings}: a copy between
+two occupied parcels carries both roles, so the reach is $7.505\times10^{-2}$ and
+$\max_s|\beta_{s,\mathrm{ion}}|$ is not a bound on it. The two values differ by $0.067\%$ and the
+larger is attained in a shipped configuration. The fraction of evaluated proposals carrying
+$\Delta H_{\mathrm{rad}} < -5\times10^{-5}$ is likewise restated as $26.7\%$ over the three runs of
+Table~\ref{tab:decided_moves}; the $29.8\%$ first written here came from a run this paper did not
+identify, which is the same defect as \texttt{PP-62-11} and is why the configuration is now named in
+the sentence. \texttt{tests/prose\_bounds.jl} recomputes the bound from the shipped coefficients and
+fails on either withdrawn form.
+Table~\ref{tab:term_magnitudes} gains the missing row and the paragraph beneath
+Table~\ref{tab:decided_moves} is rewritten. \textbf{Two published numbers move.} The count of moves
+for which the direct radiation term was solely decisive is one of 206\,042, not zero --- seed 44
+carries one --- and the number that removing $\Delta H_{\mathrm{rad}}$ alone would reverse is
+sixteen, against $0.26$ predicted under the withdrawn bound and $16.7$ under the corrected one. The
+remaining entries of Table~\ref{tab:decided_moves} were re-measured and reproduce exactly; that is
+a statement about those entries and not about any other result in this paper. Recorded as
+\texttt{PP-62-04} and \texttt{PP-62-09} to \texttt{PP-62-11} in the claims ledger; raised in review
+by Codex on pull request \#23. Figure~\ref{fig:membrane} has separately been rebuilt to remove an in-plot
+``50~Gy cumulative'' annotation that the generator dropped on 14 August 2026 and the committed
+artifact kept, and to separate two labels that had been printing on top of one another; no value in
+it changed.
 
 \section*{Ethics, Biosafety, and Regulatory Statement}
 This manuscript reports software development, computational simulation, code audit, and analysis of
@@ -1184,8 +1549,31 @@ irradiation campaign will begin only after strain-, protocol-, facility- and sou
 institutional approvals have been issued; no such campaign or approval is claimed in this
 manuscript.
 
+One organism named here requires a nomenclature note, because the name it is published under is
+no longer the name a laboratory would receive it as. \textit{Ochrobactrum intermedium} was
+reclassified into \textit{Brucella} on genomic grounds \cite{hordt2020}, the combination
+\textit{Brucella intermedia} was validly published the same year \cite{oren2020}, and NCBI
+Taxonomy serves taxon 94625 as \textit{Brucella intermedia} with \textit{Ochrobactrum
+intermedium} retained as a synonym and a lineage reading \texttt{Brucellaceae; Brucella/}
+\texttt{Ochrobactrum group; Brucella}. The consequence is operational rather than taxonomic: CDC's
+laboratory update of 19 December 2022 records that the reclassification is reflected in the rapid
+identification systems clinical laboratories use, and directs that organisms identified as
+\textit{Brucella} be handled in a Class II biosafety cabinet and that presumptive isolates be
+referred to a state public health laboratory \cite{cdc2022}. That same notice designates the
+former \textit{Ochrobactrum} species non-brucellosis-causing.
+
+We state the record and not a determination. Containment level, select-agent status and
+procurement clearance follow the individual strain, are the responsibility of the institution
+that issues them, and are outside what a computational study can establish; this manuscript
+asserts none of them. Two facts are recorded because they bear on anyone reading this as a
+procurement plan: no culture-collection accession for AM7 was located in any repository searched,
+so the strain may be unobtainable; and the repository's own research record carries the
+determination as unresolved, with procurement held pending it. Both names are carried on every
+record here for the same reason the \textit{Wangiella}/\textit{Exophiala} mapping is carried
+--- a search under one name does not return the other.
+
 % ---- References ---------------------------------------------
-\begin{thebibliography}{53}
+\begin{thebibliography}{61}
 
 \bibitem{radcell2021}
 Liu, R., Higley, K.A., Swat, M.H., Chaplain, M.A.J., Powathil, G.G., Glazier, J.A. (2021).
@@ -1293,16 +1681,27 @@ iDynoMiCS: next-generation individual-based modelling of biofilms.
 \url{https://doi.org/10.1111/j.1462-2920.2011.02414.x}
 
 \bibitem{sonner2015}
-Sonner, S., Efendiev, M.A., Eberl, H.J. (2015).
-On the well-posedness of a mathematical model of quorum-sensing in patchy biofilm communities.
-\textit{Mathematical Methods in the Applied Sciences}, 38(3), 3037--3042.
-\url{https://doi.org/10.1002/mma.3237}
+Rahman, K.A., Sudarsan, R., Eberl, H.J. (2015).
+A mixed-culture biofilm model with cross-diffusion.
+\textit{Bulletin of Mathematical Biology}, 77(11), 2086--2124.
+\url{https://doi.org/10.1007/s11538-015-0117-1}
+% CORRECTED 2026-08-31. The entry previously here had wrong bibliographic data,
+% a DOI resolving to an unrelated paper, and was the wrong paper for the
+% cross-diffusion claim it was cited for. The withdrawn fields are recorded in
+% data/claims_ledger.csv, row PP-REF-01 (verdict delete) -- deliberately NOT
+% repeated here, so the withdrawn DOI exists in the recording layer only and
+% cannot be copied out of the manuscript.
 
 \bibitem{diele2015}
-Diele, F., Marangi, C., Ragni, S. (2015).
+Diele, F., Marangi, C. (2020).
 Geometric numerical integration in ecological modelling.
-\textit{Mathematics and Computers in Simulation}, 110, 40--52.
-\url{https://doi.org/10.1016/j.matcom.2014.02.006}
+\textit{Mathematics}, 8(1), 25.
+\url{https://doi.org/10.3390/math8010025}
+% CORRECTED 2026-08-31. EVERY FIELD of the previous entry was wrong -- authors,
+% year, journal, volume, pages -- and its DOI resolved to an unrelated
+% quadratic-programming paper. Two authors, not three; the body citation was
+% updated to match. The withdrawn fields are in data/claims_ledger.csv, row
+% PP-REF-02 (verdict delete), and are deliberately not repeated here.
 
 \bibitem{kuramoto1984}
 Kuramoto, Y. (1984).
@@ -1317,10 +1716,13 @@ The Kuramoto model: a simple paradigm for synchronization phenomena.
 \url{https://doi.org/10.1103/RevModPhys.77.137}
 
 \bibitem{campillo2017}
-Campillo, F., Joannides, M., Larramendy-Valverde, I. (2017).
+Voulgarelis, D., Velayudhan, A., Smith, F. (2018).
 Stochastic analysis of a full system of two competing populations in a chemostat.
-\textit{Chemical Engineering Science}, 175, 424--440.
-\url{https://doi.org/10.1016/j.ces.2017.10.052}
+\textit{Chemical Engineering Science}, 175, 424--444.
+% CORRECTED 2026-08-31 per claims_ledger PP-REF-03, which holds the withdrawn wording.
+% The journal and volume were right; the authors, year, title and pages were not.
+% The key is left as campillo2017 so the citation sites need no edit.
+\url{https://doi.org/10.1016/j.ces.2017.10.016}
 
 \bibitem{heidelberg2002}
 Heidelberg, J.F., et al. (2002).
@@ -1340,6 +1742,47 @@ Shukla, A., Parmar, P., Goswami, D., Patel, B., Saraf, M. (2020).
 Characterization of novel thorium tolerant \textit{Ochrobactrum intermedium} AM7.
 \textit{Journal of Hazardous Materials}, 388, 122047.
 \url{https://doi.org/10.1016/j.jhazmat.2020.122047}
+
+\bibitem{sarro2007}
+Sarr\'{o}, M. I., Garc\'{i}a, A. M., Moreno, D. A., Montero, F. (2007).
+Development and characterization of biofilms on stainless steel and titanium in spent nuclear
+fuel pools.
+\textit{Journal of Industrial Microbiology \& Biotechnology}, 34(6), 433--441.
+\url{https://doi.org/10.1007/s10295-007-0215-7}
+
+\bibitem{karley2018}
+Karley, D., Shukla, S. K., Rao, T. S. (2018).
+Isolation and characterization of culturable bacteria present in the spent nuclear fuel pool
+water.
+\textit{Environmental Science and Pollution Research}, 25(21), 20518--20526.
+\url{https://doi.org/10.1007/s11356-017-0376-5}
+
+\bibitem{karley2023}
+Karley, D., Shukla, S. K., Rao, T. S. (2023).
+Sequestration of cobalt and nickel by biofilm forming bacteria isolated from spent nuclear fuel
+pool water.
+\textit{Environmental Monitoring and Assessment}, 195(6), 731.
+\url{https://doi.org/10.1007/s10661-023-11266-x}
+
+\bibitem{hordt2020}
+H\"{o}rdt, A., Garc\'{i}a L\'{o}pez, M., Meier-Kolthoff, J. P., Schleuning, M., Weinhold, L.-M.,
+Tindall, B. J., Gronow, S., Kyrpides, N. C., Woyke, T., G\"{o}ker, M. (2020).
+Analysis of 1,000+ type-strain genomes substantially improves taxonomic classification of
+\textit{Alphaproteobacteria}.
+\textit{Frontiers in Microbiology}, 11, 468.
+\url{https://doi.org/10.3389/fmicb.2020.00468}
+
+\bibitem{oren2020}
+Oren, A., Garrity, G. M. (2020).
+List of new names and new combinations previously effectively, but not validly, published.
+\textit{International Journal of Systematic and Evolutionary Microbiology}, 70(7), 4043--4049.
+\url{https://doi.org/10.1099/ijsem.0.004244}
+
+\bibitem{cdc2022}
+Centers for Disease Control and Prevention (2022).
+Lab update: reclassification of \textit{Ochrobactrum} species into the \textit{Brucella} genus.
+Laboratory Outreach Communication System, 19 December 2022.
+\url{https://www.cdc.gov/locs/2022/12-19-2022-Lab-Update-Reclassification_Ochrobactrum_species_Brucella_genus.html}
 
 \bibitem{wright1932}
 Wright, S. (1932).
@@ -1383,31 +1826,13 @@ Adaptation of the black yeast \textit{Wangiella dermatitidis} to ionizing radiat
 \textit{PLoS ONE}, 7(11), e48674.
 \url{https://doi.org/10.1371/journal.pone.0048674}
 
-\bibitem{malo2018}
-Malo, M.E., et al. (2018).
+\bibitem{malo2018} 
+Malo, M.E., Bryan, R.A., Shuryak, I., Dadachova, E. (2018).
 Morphological changes in melanized and non-melanized \textit{Cryptococcus neoformans} cells
-post exposure to ionizing radiation.
+post exposure to sparsely and densely ionizing radiation demonstrate protective effect of
+melanin.
 \textit{Fungal Biology}, 122(6), 449--456.
-\url{https://doi.org/10.1016/j.funbio.2017.08.012}
-
-\bibitem{newsome2014}
-Newsome, L., Morris, K., Lloyd, J.R. (2014).
-The biogeochemistry and bioremediation of uranium and other priority radionuclides.
-\textit{Chemical Geology}, 363, 164--184.
-\url{https://doi.org/10.1016/j.chemgeo.2013.10.034}
-
-\bibitem{brim2000}
-Brim, H., et al. (2000).
-Engineering \textit{Deinococcus radiodurans} for metal remediation in radioactive mixed
-waste environments.
-\textit{Nature Biotechnology}, 18(1), 85--90.
-\url{https://doi.org/10.1038/71986}
-
-\bibitem{kazy2009}
-Kazy, S.K., D'Souza, S.F., Sar, P. (2009).
-Uranium and thorium sequestration by a \textit{Pseudomonas} sp.
-\textit{Journal of Hazardous Materials}, 163(1), 65--72.
-\url{https://doi.org/10.1016/j.jhazmat.2008.06.076}
+\url{https://doi.org/10.1016/j.funbio.2017.08.010}
 
 \bibitem{blasius1999}
 Blasius, B., Huppert, A., Stone, L. (1999).
@@ -1422,9 +1847,10 @@ A multidimensional multispecies continuum model for heterogeneous biofilm develo
 \url{https://doi.org/10.1007/s11538-006-9168-7}
 
 \bibitem{eberl2001}
-Eberl, H.J., Parker, D.F., van Loosdrecht, M.C.M. (2001).
+Eberl, H.J., Parker, D.F., van Loosdrecht, M.C.M. (2000).
 A new deterministic spatio-temporal continuum model for biofilm development.
-\textit{Journal of Theoretical Medicine}, 3(3), 161--175.
+\textit{Journal of Theoretical Medicine} (now \textit{Computational and Mathematical
+Methods in Medicine}), 3(3), 161--175.
 \url{https://doi.org/10.1080/10273660108833072}
 
 \bibitem{hairer2006}
@@ -1433,29 +1859,11 @@ Hairer, E., Lubich, C., Wanner, G. (2006).
 Springer-Verlag.
 \url{https://doi.org/10.1007/3-540-30666-8}
 
-\bibitem{eisenman2012}
-Eisenman, H.C., Casadevall, A. (2012).
-Synthesis and assembly of fungal melanin.
-\textit{Applied Microbiology and Biotechnology}, 93(3), 931--940.
-\url{https://doi.org/10.1007/s00253-011-3777-2}
-
-\bibitem{lloyd2005}
-Lloyd, J.R., Renshaw, J.C. (2005).
-Bioremediation of radioactive waste.
-\textit{Current Opinion in Biotechnology}, 16(3), 254--260.
-\url{https://doi.org/10.1016/j.copbio.2005.04.012}
-
 \bibitem{khajo2011}
 Khajo, A., et al. (2011).
 Protection of melanized \textit{Cryptococcus neoformans} from lethal dose gamma irradiation.
 \textit{PLoS ONE}, 6(9), e25092.
 \url{https://doi.org/10.1371/journal.pone.0025092}
-
-\bibitem{battista1997}
-Battista, J.R. (1997).
-Against all odds: the survival strategies of \textit{Deinococcus radiodurans}.
-\textit{Annual Review of Microbiology}, 51, 203--224.
-\url{https://doi.org/10.1146/annurev.micro.51.1.203}
 
 \bibitem{casadevall2017}
 Casadevall, A., et al. (2017).
@@ -1503,8 +1911,22 @@ Solving differential equations in R: package deSolve.
 Cortes\~{a}o, M., et al. (2020).
 Aspergillus niger spores are highly resistant to space radiation.
 \textit{Frontiers in Microbiology}, 11, article 560.
+\url{https://doi.org/10.3389/fmicb.2020.00560}
 (LD$_{90}$ values for N402 and the pigmentation-deficient $\Delta fwnA$ mutant MA93.1 under
 X-ray, He-ion and Fe-ion exposure; open access, CC BY 4.0.)
+
+\bibitem{sellafield2020}
+Foster, L., Boothman, C., Ruiz-Lopez, S., et al. (2020).
+Identification of a stable hydrogen-driven microbiome in a highly radioactive storage facility on
+the Sellafield site. \textit{Frontiers in Microbiology}, 11, 587556.
+\url{https://doi.org/10.3389/fmicb.2020.587556}
+
+\bibitem{sellafield2023}
+Ruiz-Lopez, S., et al. (2023).
+Identification of algal rich microbial blooms in the Sellafield Pile Fuel Storage Pond and the
+application of ultrasonic treatment to control the formation of blooms.
+\textit{Frontiers in Microbiology}, 14, 1261801.
+\url{https://doi.org/10.3389/fmicb.2023.1261801}
 
 \bibitem{walberg2015}
 Walberg, K. (2015).

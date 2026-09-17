@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 644" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="flux" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#a63a2e"/>
+    </marker>
+    <marker id="lead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5a6570"/>
+    </marker>
+    <pattern id="film" width="12" height="12" patternUnits="userSpaceOnUse">
+      <rect width="12" height="12" fill="#cddfd2"/>
+      <circle cx="3" cy="4" r="2.3" fill="#5d8a6c" opacity="0.8"/>
+      <circle cx="9" cy="9" r="1.9" fill="#3d5f49" opacity="0.7"/>
+      <circle cx="7" cy="1" r="1.3" fill="#5d8a6c" opacity="0.55"/>
+    </pattern>
+    <pattern id="mem" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="7" height="7" fill="#e9ecef"/>
+      <line x1="0" y1="0" x2="0" y2="7" stroke="#a8b1ba" stroke-width="2"/>
+    </pattern>
+  </defs>
+
+  <rect width="900" height="600" fill="#ffffff"/>
+
+  <text x="40" y="34" font-size="19" font-weight="600" fill="#14202b">Phase 2 — two-chamber diffusion cell</text>
+  <text x="40" y="55" font-size="12.5" fill="#4b5563">Biofilm grown on a permeable support; transport read as receiver breakthrough</text>
+  <line x1="40" y1="70" x2="860" y2="70" stroke="#c8cfd6" stroke-width="1"/>
+
+  <!-- barrier callout -->
+  <text x="378" y="96" font-size="11" font-weight="600" text-anchor="middle" fill="#3d5f49">biofilm on permeable support</text>
+  <line x1="378" y1="101" x2="378" y2="112" stroke="#5a6570" stroke-width="1" marker-end="url(#lead)"/>
+
+  <!-- liquids -->
+  <rect x="132" y="146" width="234" height="170" fill="#d8e5ef"/>
+  <rect x="390" y="146" width="234" height="170" fill="#eef3f7"/>
+
+  <!-- barrier stack: film then support -->
+  <rect x="366" y="124" width="14" height="192" fill="url(#film)"/>
+  <rect x="380" y="124" width="10" height="192" fill="url(#mem)"/>
+
+  <!-- chamber outlines -->
+  <rect x="132" y="124" width="234" height="192" fill="none" stroke="#14202b" stroke-width="2.5"/>
+  <rect x="390" y="124" width="234" height="192" fill="none" stroke="#14202b" stroke-width="2.5"/>
+
+  <!-- clamps holding the support -->
+  <rect x="358" y="112" width="34" height="16" fill="#8a949e" stroke="#14202b" stroke-width="1.5"/>
+  <rect x="358" y="312" width="34" height="16" fill="#8a949e" stroke="#14202b" stroke-width="1.5"/>
+
+  <!-- open fill ports -->
+  <line x1="132" y1="124" x2="366" y2="124" stroke="#ffffff" stroke-width="4"/>
+  <line x1="132" y1="124" x2="366" y2="124" stroke="#14202b" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <line x1="390" y1="124" x2="624" y2="124" stroke="#ffffff" stroke-width="4"/>
+  <line x1="390" y1="124" x2="624" y2="124" stroke="#14202b" stroke-width="2.5" stroke-dasharray="7 5"/>
+
+  <!-- solute -->
+  <circle cx="180" cy="200" r="3.6" fill="#a63a2e"/>
+  <circle cx="226" cy="238" r="3.6" fill="#a63a2e"/>
+  <circle cx="286" cy="196" r="3.6" fill="#a63a2e"/>
+  <circle cx="326" cy="232" r="3.6" fill="#a63a2e"/>
+  <circle cx="166" cy="272" r="3.6" fill="#a63a2e"/>
+  <circle cx="252" cy="284" r="3.6" fill="#a63a2e"/>
+  <circle cx="336" cy="286" r="3.6" fill="#a63a2e"/>
+  <circle cx="206" cy="172" r="3.6" fill="#a63a2e"/>
+  <circle cx="300" cy="264" r="3.6" fill="#a63a2e"/>
+  <circle cx="416" cy="222" r="3.6" fill="#a63a2e"/>
+  <circle cx="452" cy="276" r="3.6" fill="#a63a2e"/>
+
+  <!-- flux -->
+  <line x1="300" y1="252" x2="462" y2="252" stroke="#a63a2e" stroke-width="2.2" stroke-dasharray="6 5" marker-end="url(#flux)"/>
+
+  <!-- stir bars -->
+  <ellipse cx="249" cy="302" rx="20" ry="5" fill="#8a949e"/>
+  <ellipse cx="507" cy="302" rx="20" ry="5" fill="#8a949e"/>
+
+  <!-- chamber labels -->
+  <text x="249" y="170" font-size="14" font-weight="600" text-anchor="middle" fill="#14202b">Donor</text>
+  <text x="249" y="190" font-size="10.5" text-anchor="middle" fill="#3d4a56">concentration held constant</text>
+  <text x="249" y="205" font-size="10.5" text-anchor="middle" fill="#3d4a56">one solute per run</text>
+
+  <text x="507" y="170" font-size="14" font-weight="600" text-anchor="middle" fill="#14202b">Receiver</text>
+  <text x="507" y="190" font-size="10.5" text-anchor="middle" fill="#3d4a56">held near zero</text>
+  <text x="507" y="205" font-size="10.5" text-anchor="middle" fill="#3d4a56">C(t) gives the breakthrough curve</text>
+
+  <!-- sampling -->
+  <rect x="624" y="212" width="16" height="12" fill="#8a949e" stroke="#14202b" stroke-width="1.5"/>
+  <line x1="640" y1="218" x2="700" y2="218" stroke="#14202b" stroke-width="2"/>
+  <rect x="700" y="204" width="54" height="28" fill="#f2f4f6" stroke="#14202b" stroke-width="2"/>
+  <line x1="754" y1="218" x2="790" y2="218" stroke="#14202b" stroke-width="3"/>
+  <text x="700" y="196" font-size="11" font-weight="600" fill="#14202b">timed aliquots</text>
+  <text x="700" y="250" font-size="10.5" fill="#3d4a56">metal to ICP; bromide to IC</text>
+
+  <text x="378" y="348" font-size="10.5" text-anchor="middle" fill="#4b5563">Both chambers stirred — unstirred boundary layers otherwise read as film resistance.</text>
+
+  <!-- three panels -->
+  <rect x="30" y="370" width="270" height="176" fill="#ffffff" stroke="#8a949e" stroke-width="1.5"/>
+  <text x="46" y="392" font-size="11.5" font-weight="600" fill="#14202b">Paired blank: bare support</text>
+  <text x="46" y="412" font-size="10" fill="#3d4a56">Identical cell and support, no biofilm,</text>
+  <text x="46" y="425.5" font-size="10" fill="#3d4a56">run alongside every measurement.</text>
+  <text x="46" y="439" font-size="10" fill="#3d4a56">Gives the support&#8217;s own resistance and</text>
+  <text x="46" y="452.5" font-size="10" fill="#3d4a56">its wall sorption. Without it the result</text>
+  <text x="46" y="466" font-size="10" fill="#3d4a56">is film plus support, not film.</text>
+  <text x="46" y="493" font-size="10" fill="#3d4a56">Edge seal checked separately: a leak</text>
+  <text x="46" y="506.5" font-size="10" fill="#3d4a56">reads as fast transport.</text>
+
+  <rect x="315" y="370" width="270" height="176" fill="#faf3e2" stroke="#8a6420" stroke-width="1.5"/>
+  <text x="331" y="392" font-size="11.5" font-weight="600" fill="#6b4d16">Open choice: the tracer run</text>
+  <text x="331" y="410" font-size="10" fill="#6b4d16">Bromide is the tracer because R &#8776; 1: it is</text>
+  <text x="331" y="423.5" font-size="10" fill="#6b4d16">not retarded, so its breakthrough gives</text>
+  <text x="331" y="437" font-size="10" fill="#6b4d16">D_eff directly &#8212; the number the solver takes.</text>
+  <text x="331" y="450.5" font-size="10" fill="#6b4d16">If bromide is excluded from part of the pore</text>
+  <text x="331" y="464" font-size="10" fill="#6b4d16">space, that D_eff is not the metal&#8217;s. Whether</text>
+  <text x="331" y="477.5" font-size="10" fill="#6b4d16">an EPS gel does that is untested.</text>
+  <text x="331" y="491" font-size="10" fill="#6b4d16">At Hanford 300A tritiated water resolved pore</text>
+  <text x="331" y="504.5" font-size="10" fill="#6b4d16">volume bromide did not (Hay et al. 2011,</text>
+  <text x="331" y="518" font-size="10" fill="#6b4d16">doi:10.1029/2010WR010303). Tritiated water&#8217;s</text>
+  <text x="331" y="531.5" font-size="10" fill="#6b4d16">approval burden: a question for Dr. Deng.</text>
+
+  <rect x="600" y="370" width="270" height="176" fill="#ffffff" stroke="#8a949e" stroke-width="1.5"/>
+  <text x="616" y="392" font-size="11.5" font-weight="600" fill="#14202b">What the metal run yields</text>
+  <text x="616" y="412" font-size="10" fill="#3d4a56">Breakthrough lag gives a lumped</text>
+  <text x="616" y="425.5" font-size="10" fill="#3d4a56">transport parameter, not a diffusivity</text>
+  <text x="616" y="439" font-size="10" fill="#3d4a56">alone: sorption retards it, so the metal</text>
+  <text x="616" y="452.5" font-size="10" fill="#3d4a56">run yields D_app. Separating the two</text>
+  <text x="616" y="466" font-size="10" fill="#3d4a56">needs the partition coefficient from the</text>
+  <text x="616" y="479.5" font-size="10" fill="#3d4a56">Phase 1 suspended isotherm.</text>
+  <text x="616" y="500" font-size="10" fill="#3d4a56">That ordering is why Phase 1 comes first.</text>
+
+  <!-- naming caution -->
+  <rect x="30" y="560" width="840" height="48" fill="#ffffff" stroke="#a63a2e" stroke-width="1.5"/>
+  <text x="46" y="579" font-size="10.5" font-weight="600" fill="#8c2f24">What this number is not</text>
+  <text x="46" y="597" font-size="10" fill="#3d4a56">The film-scale effective diffusivity measured here is not the reactor-scale dispersion coefficient that currently carries the same name in radial_parms (1&#215;10&#8315;&#179; cm&#178; s&#8315;&#185;, about 43&#215; water&#8217;s self-diffusivity).</text>
+  <text x="46" y="611" font-size="10" fill="#3d4a56">It is the quantity slab_parms carries as D_eff (1&#215;10&#8315;&#8309; cm&#178; s&#8315;&#185;) &#8212; the one default in that file below water self-diffusivity.</text>
+</svg>

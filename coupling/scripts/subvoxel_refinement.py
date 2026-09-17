@@ -131,12 +131,17 @@ def _seed(rep: int, state: str, paired: bool) -> int:
 
 
 def parse_ratios(text: str) -> list[int]:
-    """The ratio list as positive integers, sorted, or a named refusal.
+    """The comma-separated ratio list, sorted, with every requirement named.
 
-    `int()` over `split(",")` turned `''` into an IndexError one line later,
-    `1,,4` into a ValueError from `int('')`, and let `1,0` reach the divisor
-    arithmetic and `1,-1` through entirely. A pre-transport refusal that can
-    crash or pass on malformed input is not the deterministic guard promised.
+    THREE REQUIREMENTS, EACH REFUSED BY NAME, because two merges each fixed a
+    different one. (a) Every entry is an integer: `int()` over a raw `split(",")`
+    turned `''` into an IndexError one line later and `1,,4` into an anonymous
+    ValueError. (b) Every ratio is >= 1, so `1,0` cannot reach the divisor
+    arithmetic and `1,-1` cannot pass. (c) Ratio 1 is present, because it defines
+    the common Omega_b every finer ratio is evaluated on. Checking only the
+    smallest element conflated (b) and (c): "0,1,2" was refused for lacking
+    ratio 1 (Copilot on #24), which is why `1 not in ratios` replaced
+    `ratios[0] != 1` rather than joining it.
     """
     tokens = [t.strip() for t in text.split(",")]
     try:
@@ -144,9 +149,12 @@ def parse_ratios(text: str) -> list[int]:
     except ValueError:
         raise SystemExit(
             f"--ratios {text!r}: every entry must be an integer") from None
-    if not ratios or any(r < 1 for r in ratios):
+    bad = [r for r in ratios if r < 1]
+    if bad:
+        raise SystemExit(f"--ratios {text!r}: ratios must be >= 1; got {bad}")
+    if 1 not in ratios:
         raise SystemExit(
-            f"--ratios {text!r}: every ratio must be a positive integer")
+            f"--ratios {text!r}: ratio 1 is the reference grid and must be included")
     return ratios
 
 
@@ -239,8 +247,7 @@ def main(argv=None) -> int:
     # Sorted so ratio 1 runs first: it defines the common Omega_b that every
     # finer ratio is then evaluated on.
     ratios = parse_ratios(args.ratios)
-    if ratios[0] != 1:
-        raise SystemExit("ratio 1 is the reference grid and must be included")
+
     refuse_non_divisor_ratios(ratios)
 
     import openmc

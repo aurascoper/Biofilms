@@ -72,6 +72,59 @@ by 11-21x at n = 1e3-1e5 and the arms converge to within 1.07-1.23x by n = 1e7.
 **The near-term work on this port is kernel structure, not more FLOPs**, and a
 larger device would not change that.
 
+## The decomposition is now measured (2026-08-29)
+
+Kernel agreement above is blind to the one defect the checkerboard can have of its
+own. A parity-correlated bias in accepted moves passes `jacc_port_tests.jl`
+whenever **both** kernels carry it, and `tests/fixtures/serial_seed42.csv` pins the
+serial stream, which has no sublattices at all. `tests/jacc_parity_tests.jl` is that
+measurement. `cpm_color!` gained two write-only per-site arrays — `st`
+(0 never proposed / 1 evaluated-rejected / 2 evaluated-accepted) and `dh` (ΔH of
+evaluated proposals) — reduced per sweep and **never drawn**: `d404438` refused a
+spatial map for the serial decisive-label tally at 6157 of 64000 voxels touched,
+median 3, and a parity bias is a global count comparison regardless.
+
+Three choices in that tier are not obvious and each avoids a false failure on the
+first run:
+
+**The table is conditioned on opportunity.** The kernel's early returns — wall,
+same-σ, medium-into-medium, out-of-bounds — are geometry-dependent, so a uniform
+null over eight classes would report the shape of the domain as a decomposition
+artifact. `st` carries the denominator and the 2×8 accepted/rejected table asks
+about the acceptance *rate* per class.
+
+**The thresholds are effect sizes, not χ².** n is 1.3e5–3.1e5 evaluated proposals
+per run and the cells are not independent — an accepted move changes the lattice
+for every later pass — so χ² over-disperses from autocorrelation alone and a fixed
+critical value would test "is there any asymmetry at all". Cramér's V and the max
+per-class rate deviation are asserted; χ² and n are reported beside them.
+
+**`color_order` separates the decomposition from the `vols` staleness.** The colour
+loop is sequential and `vols` accumulates across passes, so the first pass evaluates
+against sweep-start volumes and the last against volumes moved by seven passes —
+a deterministic, parity-correlated difference with nothing to do with the
+checkerboard, and `c` indexes both spatial class and sequence position. Reversal
+would separate only a monotonic position effect; random permutations drop that
+assumption. The RNG step key stays `mcs*8 + c`, keyed to the colour rather than to
+its position, so permuting changes the pass order and nothing else.
+
+Measured at N=20, 50 MCS, threads backend, seeds 42/43/44 × three orderings:
+V 0.0050–0.0111, max per-class rate deviation 0.017–0.049. **No decomposition
+artifact detected, and the pattern tracks neither spatial class nor pass position** —
+the third disposition, which the tier reports as unresolved rather than attributing.
+
+### Reproducibility has a narrower scope than this document implied
+
+`delta_H` reads `vols` while `cpm_color!` mutates it in the same pass. The
+`ponytail:` comment calls that staleness bounded and unbiased, which it is, but
+bounded is not deterministic: **the port's trajectory is not reproducible across
+thread counts.** Measured on the threads backend, seed 42, N=40, 100 MCS — one
+thread gives the same lattice every run, four threads gave three different lattices
+in three runs. Any lattice-equality check against this port is meaningful only
+single-threaded, and there is deliberately no lattice fixture in `tests/fixtures/`
+for that reason: it would sit in a compare-never-regenerate directory while being
+hardware- and thread-count-dependent.
+
 ## A Metal backend would need explicit Float32 conversion at the kernel boundary
 
 Not exercised today, and recorded here only as a forward-looking note: `Project.toml` has no
