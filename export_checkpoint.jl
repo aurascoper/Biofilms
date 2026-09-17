@@ -135,13 +135,25 @@ function _write_events!(f, state)
 end
 
 """
-    export_transport_snapshot(SR, sim, path; config_toml_path = nothing)
+    export_transport_snapshot(SR, sim, path; config_toml_path = nothing, cpm_seed = nothing)
 
-Portable snapshot for the Python/OpenMC side. Carries labels and reference
-fields only; asserts NO material composition — that mapping is config-defined
-and applied Python-side (fails loudly there when the config is absent).
+Portable snapshot for the Python/OpenMC side. It records labels and reference
+fields only, and asserts NO material composition. That mapping is config-defined
+and applied on the Python side.
+
+`cpm_seed` is the CPM run seed. It is NOT the `[transport] seed` that a coupling
+config declares for OpenMC, which defaults to 1 and means the Monte Carlo
+transport stream. One word must not name two quantities, so the attribute says
+which one it is. Without a seed the file records `cpm_seed_source = "absent"`
+and writes no `cpm_seed`.
+
+Corrected 2026-09-17: this docstring said the mapping "fails loudly there when
+the config is absent". No Python code reads `config_toml`, and none branches on
+`material_class_source`, so nothing failed. `docs/exchange_schema.md` stated the
+same thing twice and is corrected with it.
 """
-function export_transport_snapshot(SR, sim, path; config_toml_path = nothing)
+function export_transport_snapshot(SR, sim, path; config_toml_path = nothing,
+                                   cpm_seed = nothing)
     state = sim.state
     species, lineage, generation = _label_arrays(SR, state)
     cfg = config_toml_path === nothing ? "" : read(config_toml_path, String)
@@ -152,6 +164,11 @@ function export_transport_snapshot(SR, sim, path; config_toml_path = nothing)
             label_state_hash(state.lattice, species, lineage, generation)
         a["material_class_source"] = config_toml_path === nothing ?
             "absent" : "config"
+        # Declared, or declared absent. A file with NO `cpm_seed_source` at all is
+        # a THIRD state: it predates this field. A reader must not treat that
+        # silence as a writer's declaration.
+        a["cpm_seed_source"] = cpm_seed === nothing ? "absent" : "declared"
+        cpm_seed === nothing || (a["cpm_seed"] = Int(cpm_seed))
         f["config_toml"] = cfg
         f["lattice/cell_id"] = Array{Int32}(state.lattice)
         f["lattice/species_id"] = species
@@ -163,6 +180,12 @@ function export_transport_snapshot(SR, sim, path; config_toml_path = nothing)
         f["dose/accumulated_Gy"] = state.accumulated_dose_Gy
         _write_cells!(f, state)
         _write_events!(f, state)
+        # Parameters, so that a seed names a run somebody can rebuild. A seed
+        # written beside no parameters would advertise a reproducibility this
+        # file cannot support. The restart checkpoint already writes both groups
+        # through this same helper, and `_read_params` reads them back.
+        _write_params!(f, "cpm_params", state.params)
+        _write_params!(f, "rd_params", sim.rd.params)
         f["orientation_probes"] = _orientation_probes(state.lattice)
     end
     return path
@@ -377,7 +400,8 @@ One run, a transport snapshot every `every` MCS up to `n_mcs` (and at `n_mcs` it
 if it is not a multiple), written as `dir/snap_mcsNNNNNN.h5`. The files carry their
 own `mcs` attribute, which is what `export_vti.jl` keys a `.pvd` on. Returns the paths.
 """
-function export_transport_series(SR, sim, dir; every::Int, n_mcs::Int, config_toml_path = nothing)
+function export_transport_series(SR, sim, dir; every::Int, n_mcs::Int, config_toml_path = nothing,
+                                 cpm_seed = nothing)
     every >= 1 || throw(ArgumentError("every must be >= 1, got $every"))
     n_mcs >= every || throw(ArgumentError("n_mcs=$n_mcs is below every=$every; nothing would be written"))
     mkpath(dir)
@@ -388,7 +412,7 @@ function export_transport_series(SR, sim, dir; every::Int, n_mcs::Int, config_to
         SR.advance_window!(sim, step)
         done += step
         path = joinpath(dir, "snap_mcs$(lpad(done, 6, '0')).h5")
-        export_transport_snapshot(SR, sim, path; config_toml_path)
+        export_transport_snapshot(SR, sim, path; config_toml_path, cpm_seed)
         push!(paths, path)
     end
     return paths
@@ -427,14 +451,15 @@ function _cli_export(SR, mode, out, cfg, seed, n_mcs, every = nothing)
                             basis_gate_ack = true); seed)
     if every !== nothing
         mode == "transport" || error("--every writes transport snapshots only")
-        paths = export_transport_series(SR, sim, out; every, n_mcs, config_toml_path = cfg)
+        paths = export_transport_series(SR, sim, out; every, n_mcs, config_toml_path = cfg,
+                                        cpm_seed = seed)
         @printf("wrote %d transport snapshots to %s (every %d MCS to %d, seed=%d)\n",
                 length(paths), out, every, n_mcs, seed)
         return
     end
     SR.advance_window!(sim, n_mcs)
     if mode == "transport"
-        export_transport_snapshot(SR, sim, out; config_toml_path = cfg)
+        export_transport_snapshot(SR, sim, out; config_toml_path = cfg, cpm_seed = seed)
     elseif mode == "restart"
         export_restart_checkpoint(SR, sim, out)
     else

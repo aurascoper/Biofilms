@@ -105,6 +105,18 @@ let
         @test size(cell_id) == (20, 20, 20)
         @test read(f["config_toml"]) == ""
 
+        # This call passed no seed, so the file must SAY it has none. Silence
+        # would be indistinguishable from a file written before the field existed.
+        @test read(a["cpm_seed_source"]) == "absent"
+        @test !haskey(a, "cpm_seed")
+
+        # Parameters, so that a recorded seed names a run somebody can rebuild.
+        # Every field, not a chosen subset: a partial group would let a changed
+        # struct pass while the artifact lost a parameter.
+        @test Set(keys(f["cpm_params"])) == Set(String.(fieldnames(typeof(p))))
+        @test Set(keys(f["rd_params"])) == Set(String.(fieldnames(typeof(rp))))
+        @test read(f["cpm_params/N"]) == p.N
+
         # every probe row must match the array at its 0-based coordinates
         probes = read(f["orientation_probes"])
         @test size(probes, 1) >= 3
@@ -118,6 +130,35 @@ let
         ids = read(f["cells/id"])
         @test all(>(0), ids)
         @test sum(species .> 0) == sum(read(f["cells/volume"]))
+    end
+end
+
+# ---------- transport snapshot: the CPM seed, declared and declared absent ----------
+#
+# THE CONTROL IS THE PAIR. A writer that always wrote "absent" passes the block
+# above on its own. The declared case is read back here through the same reader,
+# so one value cannot satisfy both.
+#
+# `cpm_seed` is the CPM run seed. It is NOT the `[transport] seed` a coupling
+# config declares for OpenMC, which defaults to 1.
+
+let
+    sim = SR.init_coupled_simulation(p, rp; seed = 9)
+    SR.advance_window!(sim, 2)
+    seeded = joinpath(tmp, "snap_seeded.h5")
+    export_transport_snapshot(SR, sim, seeded; cpm_seed = 7)
+
+    h5open(seeded, "r") do f
+        a = attributes(f)
+        @test read(a["cpm_seed_source"]) == "declared"
+        @test read(a["cpm_seed"]) == 7
+        # The parameters rebuild through the same reader the restart path uses,
+        # which is what makes the seed usable rather than decorative.
+        back = _read_params(SR, f, "cpm_params", :CPMParams)
+        @test back.N == p.N
+        @test back.n_cells_per_species == p.n_cells_per_species
+        rback = _read_params(SR, f, "rd_params", :RadiolysisParams)
+        @test rback.Nr == rp.Nr
     end
 end
 

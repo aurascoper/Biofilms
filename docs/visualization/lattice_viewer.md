@@ -58,8 +58,12 @@ takes the deletion date then.
 
 and the attributes `schema_version`, `logical_axis_order = "xyz"`, `dataset_axis_order_h5py =
 "zyx"`, `coordinate_index_base = 0`, `cell_id_background = 0`, `cell_id_wall = -1`, `git_sha`,
-`mcs`, `physical_time_s`. The tools read those attributes and carry them; they restate none of
-them.
+`mcs`, `physical_time_s`. From 2026-09-17 a snapshot also states `cpm_seed_source` and, when
+one was declared, `cpm_seed`. The tools copy those attributes through and restate none of them.
+
+A snapshot written earlier has no `cpm_seed_source` at all. `export_vti.jl` states that third
+state as `unrecorded` rather than omitting the key, because a field missing from a `.vti` reads
+the same as a field nobody ever wrote.
 
 Two things the snapshot does not carry, with the dataset list written at those lines as the scope. One is
 the nutrient field, which is only in the restart checkpoint (`fields/nutrient`), the other is the OpenMC
@@ -280,6 +284,11 @@ The twelve field-data entries are the same inventory the Linux RC1 run reported 
 `cell_id_background`, `cell_id_wall`, `mcs`, `physical_time_s`, `logical_axis_order`,
 `dataset_axis_order_h5py`, `git_sha`. Spacing stays 1.0 per site and the `D-PITCH` refusal
 survives into the artifact and into the viewer's axis labels, which read "sites".
+
+*Corrected 2026-09-17:* the count above is fourteen for any `.vti` written from this date.
+`export_vti.jl` adds `cpm_seed_source` and `cpm_seed`. The twelve named above remain the
+measured inventory of that dated ParaView run, and this note states what moved rather than
+renumbering a recorded observation.
 
 **Step 7 is the first GLMakie render on Apple Silicon in this repository.** `--still`, not
 interactive: the standing Codex P2 at `viewer/visualize_lattice.jl:53` — `display(fig)` on one
