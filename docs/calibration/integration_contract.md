@@ -155,7 +155,7 @@ Naming the radiation term correctly is not the end of it. The shipped values are
 |------|-----|---------------------------|
 | `ΔH_rad`, radiotropic species (β = −5e-5) | −5.0e-5 | 1.000010 |
 | `ΔH_rad`, most radiosensitive species (β = 7.5e-2) | +7.5e-2 | 0.985 |
-| `ΔH_mel` over 256 seeds, M = 1.26 to 2.56 | −1.281 to −0.630 | **1.134 to 1.292** |
+| `ΔH_mel` over 256 seeds, M = 1.26 to 2.56 | −0.630 to −1.281 | **1.134 to 1.292** |
 
 `β_ion` is the one parameter Table 2 tabulates per species. It is also the one the sign convention
 is written around.
