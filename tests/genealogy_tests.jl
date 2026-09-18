@@ -210,3 +210,88 @@ let
     @test st.melanin_drive == mel0
     @test st.lattice == lat0
 end
+
+# ---------- update_centers_of_mass!: a site may not outlive its cell ----------
+
+let
+    # THE KNOWN-BAD STATE FIRST. This branch used to read
+    # `σ > 0 && haskey(sums, Int(σ))` and skip the orphan silently, so an
+    # assertion run only against clean states is a check that cannot fail:
+    # weaken the refusal and it stops firing at all while the suite stays green.
+    # Paint a site with an id that is in no registry and require the refusal to
+    # bite, before the clean-state block below means anything (AGENTS.md rule 1).
+    p = SR.CPMParams(N = 16, n_cells_per_species = 1)
+    st = SR.init_state(p; seed = 5)
+    for i in eachindex(st.lattice)
+        st.lattice[i] > 0 && (st.lattice[i] = Int32(0))
+    end
+    empty!(st.cells)
+    for x in 6:7, y in 6:7, z in 6:7
+        st.lattice[x, y, z] = Int32(1)
+    end
+    st.cells[1] = SR.CellInfo(1, 8, Float64[6.5, 6.5, 6.5])
+    st.lattice[10, 10, 10] = Int32(99)          # 99 is in no registry
+
+    err = try
+        SR.update_centers_of_mass!(st)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ErrorException
+    @test occursin("update_centers_of_mass!", err.msg)
+    @test occursin("99", err.msg)
+    @test occursin("(10, 10, 10)", err.msg)     # names the site, not just the id
+end
+
+# ---------- update_centers_of_mass!: recorded volume must match the lattice ----------
+
+let
+    # THE KNOWN-BAD STATE FIRST, for the same reason. `volume` is maintained
+    # incrementally by the ±1 pair beside each lattice write in mcs_step!, and
+    # nothing else in the model ever compares the two. The comparison has to be
+    # shown to bite on a hand-set disagreement, because the assignment two lines
+    # below it overwrites the evidence every step.
+    p = SR.CPMParams(N = 16, n_cells_per_species = 1)
+    st = SR.init_state(p; seed = 5)
+    for i in eachindex(st.lattice)
+        st.lattice[i] > 0 && (st.lattice[i] = Int32(0))
+    end
+    empty!(st.cells)
+    for x in 6:7, y in 6:7, z in 6:7
+        st.lattice[x, y, z] = Int32(1)          # 8 sites painted
+    end
+    st.cells[1] = SR.CellInfo(1, 7, Float64[6.5, 6.5, 6.5])   # 7 recorded
+
+    err = try
+        SR.update_centers_of_mass!(st)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ErrorException
+    @test occursin("volume 7", err.msg)
+    @test occursin("8 lattice sites", err.msg)
+end
+
+# ---------- update_centers_of_mass!: both refusals are narrow ----------
+
+let
+    # Without this block a function that threw unconditionally would satisfy
+    # both controls above. Two states must still pass: a stepped simulation, and
+    # a registered cell holding zero sites, which is the input the reap at the
+    # tail of mcs_step! exists to clear rather than a fault.
+    p = SR.CPMParams(N = 16, n_cells_per_species = 1)
+    st = SR.init_state(p; seed = 5)
+    rng = SR.MersenneTwister(5)
+    SR.update_centers_of_mass!(st)              # clean at init
+    for _ in 1:5
+        SR.mcs_step!(st, rng)
+        SR.update_centers_of_mass!(st)          # clean after every step
+    end
+    @test !isempty(st.cells)
+
+    st.cells[9999] = SR.CellInfo(1, 0, Float64[0.0, 0.0, 0.0])
+    SR.update_centers_of_mass!(st)
+    @test haskey(st.cells, 9999)                # zero sites is not a fault
+end
