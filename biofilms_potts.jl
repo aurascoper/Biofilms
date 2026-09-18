@@ -969,8 +969,25 @@ function update_centers_of_mass!(state::CPMState)
 
     @inbounds for z in 1:N, y in 1:N, x in 1:N
         σ = lat[x, y, z]
-        if σ > 0 && haskey(sums, Int(σ))
+        if σ > 0
             id = Int(σ)
+            # A SITE MAY NEVER OUTLIVE ITS CELL. This branch used to be
+            # `σ > 0 && haskey(sums, Int(σ))`, which computed the violation and
+            # then skipped past it -- the shape rule 3 forbids. The condition is
+            # reachable: the accept branch of mcs_step! writes `lat[tx,ty,tz]`
+            # with no haskey guard while the two volume updates beside it have
+            # one, so a single orphan spreads; and export_checkpoint.jl restores
+            # `cells/id` and `lattice/cell_id` from independent datasets with no
+            # cross-check. Left silent, the first consumer to notice is
+            # compute_delta_H, which indexes `cells[...]` bare and raises a
+            # KeyError from inside its own speculative lattice write, naming
+            # neither the site nor the id.
+            haskey(sums, id) || error(
+                "update_centers_of_mass!: lattice site ($x, $y, $z) names cell " *
+                "$id, which is absent from state.cells. A lattice site may not " *
+                "outlive the cell it names. Either a cell was deleted while it " *
+                "still occupied sites, or a restored checkpoint disagrees with " *
+                "its own registry.")
             sums[id][1] += x
             sums[id][2] += y
             sums[id][3] += z
@@ -981,6 +998,20 @@ function update_centers_of_mass!(state::CPMState)
     for (id, cell) in state.cells
         n = counts[id]
         if n > 0
+            # THIS FUNCTION IS THE VOLUME AUTHORITY, so the assignment below
+            # destroys the evidence. Compare first. `volume` is also maintained
+            # incrementally by the ±1 pair in mcs_step!'s accept branch, and
+            # nothing else ever checks that the two agree. A disagreement means
+            # a lattice write happened without its matching volume update.
+            #
+            # n == 0 is NOT checked here and must not be: a registered cell with
+            # no sites is the input the reap at the tail of mcs_step! exists to
+            # clear, not a fault.
+            cell.volume == n || error(
+                "update_centers_of_mass!: cell $id records volume " *
+                "$(cell.volume) but occupies $n lattice sites. The incremental " *
+                "volume bookkeeping in mcs_step! has drifted from the lattice " *
+                "it mirrors.")
             cell.com .= sums[id] ./ n
             cell.volume = n
         end
