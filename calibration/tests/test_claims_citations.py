@@ -51,7 +51,7 @@ BARE_ALLOWED = {("HANDOUT-02", "wan-deck.tex:153-155")}
 
 # A tripwire, not a target. A new citation changes it; update it in the same commit. It is
 # here so that a pattern which silently stops matching cannot pass on zero citations.
-N_CITATIONS = 152
+N_CITATIONS = 159
 
 
 def _flat(text: str) -> str:
@@ -95,6 +95,9 @@ def citation_problems(root: Path = REPO) -> list:
     bare = {(r["claim_id"], m.group(0)) for r in _rows(root) for col, cell in r.items() if col
             for m in BARE.finditer(cell or "")}
     out += [f"{cid}: bare citation {lit}; write it as file@`snippet`" for cid, lit in sorted(bare - BARE_ALLOWED)]
+    out += [f"{r['claim_id']}: detached line number {m.group(0)!r}; give it a file and a snippet"
+            for r in _rows(root) for col, cell in r.items() if col
+            for m in DETACHED.finditer(BARE.sub(" ", re.sub(r"`[^`]*`", "`", cell or "")))]
     out += [f"{cid}: BARE_ALLOWED names {lit}, and the row no longer has it" for cid, lit in sorted(BARE_ALLOWED - bare)]
     return out
 
@@ -126,11 +129,6 @@ def _scratch(tmp_path: Path, ledger_body: str, files: dict) -> Path:
 STEPPER = "function step!(s)\n    s.t += 1\nend\n\nfunction other!(s)\n    s.u += 1\nend\n"
 
 
-_DETACHED = pytest.mark.xfail(strict=True, raises=AssertionError,
-                             reason="no reader sees a line number left behind a converted "
-                                    "citation; see the next commit")
-
-
 @pytest.mark.parametrize("label,cell,files,want", [
     ("the snippet occurs once", "stepper.jl@`s.t += 1`", {"stepper.jl": STEPPER}, []),
     ("it spans a line break", "stepper.jl@`function step!(s) s.t += 1`", {"stepper.jl": STEPPER}, []),
@@ -142,11 +140,11 @@ _DETACHED = pytest.mark.xfail(strict=True, raises=AssertionError,
     ("a bare line citation", "stepper.jl:2", {"stepper.jl": STEPPER}, ["bare citation stepper.jl:2"]),
     ("a bare citation with a tail", "stepper.jl:2,:6", {"stepper.jl": STEPPER}, ["bare citation stepper.jl:2,:6"]),
     # The three forms below are the ones the first conversion left in the real ledger.
-    pytest.param("numbers left after the snippet", "stepper.jl@`s.t += 1`,6", {"stepper.jl": STEPPER}, ["detached line number"], marks=_DETACHED),
-    pytest.param("a tail after prose", "stepper.jl@`s.t += 1` T_cpm; :6 acceptance", {"stepper.jl": STEPPER},
-     ["detached line number ':6'"], marks=_DETACHED),
-    pytest.param("a tail in brackets", "stepper.jl@`s.t += 1` and the other (:6)", {"stepper.jl": STEPPER},
-     ["detached line number ':6'"], marks=_DETACHED),
+    ("numbers left after the snippet", "stepper.jl@`s.t += 1`,6", {"stepper.jl": STEPPER}, ["detached line number"]),
+    ("a tail after prose", "stepper.jl@`s.t += 1` T_cpm; :6 acceptance", {"stepper.jl": STEPPER},
+     ["detached line number ':6'"]),
+    ("a tail in brackets", "stepper.jl@`s.t += 1` and the other (:6)", {"stepper.jl": STEPPER},
+     ["detached line number ':6'"]),
     ("a journal volume and page is not a line number", "stepper.jl@`s.t += 1`; J Ind Microbiol 34(6):433-441, at 16:48",
      {"stepper.jl": STEPPER}, []),
 ])
