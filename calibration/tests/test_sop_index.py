@@ -1038,6 +1038,37 @@ def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, 
     assert (removal_tokens(root), capability_claims(root)) == SEEN_BY[plant_id]
 
 
+def _copy_pinned(root: Path) -> None:
+    """Every file a pin names, copied into the scratch root as it is today."""
+    import shutil
+    for rel in sorted(set(EXEMPT_LINES) | set(CAPABILITY_LINES)):
+        if not (root / rel).exists():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(REPO / rel, root / rel)
+
+
+# A DELETED FILE. Raised by Codex on pull request #47 against 80d9787, and reproduced first.
+# listed_text() omits a file that is gone, so neither reader compares that file's pins. The
+# stepper is left out: the older Julia predicate opens it, so its absence is already an error.
+PINNED_FILES = sorted((set(EXEMPT_LINES) | {rel for rel, pins in CAPABILITY_LINES.items()
+                                            if pins is not WHOLE_FILE}) - {"biofilms_potts.jl"})
+
+
+@pytest.mark.parametrize("rel", PINNED_FILES)
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="a deleted file takes its pins with it, and neither reader "
+                          "reports the file; see the next commit")
+def test_a_deleted_pinned_file_lands_the_term(tmp_path, rel):
+    root = _scratch_repo(tmp_path)
+    _copy_pinned(root)
+    if landed_terms(root, terms={SURVIVAL}):
+        raise RuntimeError("the scratch root reports a landed term before the deletion")
+    (root / rel).unlink()
+    if (root / rel).exists():
+        raise RuntimeError(f"the deletion did not apply: {rel}")
+    assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+
+
 def test_every_pin_has_its_tables():
     """An allowlisted file with no pinned lines is exempt by its name, and a capability
     file with a reason and no pinned lines is exempt by its path."""
