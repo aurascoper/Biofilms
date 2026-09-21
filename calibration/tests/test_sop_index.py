@@ -310,29 +310,58 @@ PROSE_AND_DATA = {".md", ".tex", ".txt", ".csv", ".tsv", ".json"}
 # survival fraction; dying; mitotic; necrotic; cull; resorb and resorption. Matched
 # inside an identifier at a snake_case or camelCase boundary, so `skill`, `died` and
 # `overkill` do not match and `kill_cell!`, `cellDeath` and `CELL_DYING` do.
+#
+# survival, survivor and surviving are the term's own noun, added after Codex planted
+# `survival_probability` on pull request #47. Measured on 8374b59: 14 files. The verb
+# (survive, survives, survived) is in 46, nearly all English in comments and test
+# names, so it stays out and KNOWN_UNSEEN says so.
 REMOVAL_VOCAB = (
     r"(?<![A-Za-z])(?i:deaths?|kill|cull|dying|remove_?cell|mitotic|necro|resor[bp])"
+    r"|(?<![A-Za-z])(?i:survival|survivors?|surviving)"
     r"|(?<![A-Za-z])(?i:die)(?![A-Za-z])"
-    r"|(?<=[a-z])(?:Death|Kill|Cull|Dying|RemoveCell|Die(?![a-z]))"
+    r"|(?<=[a-z])(?:Death|Kill|Cull|Dying|RemoveCell|Survival|Survivor|Surviving|Die(?![a-z]))"
     r"|(?<![A-Za-z0-9])(?i:sf)(?![A-Za-z0-9])")
 
 WHOLE_FILE = None
 # file -> (the identifiers allowed in it, why). Keyed on the identifier, not the file:
 # a `kill_cell!` added to the stepper fires although the stepper is listed here.
 REMOVAL_ALLOWED = {
-    "biofilms_potts.jl": ({"DeathEvent", "death", "death_log"},
-                          "bookkeeping for removal at volume <= 0, which no dose term enters"),
+    # Conditional: see EXEMPTION_HOLDS. The reason is checked, not only stated.
+    "biofilms_potts.jl": ({"DeathEvent", "death", "death_log",
+                           "SURVIVAL", "Surviving", "survival"},
+                          "bookkeeping for removal at volume <= 0, which no dose term "
+                          "enters, and comments stating the model computes no survival"),
     "export_checkpoint.jl": ({"DeathEvent", "death", "death_log"},
                              "serialises that same bookkeeping"),
     "biofilms_3d.R": ({"death"}, "a comment stating the model has no death"),
-    "coupling/tests/test_feedback_gate.py": ({"death"},
-                                             "a docstring stating the CPM has no death"),
+    "coupling/tests/test_feedback_gate.py":
+        ({"death", "growth_survival", "growth_survival_response"},
+         "a docstring stating the CPM has no death, and the pathway id the gate refuses"),
+    "coupling/biofilm_openmc/feedback_gate.py": ({"growth_survival"},
+                                                 "lists the pathway as unsupported"),
     "post-biofilms-standalone.html": ({"death", "killed"},
                                       "blog prose: 'the model has no death', 'seeds killed it'"),
     "docs/visualization/macos-arm64-2026-09-11/component_overlap.py":
         ({"deaths"}, "connected components that disappear between frames, not cells"),
     "docs/visualization/macos-arm64-2026-09-11/test_component_overlap.py":
-        ({"deaths"}, "the tests of that component count"),
+        ({"deaths", "surviving"}, "the tests of that component count; a lineage that "
+                                  "outlasts a merge of components"),
+    "docs/visualization/macos-arm64-2026-09-11/decay_reference.py":
+        ({"surviving", "surviving_fraction"}, "nuclei not yet decayed, 2^(-t/T_half)"),
+    ".github/workflows/claims-guards.yml": ({"survivor"}, "a withdrawn claim still in a file"),
+    "calibration/tests/test_claims_ledger.py": ({"survivor", "survivors"},
+                                                "withdrawn phrases still in a document"),
+    "calibration/tests/test_withdrawn_comparisons.py": ({"survivors", "survivors_in"},
+                                                        "withdrawn comparisons still in the tree"),
+    "calibration/tests/test_figure_staleness.py": ({"surviving"},
+                                                   "a comment: withdrawn claims in images"),
+    "calibration/tests/test_biomass_field.py": ({"surviving"},
+                                                "a comment: biomass left in a synthetic field"),
+    "coupling/tests/test_pilot_seeding.py": ({"surviving"},
+                                             "a comment: a number that outlasts a rename"),
+    "coupling/biofilm_openmc/lineage.py": ({"survivors"},
+                                           "a docstring: labels that remain after masking"),
+    "geolocator/api.py": ({"surviving"}, "a comment: fuel pairs that pass a filter"),
     "coupling/scripts/synthetic_e2e.py": ({"sf"}, "a local: the far-field standard deviation"),
     "diagnostics/payload_census/bench_reduction.py": ({"sf"}, "a local: samples, full payload"),
     "diagnostics/inert_signal/guard.jl": ({"SF"}, "a comment's example alias for signal_field"),
@@ -342,6 +371,50 @@ REMOVAL_ALLOWED = {
                                                       "frustum culling of map markers"),
     "Primary Fuel Source Geolocator.twb": ({"cull"}, "the Tableau attribute mark-labels-cull"),
     "calibration/tests/test_sop_index.py": (WHOLE_FILE, "declares the vocabulary and the plants"),
+}
+
+
+def stepper_removal_sites(root: Path = REPO) -> list:
+    """(function, enclosing conditions) for every line of the stepper that deletes from
+    state.cells or constructs a DeathEvent. Read by indentation, the way that file is
+    written. Reformat the file and this returns something else, which voids the
+    exemption below: it fails closed."""
+    import re
+    lines = (root / "biofilms_potts.jl").read_text(encoding="utf-8").split("\n")
+    sites = []
+    for i, line in enumerate(lines):
+        if "delete!(state.cells" not in line and not re.search(r"\bDeathEvent\(", line):
+            continue
+        indent, conds, fn = len(line) - len(line.lstrip()), [], None
+        for prev in reversed(lines[:i]):
+            if not prev.strip() or len(prev) - len(prev.lstrip()) >= indent:
+                continue
+            indent, head = len(prev) - len(prev.lstrip()), prev.strip()
+            if head.startswith(("if ", "elseif ")):
+                conds.append(head.split(" ", 1)[1])
+            elif head == "else":
+                conds.append("else")
+            elif head.startswith("function "):
+                fn = re.match(r"function\s+([\w!]+)", head).group(1)
+                break
+        sites.append((fn, tuple(reversed(conds))))
+    return sites
+
+
+# What earns the stepper its exemption, stated as the thing itself. Codex on pull
+# request #47: a dose condition added to this cleanup reuses DeathEvent and death_log,
+# so an exemption granted on the file name subtracts the very signal it should report.
+STEPPER_REMOVES_ON_VOLUME_ALONE = [
+    ("mcs_step!", ("cell.volume <= 0",)),      # constructs the DeathEvent
+    ("mcs_step!", ("cell.volume <= 0",)),      # deletes that cell
+    ("divide_cell!", ()),                      # the parent's identity ends at division
+]
+# file -> the relation that must hold under `root` for its REMOVAL_ALLOWED entry to apply
+EXEMPTION_HOLDS = {
+    "biofilms_potts.jl":
+        lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE,
+    "export_checkpoint.jl":     # it serialises the log; it must remove nothing
+        lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8"),
 }
 
 
@@ -359,6 +432,8 @@ def removal_tokens(root: Path = REPO) -> dict:
         allowed = REMOVAL_ALLOWED.get(rel, (set(), ""))[0]
         if allowed is WHOLE_FILE or Path(rel).suffix.lower() in PROSE_AND_DATA:
             continue
+        if rel in EXEMPTION_HOLDS and not EXEMPTION_HOLDS[rel](root):
+            allowed = set()
         hits = sorted({t for t in token.findall(blob.sub(" ", text)) if vocab.search(t)}
                       - allowed)
         if hits:
@@ -593,13 +668,6 @@ def test_the_unplanted_scratch_root_reports_no_landed_term(tmp_path):
     assert landed_terms(_scratch_repo(tmp_path), terms={SURVIVAL}) == []
 
 
-# Both raised by Codex on pull request #47 against 8374b59, and both reproduced before
-# this mark was written. The next commit removes it.
-_CODEX_P1 = pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="a survival noun is not in the vocabulary, and the stepper's exemption is "
-           "granted on its file name without checking what governs its removals")
-
 SURVIVAL_PLANTS = [
     pytest.param("odin/cpm/response.odin", ODIN_RESPONSE,
                  id="the port's survival law and sweep"),
@@ -620,7 +688,7 @@ SURVIVAL_PLANTS = [
     pytest.param("port/response.zig",
                  "const survival_probability = exp(-alpha*D - beta*G*D*D);\n"
                  "if (u > survival_probability) { cells.delete(id); }\n",
-                 marks=_CODEX_P1, id="natural survival names and a generic delete"),
+                 id="natural survival names and a generic delete"),
     # The one form the first predicate could already see.
     pytest.param("biofilms_potts.jl", "\nfunction remove_cell!(lattice, i)\nend\n",
                  id="a Julia definition in the stepper"),
@@ -636,7 +704,8 @@ def test_a_planted_survival_process_lands_the_term(tmp_path, rel, text):
 
 SEEN_BY = {     # plant id -> (removal_tokens, capability_claims), exactly
     "the port's survival law and sweep":
-        ({"odin/cpm/response.odin": ["CELL_DYING", "deaths", "sf", "sf_lq", "sf_sum"]}, []),
+        ({"odin/cpm/response.odin":
+          ["CELL_DYING", "deaths", "sf", "sf_lq", "sf_sum", "survival"]}, []),
     "the port's removal procedures":
         ({"odin/cpm/sim.odin": ["cell_kill", "cull_dying", "resorb_sweep"]}, []),
     "a definition and a call in an unlisted language": ({"port/kernel.zig": ["killCell"]}, []),
@@ -650,7 +719,6 @@ SEEN_BY = {     # plant id -> (removal_tokens, capability_claims), exactly
 }
 
 
-@_CODEX_P1
 def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
     """The shortest route to the process from inside this repository: the volume-zero
     cleanup gains a dose condition and reuses DeathEvent and death_log, the very
@@ -659,6 +727,11 @@ def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
     _replace_once(root, "biofilms_potts.jl", "        if cell.volume <= 0\n",
                   "        if cell.volume <= 0 || cell.lifetime_dose_Gy > 50.0\n")
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+    # Through the reader it was written for: the exemption is void, so every identifier
+    # the stepper was allowed is reported, and nothing else is.
+    assert removal_tokens(root) == {"biofilms_potts.jl": sorted(
+        REMOVAL_ALLOWED["biofilms_potts.jl"][0])}
+    assert capability_claims(root) == []
 
 
 @pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
@@ -692,6 +765,11 @@ KNOWN_UNSEEN = [
     ("odin/cpm/opaque.odin", "dN := g*N - k(d)*N\n"),
     # The port's own law and sweep with every name replaced.
     ("odin/cpm/opaque.odin", "p := jexp_f64(-(a*D + b*G*D*D))\nif u > p { st[id] = 3 }\n"),
+    # The verb as a name. It is excluded on a measurement: 46 files use it as English.
+    ("port/response.zig", "fn survive(d: f64) f64 { return exp(-a*d); }\n"),
+    # Dose zeroes the volume somewhere else, and the volume-only cleanup does the rest.
+    # stepper_removal_sites() reads what governs a removal, not what feeds it.
+    ("biofilms_potts.jl", "\ncell.volume = cell.lifetime_dose_Gy > 50.0 ? 0 : cell.volume\n"),
     # Inside an unbroken 60-character run, which removal_tokens() drops as a blob.
     ("viewer/blob.js", "const a = '" + "A" * 30 + "killCell" + "A" * 30 + "';\n"),
 ]
