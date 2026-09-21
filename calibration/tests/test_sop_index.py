@@ -409,18 +409,23 @@ STEPPER_REMOVES_ON_VOLUME_ALONE = [
     ("mcs_step!", ("cell.volume <= 0",)),      # deletes that cell
     ("divide_cell!", ()),                      # the parent's identity ends at division
 ]
-# THE MODEL FILES ARE EXEMPT BY THE LINES THAT EARNED IT. Codex on pull request #47, three
-# times: an exemption keyed on the file let `survival_probability` style code hide behind the
-# stepper's bookkeeping; keyed on a word, it hid `function survival(dose)`; keyed on a count,
-# it hid that same function written over the one prose line that says survival. So for the
-# three files that ARE the model, the pin is every non-comment line that holds an exempt
-# identifier, verbatim and in order. A `#` line is exempt as what it is: it cannot run.
-# Editing one of these lines trips the gate on purpose. Whoever edits it updates the pin.
+# EVERY EXEMPTION IS PINNED TO THE LINES THAT EARNED IT. Codex on pull request #47, four
+# times: keyed on the file, an exemption hid a dose condition behind the stepper's own
+# bookkeeping; keyed on a word, it hid `function survival(dose)`; keyed on a count, it hid
+# that function written over the one prose line that says survival; and pinned for three
+# model files only, it hid `def growth_survival(dose)` written over the feedback gate's
+# unsupported-pathway line, in production code I had called a test or a script.
 #
-# SCOPE: these three files. In a test, a script or a viewer, a new use of an identifier
-# that file is already allowed is not seen. Those files are edited often, a pin there
-# would trip the promotion gate on unrelated work, and none of them is the model.
-MODEL_FILE_CODE_LINES = {
+# So there is no carve-out. For every file in REMOVAL_ALLOWED the pin is every non-comment
+# line that holds an exempt identifier, verbatim and in order. A `#` line is exempt as what
+# it is: it cannot run. A new line that uses an exempt identifier, or an edit to a pinned
+# one, voids that file's exemption and the gate fails. THAT IS A TRIPWIRE ON PURPOSE: the
+# person who made the edit looks, and updates the pin. Measured on b68e800: 79 lines in 24
+# files, none longer than 87 characters.
+#
+# WHAT STAYS EXEMPT WHOLESALE, and why: this file, because it declares the vocabulary and
+# holds the pins and the plants.
+EXEMPT_LINES = {
     'biofilms_potts.jl': [
         'the quantity the model computes is a DIRECTIONAL PREFERENCE, not survival and',
         'lifetime_dose_Gy::Float64   # accrued while alive; finalized at division/death',
@@ -448,6 +453,106 @@ MODEL_FILE_CODE_LINES = {
     ],
     'biofilms_3d.R': [
     ],
+    'coupling/tests/test_feedback_gate.py': [
+        '@pytest.mark.parametrize("pathway", ["growth_survival", "membrane_response"])',
+        '"""The CPM has no birth and no death, and the membrane constitutive law is',
+        'for pid in ("growth_survival_response", "membrane_response"):',
+    ],
+    'coupling/biofilm_openmc/feedback_gate.py': [
+        'unsupported_pathways: tuple = ("growth_survival", "membrane_response")',
+    ],
+    'post-biofilms-standalone.html': [
+        'damage, not benefit: the model has no death and no growth to express',
+        '<p>Tidy. I was pleased with it. Three more seeds killed it. On seed 43',
+    ],
+    'docs/visualization/macos-arm64-2026-09-11/component_overlap.py': [
+        'events.append({"mcs": t, "births": k, "deaths": 0, "merges": 0, "splits": 0,',
+        'events.append({"mcs": t, "births": births, "deaths": disappeared,',
+        'churn = sum(e["births"] + e["deaths"] + e.get("retired_by_merge", 0) for e in within)',
+        'for kk in ("births", "deaths", "retired_by_merge", "merges", "splits")}',
+        '% (totals["births"], totals["deaths"], totals["retired_by_merge"],',
+        '("births", "deaths", "retired_by_merge", "merges", "carried")}',
+    ],
+    'docs/visualization/macos-arm64-2026-09-11/test_component_overlap.py': [
+        'present for one frame reported two, an all-vanish frame reported zero deaths, and every',
+        'check("deaths == 1", e["deaths"] == 1, e["deaths"])',
+        'print("\\n=== two components joining into one: 1 merge, 1 retirement, 0 deaths ===")',
+        'check("deaths == 0 (neither disappeared)", e["deaths"] == 0, e["deaths"])',
+        'print("\\n=== one component splitting into two: 1 split, 1 birth, 0 deaths ===")',
+        'check("deaths == 0", e["deaths"] == 0, e["deaths"])',
+        'check("surviving lineage is the LARGER predecessor (id 0)",',
+        'check("deaths == 1 (C disappeared)", e["deaths"] == 1, e["deaths"])',
+    ],
+    'docs/visualization/macos-arm64-2026-09-11/decay_reference.py': [
+        'surviving = 2.0 ** (-t / T_HALF_DAYS)',
+        'act = a0 * surviving',
+        '"surviving_fraction": surviving,',
+        'metrics.append({"days": t, "surviving_fraction": surviving,',
+        'print("surviving at 1 t1/2 : %.6f   at 2: %.6f   at 3: %.6f" %',
+    ],
+    '.github/workflows/claims-guards.yml': [
+    ],
+    'calibration/tests/test_claims_ledger.py': [
+        'survivors = []',
+        'survivors.append(f"{row[\'claim_id\']} in {row[\'document\']}: {phrase[:90]}")',
+        'survivors.append(',
+        'assert not survivors, (',
+        '"carried them:\\n  " + "\\n  ".join(survivors))',
+        'reports survivors by id. A duplicate makes every one of those references',
+        'duplicate definition is legal Python and pytest collects only the survivor.',
+    ],
+    'calibration/tests/test_withdrawn_comparisons.py': [
+        'def survivors_in(text: str) -> list[str]:',
+        'survivors = []',
+        'for window in survivors_in(path.read_text(encoding="utf-8", errors="replace")):',
+        'survivors.append(f"{rel}: ...{window[WINDOW - 90:WINDOW + 120]}...")',
+        'assert not survivors, (',
+        '"as withdrawn:\\n  " + "\\n  ".join(survivors))',
+        'assert len(survivors_in(as_it_wrapped)) == 1',
+        'assert len(survivors_in(as_it_was)) == 1',
+        'assert survivors_in(corrected) == []',
+        'assert survivors_in(unrelated) == []',
+        'assert survivors_in(dose) == []',
+    ],
+    'calibration/tests/test_figure_staleness.py': [
+    ],
+    'calibration/tests/test_biomass_field.py': [
+    ],
+    'coupling/tests/test_pilot_seeding.py': [
+        'hazard was the NUMBER surviving, not the variable name.',
+    ],
+    'coupling/biofilm_openmc/lineage.py': [
+        'Masking the inputs beforehand does NOT fix that — survivors labelled 0 are',
+    ],
+    'geolocator/api.py': [
+    ],
+    'coupling/scripts/synthetic_e2e.py': [
+        'sf = np.sqrt((sd_occ[far] ** 2).sum()) / far.sum()',
+        'separation = (dn - df) / math.sqrt(sn ** 2 + sf ** 2)',
+    ],
+    'diagnostics/payload_census/bench_reduction.py': [
+        'sf, af = samples(lambda: load_full(full_d), reps)',
+        'show("full trajectory, 10 arrays", sf)',
+        'mf, mr = statistics.median(sf), statistics.median(sr)',
+        'sep = sr[-1] < sf[0] or sf[-1] < sr[0]',
+    ],
+    'diagnostics/inert_signal/guard.jl': [
+        'bump`), an alias (`const SF = signal_field`), or entry through a struct field it does',
+    ],
+    'geolocator/static/app/tokens.js': [
+        'mono: \'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace\',',
+    ],
+    'geolocator/static/index.html': [
+        '--mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;',
+    ],
+    'geolocator/static/app/hud/detectionOverlay.js': [
+        '* projected every marker every frame would be the thing that finally killed the',
+        '*   - frustum-culled before sorting, so off-screen markers cost nothing',
+        'if (!frustum.containsPoint(v)) continue;         // cull before sorting',
+    ],
+    'Primary Fuel Source Geolocator.twb': [
+        "<format attr='mark-labels-cull' value='true' />",
+    ],
 }
 
 
@@ -457,20 +562,18 @@ def exempt_code_lines(root: Path, rel: str) -> list:
     import re
     token = re.compile(r"[A-Za-z_][A-Za-z0-9_]*!?")
     allowed = REMOVAL_ALLOWED[rel][0]
-    return [line.strip() for line in (root / rel).read_text(encoding="utf-8").split("\n")
+    text = (root / rel).read_text(encoding="utf-8", errors="replace")
+    text = re.sub(r"[A-Za-z0-9+/=]{60,}", " ", text)      # the same blobs removal_tokens() drops
+    return [line.strip() for line in text.split("\n")
             if not line.strip().startswith("#") and allowed & set(token.findall(line))]
 
 
-# file -> the relation that must hold under `root` for its REMOVAL_ALLOWED entry to apply
+# file -> a relation that must hold BESIDE the line pin for its exemption to apply
 EXEMPTION_HOLDS = {
-    "biofilms_potts.jl":
-        lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE
-        and exempt_code_lines(root, "biofilms_potts.jl") == MODEL_FILE_CODE_LINES["biofilms_potts.jl"],
-    "export_checkpoint.jl":     # it serialises the log; it must remove nothing
-        lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8")
-        and exempt_code_lines(root, "export_checkpoint.jl") == MODEL_FILE_CODE_LINES["export_checkpoint.jl"],
-    "biofilms_3d.R":
-        lambda root: exempt_code_lines(root, "biofilms_3d.R") == MODEL_FILE_CODE_LINES["biofilms_3d.R"],
+    "biofilms_potts.jl":         # what governs each removal, not only which lines name one
+        lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE,
+    "export_checkpoint.jl":      # it serialises the log; it must remove nothing
+        lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8"),
 }
 
 
@@ -488,7 +591,9 @@ def removal_tokens(root: Path = REPO) -> dict:
         allowed = REMOVAL_ALLOWED.get(rel, (set(), ""))[0]
         if allowed is WHOLE_FILE or Path(rel).suffix.lower() in PROSE_AND_DATA:
             continue
-        if rel in EXEMPTION_HOLDS and not EXEMPTION_HOLDS[rel](root):
+        if rel in REMOVAL_ALLOWED and not (
+                exempt_code_lines(root, rel) == EXEMPT_LINES[rel]
+                and EXEMPTION_HOLDS.get(rel, lambda _root: True)(root)):
             allowed = set()
         hits = sorted({t for t in token.findall(blob.sub(" ", text)) if vocab.search(t)}
                       - allowed)
@@ -857,14 +962,16 @@ REPLACEMENT_PLANTS = [
     pytest.param("data/parameter_provenance.csv", r",response\.growth_survival,",
                  lambda line: line.replace("unsupported_by_current_model", "supported_by_current_model"),
                  id="the provenance row's status flips"),
-    # Raised by Codex on pull request #47 against b68e800, and reproduced first. This file
-    # is production code, exempt by identifier alone. The next commit removes the mark.
+    # Raised by Codex on pull request #47 against b68e800. Production code, which an
+    # earlier comment here had called a test or a script.
     pytest.param("coupling/biofilm_openmc/feedback_gate.py", r"growth_survival",
                  lambda line: "def growth_survival(dose):\n    return math.exp(-0.2 * dose)",
-                 marks=pytest.mark.xfail(
-                     strict=True, raises=AssertionError,
-                     reason="line pins cover three model files; this one is exempt by word"),
                  id="the gate's unsupported-pathway line becomes an implementation"),
+    # OUTSIDE THE SCOPE I HAD IN MIND. I would have called this file "just a script" and
+    # left it exempt by word. Its local `sf` is a far-field standard deviation.
+    pytest.param("coupling/scripts/synthetic_e2e.py", r"^\s*sf = ",
+                 lambda line: "    sf = np.exp(-0.2 * dose)",
+                 id="a script's local sf becomes a survival fraction"),
 ]
 
 
@@ -887,11 +994,8 @@ def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victi
     _replace_once(root, rel, old + "\n", new + "\n")
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
     # ...and through the reader it was written for, exactly.
-    if rel == "biofilms_potts.jl":      # the exemption is void: every exempt identifier shows
+    if rel in REMOVAL_ALLOWED:      # the exemption is void: every exempt identifier shows
         assert removal_tokens(root) == {rel: sorted(REMOVAL_ALLOWED[rel][0])}
-        assert capability_claims(root) == []
-    elif rel in REMOVAL_ALLOWED:        # likewise, with what is left of them in that file
-        assert removal_tokens(root) == {rel: ["growth_survival"]}
         assert capability_claims(root) == []
     else:
         assert removal_tokens(root) == {}
@@ -909,10 +1013,11 @@ def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, 
 
 
 def test_every_pin_has_its_tables():
-    """A model file with pinned lines and no relation in EXEMPTION_HOLDS is pinned by
-    nothing, and a capability file with a reason and no pinned lines is exempt by path."""
-    for rel in MODEL_FILE_CODE_LINES:
-        assert rel in EXEMPTION_HOLDS and rel in REMOVAL_ALLOWED, rel
+    """An allowlisted file with no pinned lines is exempt by its name, and a capability
+    file with a reason and no pinned lines is exempt by its path."""
+    assert set(EXEMPT_LINES) == {rel for rel, (allowed, _why) in REMOVAL_ALLOWED.items()
+                                 if allowed is not WHOLE_FILE}
+    assert set(EXEMPTION_HOLDS) <= set(EXEMPT_LINES)
     assert set(CAPABILITY_LINES) == set(CAPABILITY_NAMED_AS_UNSUPPORTED)
 
 
