@@ -409,12 +409,39 @@ STEPPER_REMOVES_ON_VOLUME_ALONE = [
     ("mcs_step!", ("cell.volume <= 0",)),      # deletes that cell
     ("divide_cell!", ()),                      # the parent's identity ends at division
 ]
+# THE MODEL FILES ARE EXEMPT BY OCCURRENCE, NOT BY WORD. Codex on pull request #47, at
+# d49b43c: `function survival(dose)` written in the stepper reuses a word its comments
+# were exempted for, and a file-wide allowlist subtracts it. So for the three files that
+# ARE the model, each exempt identifier is pinned to the number of times it occurs now.
+# One more `survival` anywhere in the stepper voids the exemption, and someone looks.
+#
+# SCOPE: these three files. In a test, a script or a viewer, a new use of an identifier
+# that file is already allowed is not seen. Those files are edited often, a count there
+# would trip the promotion gate on unrelated work, and none of them is the model.
+MODEL_FILE_OCCURRENCES = {
+    "biofilms_potts.jl": {"DeathEvent": 4, "death_log": 2, "death": 3,
+                          "SURVIVAL": 1, "Surviving": 2, "survival": 1},
+    "export_checkpoint.jl": {"DeathEvent": 2, "death_log": 1, "death": 9},
+    "biofilms_3d.R": {"death": 1},
+}
+
+
+def occurrences_are_the_pinned_ones(root: Path, rel: str) -> bool:
+    import re
+    words = re.findall(r"[A-Za-z_][A-Za-z0-9_]*!?", (root / rel).read_text(encoding="utf-8"))
+    pinned = MODEL_FILE_OCCURRENCES[rel]
+    return {w: words.count(w) for w in pinned} == pinned
+
+
 # file -> the relation that must hold under `root` for its REMOVAL_ALLOWED entry to apply
 EXEMPTION_HOLDS = {
     "biofilms_potts.jl":
-        lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE,
+        lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE
+        and occurrences_are_the_pinned_ones(root, "biofilms_potts.jl"),
     "export_checkpoint.jl":     # it serialises the log; it must remove nothing
-        lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8"),
+        lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8")
+        and occurrences_are_the_pinned_ones(root, "export_checkpoint.jl"),
+    "biofilms_3d.R": lambda root: occurrences_are_the_pinned_ones(root, "biofilms_3d.R"),
 }
 
 
@@ -668,13 +695,6 @@ def test_the_unplanted_scratch_root_reports_no_landed_term(tmp_path):
     assert landed_terms(_scratch_repo(tmp_path), terms={SURVIVAL}) == []
 
 
-# Raised by Codex on pull request #47 against d49b43c, and reproduced before this mark
-# was written. The next commit removes it.
-_CODEX_P1 = pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="the stepper's exemption names identifiers, so a new use of an exempt word "
-           "in that file is subtracted with the comments that earned it")
-
 SURVIVAL_PLANTS = [
     pytest.param("odin/cpm/response.odin", ODIN_RESPONSE,
                  id="the port's survival law and sweep"),
@@ -700,7 +720,7 @@ SURVIVAL_PLANTS = [
     # under the very word its comments were exempted for.
     pytest.param("biofilms_potts.jl",
                  "\nfunction survival(dose)\n    return exp(-0.2 * dose)\nend\n",
-                 marks=_CODEX_P1, id="a survival function in the stepper"),
+                 id="a survival function in the stepper"),
     # The one form the first predicate could already see.
     pytest.param("biofilms_potts.jl", "\nfunction remove_cell!(lattice, i)\nend\n",
                  id="a Julia definition in the stepper"),
@@ -757,6 +777,14 @@ def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, 
     _plant(root, rel, text)
     plant_id = request.node.callspec.id
     assert (removal_tokens(root), capability_claims(root)) == SEEN_BY[plant_id]
+
+
+def test_the_pinned_identifiers_are_the_allowed_ones():
+    """Two tables name the model files' identifiers. If they differ, an identifier is
+    either exempt without a count or counted without being exempt."""
+    for rel, pinned in MODEL_FILE_OCCURRENCES.items():
+        assert set(pinned) == REMOVAL_ALLOWED[rel][0], rel
+        assert rel in EXEMPTION_HOLDS, rel
 
 
 def test_no_allowlist_entry_has_outlived_its_reason():
