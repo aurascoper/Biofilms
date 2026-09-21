@@ -577,6 +577,14 @@ EXEMPTION_HOLDS = {
 }
 
 
+# A BROKEN PIN IS THE SIGNAL, WITH OR WITHOUT AN IDENTIFIER LEFT TO NAME. Codex on pull
+# request #47, at a60be28: the natural way to ENABLE the capability deletes the line that
+# declared it absent. The pin stops matching, the exemption goes void, and the only
+# identifier a reader could have named is gone with the line. So a file whose pinned
+# lines changed is reported even when nothing else in it is.
+PINS_CHANGED = "<the pinned lines of this file changed>"
+
+
 def removal_tokens(root: Path = REPO) -> dict:
     """relative path -> the removal-vocabulary identifiers in it that REMOVAL_ALLOWED
     does not name. Empty while no survival or removal process has arrived."""
@@ -591,14 +599,15 @@ def removal_tokens(root: Path = REPO) -> dict:
         allowed = REMOVAL_ALLOWED.get(rel, (set(), ""))[0]
         if allowed is WHOLE_FILE or Path(rel).suffix.lower() in PROSE_AND_DATA:
             continue
-        if rel in REMOVAL_ALLOWED and not (
-                exempt_code_lines(root, rel) == EXEMPT_LINES[rel]
-                and EXEMPTION_HOLDS.get(rel, lambda _root: True)(root)):
+        broken = rel in REMOVAL_ALLOWED and not (
+            exempt_code_lines(root, rel) == EXEMPT_LINES[rel]
+            and EXEMPTION_HOLDS.get(rel, lambda _root: True)(root))
+        if broken:
             allowed = set()
         hits = sorted({t for t in token.findall(blob.sub(" ", text)) if vocab.search(t)}
                       - allowed)
-        if hits:
-            found[rel] = hits
+        if hits or broken:
+            found[rel] = hits or [PINS_CHANGED]
     return found
 
 
@@ -662,11 +671,14 @@ def capability_claims(root: Path = REPO) -> list:
     claims = []
     for rel, text in listed_text(root).items():
         pinned = CAPABILITY_LINES.get(rel, set())
-        if CAPABILITY not in text or pinned is WHOLE_FILE:
+        if pinned is WHOLE_FILE or (CAPABILITY not in text and not pinned):
             continue
-        claims += [f"{rel}:{n}" for n, line in enumerate(text.split("\n"), 1)
-                   if CAPABILITY in line
-                   and hashlib.sha256(line.strip().encode("utf-8")).hexdigest() not in pinned]
+        now = {n: hashlib.sha256(line.strip().encode("utf-8")).hexdigest()
+               for n, line in enumerate(text.split("\n"), 1) if CAPABILITY in line}
+        claims += [f"{rel}:{n}" for n, digest in now.items() if digest not in pinned]
+        gone = len(set(pinned) - set(now.values()))
+        if gone:        # a deleted line has no digest of its own to report
+            claims.append(f"{rel}: {gone} pinned line(s) gone")
     return claims
 
 
@@ -951,11 +963,6 @@ def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
 # against ce141b2, and each reproduced before this was written: an exemption keyed on a file,
 # a word or a count survives an edit that swaps what earned it for the thing it hides.
 # (file, a pattern that must select exactly ONE line of it, what that line becomes)
-_VANISHED = pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="a pin that no longer matches voids an exemption, and a line that is gone "
-           "leaves nothing to report; see the next commit")
-
 REPLACEMENT_PLANTS = [
     pytest.param("biofilms_potts.jl", r"(?<![A-Za-z_])survival(?![A-Za-z_])",
                  lambda line: "function survival(dose)\n    return exp(-0.2 * dose)\nend",
@@ -983,9 +990,9 @@ REPLACEMENT_PLANTS = [
     pytest.param("coupling/biofilm_openmc/feedback_gate.py", r"growth_survival",
                  lambda line: line.replace('("growth_survival", "membrane_response")',
                                            '("membrane_response",)'),
-                 marks=_VANISHED, id="the pathway leaves the unsupported list"),
+                 id="the pathway leaves the unsupported list"),
     pytest.param("README.md", r"^`response\.growth_survival` is `unsupported_by_current_model`",
-                 lambda line: "", marks=_VANISHED,
+                 lambda line: "",
                  id="the README line that declares it unsupported is deleted"),
 ]
 
@@ -1009,12 +1016,16 @@ def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victi
     _replace_once(root, rel, old + "\n", new + "\n")
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
     # ...and through the reader it was written for, exactly.
-    if rel in REMOVAL_ALLOWED:      # the exemption is void: every exempt identifier shows
-        assert removal_tokens(root) == {rel: sorted(REMOVAL_ALLOWED[rel][0])}
+    after = (root / rel).read_text(encoding="utf-8")
+    if rel in REMOVAL_ALLOWED:      # the exemption is void: every exempt identifier still
+        left = sorted(a for a in REMOVAL_ALLOWED[rel][0]      # in the file shows, or the
+                      if re.search(rf"(?<![A-Za-z0-9_]){re.escape(a)}(?![A-Za-z0-9_!])", after))
+        assert removal_tokens(root) == {rel: left or [PINS_CHANGED]}    # broken pin alone
         assert capability_claims(root) == []
-    else:
+    else:                           # a new or edited line by number, and the pin it replaced
         assert removal_tokens(root) == {}
-        assert capability_claims(root) == [f"{rel}:{hits[0]}"]
+        edited = [f"{rel}:{hits[0]}"] if CAPABILITY in new else []
+        assert capability_claims(root) == edited + [f"{rel}: 1 pinned line(s) gone"]
 
 
 @pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
@@ -1038,7 +1049,13 @@ def test_every_pin_has_its_tables():
 
 def test_no_allowlist_entry_has_outlived_its_reason():
     """An exemption is keyed on what earns it. When the identifier leaves the file, or
-    the file stops naming the capability, the entry exempts nothing and must go."""
+    the file stops naming the capability, the entry exempts nothing.
+
+    READ THE GATE FIRST. If a pinned line is gone because the thing it declared absent
+    was just ENABLED, test_every_registered_absence_still_holds is red too, and the
+    remedy is to promote the rows blocked on the term. Deleting the entry to make this
+    test pass is the edit Codex described on pull request #47: it leaves the capability
+    enabled and the trigger green. Delete an entry only when the gate is green."""
     import re
     texts = listed_text()
     token = re.compile(r"[A-Za-z_][A-Za-z0-9_]*!?")
