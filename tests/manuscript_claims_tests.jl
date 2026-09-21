@@ -206,6 +206,15 @@ let
     open(io -> write(io, "<p>" * uppercasefirst(terms[1]) * "ic fungi grow toward the source.</p>\n"),
          joinpath(fresh, post), "a")
     @test post in _retracted_word_files(fresh, terms[1])
+    # Codex on pull request #52, at 823f701: the sentence that makes the second use safe starts
+    # 138 characters after the word, outside a 40-character window. An edit to that sentence
+    # alone must make the post a hit. The victim is taken from the post as it is.
+    cp(joinpath(REPO, post), joinpath(fresh, post); force=true)
+    src = read(joinpath(fresh, post), String)
+    victim = "cannot implement the second"
+    length(findall(victim, src)) == 1 || error("the victim occurs $(length(findall(victim, src))) times in the post")
+    write(joinpath(fresh, post), replace(src, victim => "implements the second as well"))
+    @test_broken post in _retracted_word_files(fresh, terms[1])
     # A pin whose file is gone is stale, and says so.
     listed = _listed_text_files(REPO)
     @test all(f -> f in listed, keys(RETRACTED_WORD_PINNED))
