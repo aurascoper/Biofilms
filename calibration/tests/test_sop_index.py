@@ -951,6 +951,11 @@ def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
 # against ce141b2, and each reproduced before this was written: an exemption keyed on a file,
 # a word or a count survives an edit that swaps what earned it for the thing it hides.
 # (file, a pattern that must select exactly ONE line of it, what that line becomes)
+_VANISHED = pytest.mark.xfail(
+    strict=True, raises=AssertionError,
+    reason="a pin that no longer matches voids an exemption, and a line that is gone "
+           "leaves nothing to report; see the next commit")
+
 REPLACEMENT_PLANTS = [
     pytest.param("biofilms_potts.jl", r"(?<![A-Za-z_])survival(?![A-Za-z_])",
                  lambda line: "function survival(dose)\n    return exp(-0.2 * dose)\nend",
@@ -972,6 +977,16 @@ REPLACEMENT_PLANTS = [
     pytest.param("coupling/scripts/synthetic_e2e.py", r"^\s*sf = ",
                  lambda line: "    sf = np.exp(-0.2 * dose)",
                  id="a script's local sf becomes a survival fraction"),
+    # REMOVALS. Raised by Codex on pull request #47 against a60be28, and reproduced first.
+    # The natural way to ENABLE the capability deletes the line that declared it absent.
+    # The pin then fails to match, and nothing is left in the file for a reader to name.
+    pytest.param("coupling/biofilm_openmc/feedback_gate.py", r"growth_survival",
+                 lambda line: line.replace('("growth_survival", "membrane_response")',
+                                           '("membrane_response",)'),
+                 marks=_VANISHED, id="the pathway leaves the unsupported list"),
+    pytest.param("README.md", r"^`response\.growth_survival` is `unsupported_by_current_model`",
+                 lambda line: "", marks=_VANISHED,
+                 id="the README line that declares it unsupported is deleted"),
 ]
 
 
