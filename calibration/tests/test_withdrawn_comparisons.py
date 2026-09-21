@@ -83,10 +83,10 @@ def survivors_in(text: str) -> list[str]:
     return out
 
 
-def tracked_text_files() -> list[Path]:
-    listing = subprocess.run(["git", "-C", str(REPO), "ls-files", "-z"],
+def tracked_text_files(root: Path = REPO) -> list[Path]:
+    listing = subprocess.run(["git", "-C", str(root), "ls-files", "-z"],
                              capture_output=True, text=True, check=True).stdout
-    return [REPO / name for name in listing.split("\0")
+    return [root / name for name in listing.split("\0")
             if name and Path(name).suffix in SUFFIXES]
 
 
@@ -104,6 +104,15 @@ def test_the_withdrawn_comparison_survives_nowhere_in_the_tree():
         "as withdrawn:\n  " + "\n  ".join(survivors))
 
 
+# README.md as it stood at c31917c, wrapped where README wrapped it.
+AS_IT_WRAPPED = (
+    "`β_ion` — the one parameter Table 2 tabulates per species, and the one the entire sign convention is\n"
+    "written around — biases acceptance by **one part in 10⁵** for exactly the species whose radial\n"
+    "stratification is the headline result. The melanin term biases it by **15.5%**: four orders of\n"
+    "magnitude more, through a coefficient of `0.5` hard-coded at its call site in `compute_delta_H`,\n"
+    "appearing in no table and in no configuration file.\n")
+
+
 def test_the_scan_detects_the_instance_the_grep_missed():
     """THE CONTROL, AND IT IS THE REAL SENTENCE.
 
@@ -111,12 +120,7 @@ def test_the_scan_detects_the_instance_the_grep_missed():
     line-oriented search for the withdrawn phrase returns nothing here; this
     scan must return one.
     """
-    as_it_wrapped = (
-        "`β_ion` — the one parameter Table 2 tabulates per species, and the one the entire sign convention is\n"
-        "written around — biases acceptance by **one part in 10⁵** for exactly the species whose radial\n"
-        "stratification is the headline result. The melanin term biases it by **15.5%**: four orders of\n"
-        "magnitude more, through a coefficient of `0.5` hard-coded at its call site in `compute_delta_H`,\n"
-        "appearing in no table and in no configuration file.\n")
+    as_it_wrapped = AS_IT_WRAPPED
     assert "four orders of magnitude" not in as_it_wrapped, (
         "the control no longer wraps, so it no longer reproduces the defect")
     assert not [l for l in as_it_wrapped.splitlines()
@@ -170,3 +174,26 @@ def test_the_scan_reaches_more_than_one_file_type():
     suffixes = {p.suffix for p in tracked_text_files()}
     assert {".md", ".jl", ".csv"} <= suffixes
     assert len(tracked_text_files()) > 100
+
+
+# A PAGE AND A SCRIPT. SUFFIXES names thirteen kinds, and this repository publishes a standalone
+# HTML post and JavaScript viewers, which none of them is. The sentence is the real one above.
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="SUFFIXES has no .html and no .js; see the next commit")
+def test_the_scan_reads_a_page_and_a_script(tmp_path):
+    def git(*args):
+        done = subprocess.run(["git", "-C", str(tmp_path), *args], capture_output=True, text=True)
+        if done.returncode:
+            raise RuntimeError(done.stderr)                        # plumbing, never the defect
+    git("init", "-q")
+    plants = {"site/post.html": f"<p>{AS_IT_WRAPPED}</p>\n",
+              "viewer/app.js": f"const note = `{AS_IT_WRAPPED}`;\n"}
+    for rel, text in plants.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text, encoding="utf-8")
+        if len(survivors_in(text)) != 1:
+            raise RuntimeError(f"the plant in {rel} does not carry the sentence")
+    git("add", ".")
+    found = {p.relative_to(tmp_path).as_posix() for p in tracked_text_files(tmp_path)
+             if survivors_in(p.read_text(encoding="utf-8"))}
+    assert found == set(plants)

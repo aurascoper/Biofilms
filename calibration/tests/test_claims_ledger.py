@@ -1743,6 +1743,24 @@ def test_source_normalisation_enters_through_the_production_scanner(
         "and the current file must carry none"
 
 
+# UNLISTED LANGUAGES. This walk and GUARD-SCOPE-01's shared one suffix list, .jl .R .py, so a
+# source in any other language was read by neither. The victim is the one the control above
+# recovers from git; the languages are two the list never named, in directories it never saw.
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="SOURCE_SUFFIXES names three languages; see the next commit")
+def test_a_retracted_string_in_an_unlisted_language_is_found(tmp_path):
+    import subprocess
+    victim = "Table 2 range 1e-4..1e-2"
+    if victim not in RETRACTED_IN_SOURCES:
+        raise RuntimeError("the victim left the vocabulary")     # plumbing, never the defect
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for rel in ("odin/cpm/response.odin", "viewer/plot.js"):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(f"// D_eff: {victim}\n", encoding="utf-8")
+    assert sources_carrying_retracted_strings(tmp_path) == {
+        "odin/cpm/response.odin": [victim], "viewer/plot.js": [victim]}
+
+
 # ---------------------------------------------------------------- addressing by key, not number
 #
 # ALL SIX PP-REF ROWS POINTED AT THE WRONG ENTRY, AND HAD FOR SOME TIME. They located

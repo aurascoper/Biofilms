@@ -147,11 +147,19 @@ let
     # walker production uses, and for a term other than the first: the term is taken from
     # the vocabulary at runtime so this file does not carry it.
     fresh = mktempdir()
+    run(`git -C $fresh init -q`)
     mkpath(joinpath(fresh, "bench"))
     write(joinpath(fresh, "bench", "plant.jl"), "ax.title = \"" * uppercasefirst(terms[3]) * "\"\n")
     write(joinpath(fresh, "bench", "clean.py"), "title = 'MCS 20'\n")
     @test _retracted_word_files(fresh, terms[3]) == [joinpath("bench", "plant.jl")]
     @test isempty(_retracted_word_files(fresh, terms[1]))
+    # UNLISTED LANGUAGES (GUARD-SCOPE-01). The walk named .jl, .R and .py, so a figure made in
+    # any other language was read by nothing. Two plants in languages the list never named.
+    write(joinpath(fresh, "bench", "plot.js"), "chart.title = \"" * uppercasefirst(terms[3]) * "\";\n")
+    mkpath(joinpath(fresh, "odin"))
+    write(joinpath(fresh, "odin", "fig.odin"), "title := \"" * uppercasefirst(terms[3]) * "\"\n")
+    @test_broken _retracted_word_files(fresh, terms[3]) ==
+                 sort([joinpath("bench", "plant.jl"), joinpath("bench", "plot.js"), joinpath("odin", "fig.odin")])
     for term in terms
         found = _retracted_word_files(REPO, term)
         @test found == sort(retracted_allowed(term))

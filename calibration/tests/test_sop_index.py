@@ -540,6 +540,8 @@ EXEMPT_LINES = {
         'assert survivors_in(corrected) == []',
         'assert survivors_in(unrelated) == []',
         'assert survivors_in(dose) == []',
+        'if len(survivors_in(text)) != 1:',
+        'if survivors_in(p.read_text(encoding="utf-8"))}',
     ],
     'calibration/tests/test_figure_staleness.py': [
     ],
