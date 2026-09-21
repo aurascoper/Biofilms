@@ -668,6 +668,13 @@ def test_the_unplanted_scratch_root_reports_no_landed_term(tmp_path):
     assert landed_terms(_scratch_repo(tmp_path), terms={SURVIVAL}) == []
 
 
+# Raised by Codex on pull request #47 against d49b43c, and reproduced before this mark
+# was written. The next commit removes it.
+_CODEX_P1 = pytest.mark.xfail(
+    strict=True, raises=AssertionError,
+    reason="the stepper's exemption names identifiers, so a new use of an exempt word "
+           "in that file is subtracted with the comments that earned it")
+
 SURVIVAL_PLANTS = [
     pytest.param("odin/cpm/response.odin", ODIN_RESPONSE,
                  id="the port's survival law and sweep"),
@@ -689,6 +696,11 @@ SURVIVAL_PLANTS = [
                  "const survival_probability = exp(-alpha*D - beta*G*D*D);\n"
                  "if (u > survival_probability) { cells.delete(id); }\n",
                  id="natural survival names and a generic delete"),
+    # The shortest route from inside the repository: the law, written in the stepper,
+    # under the very word its comments were exempted for.
+    pytest.param("biofilms_potts.jl",
+                 "\nfunction survival(dose)\n    return exp(-0.2 * dose)\nend\n",
+                 marks=_CODEX_P1, id="a survival function in the stepper"),
     # The one form the first predicate could already see.
     pytest.param("biofilms_potts.jl", "\nfunction remove_cell!(lattice, i)\nend\n",
                  id="a Julia definition in the stepper"),
@@ -716,6 +728,9 @@ SEEN_BY = {     # plant id -> (removal_tokens, capability_claims), exactly
     "a Julia definition in the stepper": ({"biofilms_potts.jl": ["remove_cell!"]}, []),
     "natural survival names and a generic delete":
         ({"port/response.zig": ["survival_probability"]}, []),
+    # The exemption is void, so every identifier the stepper was allowed is reported.
+    "a survival function in the stepper":
+        ({"biofilms_potts.jl": sorted(REMOVAL_ALLOWED["biofilms_potts.jl"][0])}, []),
 }
 
 
