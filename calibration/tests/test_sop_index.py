@@ -403,6 +403,31 @@ def stepper_removal_sites(root: Path = REPO) -> list:
     return sites
 
 
+def stepper_removal_functions(root: Path = REPO) -> dict:
+    """function name -> sha256 of its code, for every stepper function that deletes from
+    state.cells or constructs a DeathEvent. Comment lines and blank lines are left out.
+
+    The if-headers above are a marker for what governs a removal. A guard clause, a ternary
+    or an early return governs it too and changes no header (Codex on pull request #47, at
+    02f8732). So the WHOLE function is pinned: any edit to its code voids the exemption
+    until someone has read the function again and updated the digest."""
+    import hashlib
+    import re
+    lines = (root / "biofilms_potts.jl").read_text(encoding="utf-8").split("\n")
+    out, start = {}, None
+    for i, line in enumerate(lines):
+        if line.startswith("function "):
+            start = i
+        elif line == "end" and start is not None:
+            body = lines[start:i + 1]
+            if any("delete!(state.cells" in b or re.search(r"\bDeathEvent\(", b) for b in body):
+                code = "\n".join(b.strip() for b in body if b.strip() and not b.strip().startswith("#"))
+                name = re.match(r"function\s+([\w!]+)", body[0]).group(1)
+                out[name] = hashlib.sha256(code.encode("utf-8")).hexdigest()
+            start = None
+    return out
+
+
 # What earns the stepper its exemption, stated as the thing itself. Codex on pull
 # request #47: a dose condition added to this cleanup reuses DeathEvent and death_log,
 # so an exemption granted on the file name subtracts the very signal it should report.
@@ -571,9 +596,19 @@ def exempt_code_lines(root: Path, rel: str) -> list:
 
 
 # file -> a relation that must hold BESIDE the line pin for its exemption to apply
+# A TRIPWIRE ON TWO FUNCTIONS, AND ITS COST. Any edit to the code of mcs_step! or of
+# divide_cell! fails the survival gate until this digest is updated. Whoever updates it has
+# read the function and confirmed that every removal in it still depends on volume alone.
+# Control flow in a CALLER of these functions is not read by anything here.
+STEPPER_REMOVAL_FUNCTIONS = {
+    "mcs_step!": "b5f1f5e0812e1f6e11c3d375e1a2b16b2254e9ba9256155af8850a32117b621c",
+    "divide_cell!": "60c744c42cbbe2b3b36c06a92c740077788865f47f0c8b3878e3b957bf1355f4",
+}
+
 EXEMPTION_HOLDS = {
     "biofilms_potts.jl":         # what governs each removal, not only which lines name one
-        lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE,
+        lambda root: (stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE
+                      and stepper_removal_functions(root) == STEPPER_REMOVAL_FUNCTIONS),
     "export_checkpoint.jl":      # it serialises the log; it must remove nothing
         lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8"),
 }
@@ -1024,22 +1059,19 @@ def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
 # the `if` headers around a removal. A guard clause or a ternary makes the removal depend on
 # dose and changes no header, no pinned line and no vocabulary word.
 # (victim line, taken from the stepper as it is; what it becomes)
-_GUARD = pytest.mark.xfail(strict=True, raises=AssertionError,
-                           reason="the stepper's exemption reads the if-headers around a "
-                                  "removal, and this edit changes none; see the next commit")
 STEPPER_GUARD_PLANTS = [
     pytest.param("        if cell.volume <= 0\n",
                  "        if cell.volume <= 0\n            cell.lifetime_dose_Gy <= 50.0 && continue\n",
-                 marks=_GUARD, id="a guard clause with && continue"),
+                 id="a guard clause with && continue"),
     pytest.param("        if cell.volume <= 0\n",
                  "        if cell.volume <= 0\n            cell.lifetime_dose_Gy > 50.0 || continue\n",
-                 marks=_GUARD, id="a guard clause with || continue"),
+                 id="a guard clause with || continue"),
     pytest.param("            delete!(state.cells, id)\n",
                  "            cell.lifetime_dose_Gy > 50.0 ? delete!(state.cells, id) : nothing\n",
-                 marks=_GUARD, id="a ternary on the delete"),
+                 id="a ternary on the delete"),
     pytest.param("    parent = state.cells[id]\n",
                  "    parent = state.cells[id]\n    parent.lifetime_dose_Gy > 50.0 && return :spared\n",
-                 marks=_GUARD, id="a dose guard at the top of divide_cell!"),
+                 id="a dose guard at the top of divide_cell!"),
 ]
 
 
