@@ -59,9 +59,20 @@ def problems(got: dict, want: dict) -> list:
 
 
 def self_test() -> int:
-    """Each case is a report and a list, and the verdict it must get."""
+    """Each case is a report and a list, and the exit status THIS SCRIPT must give.
+
+    Every case runs the script as CI runs it, as a command, and reads its exit status.
+    The first version called problems() directly and made up its own verdict. With the
+    last line of the script changed to `sys.exit(0)` it stayed green, while every CI
+    assertion would have accepted an undeclared skip. Raised by Codex on pull request
+    #48. AGENTS.md rule 1: a control enters by the production door."""
     import os
+    import subprocess
     import tempfile
+
+    def cli(report: str, wanted: str) -> int:
+        return subprocess.run([sys.executable, os.path.abspath(__file__), report, wanted],
+                              capture_output=True, text=True).returncode
     # The two shapes pytest writes, copied from real reports of this repository:
     # a module skipped at collection, and a test skipped by a skipif mark.
     module = ('<testcase classname="" name="tests.test_model_build" time="0.0">'
@@ -90,17 +101,25 @@ def self_test() -> int:
             rep, exp = os.path.join(d, "r.xml"), os.path.join(d, "e.txt")
             open(rep, "w").write(f'<testsuites><testsuite name="pytest">{body}</testsuite></testsuites>')
             open(exp, "w").write(want)
-            got = 1 if problems(skipped(rep), expected(exp)) else 0
+            got = cli(rep, exp)
             print(("ok     " if got == verdict else "WRONG  ") + f"{label}: verdict {got}, wanted {verdict}")
             bad |= got != verdict
-        # A report with no testcase must be refused, never read as "no skips".
+        # A report with no testcase must be refused, never read as "no skips". So must a
+        # list line with no tab, and a report that is not there.
+        exp = os.path.join(d, "none.txt")
+        open(exp, "w").write("# none\n")
         rep = os.path.join(d, "empty.xml")
         open(rep, "w").write('<testsuites><testsuite name="pytest"/></testsuites>')
-        try:
-            skipped(rep)
-            print("WRONG  an empty report was accepted"); bad = 1
-        except SystemExit as e:
-            print(f"ok     an empty report is refused: {e}")
+        full = os.path.join(d, "full.xml")
+        open(full, "w").write(f'<testsuites><testsuite name="pytest">{passed}</testsuite></testsuites>')
+        untabbed = os.path.join(d, "untabbed.txt")
+        open(untabbed, "w").write("tests.test_model_build could not import\n")
+        for label, r, e in (("an empty report", rep, exp),
+                            ("a list line with no tab", full, untabbed),
+                            ("a report that is not there", os.path.join(d, "absent.xml"), exp)):
+            got = cli(r, e)
+            print(("ok     " if got else "WRONG  ") + f"{label} is refused: exit {got}")
+            bad |= got == 0
     print("all skip pin controls gave the expected verdict" if not bad else "AT LEAST ONE CONTROL IS WRONG")
     return int(bad)
 
