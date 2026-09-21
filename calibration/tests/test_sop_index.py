@@ -1065,6 +1065,28 @@ def test_a_deleted_pinned_file_lands_the_term(tmp_path, rel):
     assert capability_claims(root) == ([f"{rel}: {len(pins)} pinned line(s) gone"] if pins else [])
 
 
+# ...AND ITS TABLE ENTRIES WITH IT. Raised by Codex on pull request #47 against c28a381, and
+# reproduced first. The natural clean-up after deleting a file removes its entries from the
+# four tables. Both readers then forget the path, the tables still agree with each other, and
+# PINNED_FILES above shrinks without a word, because it is built from those same tables.
+@pytest.mark.parametrize("rel", PINNED_FILES)
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="the pinned paths are remembered by the tables alone, so an edit "
+                          "that drops a path from them is forgotten; see the next commit")
+def test_a_deleted_file_is_remembered_after_its_table_entries_go(tmp_path, monkeypatch, rel):
+    root = _scratch_repo(tmp_path)
+    if landed_terms(root, terms={SURVIVAL}):
+        raise RuntimeError("the scratch root reports a landed term before the deletion")
+    (root / rel).unlink()
+    dropped = 0
+    for table in (EXEMPT_LINES, REMOVAL_ALLOWED, CAPABILITY_LINES, CAPABILITY_NAMED_AS_UNSUPPORTED):
+        dropped += rel in table
+        monkeypatch.delitem(table, rel, raising=False)
+    if (root / rel).exists() or not dropped:
+        raise RuntimeError(f"the deletion did not apply: {rel}, {dropped} table entries")
+    assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+
+
 def test_every_pin_has_its_tables():
     """An allowlisted file with no pinned lines is exempt by its name, and a capability
     file with a reason and no pinned lines is exempt by its path."""
