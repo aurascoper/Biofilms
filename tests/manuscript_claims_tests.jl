@@ -99,8 +99,14 @@ end
 # suite; a first fix scanned only viewer/, the directory where the plant landed, and a second
 # scanned the whole root for that one term while the vocabulary has four (Codex on #25).
 # The vocabulary is READ from the python file at test time, one source and no mirror; the
-# scope is every .jl, .R and .py under the root minus .git and virtualenvs; and every file
+# scope is every text file git lists, except six prose and data suffixes; and every file
 # carrying a term must be declared for that term. The list is the claim.
+#
+# THE SCOPE WAS .jl, .R AND .py UNTIL GUARD-SCOPE-01'S SECOND CORRECTION. A figure made in any
+# other language (a .js viewer, an .odin port, a page) was read by nothing. The file set is now
+# whatever git lists, as in the two readers of test_sop_index.py, and it skips the same
+# six suffixes by the same decision (Hunter, 2026-09-20): prose and data ABOUT the model name
+# these words as topics. An ignored file is not read, because it cannot arrive in a pull request.
 function retracted_figure_terms(root)
     src = read(joinpath(root, "calibration", "tests", "test_claims_ledger.py"), String)
     m = match(r"RETRACTED_IN_FIGURES\s*=\s*\(([^)]*)\)", src)
@@ -124,17 +130,66 @@ RETRACTED_WORD_ALLOWED = Dict(
 )
 # every other term: only the vocabulary declares it
 retracted_allowed(term) = get(RETRACTED_WORD_ALLOWED, term, ["calibration/tests/test_claims_ledger.py"])
+# A FILE THAT MAY CARRY A TERM IN THESE PARAGRAPHS AND NO OTHER. The post explains, six times,
+# why the model is not radiotrophic; a file-wide allowance would also pass a seventh use that
+# asserts it. A use is safe because of what its paragraph says, and the sentence that says it
+# can sit far from the word: a 40-character window missed one 138 characters away (Codex on
+# pull request #52, at 823f701). So each use is pinned by the sha256 of its enclosing <p>
+# element, in the text as _figure_norm gives it. A use outside a <p> element cannot be pinned,
+# and is a hit. Any edit to such a paragraph makes the file a hit until this is updated.
+RETRACTED_WORD_PINNED = Dict(
+    "post-biofilms-standalone.html" => Dict("radiotroph" => [
+        "8571966da9974f5b12c3594172d5412ec3175807f33fc0bdafe0ccad7b778055",   # the set used to be called ... it cannot implement the second
+        "8571966da9974f5b12c3594172d5412ec3175807f33fc0bdafe0ccad7b778055",   # the set used to be called ... it cannot implement the second
+        "1f37ae101d68cf8d92735cbc316a77ad49aafccb7eeffc1300285e7759937088",   # which is why ... cannot be in this model
+        "1f37ae101d68cf8d92735cbc316a77ad49aafccb7eeffc1300285e7759937088",   # which is why ... cannot be in this model
+        "9cc091bb8c9ffd9418158d8a8f95370c1b924b9d26c20501e86abd5201c247cb",   # literature claims come from the compatibility audit
+        "9cc091bb8c9ffd9418158d8a8f95370c1b924b9d26c20501e86abd5201c247cb",   # literature claims come from the compatibility audit
+    ]),
+)
+const _FIGURE_SCAN_SKIPS = (".md", ".tex", ".txt", ".csv", ".tsv", ".json")
+function _listed_text_files(root)
+    listing = read(`git -C $root ls-files -z --cached --others --exclude-standard`, String)
+    files = String[]
+    for rel in split(listing, '\0'; keepempty=false)
+        p = joinpath(root, rel)
+        isfile(p) || continue                       # in the index, deleted from the work tree
+        any(s -> endswith(lowercase(rel), s), _FIGURE_SCAN_SKIPS) && continue
+        head = open(io -> read(io, 8192), p)
+        0x00 in head && continue                    # binary: keyed on the content, not a suffix
+        push!(files, String(rel))
+    end
+    isempty(files) && error("git listed no text file under $root")   # never default to pass
+    files
+end
+using SHA
+# Normalised to lowercase letters and digits, one space between runs, before it is digested.
+_figure_norm(s) = strip(replace(lowercase(s), r"[^a-z0-9]+" => " "))
+# One digest per use of the term: the enclosing <p> element's, or a marker no pin equals.
+function _occurrences(text, pattern)
+    opens = [first(r) for r in findall(r"<p[\s>]", text)]
+    closes = [last(r) for r in findall("</p>", text)]
+    out = String[]
+    for m in eachmatch(pattern, text)
+        i = m.offset
+        a, b = findlast(<(i), opens), findfirst(>(i), closes)
+        if a === nothing || b === nothing || any(c -> opens[a] < c < i, closes)
+            push!(out, "no enclosing paragraph")
+            continue
+        end
+        push!(out, bytes2hex(sha256(String(_figure_norm(text[opens[a]:closes[b]])))))
+    end
+    out
+end
 function _retracted_word_files(root, term)
     pattern = Regex(escape_string(term) |> x -> replace(x, r"[.*+?^\${}()|\[\]\\]" => s"\\\0"), "i")
     hits = String[]
-    for (dir, _, files) in walkdir(root)
-        rel_dir = relpath(dir, root)
-        any(part -> part in (".git", ".venv", "node_modules"), splitpath(rel_dir)) && continue
-        for f in files
-            endswith(f, ".jl") || endswith(f, ".R") || endswith(f, ".py") || continue
-            p = joinpath(dir, f)
-            isempty(_scan([p], pattern)) || push!(hits, relpath(p, root))
-        end
+    for rel in _listed_text_files(root)
+        text = read(joinpath(root, rel), String)
+        occursin(pattern, text) || continue
+        pins = get(get(RETRACTED_WORD_PINNED, rel, Dict()), term, nothing)
+        pins !== nothing && _occurrences(text, pattern) == pins && continue
+        push!(hits, rel)
     end
     return sort(hits)
 end
@@ -147,11 +202,38 @@ let
     # walker production uses, and for a term other than the first: the term is taken from
     # the vocabulary at runtime so this file does not carry it.
     fresh = mktempdir()
+    run(`git -C $fresh init -q`)
     mkpath(joinpath(fresh, "bench"))
     write(joinpath(fresh, "bench", "plant.jl"), "ax.title = \"" * uppercasefirst(terms[3]) * "\"\n")
     write(joinpath(fresh, "bench", "clean.py"), "title = 'MCS 20'\n")
     @test _retracted_word_files(fresh, terms[3]) == [joinpath("bench", "plant.jl")]
     @test isempty(_retracted_word_files(fresh, terms[1]))
+    # UNLISTED LANGUAGES (GUARD-SCOPE-01). The walk named .jl, .R and .py, so a figure made in
+    # any other language was read by nothing. Two plants in languages the list never named.
+    write(joinpath(fresh, "bench", "plot.js"), "chart.title = \"" * uppercasefirst(terms[3]) * "\";\n")
+    mkpath(joinpath(fresh, "odin"))
+    write(joinpath(fresh, "odin", "fig.odin"), "title := \"" * uppercasefirst(terms[3]) * "\"\n")
+    @test _retracted_word_files(fresh, terms[3]) ==
+          sort([joinpath("bench", "plant.jl"), joinpath("bench", "plot.js"), joinpath("odin", "fig.odin")])
+    # The pin passes the post as it is, and a seventh use of the term in it is a hit.
+    post = "post-biofilms-standalone.html"
+    cp(joinpath(REPO, post), joinpath(fresh, post))
+    @test !(post in _retracted_word_files(fresh, terms[1]))
+    open(io -> write(io, "<p>" * uppercasefirst(terms[1]) * "ic fungi grow toward the source.</p>\n"),
+         joinpath(fresh, post), "a")
+    @test post in _retracted_word_files(fresh, terms[1])
+    # Codex on pull request #52, at 823f701: the sentence that makes the second use safe starts
+    # 138 characters after the word, outside a 40-character window. An edit to that sentence
+    # alone must make the post a hit. The victim is taken from the post as it is.
+    cp(joinpath(REPO, post), joinpath(fresh, post); force=true)
+    src = read(joinpath(fresh, post), String)
+    victim = "cannot implement the second"
+    length(findall(victim, src)) == 1 || error("the victim occurs $(length(findall(victim, src))) times in the post")
+    write(joinpath(fresh, post), replace(src, victim => "implements the second as well"))
+    @test post in _retracted_word_files(fresh, terms[1])
+    # A pin whose file is gone is stale, and says so.
+    listed = _listed_text_files(REPO)
+    @test all(f -> f in listed, keys(RETRACTED_WORD_PINNED))
     for term in terms
         found = _retracted_word_files(REPO, term)
         @test found == sort(retracted_allowed(term))
