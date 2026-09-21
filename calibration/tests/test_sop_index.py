@@ -1220,8 +1220,28 @@ def unnamed_survival_predicates(root: Path = REPO) -> list:
     return sorted(name for name in called if f"{name}(" not in claim)
 
 
+def stale_survival_row(root: Path = REPO) -> list:
+    """Every reason GUARD-SCOPE-02 may no longer describe the predicates. Empty while it does."""
+    return unnamed_survival_predicates(root)
+
+
 def test_the_ledger_row_names_every_survival_predicate():
-    assert unnamed_survival_predicates() == []
+    assert stale_survival_row() == []
+
+
+# A HELPER NAME IS A MARKER TOO. Raised by Codex on pull request #47 against 5937c7d, and
+# reproduced first: a second _absent_from() call, on a new file, adds a scope the row does not
+# state, and the name census returns nothing because the row already names _absent_from().
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="the census keys on helper names, so a named helper called again "
+                          "with new arguments is unseen; see the next commit")
+def test_a_reused_helper_with_new_arguments_makes_the_row_stale(monkeypatch):
+    why, preds = ABSENT_TERMS[SURVIVAL]
+    monkeypatch.setitem(ABSENT_TERMS, SURVIVAL, (why, preds + [
+        lambda root=REPO: _absent_from("odin/cpm/sim.odin", r"cell_kill", root)]))
+    if len(ABSENT_TERMS[SURVIVAL][1]) != len(preds) + 1:
+        raise RuntimeError("the plant did not apply")
+    assert stale_survival_row() != []
 
 
 def test_the_predicate_census_detects_an_unnamed_one(monkeypatch):
