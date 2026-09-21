@@ -1,7 +1,7 @@
 """Every code citation in the claims ledger resolves, and resolves to ONE place.
 
 The ledger cited code as `file:line`. No test read a line number, and on 2026-09-21 only
-49 of 153 still named the line the row was written about. A line number goes stale on any
+41 of the 126 that a rule could place still named their line. A line number goes stale on any
 insertion above it and fails nowhere.
 
 A citation is now a file and a snippet:
@@ -16,6 +16,11 @@ the production door, `citation_problems(root)`, on a scratch repository.
 
 THREE OUTCOMES, NOT TWO. A snippet that occurs twice still "is present", and it points at
 the wrong occurrence as easily as the right one. `ambiguous` is its own verdict.
+
+WHAT THIS DOES NOT PROVE. A snippet that is unique and WRONG resolves. Codex found two on
+pull request #49: a range whose first line was cited, where the row is about a later line.
+That a citation names the right place is checked by reading the row beside the cited text,
+and by nothing here.
 
 SCOPE. This reads data/claims_ledger.csv alone. Line references into the superseded
 preprint ("lines 711-721") name no file and are out of scope, as the ledger header says.
@@ -33,6 +38,12 @@ LEDGER = Path("data") / "claims_ledger.csv"
 CITATION = re.compile(r"(?<![\w/.-])([\w./-]+\.[A-Za-z]\w*)@(?:([0-9a-f]{7,40})@)?`([^`]+)`")
 # The retired form, with its `,:571` and ` and :24` tails.
 BARE = re.compile(r"(?<![\w/.-])[\w./-]+\.[A-Za-z][A-Za-z0-9]*:\d+(?:[-–]\d+)?(?:(?:,|\s+and)\s*:\d+(?:[-–]\d+)?)*")
+
+# A line number left behind a converted citation. Three forms were in the ledger after the
+# first conversion: `snippet`,86,132 and "; :593 dH_mel" and "(:266)". Snippets and bare
+# citations are taken out before this is applied, so neither is read twice. A journal's
+# 34(6):433 has a bracket before its colon, and a time has a digit, so neither matches.
+DETACHED = re.compile(r"(?<=[\s(;,]):\d+\b|`\s*,\s*\d+")
 
 # A bare citation that may stay, keyed on the row AND the exact text. One entry: the deck was
 # never tracked in this repository, and the note quotes the deck's sentence in full.
@@ -115,6 +126,11 @@ def _scratch(tmp_path: Path, ledger_body: str, files: dict) -> Path:
 STEPPER = "function step!(s)\n    s.t += 1\nend\n\nfunction other!(s)\n    s.u += 1\nend\n"
 
 
+_DETACHED = pytest.mark.xfail(strict=True, raises=AssertionError,
+                             reason="no reader sees a line number left behind a converted "
+                                    "citation; see the next commit")
+
+
 @pytest.mark.parametrize("label,cell,files,want", [
     ("the snippet occurs once", "stepper.jl@`s.t += 1`", {"stepper.jl": STEPPER}, []),
     ("it spans a line break", "stepper.jl@`function step!(s) s.t += 1`", {"stepper.jl": STEPPER}, []),
@@ -125,6 +141,14 @@ STEPPER = "function step!(s)\n    s.t += 1\nend\n\nfunction other!(s)\n    s.u +
     ("the file is not there", "stepper.jl@`s.t += 1`", {}, ["absent"]),
     ("a bare line citation", "stepper.jl:2", {"stepper.jl": STEPPER}, ["bare citation stepper.jl:2"]),
     ("a bare citation with a tail", "stepper.jl:2,:6", {"stepper.jl": STEPPER}, ["bare citation stepper.jl:2,:6"]),
+    # The three forms below are the ones the first conversion left in the real ledger.
+    pytest.param("numbers left after the snippet", "stepper.jl@`s.t += 1`,6", {"stepper.jl": STEPPER}, ["detached line number"], marks=_DETACHED),
+    pytest.param("a tail after prose", "stepper.jl@`s.t += 1` T_cpm; :6 acceptance", {"stepper.jl": STEPPER},
+     ["detached line number ':6'"], marks=_DETACHED),
+    pytest.param("a tail in brackets", "stepper.jl@`s.t += 1` and the other (:6)", {"stepper.jl": STEPPER},
+     ["detached line number ':6'"], marks=_DETACHED),
+    ("a journal volume and page is not a line number", "stepper.jl@`s.t += 1`; J Ind Microbiol 34(6):433-441, at 16:48",
+     {"stepper.jl": STEPPER}, []),
 ])
 def test_the_checker_gives_each_verdict(tmp_path, monkeypatch, label, cell, files, want):
     monkeypatch.setitem(globals(), "BARE_ALLOWED", set())
