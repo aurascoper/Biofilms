@@ -266,7 +266,9 @@ ABSENT_TERMS = {
          # THE TWO ABOVE READ ONE MANUSCRIPT AND ONE JULIA FILE. A port in another
          # language changes neither, so the two below read every listed file.
          lambda root=REPO: not removal_tokens(root),
-         lambda root=REPO: not capability_claims(root)],
+         lambda root=REPO: not capability_claims(root),
+         # ...and a pinned file that is gone is reported from a list of its own.
+         lambda root=REPO: not missing_pinned_paths(root)],
     ),
 }
 
@@ -686,6 +688,55 @@ def capability_claims(root: Path = REPO) -> list:
     return claims
 
 
+# THE PATHS THE PINS NAME, WRITTEN OUT A SECOND TIME, ON PURPOSE. The tables above remember a
+# path only while they have an entry for it. The natural clean-up after deleting a file
+# removes its entries, and then nothing remembers that the file was ever pinned (Codex on
+# pull request #47, at c28a381). This list is not built from the tables, so that clean-up
+# does not touch it, and test_every_pin_has_its_tables fails until the two agree again.
+#
+# WHERE THIS STOPS. An edit that deletes the file, its table entries AND its line here leaves
+# the gate green. No guard in a repository outlasts an edit of itself. That edit is three
+# deliberate changes to this file in one diff, and the diff's reader is the last check.
+PINNED_PATHS = [
+    ".github/workflows/claims-guards.yml",
+    "Primary Fuel Source Geolocator.twb",
+    "README.md",
+    "biofilms_3d.R",
+    "biofilms_potts.jl",
+    "calibration/tests/test_biomass_field.py",
+    "calibration/tests/test_claims_ledger.py",
+    "calibration/tests/test_figure_staleness.py",
+    "calibration/tests/test_withdrawn_comparisons.py",
+    "coupling/biofilm_openmc/feedback_gate.py",
+    "coupling/biofilm_openmc/lineage.py",
+    "coupling/scripts/synthetic_e2e.py",
+    "coupling/tests/test_feedback_gate.py",
+    "coupling/tests/test_pilot_seeding.py",
+    "data/claims_ledger.csv",
+    "data/parameter_provenance.csv",
+    "data/uncertainty/feedback_parameter_distributions.csv",
+    "diagnostics/inert_signal/guard.jl",
+    "diagnostics/payload_census/bench_reduction.py",
+    "docs/calibration/integration_contract.md",
+    "docs/calibration/time_observable_contract.md",
+    "docs/online_coupling_design.md",
+    "docs/visualization/macos-arm64-2026-09-11/component_overlap.py",
+    "docs/visualization/macos-arm64-2026-09-11/decay_reference.py",
+    "docs/visualization/macos-arm64-2026-09-11/test_component_overlap.py",
+    "export_checkpoint.jl",
+    "geolocator/api.py",
+    "geolocator/static/app/hud/detectionOverlay.js",
+    "geolocator/static/app/tokens.js",
+    "geolocator/static/index.html",
+    "post-biofilms-standalone.html",
+]
+
+
+def missing_pinned_paths(root: Path = REPO) -> list:
+    """The pinned paths that git does not list under `root`."""
+    return sorted(set(PINNED_PATHS) - set(listed_text(root)))
+
+
 def landed_terms(root: Path = REPO, *, terms=None) -> list:
     """Registered absences whose predicates no longer all hold under `root`.
     Shared by the gate and its plants, so a plant cannot pass against a copy."""
@@ -1046,8 +1097,7 @@ def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, 
 # A DELETED FILE. Raised by Codex on pull request #47 against 80d9787, and reproduced first.
 # listed_text() omits a file that is gone, so neither reader compares that file's pins. The
 # stepper is left out: the older Julia predicate opens it, so its absence is already an error.
-PINNED_FILES = sorted((set(EXEMPT_LINES) | {rel for rel, pins in CAPABILITY_LINES.items()
-                                            if pins is not WHOLE_FILE}) - {"biofilms_potts.jl"})
+PINNED_FILES = sorted(set(PINNED_PATHS) - {"biofilms_potts.jl"})
 
 
 @pytest.mark.parametrize("rel", PINNED_FILES)
@@ -1070,9 +1120,6 @@ def test_a_deleted_pinned_file_lands_the_term(tmp_path, rel):
 # four tables. Both readers then forget the path, the tables still agree with each other, and
 # PINNED_FILES above shrinks without a word, because it is built from those same tables.
 @pytest.mark.parametrize("rel", PINNED_FILES)
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="the pinned paths are remembered by the tables alone, so an edit "
-                          "that drops a path from them is forgotten; see the next commit")
 def test_a_deleted_file_is_remembered_after_its_table_entries_go(tmp_path, monkeypatch, rel):
     root = _scratch_repo(tmp_path)
     if landed_terms(root, terms={SURVIVAL}):
@@ -1085,6 +1132,9 @@ def test_a_deleted_file_is_remembered_after_its_table_entries_go(tmp_path, monke
     if (root / rel).exists() or not dropped:
         raise RuntimeError(f"the deletion did not apply: {rel}, {dropped} table entries")
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+    # ...through the list alone: both table readers have forgotten the path.
+    assert (removal_tokens(root), capability_claims(root)) == ({}, [])
+    assert missing_pinned_paths(root) == [rel]
 
 
 def test_every_pin_has_its_tables():
@@ -1094,6 +1144,11 @@ def test_every_pin_has_its_tables():
                                  if allowed is not WHOLE_FILE}
     assert set(EXEMPTION_HOLDS) <= set(EXEMPT_LINES)
     assert set(CAPABILITY_LINES) == set(CAPABILITY_NAMED_AS_UNSUPPORTED)
+    # READ THE GATE FIRST, as the next test says. A path that left the tables because its
+    # file was deleted is a red gate, and the remedy is not to delete its line from the list.
+    assert set(PINNED_PATHS) == set(EXEMPT_LINES) | {
+        rel for rel, pins in CAPABILITY_LINES.items() if pins is not WHOLE_FILE}
+    assert len(PINNED_PATHS) == len(set(PINNED_PATHS))
 
 
 def test_no_allowlist_entry_has_outlived_its_reason():
