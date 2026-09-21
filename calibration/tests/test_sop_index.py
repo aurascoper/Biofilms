@@ -632,7 +632,7 @@ CAPABILITY_LINES = {
         'a20f598b29e16a246a648ccdc8ad9bff380c84b8d6dba5e57bd09166174fe0c4',   # #    Both are STRUCTURALLY ABSENT, like response.growth_su
         'bdd5212b0150cc38d00756d32f9feaf0a1c35187d9426ee1c12102d8deebac81',   # RM-KR-12,README,Key Results row 7,no extinctions,model_out
         'b9152435103a2a45c1eb62c48e5812279333f8e1cd9f2c2919955acbbd9bce45',   # NEWS-PHEN-02,repository,docs/calibration/integration_contr
-        '29768a22cda409585e0a19c8243e42d5b2f18252079f807c3d011a093faa0f1f',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
+        '1dd38a1bdadee863e66dcc3f3166308a7f464f3ec62b7de85d852a920095d5d8',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
     },
     'data/parameter_provenance.csv': {
         '847be5f2ebe76d7c286d07f3b6b01573e6d9e450053a48c2fc48def29f0fb8a5',   # D_engineered_composite,none,response.hamiltonian,RADIOTROP
