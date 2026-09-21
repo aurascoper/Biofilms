@@ -69,7 +69,8 @@ jobs:
             coupling/pyproject.toml
       - name: Install headless rendering support
         # PyVista needs an X server to construct a Plotter even off-screen.
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1 libxrender1
+        # apt-get update is not the gate, the install is: see scripts/apt_install.sh.
+        run: scripts/apt_install.sh -y xvfb libgl1 libxrender1
       - name: Install package (bare)
         run: pip install -e contract && pip install -e "coupling[dev]"
       - name: Run shared-contract tier
@@ -96,6 +97,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run the merge gate's negative controls
         run: scripts/test_preflight_merge.sh
+      - name: Run the apt gate's negative controls
+        # A failed update must warn and go on; a failed install must fail.
+        run: scripts/test_apt_install.sh
       - name: Run the review watcher's negative controls
         # The watcher only observes; these prove it never reads an error as
         # "no reviews", never returns a partial page, and keeps what it last
@@ -130,7 +134,7 @@ jobs:
         # The layout sidecar intentionally clips one final token. pdftohtml's
         # hidden-text path verifies the complete token in the PDF, and must run
         # in CI rather than leave the location-scoped exception behind a skip.
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+        run: scripts/apt_install.sh -y --no-install-recommends poppler-utils
       - name: Run calibration tier
         run: cd calibration && pytest -rs tests
 
