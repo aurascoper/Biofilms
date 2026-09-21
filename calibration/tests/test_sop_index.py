@@ -1203,6 +1203,37 @@ def test_a_deleted_file_is_remembered_after_its_table_entries_go(tmp_path, monke
     assert missing_pinned_paths(root) == [rel]
 
 
+# THE LEDGER ROW THAT DESCRIBES THIS GUARD IS A CLAIM, AND IT WENT STALE THREE TIMES. Codex on
+# pull request #47, at 4b9c25e, a7740c9 and 54f920b: the row named two readers "and nothing
+# else" while the term had five predicates. A sentence that lists predicates is wrong the day
+# one is added. So the row is read here: it must name every function the predicates call.
+def unnamed_survival_predicates(root: Path = REPO) -> list:
+    """Functions of this module that a survival predicate calls and GUARD-SCOPE-02 does not name."""
+    import csv
+    with open(root / "data" / "claims_ledger.csv", encoding="utf-8") as fh:
+        rows = {r["claim_id"]: r for r in csv.DictReader(l for l in fh if not l.startswith("#"))}
+    claim = rows["GUARD-SCOPE-02"]["claim_text"]
+    called = {name for pred in ABSENT_TERMS[SURVIVAL][1] for name in pred.__code__.co_names
+              if callable(globals().get(name))}
+    if not called:
+        raise RuntimeError("no function found in the survival predicates")    # never default to pass
+    return sorted(name for name in called if f"{name}(" not in claim)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="GUARD-SCOPE-02 names two readers and says nothing else fires the "
+                          "term; see the next commit")
+def test_the_ledger_row_names_every_survival_predicate():
+    assert unnamed_survival_predicates() == []
+
+
+def test_the_predicate_census_detects_an_unnamed_one(monkeypatch):
+    why, preds = ABSENT_TERMS[SURVIVAL]
+    before = unnamed_survival_predicates()
+    monkeypatch.setitem(ABSENT_TERMS, SURVIVAL, (why, preds + [lambda root=REPO: bool(listed_text(root))]))
+    assert unnamed_survival_predicates() == sorted(before + ["listed_text"])
+
+
 def test_every_pin_has_its_tables():
     """An allowlisted file with no pinned lines is exempt by its name, and a capability
     file with a reason and no pinned lines is exempt by its path."""
