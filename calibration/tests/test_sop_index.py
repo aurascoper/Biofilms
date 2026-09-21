@@ -575,11 +575,30 @@ def _plant(root: Path, rel: str, text: str) -> None:
         raise RuntimeError(f"the plant did not apply: {rel}")
 
 
+def _replace_once(root: Path, rel: str, old: str, new: str) -> None:
+    """Replace the one occurrence of `old` in root/rel. The victim is taken from the
+    file as it is: anything but exactly one occurrence is a RuntimeError."""
+    path = root / rel
+    text = path.read_text(encoding="utf-8")
+    if text.count(old) != 1:
+        raise RuntimeError(f"{rel} has {text.count(old)} occurrences of {old!r}")
+    path.write_text(text.replace(old, new), encoding="utf-8")
+    if new not in path.read_text(encoding="utf-8"):
+        raise RuntimeError(f"the replacement did not apply: {rel}")
+
+
 def test_the_unplanted_scratch_root_reports_no_landed_term(tmp_path):
     """NEGATIVE CONTROL: without it, a reader that fires on every root passes
     every plant below."""
     assert landed_terms(_scratch_repo(tmp_path), terms={SURVIVAL}) == []
 
+
+# Both raised by Codex on pull request #47 against 8374b59, and both reproduced before
+# this mark was written. The next commit removes it.
+_CODEX_P1 = pytest.mark.xfail(
+    strict=True, raises=AssertionError,
+    reason="a survival noun is not in the vocabulary, and the stepper's exemption is "
+           "granted on its file name without checking what governs its removals")
 
 SURVIVAL_PLANTS = [
     pytest.param("odin/cpm/response.odin", ODIN_RESPONSE,
@@ -597,6 +616,11 @@ SURVIVAL_PLANTS = [
                  id="a rate constant in the stepper"),
     pytest.param("odin/CONFORMANCE.md", ODIN_CONFORMANCE,
                  id="the port's declaration of the capability"),
+    # The natural names for the process, a generic removal, and no capability name.
+    pytest.param("port/response.zig",
+                 "const survival_probability = exp(-alpha*D - beta*G*D*D);\n"
+                 "if (u > survival_probability) { cells.delete(id); }\n",
+                 marks=_CODEX_P1, id="natural survival names and a generic delete"),
     # The one form the first predicate could already see.
     pytest.param("biofilms_potts.jl", "\nfunction remove_cell!(lattice, i)\nend\n",
                  id="a Julia definition in the stepper"),
@@ -621,7 +645,20 @@ SEEN_BY = {     # plant id -> (removal_tokens, capability_claims), exactly
     "a rate constant in the stepper": ({"biofilms_potts.jl": ["k_death"]}, []),
     "the port's declaration of the capability": ({}, ["odin/CONFORMANCE.md"]),
     "a Julia definition in the stepper": ({"biofilms_potts.jl": ["remove_cell!"]}, []),
+    "natural survival names and a generic delete":
+        ({"port/response.zig": ["survival_probability"]}, []),
 }
+
+
+@_CODEX_P1
+def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
+    """The shortest route to the process from inside this repository: the volume-zero
+    cleanup gains a dose condition and reuses DeathEvent and death_log, the very
+    identifiers REMOVAL_ALLOWED exempts in that file."""
+    root = _scratch_repo(tmp_path)
+    _replace_once(root, "biofilms_potts.jl", "        if cell.volume <= 0\n",
+                  "        if cell.volume <= 0 || cell.lifetime_dose_Gy > 50.0\n")
+    assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
 
 
 @pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
