@@ -156,6 +156,31 @@ def test_the_checker_gives_each_verdict(tmp_path, monkeypatch, label, cell, file
     assert len(got) == len(want) and all(w in g for w, g in zip(want, got)), (label, got)
 
 
+# THE LEDGER'S COMMENT LINES. Raised by Codex on pull request #49 against 641f278, and
+# reproduced first: header line 176 cited a file that is gone, as `file:157-182`, and the
+# gate read data rows alone. The first form below is that header line's own.
+_COMMENT_LINES = pytest.mark.xfail(strict=True, raises=AssertionError,
+                                   reason="the gate drops every comment line of the ledger "
+                                          "before it reads; see the next commit")
+
+
+@pytest.mark.parametrize("comment,want", [
+    ("#   Counted directly at stepper.jl:2-6: two rows.", "bare citation stepper.jl:2-6"),
+    ("#   The update is stepper.jl@`s.t += 9`.", "absent"),
+    ("#   ...and the second update, at (:6).", "detached line number"),
+])
+@_COMMENT_LINES
+def test_a_comment_line_of_the_ledger_is_read_too(tmp_path, monkeypatch, comment, want):
+    monkeypatch.setitem(globals(), "BARE_ALLOWED", set())
+    root = _scratch(tmp_path, 'X-01,"stepper.jl@`s.t += 1`",\n', {"stepper.jl": STEPPER})
+    path = root / LEDGER
+    path.write_text(comment + "\n" + path.read_text(encoding="utf-8"), encoding="utf-8")
+    if path.read_text(encoding="utf-8").count(comment) != 1:
+        raise RuntimeError("the plant did not apply")         # plumbing, never the defect
+    got = citation_problems(root)
+    assert len(got) == 1 and want in got[0], got
+
+
 def test_a_citation_at_a_commit_reads_that_commit(tmp_path, monkeypatch):
     """The text is gone today and present at the commit. Both directions are checked."""
     monkeypatch.setitem(globals(), "BARE_ALLOWED", set())
