@@ -43,7 +43,13 @@ jobs:
       - name: Claims-ledger and withdrawn-comparison guards
         working-directory: calibration/tests
         shell: bash
-        run: python -m pytest test_claims*.py test_withdrawn_comparisons.py -v
+        run: python -m pytest test_claims*.py test_withdrawn_comparisons.py -v --junitxml="$RUNNER_TEMP/junit-guards.xml"
+      - name: Prove the skip pin rejects an undeclared skip
+        run: python3 scripts/assert_skips.py --self-test
+      - name: Assert nothing skipped beyond the declared list
+        # This job has no pdftotext, so one sidecar test skips by design. A second
+        # skip here is a guard that stopped running, and the pass count stays green.
+        run: python3 scripts/assert_skips.py "$RUNNER_TEMP/junit-guards.xml" calibration/tests/expected_skips_guards.txt
       - name: Assert the deleted-claim guard was calibrated, not skipped
         working-directory: calibration/tests
         run: |
