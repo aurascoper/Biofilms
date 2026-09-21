@@ -1,0 +1,9 @@
+# The skips this tier may report in CI, and nothing else. Read by scripts/assert_skips.py.
+# One per line: <test id><TAB><text the reason must contain>.
+# The hosted runner has no OpenMC. These six modules import it at the top.
+tests.integration.test_attenuation	could not import 'openmc'
+tests.integration.test_csg_mass	could not import 'openmc'
+tests.integration.test_openmc_smoke	could not import 'openmc'
+tests.integration.test_synthetic_e2e	could not import 'openmc'
+tests.integration.test_water_phantom	could not import 'openmc'
+tests.test_model_build	could not import 'openmc'
