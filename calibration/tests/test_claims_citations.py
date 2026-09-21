@@ -22,6 +22,12 @@ pull request #49: a range whose first line was cited, where the row is about a l
 That a citation names the right place is checked by reading the row beside the cited text,
 and by nothing here.
 
+READ BY EYE, 2026-09-21. Every citation of the conversion was read beside its row, the
+audit-time text and today's line. 126 were placed by rule: 52 that a token comparison
+flagged, with 7 wrong and fixed in pull request #49; and 74 unflagged, with 0 wrong (20 in
+a seeded sample before the merge, then the other 54). A citation added later is read by its
+author, and by nothing here.
+
 SCOPE. This reads data/claims_ledger.csv alone, its rows and its comment lines. Line references into the superseded
 preprint ("lines 711-721") name no file and are out of scope, as the ledger header says.
 """
