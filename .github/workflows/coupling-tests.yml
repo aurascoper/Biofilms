@@ -77,12 +77,23 @@ jobs:
         # Runs here rather than in its own job because one of its tests asserts
         # that the coupling loader and the contract share ONE vocabulary object,
         # which needs both installed.
-        run: pytest -rs contract/tests
+        run: pytest -rs --junitxml="$RUNNER_TEMP/junit-contract.xml" contract/tests
       - name: Run unit tier
         # -rs so the skip list is VISIBLE in the log. The render tier used to
         # be eight silent skips that hid three real defects; the only skips
-        # that should remain here are the openmc ones.
-        run: cd coupling && xvfb-run -a pytest -rs tests
+        # that should remain here are the openmc ones. The two steps after
+        # this one ENFORCE that sentence; until 2026-09-21 nothing did.
+        run: cd coupling && xvfb-run -a pytest -rs --junitxml="$RUNNER_TEMP/junit-coupling.xml" tests
+      - name: Prove the skip pin rejects an undeclared skip
+        run: python3 scripts/assert_skips.py --self-test
+      - name: Assert nothing skipped beyond the declared lists
+        # A runner that half-installs the rendering packages turns a failing
+        # render test into a skipped one, and the pass count stays green.
+        # The reports go to RUNNER_TEMP: an untracked file in the checkout is
+        # input to every guard that lists files with git.
+        run: |
+          python3 scripts/assert_skips.py "$RUNNER_TEMP/junit-contract.xml" contract/tests/expected_skips_ci.txt
+          python3 scripts/assert_skips.py "$RUNNER_TEMP/junit-coupling.xml" coupling/tests/expected_skips_ci.txt
       - name: Run the payload-census diagnostic suite
         run: python3 diagnostics/payload_census/test_census.py
 
@@ -136,7 +147,12 @@ jobs:
         # in CI rather than leave the location-scoped exception behind a skip.
         run: scripts/apt_install.sh -y --no-install-recommends poppler-utils
       - name: Run calibration tier
-        run: cd calibration && pytest -rs tests
+        run: cd calibration && pytest -rs --junitxml="$RUNNER_TEMP/junit-calibration.xml" tests
+      - name: Prove the skip pin rejects an undeclared skip
+        run: python3 scripts/assert_skips.py --self-test
+      - name: Assert nothing skipped beyond the declared list
+        # If poppler-utils half-installs, the artifact tests skip and do not fail.
+        run: python3 scripts/assert_skips.py "$RUNNER_TEMP/junit-calibration.xml" calibration/tests/expected_skips_ci.txt
 
   openmc-integration:
     # Manual opt-in: pinned conda-forge OpenMC. The hosted runner does not

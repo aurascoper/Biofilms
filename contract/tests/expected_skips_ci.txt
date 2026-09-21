@@ -1,0 +1,3 @@
+# The skips this tier may report in CI, and nothing else. Read by scripts/assert_skips.py.
+# One per line: <test id><TAB><text the reason must contain>.
+# None. A skip in this tier is a defect.
