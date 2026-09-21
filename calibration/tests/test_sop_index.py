@@ -680,7 +680,7 @@ CAPABILITY_LINES = {
         'a20f598b29e16a246a648ccdc8ad9bff380c84b8d6dba5e57bd09166174fe0c4',   # #    Both are STRUCTURALLY ABSENT, like response.growth_su
         'bdd5212b0150cc38d00756d32f9feaf0a1c35187d9426ee1c12102d8deebac81',   # RM-KR-12,README,Key Results row 7,no extinctions,model_out
         'b9152435103a2a45c1eb62c48e5812279333f8e1cd9f2c2919955acbbd9bce45',   # NEWS-PHEN-02,repository,docs/calibration/integration_contr
-        'cb638a30ca9e43442d0b03031e870d6f451d6326e83869bd431262294a91642c',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
+        '19a8906a502d01efc3d9676399d7b206ffcb1b3c4bcff9c5aa917e748de5e33b',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
     },
     'data/parameter_provenance.csv': {
         '847be5f2ebe76d7c286d07f3b6b01573e6d9e450053a48c2fc48def29f0fb8a5',   # D_engineered_composite,none,response.hamiltonian,RADIOTROP
@@ -1220,9 +1220,6 @@ def unnamed_survival_predicates(root: Path = REPO) -> list:
     return sorted(name for name in called if f"{name}(" not in claim)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="GUARD-SCOPE-02 names two readers and says nothing else fires the "
-                          "term; see the next commit")
 def test_the_ledger_row_names_every_survival_predicate():
     assert unnamed_survival_predicates() == []
 
