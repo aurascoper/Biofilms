@@ -608,6 +608,8 @@ def removal_tokens(root: Path = REPO) -> dict:
                       - allowed)
         if hits or broken:
             found[rel] = hits or [PINS_CHANGED]
+    for rel in set(EXEMPT_LINES) - set(found) - set(listed_text(root)):
+        found[rel] = [PINS_CHANGED]     # the whole file is gone, and its pins with it
     return found
 
 
@@ -669,7 +671,9 @@ def capability_claims(root: Path = REPO) -> list:
     No suffix is skipped: the port's own declaration is a Markdown file."""
     import hashlib
     claims = []
-    for rel, text in listed_text(root).items():
+    texts = listed_text(root)
+    for rel in sorted(set(texts) | set(CAPABILITY_LINES)):      # a deleted file is not listed
+        text = texts.get(rel, "")
         pinned = CAPABILITY_LINES.get(rel, set())
         if pinned is WHOLE_FILE or (CAPABILITY not in text and not pinned):
             continue
@@ -843,13 +847,18 @@ ODIN_CONFORMANCE = '# Conformance report: Odin port vs `response.growth_survival
 
 
 def _scratch_repo(tmp_path: Path) -> Path:
-    """A fresh git root holding the two files the survival predicates open."""
+    """A fresh git root holding the two files the survival predicates open, and every
+    file a pin names. A pinned file that is missing is reported, as a deleted one is."""
     import shutil
     import subprocess
     root = tmp_path / "repo"
     (root / TEX.relative_to(REPO)).parent.mkdir(parents=True)
     shutil.copy(TEX, root / TEX.relative_to(REPO))
     shutil.copy(REPO / "biofilms_potts.jl", root / "biofilms_potts.jl")
+    for rel in sorted(set(EXEMPT_LINES) | set(CAPABILITY_LINES)):
+        if not (root / rel).exists():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(REPO / rel, root / rel)
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     return root
 
@@ -1000,11 +1009,7 @@ REPLACEMENT_PLANTS = [
 @pytest.mark.parametrize("rel, victim, rewrite", REPLACEMENT_PLANTS)
 def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victim, rewrite):
     import re
-    import shutil
     root = _scratch_repo(tmp_path)
-    if not (root / rel).exists():
-        (root / rel).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(REPO / rel, root / rel)
     # The victim comes from the file as it is now, never from memory of it.
     lines = (root / rel).read_text(encoding="utf-8").split("\n")
     hits = [n for n, line in enumerate(lines, 1) if re.search(victim, line)]
@@ -1038,15 +1043,6 @@ def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, 
     assert (removal_tokens(root), capability_claims(root)) == SEEN_BY[plant_id]
 
 
-def _copy_pinned(root: Path) -> None:
-    """Every file a pin names, copied into the scratch root as it is today."""
-    import shutil
-    for rel in sorted(set(EXEMPT_LINES) | set(CAPABILITY_LINES)):
-        if not (root / rel).exists():
-            (root / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(REPO / rel, root / rel)
-
-
 # A DELETED FILE. Raised by Codex on pull request #47 against 80d9787, and reproduced first.
 # listed_text() omits a file that is gone, so neither reader compares that file's pins. The
 # stepper is left out: the older Julia predicate opens it, so its absence is already an error.
@@ -1055,18 +1051,18 @@ PINNED_FILES = sorted((set(EXEMPT_LINES) | {rel for rel, pins in CAPABILITY_LINE
 
 
 @pytest.mark.parametrize("rel", PINNED_FILES)
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="a deleted file takes its pins with it, and neither reader "
-                          "reports the file; see the next commit")
 def test_a_deleted_pinned_file_lands_the_term(tmp_path, rel):
     root = _scratch_repo(tmp_path)
-    _copy_pinned(root)
     if landed_terms(root, terms={SURVIVAL}):
         raise RuntimeError("the scratch root reports a landed term before the deletion")
     (root / rel).unlink()
     if (root / rel).exists():
         raise RuntimeError(f"the deletion did not apply: {rel}")
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+    # ...and through the reader that pins the file, exactly.
+    pins = CAPABILITY_LINES.get(rel) or set()
+    assert removal_tokens(root) == ({rel: [PINS_CHANGED]} if rel in EXEMPT_LINES else {})
+    assert capability_claims(root) == ([f"{rel}: {len(pins)} pinned line(s) gone"] if pins else [])
 
 
 def test_every_pin_has_its_tables():
