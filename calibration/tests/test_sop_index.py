@@ -678,7 +678,7 @@ CAPABILITY_LINES = {
     },
     'data/claims_ledger.csv': {
         'a20f598b29e16a246a648ccdc8ad9bff380c84b8d6dba5e57bd09166174fe0c4',   # #    Both are STRUCTURALLY ABSENT, like response.growth_su
-        'bdd5212b0150cc38d00756d32f9feaf0a1c35187d9426ee1c12102d8deebac81',   # RM-KR-12,README,Key Results row 7,no extinctions,model_out
+        '829f96a744091e5127330c6cc2dba5d8a72347dc02999e9c4d91d5fff0d2d88f',   # RM-KR-12,README,Key Results row 7,no extinctions,model_out
         'b9152435103a2a45c1eb62c48e5812279333f8e1cd9f2c2919955acbbd9bce45',   # NEWS-PHEN-02,repository,docs/calibration/integration_contr
         '19a8906a502d01efc3d9676399d7b206ffcb1b3c4bcff9c5aa917e748de5e33b',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
     },
