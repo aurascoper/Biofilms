@@ -38,9 +38,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 
-SUFFIXES = {".md", ".jl", ".csv", ".py", ".tex", ".txt", ".yml", ".yaml",
-            ".json", ".R", ".r", ".toml", ".sh"}
-
 # The withdrawn magnitude, either as the ratio in words or as the number the
 # comparison against 1.000010 produces.
 WITHDRAWN_MAGNITUDE = re.compile(r"(?:four|4) orders of magnitude|15,?500\s*(?:x|×|-?fold)")
@@ -84,10 +81,11 @@ def survivors_in(text: str) -> list[str]:
 
 
 def tracked_text_files(root: Path = REPO) -> list[Path]:
-    listing = subprocess.run(["git", "-C", str(root), "ls-files", "-z"],
-                             capture_output=True, text=True, check=True).stdout
-    return [root / name for name in listing.split("\0")
-            if name and Path(name).suffix in SUFFIXES]
+    """Every text file git lists under `root`. No suffix is skipped: the withdrawn
+    comparison is a sentence, and a sentence can be in a page or a script as well as in
+    prose. A file with a NUL byte in its first 8 KiB is not read."""
+    from test_sop_index import listed_text
+    return [root / rel for rel in listed_text(root)]
 
 
 def test_the_withdrawn_comparison_survives_nowhere_in_the_tree():
@@ -176,10 +174,8 @@ def test_the_scan_reaches_more_than_one_file_type():
     assert len(tracked_text_files()) > 100
 
 
-# A PAGE AND A SCRIPT. SUFFIXES names thirteen kinds, and this repository publishes a standalone
-# HTML post and JavaScript viewers, which none of them is. The sentence is the real one above.
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="SUFFIXES has no .html and no .js; see the next commit")
+# A PAGE AND A SCRIPT. The walk named thirteen file kinds, and this repository publishes a
+# standalone HTML post and JavaScript viewers, which none of them was. The sentence is the real one above.
 def test_the_scan_reads_a_page_and_a_script(tmp_path):
     def git(*args):
         done = subprocess.run(["git", "-C", str(tmp_path), *args], capture_output=True, text=True)

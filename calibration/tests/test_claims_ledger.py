@@ -1571,7 +1571,9 @@ def test_only_current_bytecode_is_exempt_from_the_production_scanners(tmp_path):
     """
     import importlib.util
     import py_compile
+    import subprocess
 
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)   # the source walk lists by git
     doi = next(iter(RETRACTED_CITATIONS))
     source_claim = next(iter(RETRACTED_IN_SOURCES))
     source = tmp_path / "foo.py"
@@ -1671,31 +1673,25 @@ SOURCE_RECORDING_FILES = {
     "calibration/tests/test_claims_ledger.py",
 }
 
-SOURCE_SUFFIXES = {".jl", ".R", ".py"}
-
-
 def sources_carrying_retracted_strings(root: Path = REPO) -> dict:
     """{repo-relative path: [strings]} for every source carrying a withdrawn string.
 
-    SCOPE: files with a SOURCE_SUFFIXES extension anywhere in the repository,
-    excluding `.git` and any file derived from a source already scanned. Shared by
-    the check and its control.
+    SCOPE: every text file git lists under `root`, tracked or untracked and not ignored,
+    except the six prose and data suffixes of PROSE_AND_DATA. A file with a NUL byte in
+    its first 8 KiB is not read. The list of source languages was .jl .R .py until
+    GUARD-SCOPE-01's second correction: a source in any other language was read by
+    nothing. The reader is test_sop_index.listed_text(), shared with the absence registry.
     """
+    from test_sop_index import PROSE_AND_DATA, listed_text
     out: dict[str, list[str]] = {}
-    for path in root.rglob("*"):
-        if not path.is_file() or ".git" in path.parts:
-            continue
-        if path.suffix not in SOURCE_SUFFIXES:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+    for rel, text in listed_text(root).items():
+        if Path(rel).suffix.lower() in PROSE_AND_DATA:
             continue
         flat = _normalised_for_retraction(text)
         hits = [s for s in RETRACTED_IN_SOURCES
                 if _normalised_for_retraction(s) in flat]
         if hits:
-            out[str(path.relative_to(root)).replace("\\", "/")] = sorted(hits)
+            out[rel] = sorted(hits)
     return out
 
 
@@ -1732,6 +1728,7 @@ def test_source_normalisation_enters_through_the_production_scanner(
         "uppercase": victim.upper(),
         "wrapped": victim.replace("range ", "range\n# "),
     }[representation]
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)   # the source walk lists by git
     candidate = tmp_path / "candidate.R"
     candidate.write_text(rendered, encoding="utf-8")
     found = sources_carrying_retracted_strings(tmp_path)
@@ -1746,8 +1743,6 @@ def test_source_normalisation_enters_through_the_production_scanner(
 # UNLISTED LANGUAGES. This walk and GUARD-SCOPE-01's shared one suffix list, .jl .R .py, so a
 # source in any other language was read by neither. The victim is the one the control above
 # recovers from git; the languages are two the list never named, in directories it never saw.
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="SOURCE_SUFFIXES names three languages; see the next commit")
 def test_a_retracted_string_in_an_unlisted_language_is_found(tmp_path):
     import subprocess
     victim = "Table 2 range 1e-4..1e-2"

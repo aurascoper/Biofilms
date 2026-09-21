@@ -227,9 +227,9 @@ on 2026-09-07 left every suite green. The figure-vocabulary guard reads
 ceiling-vocabulary walk scans three other terms. A first fix scanned only `viewer/`, the
 directory the plant landed in, which is the defect relocated. `tests/manuscript_claims_tests.jl`
 now reads the whole `RETRACTED_IN_FIGURES` vocabulary out of the python file at test time (one
-source, no mirror; Codex on #25 caught the one-term version) and walks every `.jl`, `.R` and
-`.py` under the root minus `.git` and virtualenvs for each term against a per-term declared
-allowlist, with a synthetic control and a control that plants a term other than the first under
+source, no mirror; Codex on #25 caught the one-term version) and reads every text file git
+lists, except six prose and data suffixes, for each term against a per-term declared
+allowlist (the walk named `.jl`, `.R` and `.py` alone until GUARD-SCOPE-01's second correction), with a synthetic control and a control that plants a term other than the first under
 a directory that did not exist when the scan was written, through the same walker. A
 `bench/plant.jl` planted by hand on committed state failed it by name. Ledger row
 `GUARD-SCOPE-01` records the gap.
