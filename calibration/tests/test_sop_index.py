@@ -1220,9 +1220,36 @@ def unnamed_survival_predicates(root: Path = REPO) -> list:
     return sorted(name for name in called if f"{name}(" not in claim)
 
 
+def survival_predicate_census() -> list:
+    """One entry per survival predicate: the functions of this module it calls, and the
+    string arguments it passes. Read from the code objects, so it is what the gate runs."""
+    return [(tuple(n for n in pred.__code__.co_names if callable(globals().get(n))),
+             tuple(c for c in pred.__code__.co_consts if isinstance(c, str)))
+            for pred in ABSENT_TERMS[SURVIVAL][1]]
+
+
+# THE PREDICATES AS GUARD-SCOPE-02 DESCRIBES THEM, PINNED VERBATIM. A change to any predicate,
+# or a new one, fails the row test below. Whoever updates this list has read the row's claim
+# against the predicates again and corrected it first. A new argument is a new scope.
+SURVIVAL_PREDICATES = [
+    (("_declaration_still_stands",),
+     ("has neither biomass growth nor a dose-dependent survival process",)),
+    (("_absent_from",),
+     ("biofilms_potts.jl", r"function\s+\w*(death|kill|remove_cell|die)\w*!?\s*\(")),
+    (("removal_tokens",), ()),
+    (("capability_claims",), ()),
+    (("missing_pinned_paths",), ()),
+]
+
+
 def stale_survival_row(root: Path = REPO) -> list:
     """Every reason GUARD-SCOPE-02 may no longer describe the predicates. Empty while it does."""
-    return unnamed_survival_predicates(root)
+    changed = [f"predicate {n}: {now} is not the pinned {then}" for n, (now, then) in
+               enumerate(zip(survival_predicate_census(), SURVIVAL_PREDICATES)) if now != then]
+    if len(survival_predicate_census()) != len(SURVIVAL_PREDICATES):
+        changed.append(f"{len(survival_predicate_census())} predicates, and "
+                       f"{len(SURVIVAL_PREDICATES)} are pinned")
+    return unnamed_survival_predicates(root) + changed
 
 
 def test_the_ledger_row_names_every_survival_predicate():
@@ -1232,16 +1259,24 @@ def test_the_ledger_row_names_every_survival_predicate():
 # A HELPER NAME IS A MARKER TOO. Raised by Codex on pull request #47 against 5937c7d, and
 # reproduced first: a second _absent_from() call, on a new file, adds a scope the row does not
 # state, and the name census returns nothing because the row already names _absent_from().
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="the census keys on helper names, so a named helper called again "
-                          "with new arguments is unseen; see the next commit")
 def test_a_reused_helper_with_new_arguments_makes_the_row_stale(monkeypatch):
     why, preds = ABSENT_TERMS[SURVIVAL]
     monkeypatch.setitem(ABSENT_TERMS, SURVIVAL, (why, preds + [
         lambda root=REPO: _absent_from("odin/cpm/sim.odin", r"cell_kill", root)]))
     if len(ABSENT_TERMS[SURVIVAL][1]) != len(preds) + 1:
         raise RuntimeError("the plant did not apply")
-    assert stale_survival_row() != []
+    assert stale_survival_row() == ["6 predicates, and 5 are pinned"]
+    assert unnamed_survival_predicates() == []      # the name census alone still sees nothing
+
+
+def test_a_changed_argument_makes_the_row_stale(monkeypatch):
+    """Not a new predicate: the old one, pointed at another file."""
+    why, preds = ABSENT_TERMS[SURVIVAL]
+    swapped = [(lambda root=REPO: _absent_from("odin/cpm/sim.odin", r"cell_kill", root))
+               if "_absent_from" in p.__code__.co_names else p for p in preds]
+    monkeypatch.setitem(ABSENT_TERMS, SURVIVAL, (why, swapped))
+    got = stale_survival_row()
+    assert len(got) == 1 and got[0].startswith("predicate 1:") and "odin/cpm/sim.odin" in got[0], got
 
 
 def test_the_predicate_census_detects_an_unnamed_one(monkeypatch):
