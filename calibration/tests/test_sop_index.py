@@ -632,7 +632,7 @@ CAPABILITY_LINES = {
         'a20f598b29e16a246a648ccdc8ad9bff380c84b8d6dba5e57bd09166174fe0c4',   # #    Both are STRUCTURALLY ABSENT, like response.growth_su
         'bdd5212b0150cc38d00756d32f9feaf0a1c35187d9426ee1c12102d8deebac81',   # RM-KR-12,README,Key Results row 7,no extinctions,model_out
         'b9152435103a2a45c1eb62c48e5812279333f8e1cd9f2c2919955acbbd9bce45',   # NEWS-PHEN-02,repository,docs/calibration/integration_contr
-        'a439a42280659ea5d1c1dbbafbf58ccbb95212e3382bce8e235b90ffc169d087',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
+        'cb638a30ca9e43442d0b03031e870d6f451d6326e83869bd431262294a91642c',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
     },
     'data/parameter_provenance.csv': {
         '847be5f2ebe76d7c286d07f3b6b01573e6d9e450053a48c2fc48def29f0fb8a5',   # D_engineered_composite,none,response.hamiltonian,RADIOTROP
@@ -1052,6 +1052,9 @@ KNOWN_UNSEEN = [
     # Dose zeroes the volume somewhere else, and the volume-only cleanup does the rest.
     # stepper_removal_sites() reads what governs a removal, not what feeds it.
     ("biofilms_potts.jl", "\ncell.volume = cell.lifetime_dose_Gy > 50.0 ? 0 : cell.volume\n"),
+    # Source under one of the six PROSE_AND_DATA suffixes. The same line in port/model.zig
+    # is seen. Skipping them is the departure from AGENTS.md decided on 2026-09-20.
+    ("port/model.txt", "fn killCell(i: usize) void {}\n"),
     # Inside an unbroken 60-character run, which removal_tokens() drops as a blob.
     ("viewer/blob.js", "const a = '" + "A" * 30 + "killCell" + "A" * 30 + "';\n"),
 ]
