@@ -1,0 +1,8 @@
+# The skips this tier may report in CI, and nothing else. Read by scripts/assert_skips.py.
+# One per line: <test id><TAB><text the reason must contain>.
+# Dryad serves the three .nd2 files behind a proof-of-work challenge, so CI has none of them.
+tests.test_pilot::test_real_stack_ingests_with_its_own_calibration	not present; Dryad
+tests.test_pilot::test_an_uncalibrated_file_is_refused_rather_than_read_as_one_micron	not present; Dryad
+tests.test_pilot::test_a_single_plane_time_lapse_is_not_a_stack	not present; Dryad
+tests.test_pilot::test_three_channels_force_an_explicit_choice	not present; Dryad
+tests.test_pilot::test_a_stack_with_no_time_axis_raises_no_time_axis_error_by_name	not present; Dryad
