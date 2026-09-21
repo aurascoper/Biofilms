@@ -1019,6 +1019,40 @@ def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
     assert capability_claims(root) == []
 
 
+# CONTROL FLOW INSIDE THE BLOCK. Raised by Codex on pull request #47 against 02f8732, and
+# reproduced first, in three more forms than the one it named. stepper_removal_sites() reads
+# the `if` headers around a removal. A guard clause or a ternary makes the removal depend on
+# dose and changes no header, no pinned line and no vocabulary word.
+# (victim line, taken from the stepper as it is; what it becomes)
+_GUARD = pytest.mark.xfail(strict=True, raises=AssertionError,
+                           reason="the stepper's exemption reads the if-headers around a "
+                                  "removal, and this edit changes none; see the next commit")
+STEPPER_GUARD_PLANTS = [
+    pytest.param("        if cell.volume <= 0\n",
+                 "        if cell.volume <= 0\n            cell.lifetime_dose_Gy <= 50.0 && continue\n",
+                 marks=_GUARD, id="a guard clause with && continue"),
+    pytest.param("        if cell.volume <= 0\n",
+                 "        if cell.volume <= 0\n            cell.lifetime_dose_Gy > 50.0 || continue\n",
+                 marks=_GUARD, id="a guard clause with || continue"),
+    pytest.param("            delete!(state.cells, id)\n",
+                 "            cell.lifetime_dose_Gy > 50.0 ? delete!(state.cells, id) : nothing\n",
+                 marks=_GUARD, id="a ternary on the delete"),
+    pytest.param("    parent = state.cells[id]\n",
+                 "    parent = state.cells[id]\n    parent.lifetime_dose_Gy > 50.0 && return :spared\n",
+                 marks=_GUARD, id="a dose guard at the top of divide_cell!"),
+]
+
+
+@pytest.mark.parametrize("victim, rewrite", STEPPER_GUARD_PLANTS)
+def test_control_flow_inside_a_removal_lands_the_term(tmp_path, victim, rewrite):
+    root = _scratch_repo(tmp_path)
+    _replace_once(root, "biofilms_potts.jl", victim, rewrite)
+    assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+    assert removal_tokens(root) == {"biofilms_potts.jl": sorted(
+        REMOVAL_ALLOWED["biofilms_potts.jl"][0])}
+    assert capability_claims(root) == []
+
+
 # REPLACEMENTS INSIDE A FILE THAT IS ALREADY EXEMPT. Raised by Codex on pull request #47
 # against ce141b2, and each reproduced before this was written: an exemption keyed on a file,
 # a word or a count survives an edit that swaps what earned it for the thing it hides.
