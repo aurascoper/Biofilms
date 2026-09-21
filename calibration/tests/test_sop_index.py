@@ -180,27 +180,27 @@ def test_the_constraint_check_detects_a_collapsed_distinction(register):
 # One test doing both jobs, instead of a registry plus a prose trigger somebody
 # has to remember to re-read.
 
-ROOT_SOURCES = sorted(REPO.glob("*.jl")) + sorted(REPO.glob("*.R")) \
-    + sorted((REPO / "analysis").glob("*.R"))
+_root_sources = lambda root: sorted(root.glob("*.jl")) + sorted(root.glob("*.R")) \
+    + sorted((root / "analysis").glob("*.R"))   # noqa: E731 -- two lines, so :219 stays put
 TEX = REPO / "preprint" / "modeling_radioresistance_and_radiotropic_fitness.tex"
 
 
-def _absent_from_sources(pattern: str) -> bool:
+def _absent_from_sources(pattern: str, root: Path = REPO) -> bool:
     """No source names a symbol matching `pattern`."""
     import re
     rx = re.compile(pattern)
     return not any(rx.search(f.read_text(encoding="utf-8", errors="replace"))
-                   for f in ROOT_SOURCES)
+                   for f in _root_sources(root))
 
 
-def _declaration_still_stands(phrase: str) -> bool:
+def _declaration_still_stands(phrase: str, root: Path = REPO) -> bool:
     """The manuscript still declares the term absent."""
-    return phrase in TEX.read_text(encoding="utf-8")
+    return phrase in (root / TEX.relative_to(REPO)).read_text(encoding="utf-8")
 
 
-def _absent_from(path: str, pattern: str) -> bool:
+def _absent_from(path: str, pattern: str, root: Path = REPO) -> bool:
     import re
-    return not re.search(pattern, (REPO / path).read_text(encoding="utf-8"))
+    return not re.search(pattern, (root / path).read_text(encoding="utf-8"))
 
 
 # TWO PREDICATES PER TERM, WATCHING DIFFERENT CLOCKS. Striking a declaration
@@ -216,17 +216,17 @@ ABSENT_TERMS = {
     "matrix diffusion (D_eff_film != D_w)": (
         "the radiodialysis solver carries one D_eff and no bulk-water diffusivity, "
         "so nothing in it makes matrix diffusion slower than bulk",
-        [lambda: _absent_from_sources(r"\bD_w\b|D_bulk|D_water|D_free")],
+        [lambda root=REPO: _absent_from_sources(r"\bD_w\b|D_bulk|D_water|D_free", root)],
     ),
     "attenuation contrast with concentration": (
         "the planned-feedback section declares d(mu)/dc ~ 0, and the coupling assigns "
         "voxel material class from occupancy alone",
-        [lambda: _declaration_still_stands(
-            r"\partial\mu(\mathbf{r})/\partial c(\mathbf{r},t) \approx 0"),
+        [lambda root=REPO: _declaration_still_stands(
+            r"\partial\mu(\mathbf{r})/\partial c(\mathbf{r},t) \approx 0", root),
          # CODE SIDE, the faster indicator: material class is a function of
          # cell_id only. A concentration-dependent mu would have to enter here.
-         lambda: _absent_from("coupling/biofilm_openmc/materials.py",
-                              r"concentration|loading|sorbed|c_ext"),
+         lambda root=REPO: _absent_from("coupling/biofilm_openmc/materials.py",
+                                        r"concentration|loading|sorbed|c_ext", root),
          # REGIME SIDE. d(mu)/dc ~ 0 is a PHOTON statement: at ~1 MeV over
          # C/H/N/O, biomass and void are near-indistinguishable. For NEUTRONS it
          # is false and interestingly so -- biofilm is largely water, so a
@@ -236,14 +236,14 @@ ABSENT_TERMS = {
          # fails if the particle changes while the manuscript sentence stays.
          # Matched on CONTENT, not a line number: a line anchor silently starts
          # reading a different statement the moment anything above it shifts.
-         lambda: not _absent_from("coupling/biofilm_openmc/model.py",
-                                  r'particle\s*=\s*"photon"')],
+         lambda root=REPO: not _absent_from("coupling/biofilm_openmc/model.py",
+                                            r'particle\s*=\s*"photon"', root)],
     ),
     "dose-dependent survival": (
         "section 2.6 declares neither growth nor survival, and no removal process "
         "exists in the stepper",
-        [lambda: _declaration_still_stands(
-            "has neither biomass growth nor a dose-dependent survival process"),
+        [lambda root=REPO: _declaration_still_stands(
+            "has neither biomass growth nor a dose-dependent survival process", root),
          # CODE SIDE: no death, kill or removal function.
          # The trailing !? is load-bearing: Julia mutators end in `!`, and the
          # first version of this pattern could not match `remove_cell!(` at all.
@@ -259,18 +259,26 @@ ABSENT_TERMS = {
          # character, and mutator-bang is a Julia convention -- so it reads as
          # reasonable to anyone reviewing it. Invisible to inspection, visible
          # only to execution.
-         lambda: _absent_from("biofilms_potts.jl",
-                              r"function\s+\w*(death|kill|remove_cell|die)\w*!?\s*\(")],
+         lambda root=REPO: _absent_from("biofilms_potts.jl",
+                                        r"function\s+\w*(death|kill|remove_cell|die)\w*!?\s*\(",
+                                        root)],
     ),
 }
+
+
+def landed_terms(root: Path = REPO, *, terms=None) -> list:
+    """Registered absences whose predicates no longer all hold under `root`.
+    Shared by the gate and its plants, so a plant cannot pass against a copy."""
+    keys = set(ABSENT_TERMS) if terms is None else set(terms)
+    return [t for t, (_why, preds) in ABSENT_TERMS.items()
+            if t in keys and not all(p(root) for p in preds)]
 
 
 def test_every_registered_absence_still_holds():
     """THE PROMOTION TRIGGER, AT OPPOSITE POLARITY. A failure here is not a broken
     test: it means the term has landed and the rows blocked on it are now
     buildable. Fix by promoting those rows, never by deleting the entry."""
-    landed = [t for t, (_why, preds) in ABSENT_TERMS.items()
-              if not all(p() for p in preds)]
+    landed = landed_terms()
     assert not landed, (
         f"these registered absences no longer hold, so the rows blocked on them "
         f"should promote: {landed}")
@@ -366,3 +374,117 @@ def test_the_dead_term_check_detects_an_orphan(index):
     planted = list(index) + [{"signal_source": ""}]
     assert "a term no row names" in dead_terms(planted, terms={"a term no row names"})
     assert not dead_terms(planted, terms=set())
+
+
+# ---------------------------------------------------------------------------
+# PLANTS FOR ONE TERM, THROUGH THE PRODUCTION READER, UNDER A SCRATCH ROOT
+# ---------------------------------------------------------------------------
+# test_the_absence_predicates_can_fail proves the predicate SHAPES can return False.
+# It says itself that it does not bind any predicate to its term. These do, for
+# "dose-dependent survival", because an implementation of it now exists: an Odin
+# port of PRRT-spatial-CPM's response.growth_survival, not yet proposed here.
+#
+# SCOPE: one term. Each plant is written under a scratch git root, and the gate's
+# own landed_terms() reads that root. The other two terms have no plant yet.
+#
+# THE KNOWN-BAD IS THE PORT'S OWN TEXT, NOT A PARAPHRASE OF IT. Source:
+# github.com/ffinkdevs/Biofilms, branch odin-port,
+# commit 5c7e46aadedc0f48bbf6f6b697cfb19582217eb9. That commit is in no ref of
+# this repository, so the lines are embedded and a reader can diff them there.
+SURVIVAL = "dose-dependent survival"
+
+# odin/cpm/response.odin lines 64-66 (the survival law) and 322-337 (the sweep).
+ODIN_RESPONSE = '''sf_lq :: proc(D, G, alpha, beta: f64) -> f64 {
+	return jexp_f64(-(alpha * D + beta * G * D * D))
+}
+	// Phase 2: unconditional survival sweep (A1).
+	sf_sum := 0.0
+	n_drawn := 0
+	for id in 1..<s.next_id {
+		if !cell_alive(s, id) {
+			continue
+		}
+		sf := sf_lq(cell_dose(s, id), G, rp.alpha, rp.beta)
+		sf_sum += sf
+		n_drawn += 1
+		u := rng_f64(&s.rng)
+		if u > sf {
+			cell_set_state(s, id, CELL_DYING)
+			rep.deaths += 1
+		}
+	}
+'''
+
+# odin/cpm/sim.odin lines 248, 468 and 489: the three definitions, nothing between.
+ODIN_SIM = '''cell_kill :: #force_inline proc(s: ^Sim, id: int) {
+cull_dying :: proc(s: ^Sim, id: int) -> bool {
+resorb_sweep :: proc(s: ^Sim) -> int {
+'''
+
+# odin/CONFORMANCE.md line 1.
+ODIN_CONFORMANCE = '# Conformance report: Odin port vs `response.growth_survival`\n'
+
+
+def _scratch_repo(tmp_path: Path) -> Path:
+    """A fresh git root holding the two files the survival predicates open."""
+    import shutil
+    import subprocess
+    root = tmp_path / "repo"
+    (root / TEX.relative_to(REPO)).parent.mkdir(parents=True)
+    shutil.copy(TEX, root / TEX.relative_to(REPO))
+    shutil.copy(REPO / "biofilms_potts.jl", root / "biofilms_potts.jl")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    return root
+
+
+def _plant(root: Path, rel: str, text: str) -> None:
+    """Append `text` to root/rel, creating it, and prove it is there.
+
+    RuntimeError, not assert: the xfail marks below expect AssertionError, and a
+    plant that never applied must not be counted as the defect it was meant to show."""
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(text)
+    if text not in path.read_text(encoding="utf-8"):
+        raise RuntimeError(f"the plant did not apply: {rel}")
+
+
+def test_the_unplanted_scratch_root_reports_no_landed_term(tmp_path):
+    """NEGATIVE CONTROL: without it, a reader that fires on every root passes
+    every plant below."""
+    assert landed_terms(_scratch_repo(tmp_path), terms={SURVIVAL}) == []
+
+
+_BLIND = pytest.mark.xfail(
+    strict=True, raises=AssertionError,
+    reason="the code-side predicate opens biofilms_potts.jl alone and needs the "
+           "keyword `function`; see the next commit")
+
+SURVIVAL_PLANTS = [
+    pytest.param("odin/cpm/response.odin", ODIN_RESPONSE, marks=_BLIND,
+                 id="the port's survival law and sweep"),
+    pytest.param("odin/cpm/sim.odin", ODIN_SIM, marks=_BLIND,
+                 id="the port's removal procedures"),
+    # A language and a directory nobody had in mind when any scan here was written.
+    pytest.param("port/kernel.zig",
+                 "fn killCell(lattice: *Lattice, i: usize) void {}\n"
+                 "pub fn step(lattice: *Lattice) void { killCell(lattice, 0); }\n",
+                 marks=_BLIND, id="a definition and a call in an unlisted language"),
+    pytest.param("biofilms_potts.jl", "\nremove_cell!(lattice, i)\n", marks=_BLIND,
+                 id="a call site in the stepper, with no definition"),
+    pytest.param("biofilms_potts.jl", "\nk_death = 0.1\n", marks=_BLIND,
+                 id="a rate constant in the stepper"),
+    pytest.param("odin/CONFORMANCE.md", ODIN_CONFORMANCE, marks=_BLIND,
+                 id="the port's declaration of the capability"),
+    # Passes today. It proves the scratch root, the plant and the reader are wired.
+    pytest.param("biofilms_potts.jl", "\nfunction remove_cell!(lattice, i)\nend\n",
+                 id="a Julia definition in the stepper"),
+]
+
+
+@pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
+def test_a_planted_survival_process_lands_the_term(tmp_path, rel, text):
+    root = _scratch_repo(tmp_path)
+    _plant(root, rel, text)
+    assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
