@@ -409,39 +409,68 @@ STEPPER_REMOVES_ON_VOLUME_ALONE = [
     ("mcs_step!", ("cell.volume <= 0",)),      # deletes that cell
     ("divide_cell!", ()),                      # the parent's identity ends at division
 ]
-# THE MODEL FILES ARE EXEMPT BY OCCURRENCE, NOT BY WORD. Codex on pull request #47, at
-# d49b43c: `function survival(dose)` written in the stepper reuses a word its comments
-# were exempted for, and a file-wide allowlist subtracts it. So for the three files that
-# ARE the model, each exempt identifier is pinned to the number of times it occurs now.
-# One more `survival` anywhere in the stepper voids the exemption, and someone looks.
+# THE MODEL FILES ARE EXEMPT BY THE LINES THAT EARNED IT. Codex on pull request #47, three
+# times: an exemption keyed on the file let `survival_probability` style code hide behind the
+# stepper's bookkeeping; keyed on a word, it hid `function survival(dose)`; keyed on a count,
+# it hid that same function written over the one prose line that says survival. So for the
+# three files that ARE the model, the pin is every non-comment line that holds an exempt
+# identifier, verbatim and in order. A `#` line is exempt as what it is: it cannot run.
+# Editing one of these lines trips the gate on purpose. Whoever edits it updates the pin.
 #
 # SCOPE: these three files. In a test, a script or a viewer, a new use of an identifier
-# that file is already allowed is not seen. Those files are edited often, a count there
+# that file is already allowed is not seen. Those files are edited often, a pin there
 # would trip the promotion gate on unrelated work, and none of them is the model.
-MODEL_FILE_OCCURRENCES = {
-    "biofilms_potts.jl": {"DeathEvent": 4, "death_log": 2, "death": 3,
-                          "SURVIVAL": 1, "Surviving": 2, "survival": 1},
-    "export_checkpoint.jl": {"DeathEvent": 2, "death_log": 1, "death": 9},
-    "biofilms_3d.R": {"death": 1},
+MODEL_FILE_CODE_LINES = {
+    'biofilms_potts.jl': [
+        'the quantity the model computes is a DIRECTIONAL PREFERENCE, not survival and',
+        'lifetime_dose_Gy::Float64   # accrued while alive; finalized at division/death',
+        'struct DeathEvent',
+        'death_log::Vector{DeathEvent}',
+        'DivisionEvent[], DeathEvent[], ArchivedCell[],',
+        'push!(state.death_log,',
+        'DeathEvent(state.current_mcs, state.physical_time_s, id,',
+        '@printf("  Surviving cells: %d\\n", length(state.cells))',
+        '@printf("  Surviving cells: %d\\n", length(state.cells))',
+    ],
+    'export_checkpoint.jl': [
+        'de = state.death_log',
+        'f["events/death/$name"] = name in ("physical_time_s", "lifetime_dose_Gy") ?',
+        'de = [SR.DeathEvent(',
+        'Int(read(f["events/death/mcs"])[i]),',
+        'read(f["events/death/physical_time_s"])[i],',
+        'Int(read(f["events/death/cell_id"])[i]),',
+        'Int(read(f["events/death/species"])[i]),',
+        'Int(read(f["events/death/lineage_id"])[i]),',
+        'Int(read(f["events/death/generation"])[i]),',
+        'read(f["events/death/lifetime_dose_Gy"])[i])',
+        'for i in eachindex(read(f["events/death/mcs"]))]',
+        'convert(Vector{SR.DeathEvent}, de),',
+    ],
+    'biofilms_3d.R': [
+    ],
 }
 
 
-def occurrences_are_the_pinned_ones(root: Path, rel: str) -> bool:
+def exempt_code_lines(root: Path, rel: str) -> list:
+    """The stripped lines of root/rel that are not comments and hold an identifier
+    REMOVAL_ALLOWED exempts there, in file order."""
     import re
-    words = re.findall(r"[A-Za-z_][A-Za-z0-9_]*!?", (root / rel).read_text(encoding="utf-8"))
-    pinned = MODEL_FILE_OCCURRENCES[rel]
-    return {w: words.count(w) for w in pinned} == pinned
+    token = re.compile(r"[A-Za-z_][A-Za-z0-9_]*!?")
+    allowed = REMOVAL_ALLOWED[rel][0]
+    return [line.strip() for line in (root / rel).read_text(encoding="utf-8").split("\n")
+            if not line.strip().startswith("#") and allowed & set(token.findall(line))]
 
 
 # file -> the relation that must hold under `root` for its REMOVAL_ALLOWED entry to apply
 EXEMPTION_HOLDS = {
     "biofilms_potts.jl":
         lambda root: stepper_removal_sites(root) == STEPPER_REMOVES_ON_VOLUME_ALONE
-        and occurrences_are_the_pinned_ones(root, "biofilms_potts.jl"),
+        and exempt_code_lines(root, "biofilms_potts.jl") == MODEL_FILE_CODE_LINES["biofilms_potts.jl"],
     "export_checkpoint.jl":     # it serialises the log; it must remove nothing
         lambda root: "delete!(" not in (root / "export_checkpoint.jl").read_text(encoding="utf-8")
-        and occurrences_are_the_pinned_ones(root, "export_checkpoint.jl"),
-    "biofilms_3d.R": lambda root: occurrences_are_the_pinned_ones(root, "biofilms_3d.R"),
+        and exempt_code_lines(root, "export_checkpoint.jl") == MODEL_FILE_CODE_LINES["export_checkpoint.jl"],
+    "biofilms_3d.R":
+        lambda root: exempt_code_lines(root, "biofilms_3d.R") == MODEL_FILE_CODE_LINES["biofilms_3d.R"],
 }
 
 
@@ -471,8 +500,7 @@ def removal_tokens(root: Path = REPO) -> dict:
 # The name the PRRT spec, this repository's ledgers and the port all use for the
 # capability. A port that follows spec/pr_checklist.md declares it, in any language.
 CAPABILITY = "response.growth_survival"
-# SCOPE: a listed file that starts to declare SUPPORT is not seen here. The status in
-# data/parameter_provenance.csv is pinned by coupling/tests/test_feedback_gate.py.
+# These files may name it, and why. WHICH LINES may name it is CAPABILITY_LINES below.
 CAPABILITY_NAMED_AS_UNSUPPORTED = {
     "README.md": "states it is unsupported_by_current_model and unfittable in principle",
     "data/claims_ledger.csv": "rows and comments recording the absence",
@@ -485,11 +513,56 @@ CAPABILITY_NAMED_AS_UNSUPPORTED = {
 }
 
 
+# A file exempt by its path stays exempt when its sentence flips to "supported" (Codex on
+# pull request #47, at ce141b2). So every line that names the capability today is pinned by
+# the sha256 of its stripped text. A new line, or an edited one, is reported. The hint
+# beside each digest is for the reader; only the digest is compared.
+CAPABILITY_LINES = {
+    'README.md': {
+        'd532e460a85283c8f1f1f6bbec45cb8ce273310b8fb6d2ac774de93cc8236dd5',   # `response.growth_survival` is `unsupported_by_current_mode
+        'e9f8ed58ad95fb9c6bba3fb0f07596140895586157aa048dbd86caf7a526fcf9',   # | Growth, division, survival, or extinction | **`response.
+        '89038d1100abe10df00a57e419ca5b40ad7d276c45c6ca1c7e751f07bd993e11',   # | Parcel persistence | 42 / 42 seeded **biomass parcels**,
+    },
+    'data/claims_ledger.csv': {
+        'a20f598b29e16a246a648ccdc8ad9bff380c84b8d6dba5e57bd09166174fe0c4',   # #    Both are STRUCTURALLY ABSENT, like response.growth_su
+        'bdd5212b0150cc38d00756d32f9feaf0a1c35187d9426ee1c12102d8deebac81',   # RM-KR-12,README,Key Results row 7,no extinctions,model_out
+        'b9152435103a2a45c1eb62c48e5812279333f8e1cd9f2c2919955acbbd9bce45',   # NEWS-PHEN-02,repository,docs/calibration/integration_contr
+        '29768a22cda409585e0a19c8243e42d5b2f18252079f807c3d011a093faa0f1f',   # GUARD-SCOPE-02,repository,calibration/tests/test_sop_index
+    },
+    'data/parameter_provenance.csv': {
+        '847be5f2ebe76d7c286d07f3b6b01573e6d9e450053a48c2fc48def29f0fb8a5',   # D_engineered_composite,none,response.hamiltonian,RADIOTROP
+        'de1072e11fdfd4a5bf7b18c009bd0717a27579f01baded0fd503e8a42c32b21e',   # D_engineered_composite,none,response.growth_survival,Dose 
+    },
+    'data/uncertainty/feedback_parameter_distributions.csv': {
+        '74ed6997de4db71e825187e511b21da7a776f222c8321c02b3d58484e955e1cd',   # growth_survival_response,response.growth_survival,dose to 
+    },
+    'docs/calibration/integration_contract.md': {
+        '292820152278b7c843aefe40d9cdb1a09093301929232016c2438b605f0720e0',   # - **`response.growth_survival` is currently unfittable in 
+        'e9dad65e5ac59c013f035612880eec1d4e4bcb8ae383a268fc1d165b5256a6e0',   # absent**, for the same reason `response.growth_survival` i
+    },
+    'docs/calibration/time_observable_contract.md': {
+        '5af4b5d0d71e1ad2bc64dc170876fd39aae964ca7b276a3e1012d950024d8b64',   # The same status now applies to `response.growth_survival` 
+    },
+    'docs/online_coupling_design.md': {
+        'dac60bf35e7bcab4e37866922463c9791582e87adb4c5a753f13ed0610596a3e',   # | 6 · Biological response transforms | **NOT NEEDED** | **
+    },
+    "calibration/tests/test_sop_index.py": WHOLE_FILE,   # declares the name and the plants
+}
+
+
 def capability_claims(root: Path = REPO) -> list:
-    """Every listed file that names the capability and is not on the list above.
+    """"file:line" for every line that names the capability and is not pinned above.
     No suffix is skipped: the port's own declaration is a Markdown file."""
-    return sorted(rel for rel, text in listed_text(root).items()
-                  if CAPABILITY in text and rel not in CAPABILITY_NAMED_AS_UNSUPPORTED)
+    import hashlib
+    claims = []
+    for rel, text in listed_text(root).items():
+        pinned = CAPABILITY_LINES.get(rel, set())
+        if CAPABILITY not in text or pinned is WHOLE_FILE:
+            continue
+        claims += [f"{rel}:{n}" for n, line in enumerate(text.split("\n"), 1)
+                   if CAPABILITY in line
+                   and hashlib.sha256(line.strip().encode("utf-8")).hexdigest() not in pinned]
+    return claims
 
 
 def landed_terms(root: Path = REPO, *, terms=None) -> list:
@@ -744,7 +817,7 @@ SEEN_BY = {     # plant id -> (removal_tokens, capability_claims), exactly
     "a call site in the stepper, with no definition":
         ({"biofilms_potts.jl": ["remove_cell!"]}, []),
     "a rate constant in the stepper": ({"biofilms_potts.jl": ["k_death"]}, []),
-    "the port's declaration of the capability": ({}, ["odin/CONFORMANCE.md"]),
+    "the port's declaration of the capability": ({}, ["odin/CONFORMANCE.md:1"]),
     "a Julia definition in the stepper": ({"biofilms_potts.jl": ["remove_cell!"]}, []),
     "natural survival names and a generic delete":
         ({"port/response.zig": ["survival_probability"]}, []),
@@ -787,8 +860,6 @@ REPLACEMENT_PLANTS = [
 ]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="exemptions are keyed on a file, a word or a count; see the next commit")
 @pytest.mark.parametrize("rel, victim, rewrite", REPLACEMENT_PLANTS)
 def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victim, rewrite):
     import re
@@ -807,6 +878,13 @@ def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victi
         raise RuntimeError(f"the rewrite changed nothing in {rel}:{hits[0]}")
     _replace_once(root, rel, old + "\n", new + "\n")
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+    # ...and through the reader it was written for, exactly.
+    if rel == "biofilms_potts.jl":      # the exemption is void: every exempt identifier shows
+        assert removal_tokens(root) == {rel: sorted(REMOVAL_ALLOWED[rel][0])}
+        assert capability_claims(root) == []
+    else:
+        assert removal_tokens(root) == {}
+        assert capability_claims(root) == [f"{rel}:{hits[0]}"]
 
 
 @pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
@@ -819,12 +897,12 @@ def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, 
     assert (removal_tokens(root), capability_claims(root)) == SEEN_BY[plant_id]
 
 
-def test_the_pinned_identifiers_are_the_allowed_ones():
-    """Two tables name the model files' identifiers. If they differ, an identifier is
-    either exempt without a count or counted without being exempt."""
-    for rel, pinned in MODEL_FILE_OCCURRENCES.items():
-        assert set(pinned) == REMOVAL_ALLOWED[rel][0], rel
-        assert rel in EXEMPTION_HOLDS, rel
+def test_every_pin_has_its_tables():
+    """A model file with pinned lines and no relation in EXEMPTION_HOLDS is pinned by
+    nothing, and a capability file with a reason and no pinned lines is exempt by path."""
+    for rel in MODEL_FILE_CODE_LINES:
+        assert rel in EXEMPTION_HOLDS and rel in REMOVAL_ALLOWED, rel
+    assert set(CAPABILITY_LINES) == set(CAPABILITY_NAMED_AS_UNSUPPORTED)
 
 
 def test_no_allowlist_entry_has_outlived_its_reason():
@@ -836,8 +914,13 @@ def test_no_allowlist_entry_has_outlived_its_reason():
     stale = [(rel, sorted(allowed - set(token.findall(texts.get(rel, "")))))
              for rel, (allowed, _why) in REMOVAL_ALLOWED.items() if allowed is not WHOLE_FILE]
     assert not [(rel, gone) for rel, gone in stale if gone]
-    assert not [rel for rel in CAPABILITY_NAMED_AS_UNSUPPORTED
-                if CAPABILITY not in texts.get(rel, "")]
+    import hashlib
+    for rel, pinned in CAPABILITY_LINES.items():
+        if pinned is WHOLE_FILE:
+            continue
+        now = {hashlib.sha256(line.strip().encode("utf-8")).hexdigest()
+               for line in texts.get(rel, "").split("\n") if CAPABILITY in line}
+        assert pinned == now, f"{rel}: pinned lines that are gone {sorted(pinned - now)}"
 
 
 # WHAT NEITHER READER SEES, ASSERTED SO THE LIMIT IS A FACT IN THE SUITE AND NOT A HOPE.
