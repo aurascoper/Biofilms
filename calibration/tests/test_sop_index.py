@@ -857,6 +857,14 @@ REPLACEMENT_PLANTS = [
     pytest.param("data/parameter_provenance.csv", r",response\.growth_survival,",
                  lambda line: line.replace("unsupported_by_current_model", "supported_by_current_model"),
                  id="the provenance row's status flips"),
+    # Raised by Codex on pull request #47 against b68e800, and reproduced first. This file
+    # is production code, exempt by identifier alone. The next commit removes the mark.
+    pytest.param("coupling/biofilm_openmc/feedback_gate.py", r"growth_survival",
+                 lambda line: "def growth_survival(dose):\n    return math.exp(-0.2 * dose)",
+                 marks=pytest.mark.xfail(
+                     strict=True, raises=AssertionError,
+                     reason="line pins cover three model files; this one is exempt by word"),
+                 id="the gate's unsupported-pathway line becomes an implementation"),
 ]
 
 
@@ -881,6 +889,9 @@ def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victi
     # ...and through the reader it was written for, exactly.
     if rel == "biofilms_potts.jl":      # the exemption is void: every exempt identifier shows
         assert removal_tokens(root) == {rel: sorted(REMOVAL_ALLOWED[rel][0])}
+        assert capability_claims(root) == []
+    elif rel in REMOVAL_ALLOWED:        # likewise, with what is left of them in that file
+        assert removal_tokens(root) == {rel: ["growth_survival"]}
         assert capability_claims(root) == []
     else:
         assert removal_tokens(root) == {}
