@@ -240,8 +240,9 @@ ABSENT_TERMS = {
                                             r'particle\s*=\s*"photon"', root)],
     ),
     "dose-dependent survival": (
-        "section 2.6 declares neither growth nor survival, and no removal process "
-        "exists in the stepper",
+        "the abstract declares neither growth nor a dose-dependent survival process, "
+        "and the stepper removes a cell only when its volume reaches zero: it records "
+        "the lifetime dose in that event, and the dose decides nothing there",
         [lambda root=REPO: _declaration_still_stands(
             "has neither biomass growth nor a dose-dependent survival process", root),
          # CODE SIDE: no death, kill or removal function.
@@ -261,9 +262,132 @@ ABSENT_TERMS = {
          # only to execution.
          lambda root=REPO: _absent_from("biofilms_potts.jl",
                                         r"function\s+\w*(death|kill|remove_cell|die)\w*!?\s*\(",
-                                        root)],
+                                        root),
+         # THE TWO ABOVE READ ONE MANUSCRIPT AND ONE JULIA FILE. A port in another
+         # language changes neither, so the two below read every listed file.
+         lambda root=REPO: not removal_tokens(root),
+         lambda root=REPO: not capability_claims(root)],
     ),
 }
+
+
+# ---------------------------------------------------------------------------
+# TWO READERS WITH NO LANGUAGE AND NO DIRECTORY BUILT IN
+# ---------------------------------------------------------------------------
+# The survival predicate opened biofilms_potts.jl and wanted the word `function`.
+# An Odin port writes `cell_kill :: proc(` under odin/ and was invisible to it twice
+# over. A list of source suffixes would repeat that defect for the next language,
+# so the file set is whatever git lists, and a suffix the author never met is read.
+
+def listed_text(root: Path = REPO) -> dict:
+    """relative path -> text, for every file git lists under `root`: tracked, or
+    untracked and not ignored. An ignored file cannot arrive in a pull request."""
+    import subprocess
+    out = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
+         "--exclude-standard"], check=True, capture_output=True).stdout.decode("utf-8")
+    texts = {}
+    for rel in filter(None, out.split("\0")):
+        path = root / rel
+        if not path.is_file():
+            continue                    # still in the index, deleted from the work tree
+        raw = path.read_bytes()
+        if b"\0" not in raw[:8192]:     # keyed on the content being binary, not on a suffix
+            texts[rel] = raw.decode("utf-8", errors="replace")
+    if not texts:
+        raise RuntimeError(f"git listed no text file under {root}")   # never default to pass
+    return texts
+
+
+# DEPARTURE FROM AGENTS.md, DECIDED BY HUNTER ON 2026-09-20. "A suffix cannot justify
+# skipping" -- and these six are skipped by removal_tokens(). They hold prose and data
+# ABOUT the model, where death is a topic: measured on fe6c59e, reading them costs 27
+# allowlisted files for `death` alone. capability_claims() reads them, suffix or not.
+PROSE_AND_DATA = {".md", ".tex", ".txt", ".csv", ".tsv", ".json"}
+
+# death|kill|remove_cell|die are this entry's first stems. The others are the words
+# PRRT-spatial-CPM's spec/response_growth_survival.md uses for the process: SF, its
+# survival fraction; dying; mitotic; necrotic; cull; resorb and resorption. Matched
+# inside an identifier at a snake_case or camelCase boundary, so `skill`, `died` and
+# `overkill` do not match and `kill_cell!`, `cellDeath` and `CELL_DYING` do.
+REMOVAL_VOCAB = (
+    r"(?<![A-Za-z])(?i:deaths?|kill|cull|dying|remove_?cell|mitotic|necro|resor[bp])"
+    r"|(?<![A-Za-z])(?i:die)(?![A-Za-z])"
+    r"|(?<=[a-z])(?:Death|Kill|Cull|Dying|RemoveCell|Die(?![a-z]))"
+    r"|(?<![A-Za-z0-9])(?i:sf)(?![A-Za-z0-9])")
+
+WHOLE_FILE = None
+# file -> (the identifiers allowed in it, why). Keyed on the identifier, not the file:
+# a `kill_cell!` added to the stepper fires although the stepper is listed here.
+REMOVAL_ALLOWED = {
+    "biofilms_potts.jl": ({"DeathEvent", "death", "death_log"},
+                          "bookkeeping for removal at volume <= 0, which no dose term enters"),
+    "export_checkpoint.jl": ({"DeathEvent", "death", "death_log"},
+                             "serialises that same bookkeeping"),
+    "biofilms_3d.R": ({"death"}, "a comment stating the model has no death"),
+    "coupling/tests/test_feedback_gate.py": ({"death"},
+                                             "a docstring stating the CPM has no death"),
+    "post-biofilms-standalone.html": ({"death", "killed"},
+                                      "blog prose: 'the model has no death', 'seeds killed it'"),
+    "docs/visualization/macos-arm64-2026-09-11/component_overlap.py":
+        ({"deaths"}, "connected components that disappear between frames, not cells"),
+    "docs/visualization/macos-arm64-2026-09-11/test_component_overlap.py":
+        ({"deaths"}, "the tests of that component count"),
+    "coupling/scripts/synthetic_e2e.py": ({"sf"}, "a local: the far-field standard deviation"),
+    "diagnostics/payload_census/bench_reduction.py": ({"sf"}, "a local: samples, full payload"),
+    "diagnostics/inert_signal/guard.jl": ({"SF"}, "a comment's example alias for signal_field"),
+    "geolocator/static/app/tokens.js": ({"SF"}, "the font name SF Mono"),
+    "geolocator/static/index.html": ({"SF"}, "the font name SF Mono"),
+    "geolocator/static/app/hud/detectionOverlay.js": ({"cull", "culled", "killed"},
+                                                      "frustum culling of map markers"),
+    "Primary Fuel Source Geolocator.twb": ({"cull"}, "the Tableau attribute mark-labels-cull"),
+    "calibration/tests/test_sop_index.py": (WHOLE_FILE, "declares the vocabulary and the plants"),
+}
+
+
+def removal_tokens(root: Path = REPO) -> dict:
+    """relative path -> the removal-vocabulary identifiers in it that REMOVAL_ALLOWED
+    does not name. Empty while no survival or removal process has arrived."""
+    import re
+    token = re.compile(r"[A-Za-z_][A-Za-z0-9_]*!?")
+    vocab = re.compile(REMOVAL_VOCAB)
+    # An unbroken run of 60 base64-alphabet characters is an embedded image or a digest.
+    # No identifier here has one: the longest word between underscores is far shorter.
+    blob = re.compile(r"[A-Za-z0-9+/=]{60,}")
+    found = {}
+    for rel, text in listed_text(root).items():
+        allowed = REMOVAL_ALLOWED.get(rel, (set(), ""))[0]
+        if allowed is WHOLE_FILE or Path(rel).suffix.lower() in PROSE_AND_DATA:
+            continue
+        hits = sorted({t for t in token.findall(blob.sub(" ", text)) if vocab.search(t)}
+                      - allowed)
+        if hits:
+            found[rel] = hits
+    return found
+
+
+# The name the PRRT spec, this repository's ledgers and the port all use for the
+# capability. A port that follows spec/pr_checklist.md declares it, in any language.
+CAPABILITY = "response.growth_survival"
+# SCOPE: a listed file that starts to declare SUPPORT is not seen here. The status in
+# data/parameter_provenance.csv is pinned by coupling/tests/test_feedback_gate.py.
+CAPABILITY_NAMED_AS_UNSUPPORTED = {
+    "README.md": "states it is unsupported_by_current_model and unfittable in principle",
+    "data/claims_ledger.csv": "rows and comments recording the absence",
+    "data/parameter_provenance.csv": "the row whose status is unsupported_by_current_model",
+    "data/uncertainty/feedback_parameter_distributions.csv": "status unsupported, excluded",
+    "docs/calibration/integration_contract.md": "states it is unfittable in principle",
+    "docs/calibration/time_observable_contract.md": "applies that same status",
+    "docs/online_coupling_design.md": "lists the response transforms as BLOCKED",
+    "calibration/tests/test_sop_index.py": "declares the name and the plants",
+}
+
+
+def capability_claims(root: Path = REPO) -> list:
+    """Every listed file that names the capability and is not on the list above.
+    No suffix is skipped: the port's own declaration is a Markdown file."""
+    return sorted(rel for rel, text in listed_text(root).items()
+                  if CAPABILITY in text and rel not in CAPABILITY_NAMED_AS_UNSUPPORTED)
 
 
 def landed_terms(root: Path = REPO, *, terms=None) -> list:
@@ -281,7 +405,8 @@ def test_every_registered_absence_still_holds():
     landed = landed_terms()
     assert not landed, (
         f"these registered absences no longer hold, so the rows blocked on them "
-        f"should promote: {landed}")
+        f"should promote: {landed}; removal identifiers {removal_tokens()}; "
+        f"files naming {CAPABILITY}: {capability_claims()}")
 
 
 def test_the_absence_predicates_can_fail():
@@ -456,28 +581,23 @@ def test_the_unplanted_scratch_root_reports_no_landed_term(tmp_path):
     assert landed_terms(_scratch_repo(tmp_path), terms={SURVIVAL}) == []
 
 
-_BLIND = pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="the code-side predicate opens biofilms_potts.jl alone and needs the "
-           "keyword `function`; see the next commit")
-
 SURVIVAL_PLANTS = [
-    pytest.param("odin/cpm/response.odin", ODIN_RESPONSE, marks=_BLIND,
+    pytest.param("odin/cpm/response.odin", ODIN_RESPONSE,
                  id="the port's survival law and sweep"),
-    pytest.param("odin/cpm/sim.odin", ODIN_SIM, marks=_BLIND,
+    pytest.param("odin/cpm/sim.odin", ODIN_SIM,
                  id="the port's removal procedures"),
     # A language and a directory nobody had in mind when any scan here was written.
     pytest.param("port/kernel.zig",
                  "fn killCell(lattice: *Lattice, i: usize) void {}\n"
                  "pub fn step(lattice: *Lattice) void { killCell(lattice, 0); }\n",
-                 marks=_BLIND, id="a definition and a call in an unlisted language"),
-    pytest.param("biofilms_potts.jl", "\nremove_cell!(lattice, i)\n", marks=_BLIND,
+                 id="a definition and a call in an unlisted language"),
+    pytest.param("biofilms_potts.jl", "\nremove_cell!(lattice, i)\n",
                  id="a call site in the stepper, with no definition"),
-    pytest.param("biofilms_potts.jl", "\nk_death = 0.1\n", marks=_BLIND,
+    pytest.param("biofilms_potts.jl", "\nk_death = 0.1\n",
                  id="a rate constant in the stepper"),
-    pytest.param("odin/CONFORMANCE.md", ODIN_CONFORMANCE, marks=_BLIND,
+    pytest.param("odin/CONFORMANCE.md", ODIN_CONFORMANCE,
                  id="the port's declaration of the capability"),
-    # Passes today. It proves the scratch root, the plant and the reader are wired.
+    # The one form the first predicate could already see.
     pytest.param("biofilms_potts.jl", "\nfunction remove_cell!(lattice, i)\nend\n",
                  id="a Julia definition in the stepper"),
 ]
@@ -488,3 +608,60 @@ def test_a_planted_survival_process_lands_the_term(tmp_path, rel, text):
     root = _scratch_repo(tmp_path)
     _plant(root, rel, text)
     assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+
+
+SEEN_BY = {     # plant id -> (removal_tokens, capability_claims), exactly
+    "the port's survival law and sweep":
+        ({"odin/cpm/response.odin": ["CELL_DYING", "deaths", "sf", "sf_lq", "sf_sum"]}, []),
+    "the port's removal procedures":
+        ({"odin/cpm/sim.odin": ["cell_kill", "cull_dying", "resorb_sweep"]}, []),
+    "a definition and a call in an unlisted language": ({"port/kernel.zig": ["killCell"]}, []),
+    "a call site in the stepper, with no definition":
+        ({"biofilms_potts.jl": ["remove_cell!"]}, []),
+    "a rate constant in the stepper": ({"biofilms_potts.jl": ["k_death"]}, []),
+    "the port's declaration of the capability": ({}, ["odin/CONFORMANCE.md"]),
+    "a Julia definition in the stepper": ({"biofilms_potts.jl": ["remove_cell!"]}, []),
+}
+
+
+@pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
+def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, rel, text):
+    """landed_terms() is true if ANY predicate fires. This consumes the finest thing
+    each reader returns, so a plant cannot land its term through the wrong one."""
+    root = _scratch_repo(tmp_path)
+    _plant(root, rel, text)
+    plant_id = request.node.callspec.id
+    assert (removal_tokens(root), capability_claims(root)) == SEEN_BY[plant_id]
+
+
+def test_no_allowlist_entry_has_outlived_its_reason():
+    """An exemption is keyed on what earns it. When the identifier leaves the file, or
+    the file stops naming the capability, the entry exempts nothing and must go."""
+    import re
+    texts = listed_text()
+    token = re.compile(r"[A-Za-z_][A-Za-z0-9_]*!?")
+    stale = [(rel, sorted(allowed - set(token.findall(texts.get(rel, "")))))
+             for rel, (allowed, _why) in REMOVAL_ALLOWED.items() if allowed is not WHOLE_FILE]
+    assert not [(rel, gone) for rel, gone in stale if gone]
+    assert not [rel for rel in CAPABILITY_NAMED_AS_UNSUPPORTED
+                if CAPABILITY not in texts.get(rel, "")]
+
+
+# WHAT NEITHER READER SEES, ASSERTED SO THE LIMIT IS A FACT IN THE SUITE AND NOT A HOPE.
+# A vocabulary finds names. A survival process with opaque names and no declaration is
+# found by review and by nothing here. If a better reader sees one of these, this test
+# fails, and the entry moves to SURVIVAL_PLANTS.
+KNOWN_UNSEEN = [
+    ("odin/cpm/opaque.odin", "dN := g*N - k(d)*N\n"),
+    # The port's own law and sweep with every name replaced.
+    ("odin/cpm/opaque.odin", "p := jexp_f64(-(a*D + b*G*D*D))\nif u > p { st[id] = 3 }\n"),
+    # Inside an unbroken 60-character run, which removal_tokens() drops as a blob.
+    ("viewer/blob.js", "const a = '" + "A" * 30 + "killCell" + "A" * 30 + "';\n"),
+]
+
+
+@pytest.mark.parametrize("rel, text", KNOWN_UNSEEN)
+def test_what_the_survival_readers_cannot_see_is_stated(tmp_path, rel, text):
+    root = _scratch_repo(tmp_path)
+    _plant(root, rel, text)
+    assert landed_terms(root, terms={SURVIVAL}) == []
