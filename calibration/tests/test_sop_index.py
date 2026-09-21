@@ -769,6 +769,46 @@ def test_a_dose_condition_on_the_steppers_own_cleanup_lands_the_term(tmp_path):
     assert capability_claims(root) == []
 
 
+# REPLACEMENTS INSIDE A FILE THAT IS ALREADY EXEMPT. Raised by Codex on pull request #47
+# against ce141b2, and each reproduced before this was written: an exemption keyed on a file,
+# a word or a count survives an edit that swaps what earned it for the thing it hides.
+# (file, a pattern that must select exactly ONE line of it, what that line becomes)
+REPLACEMENT_PLANTS = [
+    pytest.param("biofilms_potts.jl", r"(?<![A-Za-z_])survival(?![A-Za-z_])",
+                 lambda line: "function survival(dose)\n    return exp(-0.2 * dose)\nend",
+                 id="the prose line saying survival becomes a survival function"),
+    # Anchored: the same phrase is also inside a table row further down the README.
+    pytest.param("README.md", r"^`response\.growth_survival` is `unsupported_by_current_model`",
+                 lambda line: line.replace("`unsupported_by_current_model`", "`supported`"),
+                 id="the README declares the capability supported"),
+    pytest.param("data/parameter_provenance.csv", r",response\.growth_survival,",
+                 lambda line: line.replace("unsupported_by_current_model", "supported_by_current_model"),
+                 id="the provenance row's status flips"),
+]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="exemptions are keyed on a file, a word or a count; see the next commit")
+@pytest.mark.parametrize("rel, victim, rewrite", REPLACEMENT_PLANTS)
+def test_a_replacement_inside_an_exempt_file_lands_the_term(tmp_path, rel, victim, rewrite):
+    import re
+    import shutil
+    root = _scratch_repo(tmp_path)
+    if not (root / rel).exists():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / rel, root / rel)
+    # The victim comes from the file as it is now, never from memory of it.
+    lines = (root / rel).read_text(encoding="utf-8").split("\n")
+    hits = [n for n, line in enumerate(lines, 1) if re.search(victim, line)]
+    if len(hits) != 1:
+        raise RuntimeError(f"{victim!r} selects {len(hits)} lines of {rel}, not one")
+    old, new = lines[hits[0] - 1], rewrite(lines[hits[0] - 1])
+    if new == old:
+        raise RuntimeError(f"the rewrite changed nothing in {rel}:{hits[0]}")
+    _replace_once(root, rel, old + "\n", new + "\n")
+    assert landed_terms(root, terms={SURVIVAL}) == [SURVIVAL]
+
+
 @pytest.mark.parametrize("rel, text", SURVIVAL_PLANTS)
 def test_each_plant_is_seen_by_the_reader_it_was_written_for(tmp_path, request, rel, text):
     """landed_terms() is true if ANY predicate fires. This consumes the finest thing
