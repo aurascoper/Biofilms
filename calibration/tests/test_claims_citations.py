@@ -22,7 +22,7 @@ pull request #49: a range whose first line was cited, where the row is about a l
 That a citation names the right place is checked by reading the row beside the cited text,
 and by nothing here.
 
-SCOPE. This reads data/claims_ledger.csv alone. Line references into the superseded
+SCOPE. This reads data/claims_ledger.csv alone, its rows and its comment lines. Line references into the superseded
 preprint ("lines 711-721") name no file and are out of scope, as the ledger header says.
 """
 import csv
@@ -51,7 +51,7 @@ BARE_ALLOWED = {("HANDOUT-02", "wan-deck.tex:153-155")}
 
 # A tripwire, not a target. A new citation changes it; update it in the same commit. It is
 # here so that a pattern which silently stops matching cannot pass on zero citations.
-N_CITATIONS = 159
+N_CITATIONS = 160
 
 
 def _flat(text: str) -> str:
@@ -61,6 +61,16 @@ def _flat(text: str) -> str:
 def _rows(root: Path) -> list:
     with open(root / LEDGER, encoding="utf-8") as fh:
         return list(csv.DictReader(l for l in fh if not l.startswith("#")))
+
+
+def _cells(root: Path) -> list:
+    """(where, column, text) for every cell of every row AND for every comment line. The
+    header holds citations too, and a reader that drops "#" lines never sees them."""
+    with open(root / LEDGER, encoding="utf-8") as fh:
+        comments = [(f"comment line {n}", "comment", line) for n, line in enumerate(fh, 1)
+                    if line.startswith("#")]
+    return comments + [(r["claim_id"], col, cell or "") for r in _rows(root)
+                       for col, cell in r.items() if col]
 
 
 def _text(root: Path, rel: str, commit):
@@ -75,9 +85,8 @@ def _text(root: Path, rel: str, commit):
 
 def citations(root: Path = REPO) -> list:
     """(claim_id, column, file, commit or None, snippet) for every citation in the ledger."""
-    return [(r["claim_id"], col, m.group(1), m.group(2), m.group(3))
-            for r in _rows(root) for col, cell in r.items() if col
-            for m in CITATION.finditer(cell or "")]
+    return [(where, col, m.group(1), m.group(2), m.group(3))
+            for where, col, cell in _cells(root) for m in CITATION.finditer(cell)]
 
 
 def resolve(root: Path, rel: str, commit, snippet: str) -> str:
@@ -88,16 +97,16 @@ def resolve(root: Path, rel: str, commit, snippet: str) -> str:
 
 
 def citation_problems(root: Path = REPO) -> list:
-    """One line per citation that does not resolve, and per bare `file:line` citation."""
+    """One line per citation that does not resolve, per bare `file:line` citation and per
+    detached line number, in the rows and in the comment lines."""
     out = [f"{cid} [{col}] {rel}@`{snippet}`: {verdict}"
            for cid, col, rel, commit, snippet in citations(root)
            for verdict in [resolve(root, rel, commit, snippet)] if verdict != "resolves"]
-    bare = {(r["claim_id"], m.group(0)) for r in _rows(root) for col, cell in r.items() if col
-            for m in BARE.finditer(cell or "")}
+    bare = {(where, m.group(0)) for where, _col, cell in _cells(root) for m in BARE.finditer(cell)}
     out += [f"{cid}: bare citation {lit}; write it as file@`snippet`" for cid, lit in sorted(bare - BARE_ALLOWED)]
-    out += [f"{r['claim_id']}: detached line number {m.group(0)!r}; give it a file and a snippet"
-            for r in _rows(root) for col, cell in r.items() if col
-            for m in DETACHED.finditer(BARE.sub(" ", re.sub(r"`[^`]*`", "`", cell or "")))]
+    out += [f"{where}: detached line number {m.group(0)!r}; give it a file and a snippet"
+            for where, _col, cell in _cells(root)
+            for m in DETACHED.finditer(BARE.sub(" ", re.sub(r"`[^`]*`", "`", cell)))]
     out += [f"{cid}: BARE_ALLOWED names {lit}, and the row no longer has it" for cid, lit in sorted(BARE_ALLOWED - bare)]
     return out
 
@@ -159,17 +168,11 @@ def test_the_checker_gives_each_verdict(tmp_path, monkeypatch, label, cell, file
 # THE LEDGER'S COMMENT LINES. Raised by Codex on pull request #49 against 641f278, and
 # reproduced first: header line 176 cited a file that is gone, as `file:157-182`, and the
 # gate read data rows alone. The first form below is that header line's own.
-_COMMENT_LINES = pytest.mark.xfail(strict=True, raises=AssertionError,
-                                   reason="the gate drops every comment line of the ledger "
-                                          "before it reads; see the next commit")
-
-
 @pytest.mark.parametrize("comment,want", [
     ("#   Counted directly at stepper.jl:2-6: two rows.", "bare citation stepper.jl:2-6"),
     ("#   The update is stepper.jl@`s.t += 9`.", "absent"),
     ("#   ...and the second update, at (:6).", "detached line number"),
 ])
-@_COMMENT_LINES
 def test_a_comment_line_of_the_ledger_is_read_too(tmp_path, monkeypatch, comment, want):
     monkeypatch.setitem(globals(), "BARE_ALLOWED", set())
     root = _scratch(tmp_path, 'X-01,"stepper.jl@`s.t += 1`",\n', {"stepper.jl": STEPPER})

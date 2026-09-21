@@ -173,7 +173,7 @@
 #
 # TWO COUNTS CORRECTED AGAINST THE BRIEFING THAT COMMISSIONED THIS FILE.
 #   Preprint Table 2 has 26 DATA ROWS, not 27. Counted directly at
-#   preprint/modeling_radiotrophic_fitness.md:157-182: D_s x6, mu_s x5, beta x6,
+#   preprint/modeling_radiotrophic_fitness.md@5980dc5@`| Parameter | Symbol | Species | Value Range | Units | Biological Basis | Ref |`: D_s x6, mu_s x5, beta x6,
 #   alpha_M x3, K_s x4, omega_s x1, sigma_s x1 = 26. Rows PP-T2-01..26 map 1:1 in file
 #   order; PP-T2-27 is the header, PP-T2-28 the precision claim, PP-T2-29 the
 #   untabulated melanin coefficient. Anyone reconciling .md against .tex on a count of 27
