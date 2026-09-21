@@ -241,9 +241,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install minimal LaTeX toolchain
+        # apt-get update is not the gate, the install is: see scripts/apt_install.sh.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/apt_install.sh -y --no-install-recommends \
             latexmk lmodern texlive-fonts-recommended texlive-latex-extra texlive-science
       - name: Compile the manuscript from source
         working-directory: preprint
