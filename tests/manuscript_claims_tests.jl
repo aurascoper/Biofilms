@@ -130,18 +130,21 @@ RETRACTED_WORD_ALLOWED = Dict(
 )
 # every other term: only the vocabulary declares it
 retracted_allowed(term) = get(RETRACTED_WORD_ALLOWED, term, ["calibration/tests/test_claims_ledger.py"])
-# A FILE THAT MAY CARRY A TERM AT THESE OCCURRENCES AND NO OTHER. The post explains, six times,
+# A FILE THAT MAY CARRY A TERM IN THESE PARAGRAPHS AND NO OTHER. The post explains, six times,
 # why the model is not radiotrophic; a file-wide allowance would also pass a seventh use that
-# asserts it. Each pin is 40 characters either side of a match, in the text as _figure_norm
-# gives it. Any edit to an occurrence, or a new one, makes the file a hit until this is updated.
+# asserts it. A use is safe because of what its paragraph says, and the sentence that says it
+# can sit far from the word: a 40-character window missed one 138 characters away (Codex on
+# pull request #52, at 823f701). So each use is pinned by the sha256 of its enclosing <p>
+# element, in the text as _figure_norm gives it. A use outside a <p> element cannot be pinned,
+# and is a hit. Any edit to such a paragraph makes the file a hit until this is updated.
 RETRACTED_WORD_PINNED = Dict(
     "post-biofilms-standalone.html" => Dict("radiotroph" => [
-        "ode p p that set used to be called code radiotrophic code the rename is one letter and it ",
-        "mean return angles under ninety degrees radiotrophy is the much larger claim that ionizing",
-        " of material shuffling p p which is why radiotrophy cannot be in this model and why one le",
-        "er is load bearing rather than pedantic radiotrophy is a statement about growth rate there",
-        "ure claims come from code docs research radiotrophic compatibility audit md code which rea",
-        "ere i learned that dadachova 2007 earns radiotrophic on growth contrasts and is refused ra",
+        "8571966da9974f5b12c3594172d5412ec3175807f33fc0bdafe0ccad7b778055",   # the set used to be called ... it cannot implement the second
+        "8571966da9974f5b12c3594172d5412ec3175807f33fc0bdafe0ccad7b778055",   # the set used to be called ... it cannot implement the second
+        "1f37ae101d68cf8d92735cbc316a77ad49aafccb7eeffc1300285e7759937088",   # which is why ... cannot be in this model
+        "1f37ae101d68cf8d92735cbc316a77ad49aafccb7eeffc1300285e7759937088",   # which is why ... cannot be in this model
+        "9cc091bb8c9ffd9418158d8a8f95370c1b924b9d26c20501e86abd5201c247cb",   # literature claims come from the compatibility audit
+        "9cc091bb8c9ffd9418158d8a8f95370c1b924b9d26c20501e86abd5201c247cb",   # literature claims come from the compatibility audit
     ]),
 )
 const _FIGURE_SCAN_SKIPS = (".md", ".tex", ".txt", ".csv", ".tsv", ".json")
@@ -159,11 +162,24 @@ function _listed_text_files(root)
     isempty(files) && error("git listed no text file under $root")   # never default to pass
     files
 end
-# Normalised to lowercase letters and digits, one space between runs, so a pin is plain ASCII.
+using SHA
+# Normalised to lowercase letters and digits, one space between runs, before it is digested.
 _figure_norm(s) = strip(replace(lowercase(s), r"[^a-z0-9]+" => " "))
-function _occurrences(text, term)
-    norm, t = _figure_norm(text), _figure_norm(term)
-    [norm[max(1, first(r) - 40):min(lastindex(norm), last(r) + 40)] for r in findall(t, norm)]
+# One digest per use of the term: the enclosing <p> element's, or a marker no pin equals.
+function _occurrences(text, pattern)
+    opens = [first(r) for r in findall(r"<p[\s>]", text)]
+    closes = [last(r) for r in findall("</p>", text)]
+    out = String[]
+    for m in eachmatch(pattern, text)
+        i = m.offset
+        a, b = findlast(<(i), opens), findfirst(>(i), closes)
+        if a === nothing || b === nothing || any(c -> opens[a] < c < i, closes)
+            push!(out, "no enclosing paragraph")
+            continue
+        end
+        push!(out, bytes2hex(sha256(String(_figure_norm(text[opens[a]:closes[b]])))))
+    end
+    out
 end
 function _retracted_word_files(root, term)
     pattern = Regex(escape_string(term) |> x -> replace(x, r"[.*+?^\${}()|\[\]\\]" => s"\\\0"), "i")
@@ -172,7 +188,7 @@ function _retracted_word_files(root, term)
         text = read(joinpath(root, rel), String)
         occursin(pattern, text) || continue
         pins = get(get(RETRACTED_WORD_PINNED, rel, Dict()), term, nothing)
-        pins !== nothing && _occurrences(text, term) == pins && continue
+        pins !== nothing && _occurrences(text, pattern) == pins && continue
         push!(hits, rel)
     end
     return sort(hits)
@@ -214,7 +230,7 @@ let
     victim = "cannot implement the second"
     length(findall(victim, src)) == 1 || error("the victim occurs $(length(findall(victim, src))) times in the post")
     write(joinpath(fresh, post), replace(src, victim => "implements the second as well"))
-    @test_broken post in _retracted_word_files(fresh, terms[1])
+    @test post in _retracted_word_files(fresh, terms[1])
     # A pin whose file is gone is stale, and says so.
     listed = _listed_text_files(REPO)
     @test all(f -> f in listed, keys(RETRACTED_WORD_PINNED))
