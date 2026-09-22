@@ -636,7 +636,10 @@ def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
     "Text.\n\n```\nThe claim is at `stepper.jl:2`.\n",
     pytest.param("``` bad`info``\nThe claim is at `stepper.jl:2`.\n```\n",
                  id="a backtick in a backtick fence's info string"),
-], ids=["four spaces of backticks is not a fence", "a fence never closed is read", None])
+    pytest.param("Text.\n\n```\nThe claim is at `stepper.jl:2`.\n    ```\n", marks=pytest.mark.xfail(
+        strict=True, raises=AssertionError, reason="evidence: Codex P1 on #54 at 7a109a2; the next commit asks the parser"),
+                 id="a closer indented four spaces does not close"),
+], ids=["four spaces of backticks is not a fence", "a fence never closed is read", None, None])
 def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
     got = markdown_problems(root)
