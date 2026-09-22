@@ -592,8 +592,41 @@ def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
 @pytest.mark.parametrize("doc", [
     "> Example:\n>\n> ```\n> stepper.jl:2\n> ```\n",
     "````\n```\nstepper.jl:2\n```\n````\n",
-    "Text.\n\n```\nstepper.jl:2\n",
-], ids=["in a block quote", "a longer fence holding a shorter one", "never closed"])
+], ids=["in a block quote", "a longer fence holding a shorter one"])
 def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
     assert markdown_problems(root) == []
+
+
+
+# Codex on pull request #54, at ce93466: two P1 findings, both a split or a blank that read
+# LESS text than Markdown does, so a citation or an edit went unseen. The rule from here: where
+# the segmentation is unsure, it reads more text, never less. This control also plants the
+# forms of the same failure that Codex had not raised.
+EVIDENCE_CE93466 = pytest.mark.xfail(strict=True, raises=AssertionError,
+                                     reason="evidence: Codex P1 on #54 at ce93466; the next commit reads more, never less")
+
+
+@EVIDENCE_CE93466
+@pytest.mark.parametrize("doc", [
+    "Text.\n\n    ```\n\nThe claim is at `stepper.jl:2`.\n",
+    "Text.\n\n```\nThe claim is at `stepper.jl:2`.\n",
+], ids=["four spaces of backticks is not a fence", "a fence never closed is read"])
+def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    got = markdown_problems(root)
+    assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got
+
+
+@EVIDENCE_CE93466
+@pytest.mark.parametrize("middle", ["#not-a-heading", "| not a table row", "2. not a list item"],
+                         ids=["a hash without a space", "a pipe outside a table", "an ordered item other than 1"])
+def test_a_line_that_starts_no_block_does_not_split_its_paragraph(tmp_path, monkeypatch, middle):
+    """An edit to the paragraph's last line must change the digest of the citation in its first."""
+    para = f"{CLAIM}\n{middle}\nand a qualifier."
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": para + "\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(para))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(para.replace("a qualifier", "another qualifier") + "\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "context changed" in got[0], got
