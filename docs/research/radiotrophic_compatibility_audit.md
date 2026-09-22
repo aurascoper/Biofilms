@@ -300,8 +300,8 @@ biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@
 in inline comments with no citation, and `data/calibration/spatial/entity_semantics.csv` repeated
 the word for CN with `evidence_basis=declared`. `01b0f4d` removed both on 2026-08-15. This audit locates the primary
 source those comments trace to — Dadachova 2007 — and simultaneously locates three same-species or
-same-genus results pointing the other way. The comments should become cited-and-contested or be
-downgraded; that is a documentation finding, reported and not fixed.
+same-genus results pointing the other way. This audit recommended that the comments become cited-and-contested or be
+downgraded; `01b0f4d` removed them instead.
 
 Two further in-repo claims are refuted rather than merely unsourced:
 

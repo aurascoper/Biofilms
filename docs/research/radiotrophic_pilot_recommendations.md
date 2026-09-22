@@ -69,9 +69,9 @@ the 2022 article.
 
 > The published *C. sphaerospermum* ISS record measured no dose, no dose rate, no
 > melanin and no dose-response, its shielding result is 147 vs 151 CPM at n = 1 with
-> p = 0.069, and it therefore supports `none_demonstrated` — so the repository's
-> unsourced "radiotrophic" annotation for species 3 is a declared modelling choice
-> with no measurement behind it.
+> p = 0.069, and it therefore supports `none_demonstrated` — so the unsourced
+> "radiotrophic" annotation the repository gave species 3 until `01b0f4d` (2026-08-15)
+> was a declared modelling choice with no measurement behind it.
 
 ### 1.2 The claims NOT licensed
 

@@ -33,10 +33,10 @@ docs/research/radiotrophic_calibration_map.md,config/coupling_template.toml@`dec
 docs/research/radiotrophic_calibration_map.md,"coupling/biofilm_openmc/config.py@`FieldSpec(""normalization"", ""hamiltonian_scale"", ""hamiltonian_scale"", ""float"", ""cpm_feedback""),`",0eae4a4400fe5129
 docs/research/radiotrophic_calibration_map.md,data/parameter_provenance.csv@`Dose response of viable biomass`,1a078b740f7d7524
 docs/research/radiotrophic_calibration_map.md,"data/parameter_provenance.csv@`none,response.hamiltonian,`",0eae4a4400fe5129
+docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,310d42a47cb208d4
 docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,9ae6b754c13b8c5b
-docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,cdcaea63454b8fab
+docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",310d42a47cb208d4
 docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",9ae6b754c13b8c5b
-docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",cdcaea63454b8fab
 docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@`X_tot, X_rd = compute_radial_biomass(state, rp.Nr)`",3b8eb1d18d6b7cde
 docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`,3b8eb1d18d6b7cde
 docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`const SPECIES_NAMES = [`,fc6e698a30513b41
