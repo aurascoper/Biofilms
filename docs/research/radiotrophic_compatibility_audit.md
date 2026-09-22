@@ -296,9 +296,9 @@ this repository, and it earns no phenotype at all.
 
 ### Two unsourced repository claims
 
-biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` describe *C. neoformans* and *C. sphaerospermum* as "radiotrophic"
-in inline comments with no citation; `data/calibration/spatial/entity_semantics.csv` repeats
-"Radiotrophic melanized yeast" for CN with `evidence_basis=declared`. This audit locates the primary
+biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` described *C. neoformans* and *C. sphaerospermum* as "radiotrophic"
+in inline comments with no citation, and `data/calibration/spatial/entity_semantics.csv` repeated
+the word for CN with `evidence_basis=declared`. `01b0f4d` removed both on 2026-08-15. This audit locates the primary
 source those comments trace to — Dadachova 2007 — and simultaneously locates three same-species or
 same-genus results pointing the other way. The comments should become cited-and-contested or be
 downgraded; that is a documentation finding, reported and not fixed.
@@ -995,7 +995,7 @@ be requested from anyone, because nobody has made it. The one retrieval that wou
 the picture, Zhdanova 2004, bears on *radiotropism*, not radiotrophy, and its own remaining blocker
 is whether its dose gradient was measured or calculated. Until such an experiment is run, the
 repository should carry `radiotrophic` for **no** species, and the unsourced inline comments at
-biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` should become cited-and-contested or be removed.
+biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` should become cited-and-contested or be removed. They were removed on 2026-08-15, by `01b0f4d`.
 
 ### CPM calibration
 

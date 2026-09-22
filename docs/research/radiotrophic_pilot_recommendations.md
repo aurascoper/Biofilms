@@ -58,10 +58,10 @@ calibration. Why, in each case:
   `HydratedVolume.require_whole_biofilm()` has nothing to refuse because nothing was
   measured.
 
-The pilot's actual purpose is **corrective**: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` labels species 3
-a *"radiotrophic filamentous fungus"* in an unsourced inline comment, and
-`data/calibration/spatial/entity_semantics.csv` repeats declared radiotrophy language
-for CN. This pilot makes the flagship study behind that word citable, and makes visible
+The pilot's actual purpose is **corrective**: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` labelled species 3
+that way in an unsourced inline comment, and
+`data/calibration/spatial/entity_semantics.csv` repeated declared radiotrophy language
+for CN, until `01b0f4d` removed both on 2026-08-15. This pilot makes the flagship study behind that word citable, and makes visible
 that peer review removed "radiotrophic" from its own title between the 2020 preprint and
 the 2022 article.
 
@@ -165,8 +165,8 @@ This pilot exercises **no calibration module**, and that is the finding. It exer
   k values must live in prose cells, not numeric columns.
 - `data/calibration/spatial/sources.csv` — one new `*_SCREEN_2026`-pattern source row,
   branch-local, pinning url + document_version + accessed_date + sha256.
-- Documentation targets, flagged not fixed: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` and
-  `data/calibration/spatial/entity_semantics.csv` row CS.
+- Documentation targets: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`, removed on 2026-08-15 by
+  `01b0f4d`, and `data/calibration/spatial/entity_semantics.csv` row CS, flagged not fixed.
 
 ### 1.6 The OpenMC modality reconciliation, and what it would require
 

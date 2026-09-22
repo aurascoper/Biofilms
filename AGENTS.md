@@ -266,10 +266,11 @@ control. The mechanical test is in rule 1.
 own assumption is not true by logical form; it is a correct implementation of a premise.
 The accurate statement is that **the model is not independent evidence for its own
 assumption** — non-informative about the thing it appears to be about, which is different
-from vacuous. This repository has several: README.md@75bdb08@`reaches 1.44. The ordering among the three producers is set by the input` records that the melanin
-ordering among the three producers "is set by the input `α_M`", and
+from vacuous. This repository has several: README.md@`The linear rise is structural, because the field equation has no saturation` records
+that melanin rises linearly because its field equation has no saturation term, and
 docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries` records a §6.3 scatter that "is a scatter of Table 2's
-own entries." The `β_ion` column has the same shape, spending survival evidence on a
+own entries." (Until 2026-09-17 the first example here was the melanin ordering among the
+producers. Ledger row SEED42-SCOPE-01 requalified it: the ordering fails in 19 of 256 seeds.) The `β_ion` column has the same shape, spending survival evidence on a
 tropism coefficient. None of these is a bug in the code. Each is a claim that must not be
 reported as a result.
 

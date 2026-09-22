@@ -291,10 +291,11 @@ measured inventory of that dated ParaView run, and this note states what moved r
 renumbering a recorded observation.
 
 **Step 7 is the first GLMakie render on Apple Silicon in this repository.** `--still`, not
-interactive: the standing Codex P2 at viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())` — `display(fig)` on one
-figure while waiting on a different `GLMakie.Screen()` — bites hardest on macOS, where OpenGL
+interactive: the Codex P2 then standing at viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())` — `display(fig)` on one
+figure while waiting on a different `GLMakie.Screen()` — bit hardest on macOS, where OpenGL
 4.1 is deprecated and the event loop is main-thread-only. The still path never opens a second
-screen and is unaffected.
+screen and is unaffected. `01717ec` fixed the P2 on 2026-09-13: the viewer now waits on the
+screen that shows the lattice, viewer/visualize_lattice.jl@`wait(out)`.
 
 **ParaView 6.1.1 arm64** (`brew install --cask paraview`), not the 6.2.0-RC1 Linux binary.
 Four macOS-specific `pvpython` issues, each of which cost a run:
