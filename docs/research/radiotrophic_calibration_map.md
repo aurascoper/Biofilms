@@ -478,10 +478,9 @@ the evidence to move it — "not the other way round".
   contrasts in *E. dermatitidis* measured melanin's effect on survival and found it
   null under gamma and under alpha, proton and deuteron exposure. Peer review
   removed "radiotrophic" from the *C. sphaerospermum* ISS title between preprint
-  and publication. biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` still carry "radiotrophic" as
-  unsourced inline comments, and `entity_semantics.csv` repeats "Radiotrophic
-  melanized yeast" as `evidence_basis=declared`. That is a documentation finding,
-  reported here and not fixed.
+  and publication. biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` carried "radiotrophic" as
+  unsourced inline comments, and `entity_semantics.csv` repeated the word for CN as
+  `evidence_basis=declared`. Both were fixed on 2026-08-15, by `01b0f4d`.
 - **A single-species dataset never clears the target gate,** however good it is.
   `clears_target_gate=true` requires `target_relationship=target_consortium` and
   `datasets.problems()` enforces it.

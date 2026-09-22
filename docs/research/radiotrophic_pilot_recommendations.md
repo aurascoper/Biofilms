@@ -58,10 +58,10 @@ calibration. Why, in each case:
   `HydratedVolume.require_whole_biofilm()` has nothing to refuse because nothing was
   measured.
 
-The pilot's actual purpose is **corrective**: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` labels species 3
-a *"radiotrophic filamentous fungus"* in an unsourced inline comment, and
-`data/calibration/spatial/entity_semantics.csv` repeats declared radiotrophy language
-for CN. This pilot makes the flagship study behind that word citable, and makes visible
+The pilot's actual purpose is **corrective**: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` labelled species 3
+that way in an unsourced inline comment, and
+`data/calibration/spatial/entity_semantics.csv` repeated declared radiotrophy language
+for CN, until `01b0f4d` rewrote both on 2026-08-15 without the word. This pilot makes the flagship study behind that word citable, and makes visible
 that peer review removed "radiotrophic" from its own title between the 2020 preprint and
 the 2022 article.
 
@@ -69,9 +69,9 @@ the 2022 article.
 
 > The published *C. sphaerospermum* ISS record measured no dose, no dose rate, no
 > melanin and no dose-response, its shielding result is 147 vs 151 CPM at n = 1 with
-> p = 0.069, and it therefore supports `none_demonstrated` — so the repository's
-> unsourced "radiotrophic" annotation for species 3 is a declared modelling choice
-> with no measurement behind it.
+> p = 0.069, and it therefore supports `none_demonstrated` — so the unsourced
+> "radiotrophic" annotation the repository gave species 3 until `01b0f4d` (2026-08-15)
+> was a declared modelling choice with no measurement behind it.
 
 ### 1.2 The claims NOT licensed
 
@@ -165,8 +165,9 @@ This pilot exercises **no calibration module**, and that is the finding. It exer
   k values must live in prose cells, not numeric columns.
 - `data/calibration/spatial/sources.csv` — one new `*_SCREEN_2026`-pattern source row,
   branch-local, pinning url + document_version + accessed_date + sha256.
-- Documentation targets, flagged not fixed: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` and
-  `data/calibration/spatial/entity_semantics.csv` row CS.
+- Documentation targets: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` and
+  `data/calibration/spatial/entity_semantics.csv` row CN, both fixed on 2026-08-15 by `01b0f4d`.
+  This list named row CS until 2026-09-22; CS never held the word, and CN did.
 
 ### 1.6 The OpenMC modality reconciliation, and what it would require
 
