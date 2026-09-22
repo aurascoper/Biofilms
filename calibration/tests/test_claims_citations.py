@@ -53,6 +53,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from markdown_it import MarkdownIt
 
 REPO = Path(__file__).resolve().parents[2]
 LEDGER = Path("data") / "claims_ledger.csv"
@@ -79,21 +80,16 @@ N_CITATIONS = 160
 ANCESTOR_OF = "origin/master"
 
 # --- live Markdown ---------------------------------------------------------------------------
-# A fenced block, as CommonMark reads one: after at most three spaces, or after block-quote
-# markers, and closed by a fence at least as long as the one that opened it. WHERE THIS IS
-# UNSURE IT READS MORE TEXT, NEVER LESS (Codex on #54): four spaces of backticks is indented
-# code, not a fence, and a fence never closed is read rather than blanked to the end.
-FENCE = re.compile(r"^(?:[ ]{0,3}>[ ]?)*[ ]{0,3}(?P<f>`{3,}|~{3,})[^\n]*\n.*?"
-                   r"^(?:[ ]{0,3}>[ ]?)*[ ]{0,3}(?P=f)[`~]*[ \t]*$", re.M | re.S)
-# An ATX heading needs a space after its marks; a GFM table needs a delimiter row.
-HEADING = re.compile(r" {0,3}#{1,6}(?:[ \t]|$)")
-TABLE_DELIMITER = re.compile(r"^\s*\|?(?:\s*:?-+:?\s*\|)+\s*(?::?-+:?)?\s*$")
 RECORD = re.compile(r"RECORD: line numbers refer to ([0-9a-f]{7,40})\s*$")
 TAIL = re.compile(r":(\d+)(?:[-–](\d+))?")
 # In Markdown only the colon form is a detached number: "`:1455`", "(:439, :450)". The
 # backtick-comma form of the ledger gave 36 false alarms in prose.
 MD_DETACHED = re.compile(r"(?<=[\s(;,`]):\d+\b")
-LIST_ITEM = re.compile(r"(?:[-*+]|\d+[.)])\s")
+# Markdown is read by a CommonMark parser with GFM tables, markdown-it-py, pinned in
+# calibration[dev] and in claims-guards.yml. A hand-written splitter drew eleven findings in six
+# Codex rounds on #54, each one edge of CommonMark it missed; Hunter chose the parser.
+MARKDOWN = MarkdownIt("commonmark").enable("table")
+LEAF_BLOCKS = {"paragraph_open", "heading_open", "html_block", "code_block"}
 
 # Bare citations that may stay in a live document or a record, keyed on the document AND the
 # exact text. Both are unrecovered: the first names a file outside this repository, and the
@@ -202,45 +198,51 @@ def _md_docs(root: Path) -> list:
     return [(rel, text) for rel, text in docs if not text.startswith("SUPERSEDED:")]
 
 
-def _elements(text: str) -> list:
-    """(first line number, raw text) per element: a table row, a list item with its
-    continuation lines, a heading, or else a blank-line block. Fenced blocks are blanked
-    first, keeping the line numbers. A whole table or list as one element would let an edit
-    to one row void the context of every citation in the others.
+def _fence_closed(lines: list, start: int, end: int, markup: str) -> bool:
+    """A fence counts as code only when its last line closes it. CommonMark runs an unclosed
+    fence to the end of its container; here it is read, because hiding the rest of a file on
+    a typo would read less text, never more."""
+    close = re.compile(r"[ \t>]*" + re.escape(markup[0]) + "{%d,}[ \t]*" % len(markup))
+    return end - start >= 2 and bool(close.fullmatch(lines[end - 1]))
 
-    A line splits a paragraph only where Markdown starts a block there: a heading with its
-    space, a row of a table that has a delimiter row, a bullet, an ordered item numbered 1, or
-    a sibling item inside a list. Anything else continues the paragraph, so a wrong guess
-    makes an element larger, never smaller."""
-    lines = FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text).split("\n")
-    rows, i = set(), 0
-    while i < len(lines):
-        opens = lines[i].lstrip().startswith("|") and (i == 0 or not lines[i - 1].strip())
-        if opens and i + 1 < len(lines) and TABLE_DELIMITER.match(lines[i + 1]):
-            while i < len(lines) and lines[i].lstrip().startswith("|"):
-                rows.add(i)
-                i += 1
-        else:
-            i += 1
-    out, cur, start, in_list = [], [], 0, False
-    for n, line in enumerate(lines, 1):
-        s = line.lstrip()
-        block = (n - 1) in rows or bool(HEADING.match(line))
-        item = bool(LIST_ITEM.match(s)) and (not cur or in_list or s[0] in "-*+" or bool(re.match(r"1[.)]", s)))
-        if cur and (not s or block or item):
-            out.append((start, "\n".join(cur)))
-            cur = []
-        if not s:
+
+def _elements(text: str) -> list:
+    """(first line number, text) per element, as markdown-it-py parses the document: a table
+    row, else a list item with all its paragraphs, else the leaf block (paragraph, heading,
+    HTML or indented code) holding the line. Closed fenced blocks are blanked. A line that no
+    block covers, such as a link reference definition, is read in its own run of lines.
+
+    A whole table or list as one element would let an edit to one row void the context of
+    every citation in the others (Hunter's design note)."""
+    lines = text.split("\n")
+    rows, items, leaves, fenced = [], [], [], set()
+    for tok in MARKDOWN.parse(text):
+        if tok.map is None:
             continue
-        if not cur:
-            start, in_list = n, item
-        cur.append(line)
-        if block:
-            out.append((start, line))
-            cur, in_list = [], False
-    if cur:
-        out.append((start, "\n".join(cur)))
-    return out
+        a, b = tok.map
+        if tok.type == "tr_open":
+            rows.append((a, b))
+        elif tok.type == "list_item_open":
+            items.append((a, b))
+        elif tok.type == "fence" and _fence_closed(lines, a, b, tok.markup):
+            fenced.update(range(a, b))
+        elif tok.type in LEAF_BLOCKS or tok.type == "fence":
+            leaves.append((a, b))
+    innermost = lambda group, i: min((s for s in group if s[0] <= i < s[1]), key=lambda s: s[1] - s[0], default=None)
+    spans, loose = {}, None
+    for i, line in enumerate(lines):
+        if i in fenced or not line.strip():
+            loose = None
+            continue
+        span = innermost(rows, i) or innermost(items, i) or innermost(leaves, i)
+        if span is None:                                   # read, in a run of its own
+            loose = (loose[0], i + 1) if loose else (i, i + 1)
+            spans.pop((loose[0], i), None)
+            span = loose
+        else:
+            loose = None
+        spans.setdefault(span, None)
+    return [(a + 1, "\n".join("" if j in fenced else lines[j] for j in range(a, b))) for a, b in spans]
 
 
 def context_digest(element: str) -> str:
@@ -623,8 +625,6 @@ def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
 
 # Codex on pull request #54, at 7b071a4: three more segmentation findings, after thirteen in
 # six rounds. Hunter chose a real CommonMark parser over enumerating edge cases (2026-09-22).
-EVIDENCE_7B071A4 = pytest.mark.xfail(strict=True, raises=AssertionError,
-                                     reason="evidence: Codex P1 on #54 at 7b071a4; the next commit parses with markdown-it-py")
 
 
 # Codex on pull request #54, at ce93466: two P1 findings, both a split or a blank that read
@@ -634,7 +634,7 @@ EVIDENCE_7B071A4 = pytest.mark.xfail(strict=True, raises=AssertionError,
 @pytest.mark.parametrize("doc", [
     "Text.\n\n    ```\n\nThe claim is at `stepper.jl:2`.\n\n```\nx = 1\n```\n",
     "Text.\n\n```\nThe claim is at `stepper.jl:2`.\n",
-    pytest.param("``` bad`info``\nThe claim is at `stepper.jl:2`.\n```\n", marks=EVIDENCE_7B071A4,
+    pytest.param("``` bad`info``\nThe claim is at `stepper.jl:2`.\n```\n",
                  id="a backtick in a backtick fence's info string"),
 ], ids=["four spaces of backticks is not a fence", "a fence never closed is read", None])
 def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
@@ -645,7 +645,7 @@ def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
 
 @pytest.mark.parametrize("middle", [
     "#not-a-heading", "| not a table row", "2. not a list item",
-    pytest.param("    - an indented bullet", marks=EVIDENCE_7B071A4, id="a bullet indented four spaces"),
+    pytest.param("    - an indented bullet", id="a bullet indented four spaces"),
 ], ids=["a hash without a space", "a pipe outside a table", "an ordered item other than 1", None])
 def test_a_line_that_starts_no_block_does_not_split_its_paragraph(tmp_path, monkeypatch, middle):
     """An edit to the paragraph's last line must change the digest of the citation in its first."""
@@ -659,7 +659,6 @@ def test_a_line_that_starts_no_block_does_not_split_its_paragraph(tmp_path, monk
 
 
 
-@EVIDENCE_7B071A4
 def test_a_list_item_is_one_element_across_its_paragraphs(tmp_path, monkeypatch):
     """The element is the list item (Hunter's note on the design). A blank line inside an item
     split it, so an edit to the item's second paragraph left its citation's pin unchanged."""
@@ -672,3 +671,12 @@ def test_a_list_item_is_one_element_across_its_paragraphs(tmp_path, monkeypatch)
     (root / "notes.md").write_text(item.replace("a qualifier", "another qualifier") + "\n- Another item.\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 1 and "context changed" in got[0], got
+
+
+
+def test_a_line_no_block_covers_is_still_read(tmp_path, monkeypatch):
+    """A link reference definition makes no block token. Its line must still be read, or a
+    citation written there would be seen by nothing."""
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "Text [ref].\n\n[ref]: stepper.jl:2\n"})
+    got = markdown_problems(root)
+    assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got

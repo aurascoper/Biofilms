@@ -1,6 +1,6 @@
 document,citation,digest
 AGENTS.md,README.md@75bdb08@`reaches 1.44. The ordering among the three producers is set by the input`,3fb1f2dc2e6d5fb8
-AGENTS.md,coupling/biofilm_openmc/mesh.py@`An earlier report stated`,b082cf3b9cc16a09
+AGENTS.md,coupling/biofilm_openmc/mesh.py@`An earlier report stated`,0c6dd3b1ca6bc514
 AGENTS.md,docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries`,3fb1f2dc2e6d5fb8
 AGENTS.md,docs/research/radiotrophic_compatibility_audit.md@`comparison is **not performed here**`,1d12733a0de5d1f0
 README.md,biofilms_potts.jl@`Hamiltonian: H = H_adh + H_vol + H_rad + H_mel`,1b2d8f5c8ad38676
@@ -15,7 +15,7 @@ diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@7003916@`@test 
 diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@`indexes both spatial class and sequence position`,c4e5cdb0ad559a1f
 docs/calibration/biofilm_material_calibration.md,biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`,168c5583e4d3706e
 docs/calibration/integration_contract.md,biofilms_potts.jl@`divide_cell! is a MANUALLY INVOKED demonstration primitive`,9892bfe800a61b58
-docs/calibration/integration_contract.md,biofilms_potts.jl@`ΔH_mel -= 0.5 * M_local # melanin-rich site preferred`,6aa9fde70414f029
+docs/calibration/integration_contract.md,biofilms_potts.jl@`ΔH_mel -= 0.5 * M_local # melanin-rich site preferred`,f4c557189ef573b0
 docs/calibration/material_basis_contract.md,biofilms_potts.jl@`Compute radial-band-averaged biomass density from the CPM lattice.`,84d5a91ea5eefc01
 docs/calibration/sop/harvest_dewatering.md,docs/research/radiotrophic_lab_gap.md@`THIS IS THE MOST CONSEQUENTIAL ITEM IN THE TABLE`,29b462c09482e8e5
 docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`Base.@kwdef struct RadiolysisParams`,4d7c5a4af53f39e7
