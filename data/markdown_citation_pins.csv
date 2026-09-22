@@ -43,7 +43,7 @@ docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`const SPECI
 docs/research/radiotrophic_compatibility_audit.md,preprint/modeling_radiotrophic_fitness.md@5980dc5@`confers substantial`,79322c4ac916a6ef
 docs/research/radiotrophic_compatibility_audit.md,preprint/modeling_radiotrophic_fitness.md@5980dc5@`α_M | *A. niger* | 0.03–0.10`,24b8dec7fafbcf79
 docs/research/radiotrophic_lab_gap.md,"calibration/biofilm_calibration/acquisition.py@`BIOSAFETY FOLLOWS STRAINS, NOT SPECIES.`",91a6bc45b5cf7614
-docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,c1d5818482f890e1
+docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,84b83ea97c0b6b2e
 docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,cf85c883592ebcd7
 docs/research/radiotrophic_pilot_recommendations.md,"calibration/biofilm_calibration/spatial/representability.py@`""needs a surface-area or elongation term; B. subtilis is ""`",4cc4198b5442c11e
 docs/research/spatial_dose_community_program.md,"coupling/biofilm_openmc/model.py@`particle=""photon"")`",9d62882f801cbfef

@@ -165,8 +165,9 @@ This pilot exercises **no calibration module**, and that is the finding. It exer
   k values must live in prose cells, not numeric columns.
 - `data/calibration/spatial/sources.csv` — one new `*_SCREEN_2026`-pattern source row,
   branch-local, pinning url + document_version + accessed_date + sha256.
-- Documentation targets: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`, removed on 2026-08-15 by
-  `01b0f4d`, and `data/calibration/spatial/entity_semantics.csv` row CS, flagged not fixed.
+- Documentation targets: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` and
+  `data/calibration/spatial/entity_semantics.csv` row CN, both fixed on 2026-08-15 by `01b0f4d`.
+  This list named row CS until 2026-09-22; CS never held the word, and CN did.
 
 ### 1.6 The OpenMC modality reconciliation, and what it would require
 
