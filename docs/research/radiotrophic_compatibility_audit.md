@@ -994,8 +994,9 @@ on the target strains, with the media carbon budget closed — does not exist in
 be requested from anyone, because nobody has made it. The one retrieval that would materially change
 the picture, Zhdanova 2004, bears on *radiotropism*, not radiotrophy, and its own remaining blocker
 is whether its dose gradient was measured or calculated. Until such an experiment is run, the
-repository should carry `radiotrophic` for **no** species, and the unsourced inline comments at
-biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` should become cited-and-contested or be removed. They were removed on 2026-08-15, by `01b0f4d`.
+repository should carry `radiotrophic` for **no** species. This audit recommended that the unsourced
+inline comments at biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` become cited-and-contested or be removed,
+and `01b0f4d` removed them on 2026-08-15.
 
 ### CPM calibration
 
