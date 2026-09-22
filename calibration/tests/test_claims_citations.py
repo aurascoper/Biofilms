@@ -28,15 +28,32 @@ flagged, with 7 wrong and fixed in pull request #49; and 74 unflagged, with 0 wr
 a seeded sample before the merge, then the other 54). A citation added later is read by its
 author, and by nothing here.
 
-SCOPE. This reads data/claims_ledger.csv alone, its rows and its comment lines. Line references into the superseded
-preprint ("lines 711-721") name no file and are out of scope, as the ledger header says.
+LIVE MARKDOWN. Every tracked .md file whose first line is not `SUPERSEDED:` is read the same
+way, with fenced blocks left out, and with two more verdicts:
+
+- `revision missing`: a pinned commit that git cannot resolve, or that is not an ancestor of
+  ANCESTOR_OF. A squash or a pruned branch can strand a pin that still reads fine locally.
+- `context changed`: each citation also pins the digest of the element around it, so a
+  snippet cannot stay true under a claim that was rewritten. The element is a table row, a
+  list item, or else a blank-line block.
+
+A dated record opens with `RECORD: line numbers refer to <commit>` and keeps its text; each
+`file:line` in it must name a line that existed at that commit.
+
+SCOPE. This reads data/claims_ledger.csv, its rows and its comment lines, and the live
+Markdown. Line references into the superseded preprint ("lines 711-721") name no file and
+are out of scope, as the ledger header says. A reference with no file name at all, such as
+`.tex:580`, matches no pattern here and is read by nothing.
 """
+import collections
 import csv
+import hashlib
 import re
 import subprocess
 from pathlib import Path
 
 import pytest
+from markdown_it import MarkdownIt
 
 REPO = Path(__file__).resolve().parents[2]
 LEDGER = Path("data") / "claims_ledger.csv"
@@ -58,6 +75,47 @@ BARE_ALLOWED = {("HANDOUT-02", "wan-deck.tex:153-155")}
 # A tripwire, not a target. A new citation changes it; update it in the same commit. It is
 # here so that a pattern which silently stops matching cannot pass on zero citations.
 N_CITATIONS = 160
+
+# A pinned commit must be an ancestor of this ref. CI fetches with depth 0, so it is there.
+ANCESTOR_OF = "origin/master"
+
+# --- live Markdown ---------------------------------------------------------------------------
+RECORD = re.compile(r"RECORD: line numbers refer to ([0-9a-f]{7,40})\s*$")
+TAIL = re.compile(r":(\d+)(?:[-–](\d+))?")
+# In Markdown only the colon form is a detached number: "`:1455`", "(:439, :450)". The
+# backtick-comma form of the ledger gave 36 false alarms in prose.
+MD_DETACHED = re.compile(r"(?<=[\s(;,`]):\d+\b")
+# Markdown is read by a CommonMark parser with GFM tables, markdown-it-py, pinned in
+# calibration[dev] and in claims-guards.yml. A hand-written splitter drew eleven findings in six
+# Codex rounds on #54, each one edge of CommonMark it missed; Hunter chose the parser.
+MARKDOWN = MarkdownIt("commonmark").enable("table")
+LEAF_BLOCKS = {"paragraph_open", "heading_open", "html_block", "code_block"}
+
+# Bare citations that may stay in a live document or a record, keyed on the document AND the
+# exact text. Both are unrecovered: the first names a file outside this repository, and the
+# second matches no version of README.md at its record's commit or before it.
+MD_BARE_ALLOWED = {("docs/metal_feasibility_macos_arm64.md", "JACC/src/threads/threads.jl:12-20"),
+                   ("docs/audit_biofilms_potts.md", "README.md:101")}
+
+# (document, citation, sha256 of the enclosing element's raw text, first 16 hex digits).
+# The element is the table row, the list item, or else the blank-line block around the
+# citation. An edit to that element fails the gate until someone rereads the claim beside
+# the cited text and updates one digest here. The digest reads raw text, markup and comments
+# included, so a comment cannot hide words from it (issue #53 was that gap in another pin).
+# The pins are data, in data/markdown_citation_pins.csv beside the ledger. They name documents
+# and quote old code, and a test file holding those words is a source to the retracted-word
+# scan (GUARD-SCOPE-01), which reads no .csv. Pinned 2026-09-21, after each claim was read
+# beside its cited text: 45 citations and 9 tails converted from `file:line`, in 15 documents.
+PINS = Path("data") / "markdown_citation_pins.csv"
+
+
+def _load_pins(root: Path) -> collections.Counter:
+    """One row per use. Two byte-identical paragraphs are two uses and need two rows (Codex on #54)."""
+    with open(root / PINS, encoding="utf-8", newline="") as fh:
+        return collections.Counter((r["document"], r["citation"], r["digest"]) for r in csv.DictReader(fh))
+
+
+CONTEXT_PINS = _load_pins(REPO)
 
 
 def _flat(text: str) -> str:
@@ -95,8 +153,21 @@ def citations(root: Path = REPO) -> list:
             for where, col, cell in _cells(root) for m in CITATION.finditer(cell)]
 
 
+def _revision_ok(root: Path, commit: str) -> bool:
+    """The commit exists AND is an ancestor of ANCESTOR_OF. A commit on a branch that was
+    squashed or pruned can still be in a local object store, and would read fine there."""
+    git = lambda *a: subprocess.run(["git", "-C", str(root), *a], capture_output=True, text=True).returncode
+    if git("rev-parse", "--verify", "--quiet", f"{ANCESTOR_OF}^{{commit}}"):
+        raise RuntimeError(f"{ANCESTOR_OF} is not a ref here; fetch it")    # plumbing, not a verdict
+    return git("cat-file", "-e", f"{commit}^{{commit}}") == 0 and \
+        git("merge-base", "--is-ancestor", commit, ANCESTOR_OF) == 0
+
+
 def resolve(root: Path, rel: str, commit, snippet: str) -> str:
-    """`resolves`, `absent` or `ambiguous`."""
+    """`resolves`, `absent`, `ambiguous` or `revision missing`. The fourth is its own verdict
+    so that nobody "fixes" a pin that lost its commit by repointing it at today's text."""
+    if commit is not None and not _revision_ok(root, commit):
+        return "revision missing"
     text = _text(root, rel, commit)
     count = 0 if text is None else _flat(text).count(_flat(snippet))
     return "resolves" if count == 1 else "absent" if count == 0 else "ambiguous"
@@ -115,6 +186,158 @@ def citation_problems(root: Path = REPO) -> list:
             for m in DETACHED.finditer(BARE.sub(" ", re.sub(r"`[^`]*`", "`", cell)))]
     out += [f"{cid}: BARE_ALLOWED names {lit}, and the row no longer has it" for cid, lit in sorted(BARE_ALLOWED - bare)]
     return out
+
+
+def _md_docs(root: Path) -> list:
+    """(path, text) for every tracked .md file whose first line is not `SUPERSEDED:`."""
+    listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "*.md"], capture_output=True, text=True)
+    if listed.returncode:
+        raise RuntimeError(listed.stderr)                   # plumbing, not a verdict
+    docs = [(rel, (root / rel).read_text(encoding="utf-8", errors="replace"))
+            for rel in listed.stdout.split("\0") if rel and (root / rel).is_file()]
+    return [(rel, text) for rel, text in docs if not text.startswith("SUPERSEDED:")]
+
+
+def _fence_closed(tok) -> bool:
+    """A fence counts as code only when the parser closed it with a delimiter line. Its content
+    then lacks two lines of its range, the opener and the closer; an unclosed fence lacks one.
+    Asking the parser, not a pattern, is what Codex asked for on #54: a pattern took a closer
+    indented four spaces, which CommonMark reads as content. An unclosed fence is read, since
+    hiding the rest of a file on a typo would read less text, never more."""
+    a, b = tok.map
+    return len(tok.content.splitlines()) == b - a - 2
+
+
+def _elements(text: str) -> list:
+    """(first line number, text) per element, as markdown-it-py parses the document: a table
+    row, else a list item with all its paragraphs, else the leaf block (paragraph, heading,
+    HTML or indented code) holding the line. Closed fenced blocks are blanked. A line that no
+    block covers, such as a link reference definition, is read in its own run of lines.
+
+    A whole table or list as one element would let an edit to one row void the context of
+    every citation in the others (Hunter's design note)."""
+    lines = text.split("\n")
+    rows, items, leaves, fenced = [], [], [], set()
+    for tok in MARKDOWN.parse(text):
+        if tok.map is None:
+            continue
+        a, b = tok.map
+        if tok.type == "tr_open":
+            rows.append((a, b))
+        elif tok.type == "list_item_open":
+            items.append((a, b))
+        elif tok.type == "fence" and _fence_closed(tok):
+            fenced.update(range(a, b))
+        elif tok.type in LEAF_BLOCKS or tok.type == "fence":
+            leaves.append((a, b))
+    innermost = lambda group, i: min((s for s in group if s[0] <= i < s[1]), key=lambda s: s[1] - s[0], default=None)
+    spans, loose = {}, None
+    for i, line in enumerate(lines):
+        if i in fenced or not line.strip():
+            loose = None
+            continue
+        span = innermost(rows, i) or innermost(items, i) or innermost(leaves, i)
+        if span is None:                                   # read, in a run of its own
+            loose = (loose[0], i + 1) if loose else (i, i + 1)
+            spans.pop((loose[0], i), None)
+            span = loose
+        else:
+            loose = None
+        spans.setdefault(span, None)
+    return [(a + 1, "\n".join("" if j in fenced else lines[j] for j in range(a, b))) for a, b in spans]
+
+
+def context_digest(element: str) -> str:
+    """sha256 of the element's raw text, whitespace included. Indentation and line breaks can
+    change what Markdown renders: a cited line moved out of a four-space code block turns an
+    example into a claim (Codex on #54). So a reflow fails the gate too, until its pin is
+    updated; that false alarm is visible, and a missed change is not."""
+    return hashlib.sha256(element.encode("utf-8")).hexdigest()[:16]
+
+
+def _record_problems(root: Path, doc: str, commit: str, lit: str) -> list:
+    """A record's `file:line` must name a line that existed at the record's commit. The path
+    is read as written, then beside the record, then as the one file with that name."""
+    name = lit.split(":", 1)[0]
+    listed = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", commit],
+                            capture_output=True, text=True).stdout.split("\n")
+    beside = str(Path(doc).parent / name)
+    same = [p for p in listed if p.rsplit("/", 1)[-1] == name.rsplit("/", 1)[-1]]
+    path = name if name in listed else beside if beside in listed else same[0] if len(same) == 1 else None
+    if path is None:
+        return [f"{doc}: {lit} names no file at {commit}"]
+    # splitlines, not split("\n"): a file that ends in a newline has no line after it.
+    n_lines = len((_text(root, path, commit) or "").splitlines())
+    parts = [(int(t.group(1)), int(t.group(2) or t.group(1))) for t in TAIL.finditer(lit[len(name):])]
+    return [f"{doc}: {lit} is not a line of {path} at {commit} ({n_lines} lines)"
+            for a, b in parts if not 1 <= a <= b <= n_lines][:1]
+
+
+def markdown_problems(root: Path = REPO) -> list:
+    """One line per problem in the live Markdown: a citation that does not resolve, an
+    element whose text changed since its digest was pinned, a citation with no pin, a bare
+    `file:line`, a detached number, and a stale pin or allowance. A document whose first line
+    is `RECORD: line numbers refer to <commit>` keeps its bare citations, and each must
+    name a line that existed at that commit."""
+    from test_guide_citations import ROW as GUIDE_ROW
+    out, found, allowed = [], [], set()
+    for doc, text in _md_docs(root):
+        # A guide's table rows are checked by test_guide_citations: the fragment must be on
+        # the cited line, and the guide's render is pinned. Only the rows its parser reads are
+        # left to it, keyed on the row's line AND its citation, so prose that repeats a row's
+        # `file:line` is still reported here (Codex on #54).
+        guide = {(text.count("\n", 0, g.start()) + 1, f"{g.group('path').strip()}:{g.group('line')}")
+                 for g in GUIDE_ROW.finditer(text)} if doc.startswith("docs/guides/") else set()
+        record = RECORD.match(text.split("\n", 1)[0])
+        record_ok = record is not None and _revision_ok(root, record.group(1))
+        if record and not record_ok:
+            out.append(f"{doc}: RECORD names {record.group(1)}: revision missing")
+        for n, el in _elements(text):
+            where = f"{doc}:{n}"
+            for m in CITATION.finditer(el):
+                verdict = resolve(root, m.group(1), m.group(2), m.group(3))
+                if verdict != "resolves":
+                    out.append(f"{where} {m.group(0)}: {verdict}")
+                if record is None:
+                    found.append(((doc, m.group(0), context_digest(el)), where))
+            rest = CITATION.sub(" ", el)
+            for m in BARE.finditer(rest):
+                if (doc, m.group(0)) in MD_BARE_ALLOWED:
+                    allowed.add((doc, m.group(0)))
+                elif (n, m.group(0)) in guide:
+                    continue
+                elif record:
+                    out += _record_problems(root, doc, record.group(1), m.group(0)) if record_ok else []
+                else:
+                    out.append(f"{where}: bare citation {m.group(0)}; write it as file@`snippet`")
+            if record is None:
+                out += [f"{where}: detached line number {m.group(0)!r}; give it a file and a snippet"
+                        for m in MD_DETACHED.finditer(BARE.sub(" ", rest))]
+    # A pin is matched by its full key, digest included: two uses of one citation are two pins,
+    # and deleting one use must leave its pin stale (Codex on #54). An unmatched use and an
+    # unmatched pin of the same citation pair off, one to one, as a changed element.
+    pins = collections.Counter(CONTEXT_PINS)
+    spare = sorted((pins - collections.Counter(key for key, _ in found)).elements())
+    used = collections.Counter()
+    for key, where in found:
+        used[key] += 1
+        if used[key] <= pins[key]:
+            continue
+        partner = next((p for p in spare if p[:2] == key[:2]), None)
+        if partner:
+            spare.remove(partner)
+        out.append(f"{where} {key[1]}: " + (
+            f"context changed, digest now {key[2]}; reread the claim, then update its pin" if partner
+            else f"no context pin; read the claim beside the cited text, then pin {key[2]}"))
+    out += [f"CONTEXT_PINS names {lit} in {doc} with digest {digest}, and no element has that text"
+            for doc, lit, digest in spare]
+    out += [f"MD_BARE_ALLOWED names {lit} in {doc}, and the document no longer has it"
+            for doc, lit in sorted(MD_BARE_ALLOWED - allowed)]
+    return out
+
+
+def test_every_citation_in_live_markdown_resolves_and_keeps_its_context():
+    assert markdown_problems() == []
 
 
 def test_every_citation_in_the_ledger_resolves_to_one_place():
@@ -193,6 +416,7 @@ def test_a_comment_line_of_the_ledger_is_read_too(tmp_path, monkeypatch, comment
 def test_a_citation_at_a_commit_reads_that_commit(tmp_path, monkeypatch):
     """The text is gone today and present at the commit. Both directions are checked."""
     monkeypatch.setitem(globals(), "BARE_ALLOWED", set())
+    monkeypatch.setitem(globals(), "ANCESTOR_OF", "HEAD")
     root = _scratch(tmp_path, "", {"stepper.jl": STEPPER})
 
     def git(*args):
@@ -220,3 +444,260 @@ def test_a_stale_allowance_is_reported(tmp_path, monkeypatch):
     assert citation_problems(root) == []
     (root / LEDGER).write_text(HEADER + 'X-01,"no citation",\n', encoding="utf-8")
     assert citation_problems(root) == ["X-01: BARE_ALLOWED names deck.tex:3, and the row no longer has it"]
+
+
+# --- controls for the Markdown scope, on a scratch repository ----------------------------------
+
+def _git(root: Path, *args) -> str:
+    done = subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                          capture_output=True, text=True)
+    if done.returncode:
+        raise RuntimeError(done.stderr)                  # plumbing, never the defect under test
+    return done.stdout.strip()
+
+
+def _md_scratch(tmp_path: Path, monkeypatch, files: dict) -> Path:
+    """A git repository holding `files`, committed, with ANCESTOR_OF at its HEAD."""
+    for rel, text in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text, encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "scratch")
+    monkeypatch.setitem(globals(), "ANCESTOR_OF", "HEAD")
+    monkeypatch.setitem(globals(), "MD_BARE_ALLOWED", set())
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", set())
+    return tmp_path
+
+
+CLAIM = "The step adds one: stepper.jl@`s.t += 1`."
+TABLE = "| what | where |\n|---|---|\n| step | stepper.jl@`s.t += 1` |\n| other | stepper.jl@`s.u += 1` |\n"
+
+
+@pytest.mark.parametrize("label,doc,want", [
+    ("a bare line citation", "The step is at `stepper.jl:2`.\n", ["bare citation stepper.jl:2"]),
+    ("a tail left in its own code span", "The step is at stepper.jl@`s.t += 1` and `:6`.\n", ["detached line number ':6'"]),
+    ("a superseded document is not read", "SUPERSEDED: 2026-09-21 — an old plan\n\n`stepper.jl:2`\n", []),
+    ("a fenced block is not read", "Before.\n\n```\nstepper.jl:2\n```\n", []),
+    ("a citation with no context pin", CLAIM + "\n", ["no context pin"]),
+    ("a pinned commit that does not resolve", "Then: stepper.jl@0123456@`s.t += 1`.\n", ["revision missing"]),
+])
+def test_the_markdown_checker_gives_each_verdict(tmp_path, monkeypatch, label, doc, want):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    got = [g for g in markdown_problems(root) if "no context pin" not in g or "no context pin" in want]
+    assert len(got) == len(want) and all(w in g for w, g in zip(want, got)), (label, got)
+
+
+def test_a_pinned_element_edited_fails_and_its_neighbour_does_not(tmp_path, monkeypatch):
+    """The plan's plant: an edit inside a cited table row must fail, and an edit to the next
+    row must not, which is why a row and not the table is the element."""
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": TABLE})
+    rows = TABLE.splitlines()[2:]
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(rows[0])),
+                                                    ("notes.md", "stepper.jl@`s.u += 1`", context_digest(rows[1]))})
+    assert markdown_problems(root) == []
+    for n, word in ((1, "another"), (0, "the step")):
+        edited = TABLE.replace(rows[n], rows[n].replace("| other |" if n else "| step |", f"| {word} |"))
+        if edited == TABLE:
+            raise RuntimeError("the plant did not apply")         # plumbing, never the defect
+        (root / "notes.md").write_text(edited, encoding="utf-8")
+        got = markdown_problems(root)
+        cited = "s.u += 1" if n else "s.t += 1"
+        assert len(got) == 1 and "context changed" in got[0] and cited in got[0], (n, got)
+
+
+def test_a_pin_on_a_commit_off_the_trunk_is_a_missing_revision(tmp_path, monkeypatch):
+    """The commit exists in the object store, on a branch the trunk never merged."""
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "none\n"})
+    _git(root, "checkout", "-q", "-b", "side")
+    (root / "stepper.jl").write_text(STEPPER + "# side\n", encoding="utf-8")
+    _git(root, "commit", "-q", "-am", "side")
+    side = _git(root, "rev-parse", "--short=7", "HEAD")
+    _git(root, "checkout", "-q", "-")
+    monkeypatch.setitem(globals(), "ANCESTOR_OF", _git(root, "rev-parse", "HEAD"))
+    (root / "notes.md").write_text(f"Then: stepper.jl@{side}@`# side`.\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 2 and "revision missing" in got[0] and "no context pin" in got[1], got
+
+
+def test_a_record_keeps_its_line_numbers_and_each_must_have_existed(tmp_path, monkeypatch):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "none\n"})
+    then = _git(root, "rev-parse", "--short=7", "HEAD")
+    for body, want in ((f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:2` and `:6`.\n", []),
+                       (f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:99`.\n", ["is not a line of"]),
+                       (f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:7`.\n", []),
+                       ("RECORD: line numbers refer to 0123456\n\nAt `stepper.jl:2`.\n", ["revision missing"])):
+        (root / "notes.md").write_text(body, encoding="utf-8")
+        got = markdown_problems(root)
+        assert len(got) == len(want) and all(w in g for w, g in zip(want, got)), (body, got)
+
+
+def test_a_stale_pin_and_a_stale_allowance_are_reported(tmp_path, monkeypatch):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "no citation\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", "0" * 16)})
+    monkeypatch.setitem(globals(), "MD_BARE_ALLOWED", {("notes.md", "deck.tex:3")})
+    got = markdown_problems(root)
+    assert len(got) == 2 and "CONTEXT_PINS names" in got[0] and "MD_BARE_ALLOWED names" in got[1], got
+
+
+def test_a_guide_row_is_left_to_its_own_check_and_guide_prose_is_not(tmp_path, monkeypatch):
+    """test_guide_citations checks a guide's table rows, fragment on the cited line. The row
+    is skipped here because that parser reads it, not because the file is in docs/guides/."""
+    row = "| the step | `stepper.jl:2` | `s.t += 1` |\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "docs/guides/g.md": row, "notes.md": row})
+    got = markdown_problems(root)
+    assert len(got) == 1 and got[0].startswith("notes.md") and "bare citation stepper.jl:2" in got[0], got
+    (root / "docs/guides/g.md").write_text(row + "\nAnd in prose, `stepper.jl:6`.\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 2 and got[0].startswith("docs/guides/g.md") and "stepper.jl:6" in got[0], got
+
+
+# Codex on pull request #54, at 7684792, two P1 findings, both reproduced here before the fix.
+def test_deleting_one_of_two_pinned_uses_of_a_citation_is_reported(tmp_path, monkeypatch):
+    """The stale check read (document, citation) alone. With one citation pinned in two
+    paragraphs, deleting one paragraph left its pin unreported, because the other paragraph
+    still had the citation."""
+    one, two = f"First: {CLAIM}", f"Second: {CLAIM}"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": f"{one}\n\n{two}\n"})
+    lit = "stepper.jl@`s.t += 1`"
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", lit, context_digest(one)),
+                                                    ("notes.md", lit, context_digest(two))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(f"{one}\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "CONTEXT_PINS names" in got[0] and context_digest(two) in got[0], got
+
+
+@pytest.mark.parametrize("ref", ["stepper.jl:0", "stepper.jl:8", "stepper.jl:7-8"])
+def test_a_record_line_that_never_existed_is_reported(tmp_path, monkeypatch, ref):
+    """STEPPER has seven lines and ends in a newline. split("\\n") counted an eighth, and
+    nothing refused line 0, so a record could name a line that never existed."""
+    if not (STEPPER.endswith("\n") and STEPPER.count("\n") == 7):
+        raise RuntimeError("the fixture is not the seven-line file this control assumes")   # plumbing
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "none\n"})
+    then = _git(root, "rev-parse", "--short=7", "HEAD")
+    (root / "notes.md").write_text(f"RECORD: line numbers refer to {then}\n\nAt `{ref}`.\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and ref in got[0] and "is not a line of" in got[0], got
+
+
+def test_each_of_two_identical_pinned_paragraphs_needs_its_own_pin(tmp_path, monkeypatch):
+    """Codex on #54 at 50cf7e3: two byte-identical paragraphs give one key twice, and a set let
+    one pin row cover both. So a second copy needed no pin, and deleting a copy was not
+    reported. Each use is a row."""
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": f"{CLAIM}\n\n{CLAIM}\n"})
+    key = ("notes.md", "stepper.jl@`s.t += 1`", context_digest(CLAIM))
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", collections.Counter({key: 1}))
+    got = markdown_problems(root)
+    assert len(got) == 1 and "no context pin" in got[0], got
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", collections.Counter({key: 2}))
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(f"{CLAIM}\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "CONTEXT_PINS names" in got[0], got
+
+
+# Codex on pull request #54, at 5ad0802: a P1 and a P2, both reproduced here before the fix.
+def test_guide_prose_repeating_a_row_citation_is_still_read(tmp_path, monkeypatch):
+    """The guide exemption was keyed on the citation text. Prose that repeats a row's
+    `file:line` was exempted with the row, though test_guide_citations reads rows only."""
+    row = "| the step | `stepper.jl:2` | `s.t += 1` |\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER,
+                                               "docs/guides/g.md": row + "\nThe same line in prose, `stepper.jl:2`.\n"})
+    got = markdown_problems(root)
+    assert len(got) == 1 and got[0].startswith("docs/guides/g.md:3") and "bare citation stepper.jl:2" in got[0], got
+
+
+def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
+    """Markdown allows a fence to be indented by up to three spaces, as AGENTS.md's own
+    SUPERSEDED example is. FENCE matched column one only."""
+    doc = "1. A step:\n\n   ```\n   stepper.jl:2\n   ```\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    assert markdown_problems(root) == []
+
+
+# Codex on pull request #54, at 35ce1d8: a fence inside a block quote. The class is fence
+# recognition, so this control also plants the two other forms Markdown accepts and FENCE did
+# not: a longer fence holding a shorter one, and a fence never closed, which runs to the end.
+@pytest.mark.parametrize("doc", [
+    "> Example:\n>\n> ```\n> stepper.jl:2\n> ```\n",
+    "````\n```\nstepper.jl:2\n```\n````\n",
+], ids=["in a block quote", "a longer fence holding a shorter one"])
+def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    assert markdown_problems(root) == []
+
+
+
+# Codex on pull request #54, at 7b071a4: three more segmentation findings, after thirteen in
+# six rounds. Hunter chose a real CommonMark parser over enumerating edge cases (2026-09-22).
+
+
+# Codex on pull request #54, at ce93466: two P1 findings, both a split or a blank that read
+# LESS text than Markdown does, so a citation or an edit went unseen. The rule from here: where
+# the segmentation is unsure, it reads more text, never less. This control also plants the
+# forms of the same failure that Codex had not raised.
+@pytest.mark.parametrize("doc", [
+    "Text.\n\n    ```\n\nThe claim is at `stepper.jl:2`.\n\n```\nx = 1\n```\n",
+    "Text.\n\n```\nThe claim is at `stepper.jl:2`.\n",
+    pytest.param("``` bad`info``\nThe claim is at `stepper.jl:2`.\n```\n",
+                 id="a backtick in a backtick fence's info string"),
+    pytest.param("Text.\n\n```\nThe claim is at `stepper.jl:2`.\n    ```\n",
+                 id="a closer indented four spaces does not close"),
+], ids=["four spaces of backticks is not a fence", "a fence never closed is read", None, None])
+def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    got = markdown_problems(root)
+    assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got
+
+
+@pytest.mark.parametrize("middle", [
+    "#not-a-heading", "| not a table row", "2. not a list item",
+    pytest.param("    - an indented bullet", id="a bullet indented four spaces"),
+], ids=["a hash without a space", "a pipe outside a table", "an ordered item other than 1", None])
+def test_a_line_that_starts_no_block_does_not_split_its_paragraph(tmp_path, monkeypatch, middle):
+    """An edit to the paragraph's last line must change the digest of the citation in its first."""
+    para = f"{CLAIM}\n{middle}\nand a qualifier."
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": para + "\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(para))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(para.replace("a qualifier", "another qualifier") + "\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "context changed" in got[0], got
+
+
+
+def test_a_list_item_is_one_element_across_its_paragraphs(tmp_path, monkeypatch):
+    """The element is the list item (Hunter's note on the design). A blank line inside an item
+    split it, so an edit to the item's second paragraph left its citation's pin unchanged."""
+    item = f"- {CLAIM}\n\n  and a qualifier."
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": item + "\n- Another item.\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(item))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(item + "\n- Another item, edited.\n", encoding="utf-8")
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(item.replace("a qualifier", "another qualifier") + "\n- Another item.\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "context changed" in got[0], got
+
+
+
+def test_a_line_no_block_covers_is_still_read(tmp_path, monkeypatch):
+    """A link reference definition makes no block token. Its line must still be read, or a
+    citation written there would be seen by nothing."""
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "Text [ref].\n\n[ref]: stepper.jl:2\n"})
+    got = markdown_problems(root)
+    assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got
+
+
+def test_moving_a_cited_line_out_of_indented_code_changes_its_digest(tmp_path, monkeypatch):
+    """Codex on #54 at 63c23e7: the digest flattened whitespace, so a cited line moved from a
+    four-space code block into prose kept its digest, though Markdown turned an example into
+    a claim."""
+    code = "    stepper.jl@`s.t += 1` is how a citation looks."
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": f"Example:\n\n{code}\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(code))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(f"Example:\n\n{code.strip()}\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "context changed" in got[0], got

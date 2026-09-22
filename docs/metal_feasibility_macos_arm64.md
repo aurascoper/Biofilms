@@ -76,7 +76,7 @@ uses only `array`, `array_type`, `backend`, `parallel_for`, `to_host` and
 unregistered — `JACC.array_type()` then throws `MethodError: no method matching
 get_backend(::Val{:metal})`, which reads exactly like "Metal is broken." It is not:
 `MetalExt` is a package extension, and `JACC.@init_backend` (what
-`biofilms_potts_jacc.jl:25` calls) is what loads it. A probe that omits the macro
+biofilms_potts_jacc.jl@`JACC.@init_backend` calls) is what loads it. A probe that omits the macro
 measures its own omission.
 
 ## Gate 3 — agreement: as specified it PASSES BUT CANNOT FAIL
@@ -106,7 +106,7 @@ JACC port kernels versus the serial reference |    9      9  13.9s
 ## The CPM kernel on device: 51 pass, 14 fail
 
 `tests/jacc_parity_tests.jl` is the tier that drives `run_coupled -> cpm_color!`, including
-the `JACC.@atomic` volume updates at `biofilms_potts_jacc.jl:217-218`. Run through
+the `JACC.@atomic` volume updates at biofilms_potts_jacc.jl@`σt > Int32(0) && (JACC.@atomic vols[σt] -= Int32(1)) σs > Int32(0) && (JACC.@atomic vols[σs] += Int32(1))`. Run through
 `tests/runtests.jl` with `backend = metal`:
 
 | Testset | Metal |
@@ -184,7 +184,7 @@ was made here to isolate it.
 
 ### Testset 6 was declared uninterpretable before the run, and is
 
-`jacc_parity_tests.jl:235` asserts `Threads.nthreads() == 1` because its byte-identical table
+tests/jacc_parity_tests.jl@`@test Threads.nthreads() == 1` asserts `Threads.nthreads() == 1` because its byte-identical table
 comparison "is interpretable only on the single-thread configuration it was measured on". That
 assertion **passes on Metal** — there is one Julia host thread — while thousands of work-items
 execute concurrently. One host thread does not serialize GPU execution.
@@ -237,7 +237,7 @@ kernel structure does. Whether the full driver is also overhead-bound on Metal i
 established here.
 
 **How to read the nthreads = 1 row.** It is not a defect in this repository.
-`tests/jacc_parity_tests.jl:235` asserts `Threads.nthreads() == 1` deliberately,
+tests/jacc_parity_tests.jl@`@test Threads.nthreads() == 1` asserts `Threads.nthreads() == 1` deliberately,
 because its byte-identical table comparison is interpretable only on the single-thread
 configuration it was measured on — with four threads, scheduling changes the tables
 even when acceptance does not read the nutrient field. That is a correctness pin, and
@@ -248,10 +248,10 @@ unconfigured invocation gets.
 
 ## The Float64 inventory is wider than previously recorded
 
-`docs/jacc_coupling_port.md:133-139` concedes a Float64 parameter side but names only
+docs/jacc_coupling_port.md@`Apple GPUs support only 32-bit floating point` concedes a Float64 parameter side but names only
 `CPMParams`. Two more live in **the port's own file**: `RadiolysisParams`
-(`biofilms_potts_jacc.jl:266-288`, 12 of 14 fields `Float64`) and `RadiolysisState`
-(`:290-304`, every numeric field `Float64`, including three `Vector{Float64}`), stepped on host
+(biofilms_potts_jacc.jl@`Base.@kwdef struct RadiolysisParams`, 12 of 14 fields `Float64`) and `RadiolysisState`
+(biofilms_potts_jacc.jl@`mutable struct RadiolysisState`, every numeric field `Float64`, including three `Vector{Float64}`), stepped on host
 every MCS from `run_coupled`. "The JACC port is Float32 throughout" is wrong; the device-facing
 arrays are Float32 and the host radiolysis integrator is not. Metal's `Float64` refusal does
 not force their conversion unless they move to the device.
