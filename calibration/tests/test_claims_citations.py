@@ -560,3 +560,26 @@ def test_each_of_two_identical_pinned_paragraphs_needs_its_own_pin(tmp_path, mon
     (root / "notes.md").write_text(f"{CLAIM}\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 1 and "CONTEXT_PINS names" in got[0], got
+
+
+# Codex on pull request #54, at 5ad0802: a P1 and a P2, both reproduced here before the fix.
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P1 on #54 at 5ad0802; the next commit keys the guide exemption on the row")
+def test_guide_prose_repeating_a_row_citation_is_still_read(tmp_path, monkeypatch):
+    """The guide exemption was keyed on the citation text. Prose that repeats a row's
+    `file:line` was exempted with the row, though test_guide_citations reads rows only."""
+    row = "| the step | `stepper.jl:2` | `s.t += 1` |\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER,
+                                               "docs/guides/g.md": row + "\nThe same line in prose, `stepper.jl:2`.\n"})
+    got = markdown_problems(root)
+    assert len(got) == 1 and got[0].startswith("docs/guides/g.md:3") and "bare citation stepper.jl:2" in got[0], got
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P2 on #54 at 5ad0802; the next commit accepts indented fences")
+def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
+    """Markdown allows a fence to be indented by up to three spaces, as AGENTS.md's own
+    SUPERSEDED example is. FENCE matched column one only."""
+    doc = "1. A step:\n\n   ```\n   stepper.jl:2\n   ```\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    assert markdown_problems(root) == []
