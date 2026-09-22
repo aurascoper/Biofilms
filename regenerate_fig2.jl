@@ -202,8 +202,19 @@ if "--self-test" in ARGS
                 extract = (pdf, txt) -> write(txt, ""))
     # Nonempty text from the wrong figure: the empty case above is refused one line earlier,
     # so without this the identity check could be deleted and every outcome would be the same.
-    must_refuse("an extraction of another figure", traj, params, ref, overlap;
-                extract = (pdf, txt) -> write(txt, "Mean melanin field value at occupied sites\n"))
+    # The known-bad is another COMMITTED figure, read by the real extractor, not a string I
+    # typed: a hand-written sidecar would test my idea of the extraction, not its shape.
+    other = joinpath(OUT, "fig1_radial_stratification.pdf")
+    isfile(other) || error("SELF-TEST: $other is missing, so the wrong-figure control has no artifact")
+    probe = joinpath(mktempdir(; cleanup = false), "probe.txt")
+    default_extract(other, probe)
+    wrong = read(probe, String)
+    isempty(strip(wrong)) && error("SELF-TEST: the wrong figure extracted to nothing, so it would " *
+                                   "exercise the empty case instead")
+    occursin("SEED42-SCOPE-01", wrong) &&
+        error("SELF-TEST: the wrong figure already names the row, so it cannot show the check bites")
+    must_refuse("an extraction of another committed figure", traj, params, ref, overlap;
+                extract = (pdf, txt) -> default_extract(other, txt))
 
     allowed = mktempdir(; cleanup = false)
     validate_and_copy(traj, params, ref, overlap, allowed) ==
