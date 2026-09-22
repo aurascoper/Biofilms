@@ -15,7 +15,7 @@ plain floats and three of them can plausibly read `0.05`.
 
 ## The live defect this contract exists to stop
 
-`compute_radial_biomass` (`biofilms_potts.jl:1309–1344`) counts occupied lattice sites per radial
+`compute_radial_biomass` (biofilms_potts.jl@`Compute radial-band-averaged biomass density from the CPM lattice.`) counts occupied lattice sites per radial
 bin and divides by the number of interior sites in that bin:
 
 ```julia

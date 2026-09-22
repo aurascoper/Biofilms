@@ -88,7 +88,7 @@ This has a consequence worth stating plainly: the published D10 evidence — whi
 what anchors the per-species `β_ion` magnitudes — is **radioresistance evidence being spent on a
 tropism coefficient**. That substitution is legitimate as a declared modelling choice, and it is now
 declared rather than left implicit in a sign convention. The constant is `RADIOTROPIC` in
-`biofilms_potts.jl:49`, renamed from `RADIOTROPHIC`; `biofilms_3d.R`'s species flag likewise.
+biofilms_potts.jl@`const RADIOTROPIC = Set([CN, CS])`, renamed from `RADIOTROPHIC`; `biofilms_3d.R`'s species flag likewise.
 
 ---
 
@@ -435,9 +435,9 @@ membrane report computed on the basis the gate refuses.
 an acknowledgement is added here. `julia --project=. biofilms_potts_jacc.jl [seeds]` refuses the
 same way and for the same reason: `run_coupled` defaults to `RadiolysisParams()`.
 
-**Fixed:** the two stale stdout banners (`main()` at `biofilms_potts.jl:1088`,
-`main_coupled()` at `:1540`) used to print `H = H_adh + H_vol + H_rad + H_pair + H_mel` — five
-terms, where the acceptance path has four and `H_pair` is a diagnostic — and `:1552` used to print
+**Fixed:** the two stale stdout banners (`main()` at biofilms_potts.jl@`Hamiltonian: H = H_adh + H_vol + H_rad + H_mel`,
+`main_coupled()` at biofilms_potts.jl@`println("  H = H_adh + H_vol + H_rad + H_mel`) used to print `H = H_adh + H_vol + H_rad + H_pair + H_mel` — five
+terms, where the acceptance path has four and `H_pair` is a diagnostic — and biofilms_potts.jl@`Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)` used to print
 `Ḋ(R)=%.1f Gy/s` for a quantity that is a dimensionless placeholder and for which
 `seconds_per_mcs` is `NaN`. Both now state the true four-term acceptance path and label the
 `Ḋ(R)` value as a placeholder rather than a physical rate. Nothing enforces agreement between the
@@ -478,8 +478,8 @@ That is a genuine emergent quantity. It then feeds back into acceptance at 13.4�
 `biofilms_potts_jacc.jl` is a JACC/AMDGPU port using 8-colour checkerboard updates. Its contract is
 **statistical, not pathwise**, and `docs/jacc_coupling_port.md` records that it is never the first
 causal comparison vehicle. The literal comment `#  13. Figure export` in `biofilms_potts.jl` is a
-load-bearing split marker: `tests/runtests.jl:14`, `validate_serial.jl:12` and
-`biofilms_potts_jacc.jl:454` all load the serial monolith by splitting the source on that exact
+load-bearing split marker: tests/runtests.jl@`src = split(src, "# 13. Figure export")[1]`, validate_serial.jl@`src = split(src, "# 13. Figure export")[1]` and
+biofilms_potts_jacc.jl@`src = split(src, "# 13. Figure export")[1]` all load the serial monolith by splitting the source on that exact
 string and evaluating the first half in a sandbox module whose imports are hard-coded to
 `LinearAlgebra, Statistics, Random, Printf`. The two rules are: never edit that line, and add nothing
 *above* it that needs a non-stdlib package.

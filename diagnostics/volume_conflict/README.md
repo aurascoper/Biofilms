@@ -216,7 +216,7 @@ speedup such a scheme could earn is small.
 
 ## The half-window parity effect, attributed
 
-`jacc_parity_tests.jl:209` asserts `s1.V < V_MAX && s2.V < V_MAX`. Julia prints no operand
+tests/jacc_parity_tests.jl@7003916@`@test s1.V < V_MAX && s2.V < V_MAX` asserts `s1.V < V_MAX && s2.V < V_MAX`. Julia prints no operand
 values for a `&&` compound, so the three Metal failures named neither the offending half nor
 its value. `parity_halves.jl` reports both, reusing the shipped `run_tables` / `pooled` /
 `parity_stats` / `PERMS` so the statistics are the file's own.
@@ -309,7 +309,7 @@ is not a sequence effect.
 
 ### A note on what the class index means here
 
-`jacc_parity_tests.jl:26-35` records that `c` indexes both spatial class and sequence
+tests/jacc_parity_tests.jl@`indexes both spatial class and sequence position` records that `c` indexes both spatial class and sequence
 position, and that `vols` accumulating across passes is a documented staleness -- which is why
 the file uses random permutations rather than reversal. That effect is *across* passes and is
 present on both backends. What concurrent execution adds is staleness *within* a pass, and it

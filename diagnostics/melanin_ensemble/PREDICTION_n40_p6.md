@@ -1,3 +1,5 @@
+RECORD: line numbers refer to 409f2e7
+
 # Pre-registered prediction: the melanin ensemble at N=40, six parcels
 
 **Recorded 2026-09-13, before the sweep was run.** Committed and pushed before

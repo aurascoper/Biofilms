@@ -115,7 +115,7 @@ citation is correct, the DOI resolves, nothing drifts, every guard passes — an
 the sentence still misreports the source, because the title was read as the
 result. §2.6 cited Khajo 2011 as reporting protection from lethal-dose gamma; its
 endpoints are EPR, absorbance, TBARS and Bi binding, and
-`docs/research/radiotrophic_compatibility_audit.md:230` says in as many words that
+docs/research/radiotrophic_compatibility_audit.md@`comparison is **not performed here**` says in as many words that
 the survival comparison is not performed there. That row was in this repository,
 unread, when the sentence was written.
 
@@ -266,9 +266,9 @@ control. The mechanical test is in rule 1.
 own assumption is not true by logical form; it is a correct implementation of a premise.
 The accurate statement is that **the model is not independent evidence for its own
 assumption** — non-informative about the thing it appears to be about, which is different
-from vacuous. This repository has several: `README.md:413` records that the melanin
+from vacuous. This repository has several: README.md@75bdb08@`reaches 1.44. The ordering among the three producers is set by the input` records that the melanin
 ordering among the three producers "is set by the input `α_M`", and
-`docs/preprint_revision_plan.md:107` records a §6.3 scatter that "is a scatter of Table 2's
+docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries` records a §6.3 scatter that "is a scatter of Table 2's
 own entries." The `β_ion` column has the same shape, spending survival evidence on a
 tropism coefficient. None of these is a bug in the code. Each is a claim that must not be
 reported as a result.
@@ -331,7 +331,7 @@ Any number this repository has published and later found wrong gets **all** of:
    **Attribution-with-correction is permitted only while the string is in no
    retraction vocabulary.** Naming what an earlier report claimed and correcting
    it in the same breath is ordinary practice, and
-   `coupling/biofilm_openmc/mesh.py:47` does it well. But once a string enters
+   coupling/biofilm_openmc/mesh.py@`An earlier report stated` does it well. But once a string enters
    `RETRACTED_IN_SOURCES` or `RETRACTED_CITATIONS`, the artifact carries it in no
    form and the row holds it alone. Vocabulary membership is the trigger because
    it tracks the two harms separately: the copy risk is low while the string is

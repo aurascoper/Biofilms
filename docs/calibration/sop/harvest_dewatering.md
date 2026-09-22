@@ -11,7 +11,7 @@ incomplete — resolve that before running, never afterwards.
 
 1. `D-APPROVAL` — institutional biosafety approval, strain- and protocol-specific.
 2. Strain identity verified against an accession record. **For *O. intermedium* AM7 no
-   culture-collection accession was located in any repository** — `radiotrophic_lab_gap.md:87`,
+   culture-collection accession was located in any repository** — docs/research/radiotrophic_lab_gap.md@`THIS IS THE MOST CONSEQUENTIAL ITEM IN THE TABLE`,
    which also records that the strain may simply be unobtainable and that CDC's 2022-12-19 update
    directs *Brucella*-identified isolates to a Class II BSC with public-health referral. For that
    strain this step may **terminate** the SOP rather than delay it.

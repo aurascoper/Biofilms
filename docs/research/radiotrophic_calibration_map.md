@@ -145,10 +145,10 @@ rather than assumed away.
 ### Hamiltonian radiation response (`normalization.hamiltonian_scale`)
 
 **Classification.** `calibratable_after_target_measurement`. The config key exists
-(`config/coupling_template.toml:84-90`, commented out, "no default exists"), the
+(config/coupling_template.toml@`declared calibration; no default exists.`, commented out, "no default exists"), the
 field is declared required at the `cpm_feedback` stage
-(`coupling/biofilm_openmc/config.py:108`), and `response.hamiltonian` is `blocked`
-in `data/parameter_provenance.csv:74` — the repository's own token for "awaits a
+(coupling/biofilm_openmc/config.py@`FieldSpec("normalization", "hamiltonian_scale", "hamiltonian_scale", "float", "cpm_feedback"),`), and `response.hamiltonian` is `blocked`
+in data/parameter_provenance.csv@`none,response.hamiltonian,` — the repository's own token for "awaits a
 measurement".
 
 **Evidence that would move it up.** Spatial redistribution of biomass in a
@@ -316,7 +316,7 @@ pre-empt it.
 ### growth/survival
 
 **Classification.** `requires_model_revision`. Repository status token
-`unsupported_by_current_model`, `data/parameter_provenance.csv:76`.
+`unsupported_by_current_model`, data/parameter_provenance.csv@`Dose response of viable biomass`.
 
 **THIS IS A MODEL FACT, NOT AN EVIDENCE GAP.** The CPM has no baseline growth
 dynamics and no automatic division or growth process. There is nothing in the
@@ -344,7 +344,7 @@ dynamics, of at least these parts:
    `entity_kind=biomass_parcel`, `lineage_semantics=computational`, and
    `integration.coherence_problems()` rejection (4) refuses a `biological` lineage
    on a `biomass_parcel` because "parcel ancestry is not organism ancestry
-   (biofilms_potts.jl:1578-1583)". A division process that creates parcels creates
+   (biofilms_potts.jl@`divide_cell! is a MANUALLY INVOKED demonstration primitive`)". A division process that creates parcels creates
    COMPUTATIONAL descendants, not daughter cells. Any survival curve fitted to it
    is a per-parcel survival, not a per-organism one, and the conversion between the
    two does not exist.
@@ -478,7 +478,7 @@ the evidence to move it — "not the other way round".
   contrasts in *E. dermatitidis* measured melanin's effect on survival and found it
   null under gamma and under alpha, proton and deuteron exposure. Peer review
   removed "radiotrophic" from the *C. sphaerospermum* ISS title between preprint
-  and publication. `biofilms_potts.jl:22` and `:24` still carry "radiotrophic" as
+  and publication. biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` still carry "radiotrophic" as
   unsourced inline comments, and `entity_semantics.csv` repeats "Radiotrophic
   melanized yeast" as `evidence_basis=declared`. That is a documentation finding,
   reported here and not fixed.

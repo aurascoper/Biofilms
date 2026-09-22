@@ -1,3 +1,5 @@
+RECORD: line numbers refer to 6782be2
+
 # ParaView views — macOS/arm64, 2026-09-11
 
 First ParaView read of this exporter's output on Apple Silicon. Prior verification

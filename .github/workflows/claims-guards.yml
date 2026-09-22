@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install pytest
+      - run: python -m pip install pytest markdown-it-py==4.2.0
       # Globbed, not listed. test_claims_generated_artifacts.py exists only on
       # the branches stacked above this one, and a named file that is absent
       # fails collection while a named file that is MISSING from the list runs

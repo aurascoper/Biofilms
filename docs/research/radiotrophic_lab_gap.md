@@ -60,7 +60,7 @@ biosafety by strain, derived replicates, observable selected"):**
   approval field.
 - `docs/calibration/acquisition_contract.md` §1 — the biosafety-by-strain rule in
   prose.
-- `calibration/biofilm_calibration/acquisition.py:69-85` — the code that carries it.
+- calibration/biofilm_calibration/acquisition.py@`BIOSAFETY FOLLOWS STRAINS, NOT SPECIES.` — the code that carries it.
 - `calibration/biofilm_calibration/spatial/report.py` — the enforcing blocker.
 
 Follow that precedent exactly: one row per STRAIN with its own
