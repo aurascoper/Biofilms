@@ -104,47 +104,63 @@ function overlap_problems(overlap::Dict{Tuple{Int,String},Float64}, ref::Dict{Tu
     return out
 end
 
-"""The production boundary: confirm the second sweep, compare every plotted point, then
-copy, or refuse and copy nothing. The self-test drives THIS with every known-bad, so a
-refusal that stopped refusing could not pass it."""
+"""Render the four artifacts into `dir` and check them there. Nothing outside `dir` is
+touched, so a failed extraction cannot leave a new image beside an old checksum."""
+function build_figure(traj, params, dir::String; extract = default_extract)
+    export_figures(traj, nothing, params; outdir = dir)
+    pdf, txt = joinpath(dir, "$NAME.pdf"), joinpath(dir, "$NAME.txt")
+    extract(pdf, txt)
+    isfile(txt) || error("REFUSING TO COPY: the extraction wrote no text sidecar")
+    body = read(txt, String)
+    isempty(strip(body)) && error("REFUSING TO COPY: the text sidecar came out empty, and an empty " *
+                                  "file greps the same as a clean one")
+    occursin("SEED42-SCOPE-01", body) ||
+        error("REFUSING TO COPY: the text sidecar does not name the ledger row the caption cites, " *
+              "so the extraction is not of the figure this run drew")
+    write(joinpath(dir, "$NAME.sha256"), bytes2hex(SHA.sha256(read(pdf))) * "\n")
+    return ["$NAME.pdf", "$NAME.png", "$NAME.sha256", "$NAME.txt"]
+end
+
+"""The default extraction. The claims guard scans this .txt rather than the PDF, so it is part
+of the operation and not a printed follow-up."""
+function default_extract(pdf::String, txt::String)
+    Sys.which("pdftotext") === nothing &&
+        error("REFUSING TO COPY: pdftotext is needed to refresh the text sidecar")
+    run(`pdftotext -layout $pdf $txt`)
+end
+
+"""The production boundary: confirm the second sweep, compare every plotted point, build and
+check all four artifacts in a staging directory, and only then replace the committed ones.
+The self-test drives THIS with every known-bad, so a refusal that stopped refusing, or one
+that half-wrote, could not pass it."""
 function validate_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64},
-                           overlap::Dict{Tuple{Int,String},Float64}, outdir::String)
+                           overlap::Dict{Tuple{Int,String},Float64}, outdir::String;
+                           extract = default_extract)
     problems = overlap_problems(overlap, ref)
     isempty(problems) || error("REFUSING TO COPY: the second committed sweep does not confirm the " *
                                "first:\n  " * join(problems, "\n  "))
     bad = mismatches(traj, ref)
     isempty(bad) || error("REFUSING TO COPY: the render does not match the committed reference:\n  " *
                           join(bad, "\n  ") * "\nThe figure would plot numbers no committed run supports.")
-    Sys.which("pdftotext") === nothing &&
-        error("REFUSING TO COPY: pdftotext is needed to refresh the text sidecar, and the claims " *
-              "guard reads that extraction rather than the PDF")
-    tmp = mktempdir(; cleanup = false)
-    export_figures(traj, nothing, params; outdir = tmp)
-    for ext in ("pdf", "png")
-        cp(joinpath(tmp, "$NAME.$ext"), joinpath(outdir, "$NAME.$ext"); force = true)
+    staging = mktempdir(; cleanup = false)
+    names = try
+        build_figure(traj, params, staging; extract = extract)
+    catch err
+        rm(staging; recursive = true)
+        rethrow(err)
     end
-    rm(tmp; recursive = true)
-
-    # THE SIDECARS ARE PART OF THE COPY, not a printed follow-up. The retracted-vocabulary
-    # guard scans the .txt extraction, so a rebuilt image beside last render's text would let
-    # it report a clean result over withdrawn wording.
-    pdf, txt = joinpath(outdir, "$NAME.pdf"), joinpath(outdir, "$NAME.txt")
-    run(`pdftotext -layout $pdf $txt`)
-    body = read(txt, String)
-    isempty(strip(body)) && error("REFUSING: the text sidecar came out empty, and an empty file " *
-                                  "greps the same as a clean one")
-    occursin("SEED42-SCOPE-01", body) ||
-        error("REFUSING: the text sidecar does not name the ledger row the caption cites, so the " *
-              "extraction is not of the figure this run drew")
-    write(joinpath(outdir, "$NAME.sha256"), bytes2hex(SHA.sha256(read(pdf))) * "\n")
+    for n in names
+        cp(joinpath(staging, n), joinpath(outdir, n); force = true)
+    end
+    rm(staging; recursive = true)
     return sort(readdir(outdir))
 end
 
 """Run the boundary with one known-bad and require a refusal that wrote nothing."""
-function must_refuse(label, traj, params, ref, overlap)
+function must_refuse(label, traj, params, ref, overlap; extract = default_extract)
     dir = mktempdir(; cleanup = false)
     threw = try
-        validate_and_copy(traj, params, ref, overlap, dir)
+        validate_and_copy(traj, params, ref, overlap, dir; extract = extract)
         false
     catch err
         occursin("REFUSING TO COPY", sprint(showerror, err)) || rethrow(err)
@@ -182,6 +198,8 @@ if "--self-test" in ARGS
     nan[(MCS, SPECIES_NAMES[1])] = NaN
     isnan(nan[(MCS, SPECIES_NAMES[1])]) || error("SELF-TEST: the NaN did not apply")
     must_refuse("a non-finite overlap value", traj, params, ref, nan)
+    must_refuse("an extraction that writes nothing", traj, params, ref, overlap;
+                extract = (pdf, txt) -> write(txt, ""))
 
     allowed = mktempdir(; cleanup = false)
     validate_and_copy(traj, params, ref, overlap, allowed) ==
