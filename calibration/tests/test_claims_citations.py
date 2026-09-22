@@ -105,9 +105,10 @@ MD_BARE_ALLOWED = {("docs/metal_feasibility_macos_arm64.md", "JACC/src/threads/t
 PINS = Path("data") / "markdown_citation_pins.csv"
 
 
-def _load_pins(root: Path) -> set:
+def _load_pins(root: Path) -> collections.Counter:
+    """One row per use. Two byte-identical paragraphs are two uses and need two rows (Codex on #54)."""
     with open(root / PINS, encoding="utf-8", newline="") as fh:
-        return {(r["document"], r["citation"], r["digest"]) for r in csv.DictReader(fh)}
+        return collections.Counter((r["document"], r["citation"], r["digest"]) for r in csv.DictReader(fh))
 
 
 CONTEXT_PINS = _load_pins(REPO)
@@ -280,9 +281,12 @@ def markdown_problems(root: Path = REPO) -> list:
     # A pin is matched by its full key, digest included: two uses of one citation are two pins,
     # and deleting one use must leave its pin stale (Codex on #54). An unmatched use and an
     # unmatched pin of the same citation pair off, one to one, as a changed element.
-    spare = sorted(set(CONTEXT_PINS) - {key for key, _ in found})
+    pins = collections.Counter(CONTEXT_PINS)
+    spare = sorted((pins - collections.Counter(key for key, _ in found)).elements())
+    used = collections.Counter()
     for key, where in found:
-        if key in CONTEXT_PINS:
+        used[key] += 1
+        if used[key] <= pins[key]:
             continue
         partner = next((p for p in spare if p[:2] == key[:2]), None)
         if partner:
@@ -542,8 +546,6 @@ def test_a_record_line_that_never_existed_is_reported(tmp_path, monkeypatch, ref
     assert len(got) == 1 and ref in got[0] and "is not a line of" in got[0], got
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="evidence: Codex P1 on #54 at 50cf7e3; the next commit counts identical uses")
 def test_each_of_two_identical_pinned_paragraphs_needs_its_own_pin(tmp_path, monkeypatch):
     """Codex on #54 at 50cf7e3: two byte-identical paragraphs give one key twice, and a set let
     one pin row cover both. So a second copy needed no pin, and deleting a copy was not
