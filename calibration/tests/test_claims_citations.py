@@ -79,8 +79,15 @@ N_CITATIONS = 160
 ANCESTOR_OF = "origin/master"
 
 # --- live Markdown ---------------------------------------------------------------------------
-# A fence may be indented by up to three spaces (CommonMark), as AGENTS.md's SUPERSEDED example is.
-FENCE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.M | re.S)
+# A fenced block, as CommonMark reads one: after at most three spaces, or after block-quote
+# markers, and closed by a fence at least as long as the one that opened it. WHERE THIS IS
+# UNSURE IT READS MORE TEXT, NEVER LESS (Codex on #54): four spaces of backticks is indented
+# code, not a fence, and a fence never closed is read rather than blanked to the end.
+FENCE = re.compile(r"^(?:[ ]{0,3}>[ ]?)*[ ]{0,3}(?P<f>`{3,}|~{3,})[^\n]*\n.*?"
+                   r"^(?:[ ]{0,3}>[ ]?)*[ ]{0,3}(?P=f)[`~]*[ \t]*$", re.M | re.S)
+# An ATX heading needs a space after its marks; a GFM table needs a delimiter row.
+HEADING = re.compile(r" {0,3}#{1,6}(?:[ \t]|$)")
+TABLE_DELIMITER = re.compile(r"^\s*\|?(?:\s*:?-+:?\s*\|)+\s*(?::?-+:?)?\s*$")
 RECORD = re.compile(r"RECORD: line numbers refer to ([0-9a-f]{7,40})\s*$")
 TAIL = re.compile(r":(\d+)(?:[-–](\d+))?")
 # In Markdown only the colon form is a detached number: "`:1455`", "(:439, :450)". The
@@ -199,21 +206,38 @@ def _elements(text: str) -> list:
     """(first line number, raw text) per element: a table row, a list item with its
     continuation lines, a heading, or else a blank-line block. Fenced blocks are blanked
     first, keeping the line numbers. A whole table or list as one element would let an edit
-    to one row void the context of every citation in the others."""
-    text = FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
-    out, cur, start = [], [], 0
-    for n, line in enumerate(text.split("\n"), 1):
+    to one row void the context of every citation in the others.
+
+    A line splits a paragraph only where Markdown starts a block there: a heading with its
+    space, a row of a table that has a delimiter row, a bullet, an ordered item numbered 1, or
+    a sibling item inside a list. Anything else continues the paragraph, so a wrong guess
+    makes an element larger, never smaller."""
+    lines = FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text).split("\n")
+    rows, i = set(), 0
+    while i < len(lines):
+        opens = lines[i].lstrip().startswith("|") and (i == 0 or not lines[i - 1].strip())
+        if opens and i + 1 < len(lines) and TABLE_DELIMITER.match(lines[i + 1]):
+            while i < len(lines) and lines[i].lstrip().startswith("|"):
+                rows.add(i)
+                i += 1
+        else:
+            i += 1
+    out, cur, start, in_list = [], [], 0, False
+    for n, line in enumerate(lines, 1):
         s = line.lstrip()
-        new = s.startswith(("|", "#")) or bool(LIST_ITEM.match(s))
-        if cur and (not s or new):
+        block = (n - 1) in rows or bool(HEADING.match(line))
+        item = bool(LIST_ITEM.match(s)) and (not cur or in_list or s[0] in "-*+" or bool(re.match(r"1[.)]", s)))
+        if cur and (not s or block or item):
             out.append((start, "\n".join(cur)))
             cur = []
-        if s:
-            start = n if not cur else start
-            cur.append(line)
-            if s.startswith(("|", "#")):
-                out.append((start, line))
-                cur = []
+        if not s:
+            continue
+        if not cur:
+            start, in_list = n, item
+        cur.append(line)
+        if block:
+            out.append((start, line))
+            cur, in_list = [], False
     if cur:
         out.append((start, "\n".join(cur)))
     return out
@@ -439,7 +463,7 @@ def _md_scratch(tmp_path: Path, monkeypatch, files: dict) -> Path:
 
 
 CLAIM = "The step adds one: stepper.jl@`s.t += 1`."
-TABLE = "| step | stepper.jl@`s.t += 1` |\n| other | stepper.jl@`s.u += 1` |\n"
+TABLE = "| what | where |\n|---|---|\n| step | stepper.jl@`s.t += 1` |\n| other | stepper.jl@`s.u += 1` |\n"
 
 
 @pytest.mark.parametrize("label,doc,want", [
@@ -460,7 +484,7 @@ def test_a_pinned_element_edited_fails_and_its_neighbour_does_not(tmp_path, monk
     """The plan's plant: an edit inside a cited table row must fail, and an edit to the next
     row must not, which is why a row and not the table is the element."""
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": TABLE})
-    rows = TABLE.splitlines()
+    rows = TABLE.splitlines()[2:]
     monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(rows[0])),
                                                     ("notes.md", "stepper.jl@`s.u += 1`", context_digest(rows[1]))})
     assert markdown_problems(root) == []
@@ -582,3 +606,43 @@ def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
     doc = "1. A step:\n\n   ```\n   stepper.jl:2\n   ```\n"
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
     assert markdown_problems(root) == []
+
+
+# Codex on pull request #54, at 35ce1d8: a fence inside a block quote. The class is fence
+# recognition, so this control also plants the two other forms Markdown accepts and FENCE did
+# not: a longer fence holding a shorter one, and a fence never closed, which runs to the end.
+@pytest.mark.parametrize("doc", [
+    "> Example:\n>\n> ```\n> stepper.jl:2\n> ```\n",
+    "````\n```\nstepper.jl:2\n```\n````\n",
+], ids=["in a block quote", "a longer fence holding a shorter one"])
+def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    assert markdown_problems(root) == []
+
+
+
+# Codex on pull request #54, at ce93466: two P1 findings, both a split or a blank that read
+# LESS text than Markdown does, so a citation or an edit went unseen. The rule from here: where
+# the segmentation is unsure, it reads more text, never less. This control also plants the
+# forms of the same failure that Codex had not raised.
+@pytest.mark.parametrize("doc", [
+    "Text.\n\n    ```\n\nThe claim is at `stepper.jl:2`.\n\n```\nx = 1\n```\n",
+    "Text.\n\n```\nThe claim is at `stepper.jl:2`.\n",
+], ids=["four spaces of backticks is not a fence", "a fence never closed is read"])
+def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    got = markdown_problems(root)
+    assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got
+
+
+@pytest.mark.parametrize("middle", ["#not-a-heading", "| not a table row", "2. not a list item"],
+                         ids=["a hash without a space", "a pipe outside a table", "an ordered item other than 1"])
+def test_a_line_that_starts_no_block_does_not_split_its_paragraph(tmp_path, monkeypatch, middle):
+    """An edit to the paragraph's last line must change the digest of the citation in its first."""
+    para = f"{CLAIM}\n{middle}\nand a qualifier."
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": para + "\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(para))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(para.replace("a qualifier", "another qualifier") + "\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "context changed" in got[0], got
