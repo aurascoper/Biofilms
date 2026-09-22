@@ -1,0 +1,48 @@
+# melanin ensemble sweep
+# N=40 parcels_per_species=6 n_mcs=100 snapshot_interval=20
+# seeds=42
+# observable=mean melanin over OCCUPIED SITES (volume-weighted; biofilms_potts.jl take_snapshot). The mean of per-parcel means is a different quantity and is not computed here.
+# alpha_M is a declared input, not a measurement.
+seed,mcs,species,species_name,alpha_M,volume,n_cells,mean_melanin
+42,0,1,C. neoformans,0.1000,648,6,0.000000
+42,0,2,D. radiodurans,0.0000,544,6,0.000000
+42,0,3,C. sphaerospermum,0.1400,498,6,0.000000
+42,0,4,B. subtilis,0.0000,275,6,0.000000
+42,0,5,A. niger,0.0650,349,6,0.000000
+42,0,6,S. oneidensis,0.0000,349,6,0.000000
+42,0,7,O. intermedium AM7,0.0000,375,6,0.000000
+42,20,1,C. neoformans,0.1000,698,6,0.341605
+42,20,2,D. radiodurans,0.0000,700,6,0.036359
+42,20,3,C. sphaerospermum,0.1400,696,6,0.532871
+42,20,4,B. subtilis,0.0000,694,6,0.030778
+42,20,5,A. niger,0.0650,697,6,0.272993
+42,20,6,S. oneidensis,0.0000,691,6,0.009813
+42,20,7,O. intermedium AM7,0.0000,694,6,0.016177
+42,40,1,C. neoformans,0.1000,699,6,0.553266
+42,40,2,D. radiodurans,0.0000,701,6,0.096309
+42,40,3,C. sphaerospermum,0.1400,697,6,0.875918
+42,40,4,B. subtilis,0.0000,700,6,0.088257
+42,40,5,A. niger,0.0650,698,6,0.487105
+42,40,6,S. oneidensis,0.0000,698,6,0.032339
+42,40,7,O. intermedium AM7,0.0000,691,6,0.042339
+42,60,1,C. neoformans,0.1000,699,6,0.721378
+42,60,2,D. radiodurans,0.0000,703,6,0.165201
+42,60,3,C. sphaerospermum,0.1400,699,6,1.111121
+42,60,4,B. subtilis,0.0000,699,6,0.162318
+42,60,5,A. niger,0.0650,699,6,0.664515
+42,60,6,S. oneidensis,0.0000,697,6,0.055649
+42,60,7,O. intermedium AM7,0.0000,693,6,0.072884
+42,80,1,C. neoformans,0.1000,695,6,0.855882
+42,80,2,D. radiodurans,0.0000,704,6,0.225741
+42,80,3,C. sphaerospermum,0.1400,698,6,1.295751
+42,80,4,B. subtilis,0.0000,699,6,0.243514
+42,80,5,A. niger,0.0650,700,6,0.806713
+42,80,6,S. oneidensis,0.0000,698,6,0.087467
+42,80,7,O. intermedium AM7,0.0000,693,6,0.102322
+42,100,1,C. neoformans,0.1000,698,6,0.973334
+42,100,2,D. radiodurans,0.0000,703,6,0.298574
+42,100,3,C. sphaerospermum,0.1400,698,6,1.437157
+42,100,4,B. subtilis,0.0000,701,6,0.312091
+42,100,5,A. niger,0.0650,698,6,0.938622
+42,100,6,S. oneidensis,0.0000,698,6,0.119718
+42,100,7,O. intermedium AM7,0.0000,692,6,0.132491
