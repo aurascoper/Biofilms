@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 dependencies = ["numpy", "biofilm-contract"]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "markdown-it-py==4.2.0"]
 # Readers for microscopy formats. The CORE NEVER IMPORTS THESE — ingest.py
 # defines a format-agnostic contract (array + voxel calibration + declared
 # segmentation basis) and readers are called by the caller. Tests that need
