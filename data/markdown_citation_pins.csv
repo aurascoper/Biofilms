@@ -1,7 +1,6 @@
 document,citation,digest
-AGENTS.md,"README.md@`The linear rise is structural, because the field equation has no saturation`",41cffa33ca607d6c
 AGENTS.md,coupling/biofilm_openmc/mesh.py@`An earlier report stated`,bb1783b2fb292f28
-AGENTS.md,docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries`,41cffa33ca607d6c
+AGENTS.md,docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries`,a27d4e303bac73b8
 AGENTS.md,docs/research/radiotrophic_compatibility_audit.md@`comparison is **not performed here**`,270da23567b75e51
 README.md,biofilms_potts.jl@`Hamiltonian: H = H_adh + H_vol + H_rad + H_mel`,8da695de2d6bb1dd
 README.md,"biofilms_potts.jl@`const RADIOTROPIC = Set([CN, CS])`",018c855d39ca7af7
