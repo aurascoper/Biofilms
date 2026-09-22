@@ -198,12 +198,14 @@ def _md_docs(root: Path) -> list:
     return [(rel, text) for rel, text in docs if not text.startswith("SUPERSEDED:")]
 
 
-def _fence_closed(lines: list, start: int, end: int, markup: str) -> bool:
-    """A fence counts as code only when its last line closes it. CommonMark runs an unclosed
-    fence to the end of its container; here it is read, because hiding the rest of a file on
-    a typo would read less text, never more."""
-    close = re.compile(r"[ \t>]*" + re.escape(markup[0]) + "{%d,}[ \t]*" % len(markup))
-    return end - start >= 2 and bool(close.fullmatch(lines[end - 1]))
+def _fence_closed(tok) -> bool:
+    """A fence counts as code only when the parser closed it with a delimiter line. Its content
+    then lacks two lines of its range, the opener and the closer; an unclosed fence lacks one.
+    Asking the parser, not a pattern, is what Codex asked for on #54: a pattern took a closer
+    indented four spaces, which CommonMark reads as content. An unclosed fence is read, since
+    hiding the rest of a file on a typo would read less text, never more."""
+    a, b = tok.map
+    return len(tok.content.splitlines()) == b - a - 2
 
 
 def _elements(text: str) -> list:
@@ -224,7 +226,7 @@ def _elements(text: str) -> list:
             rows.append((a, b))
         elif tok.type == "list_item_open":
             items.append((a, b))
-        elif tok.type == "fence" and _fence_closed(lines, a, b, tok.markup):
+        elif tok.type == "fence" and _fence_closed(tok):
             fenced.update(range(a, b))
         elif tok.type in LEAF_BLOCKS or tok.type == "fence":
             leaves.append((a, b))
@@ -636,8 +638,7 @@ def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
     "Text.\n\n```\nThe claim is at `stepper.jl:2`.\n",
     pytest.param("``` bad`info``\nThe claim is at `stepper.jl:2`.\n```\n",
                  id="a backtick in a backtick fence's info string"),
-    pytest.param("Text.\n\n```\nThe claim is at `stepper.jl:2`.\n    ```\n", marks=pytest.mark.xfail(
-        strict=True, raises=AssertionError, reason="evidence: Codex P1 on #54 at 7a109a2; the next commit asks the parser"),
+    pytest.param("Text.\n\n```\nThe claim is at `stepper.jl:2`.\n    ```\n",
                  id="a closer indented four spaces does not close"),
 ], ids=["four spaces of backticks is not a fence", "a fence never closed is read", None, None])
 def test_text_that_is_not_fenced_is_read(tmp_path, monkeypatch, doc):
