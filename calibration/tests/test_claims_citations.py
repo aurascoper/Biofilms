@@ -97,7 +97,7 @@ LEAF_BLOCKS = {"paragraph_open", "heading_open", "html_block", "code_block"}
 MD_BARE_ALLOWED = {("docs/metal_feasibility_macos_arm64.md", "JACC/src/threads/threads.jl:12-20"),
                    ("docs/audit_biofilms_potts.md", "README.md:101")}
 
-# (document, citation, sha256 of the enclosing element's flattened text, first 16 hex digits).
+# (document, citation, sha256 of the enclosing element's raw text, first 16 hex digits).
 # The element is the table row, the list item, or else the blank-line block around the
 # citation. An edit to that element fails the gate until someone rereads the claim beside
 # the cited text and updates one digest here. The digest reads raw text, markup and comments
@@ -248,7 +248,11 @@ def _elements(text: str) -> list:
 
 
 def context_digest(element: str) -> str:
-    return hashlib.sha256(_flat(element).encode("utf-8")).hexdigest()[:16]
+    """sha256 of the element's raw text, whitespace included. Indentation and line breaks can
+    change what Markdown renders: a cited line moved out of a four-space code block turns an
+    example into a claim (Codex on #54). So a reflow fails the gate too, until its pin is
+    updated; that false alarm is visible, and a missed change is not."""
+    return hashlib.sha256(element.encode("utf-8")).hexdigest()[:16]
 
 
 def _record_problems(root: Path, doc: str, commit: str, lit: str) -> list:
@@ -686,8 +690,6 @@ def test_a_line_no_block_covers_is_still_read(tmp_path, monkeypatch):
     assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="evidence: Codex P1 on #54 at 63c23e7; the next commit digests raw text")
 def test_moving_a_cited_line_out_of_indented_code_changes_its_digest(tmp_path, monkeypatch):
     """Codex on #54 at 63c23e7: the digest flattened whitespace, so a cited line moved from a
     four-space code block into prose kept its digest, though Markdown turned an example into
