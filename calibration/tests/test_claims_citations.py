@@ -582,3 +582,18 @@ def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
     doc = "1. A step:\n\n   ```\n   stepper.jl:2\n   ```\n"
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
     assert markdown_problems(root) == []
+
+
+# Codex on pull request #54, at 35ce1d8: a fence inside a block quote. The class is fence
+# recognition, so this control also plants the two other forms Markdown accepts and FENCE did
+# not: a longer fence holding a shorter one, and a fence never closed, which runs to the end.
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P2 on #54 at 35ce1d8; the next commit reads fences in containers")
+@pytest.mark.parametrize("doc", [
+    "> Example:\n>\n> ```\n> stepper.jl:2\n> ```\n",
+    "````\n```\nstepper.jl:2\n```\n````\n",
+    "Text.\n\n```\nstepper.jl:2\n",
+], ids=["in a block quote", "a longer fence holding a shorter one", "never closed"])
+def test_every_fence_markdown_accepts_is_not_read(tmp_path, monkeypatch, doc):
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    assert markdown_problems(root) == []
