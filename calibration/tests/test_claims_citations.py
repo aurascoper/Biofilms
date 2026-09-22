@@ -79,7 +79,8 @@ N_CITATIONS = 160
 ANCESTOR_OF = "origin/master"
 
 # --- live Markdown ---------------------------------------------------------------------------
-FENCE = re.compile(r"^(```|~~~).*?^\1[^\n]*$", re.M | re.S)
+# A fence may be indented by up to three spaces (CommonMark), as AGENTS.md's SUPERSEDED example is.
+FENCE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.M | re.S)
 RECORD = re.compile(r"RECORD: line numbers refer to ([0-9a-f]{7,40})\s*$")
 TAIL = re.compile(r":(\d+)(?:[-–](\d+))?")
 # In Markdown only the colon form is a detached number: "`:1455`", "(:439, :450)". The
@@ -246,13 +247,15 @@ def markdown_problems(root: Path = REPO) -> list:
     `file:line`, a detached number, and a stale pin or allowance. A document whose first line
     is `RECORD: line numbers refer to <commit>` keeps its bare citations, and each must
     name a line that existed at that commit."""
-    from test_guide_citations import citations as guide_rows
+    from test_guide_citations import ROW as GUIDE_ROW
     out, found, allowed = [], [], set()
     for doc, text in _md_docs(root):
         # A guide's table rows are checked by test_guide_citations: the fragment must be on
-        # the cited line, and the guide's render is pinned. Only the rows its parser reads
-        # are left to it, so a line citation in a guide's prose is still reported here.
-        guide = {f"{c['path']}:{c['line']}" for c in guide_rows(text)} if doc.startswith("docs/guides/") else set()
+        # the cited line, and the guide's render is pinned. Only the rows its parser reads are
+        # left to it, keyed on the row's line AND its citation, so prose that repeats a row's
+        # `file:line` is still reported here (Codex on #54).
+        guide = {(text.count("\n", 0, g.start()) + 1, f"{g.group('path').strip()}:{g.group('line')}")
+                 for g in GUIDE_ROW.finditer(text)} if doc.startswith("docs/guides/") else set()
         record = RECORD.match(text.split("\n", 1)[0])
         record_ok = record is not None and _revision_ok(root, record.group(1))
         if record and not record_ok:
@@ -269,7 +272,7 @@ def markdown_problems(root: Path = REPO) -> list:
             for m in BARE.finditer(rest):
                 if (doc, m.group(0)) in MD_BARE_ALLOWED:
                     allowed.add((doc, m.group(0)))
-                elif m.group(0) in guide:
+                elif (n, m.group(0)) in guide:
                     continue
                 elif record:
                     out += _record_problems(root, doc, record.group(1), m.group(0)) if record_ok else []
@@ -560,3 +563,22 @@ def test_each_of_two_identical_pinned_paragraphs_needs_its_own_pin(tmp_path, mon
     (root / "notes.md").write_text(f"{CLAIM}\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 1 and "CONTEXT_PINS names" in got[0], got
+
+
+# Codex on pull request #54, at 5ad0802: a P1 and a P2, both reproduced here before the fix.
+def test_guide_prose_repeating_a_row_citation_is_still_read(tmp_path, monkeypatch):
+    """The guide exemption was keyed on the citation text. Prose that repeats a row's
+    `file:line` was exempted with the row, though test_guide_citations reads rows only."""
+    row = "| the step | `stepper.jl:2` | `s.t += 1` |\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER,
+                                               "docs/guides/g.md": row + "\nThe same line in prose, `stepper.jl:2`.\n"})
+    got = markdown_problems(root)
+    assert len(got) == 1 and got[0].startswith("docs/guides/g.md:3") and "bare citation stepper.jl:2" in got[0], got
+
+
+def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
+    """Markdown allows a fence to be indented by up to three spaces, as AGENTS.md's own
+    SUPERSEDED example is. FENCE matched column one only."""
+    doc = "1. A step:\n\n   ```\n   stepper.jl:2\n   ```\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": doc})
+    assert markdown_problems(root) == []
