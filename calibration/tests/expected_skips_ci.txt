@@ -6,7 +6,3 @@ tests.test_pilot::test_an_uncalibrated_file_is_refused_rather_than_read_as_one_m
 tests.test_pilot::test_a_single_plane_time_lapse_is_not_a_stack	not present; Dryad
 tests.test_pilot::test_three_channels_force_an_explicit_choice	not present; Dryad
 tests.test_pilot::test_a_stack_with_no_time_axis_raises_no_time_axis_error_by_name	not present; Dryad
-# Evidence for #54, removed by the commit that fixes it.
-tests.test_claims_citations::test_every_fence_markdown_accepts_is_not_read[in a block quote]	evidence: Codex P2 on #54 at 35ce1d8
-tests.test_claims_citations::test_every_fence_markdown_accepts_is_not_read[a longer fence holding a shorter one]	evidence: Codex P2 on #54 at 35ce1d8
-tests.test_claims_citations::test_every_fence_markdown_accepts_is_not_read[never closed]	evidence: Codex P2 on #54 at 35ce1d8

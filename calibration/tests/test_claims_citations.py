@@ -79,8 +79,10 @@ N_CITATIONS = 160
 ANCESTOR_OF = "origin/master"
 
 # --- live Markdown ---------------------------------------------------------------------------
-# A fence may be indented by up to three spaces (CommonMark), as AGENTS.md's SUPERSEDED example is.
-FENCE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.M | re.S)
+# A fenced block, as CommonMark reads one: behind any container prefix (indentation, or the
+# `>` of a block quote), closed by a fence at least as long as the one that opened it, or
+# running to the end of the document when never closed. Codex found each missing form on #54.
+FENCE = re.compile(r"^[ \t>]*(?P<f>`{3,}|~{3,})[^\n]*(?:\n.*?^[ \t>]*(?P=f)[`~]*[ \t]*$|.*\Z)", re.M | re.S)
 RECORD = re.compile(r"RECORD: line numbers refer to ([0-9a-f]{7,40})\s*$")
 TAIL = re.compile(r":(\d+)(?:[-–](\d+))?")
 # In Markdown only the colon form is a detached number: "`:1455`", "(:439, :450)". The
@@ -587,8 +589,6 @@ def test_a_fence_indented_up_to_three_spaces_is_not_read(tmp_path, monkeypatch):
 # Codex on pull request #54, at 35ce1d8: a fence inside a block quote. The class is fence
 # recognition, so this control also plants the two other forms Markdown accepts and FENCE did
 # not: a longer fence holding a shorter one, and a fence never closed, which runs to the end.
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="evidence: Codex P2 on #54 at 35ce1d8; the next commit reads fences in containers")
 @pytest.mark.parametrize("doc", [
     "> Example:\n>\n> ```\n> stepper.jl:2\n> ```\n",
     "````\n```\nstepper.jl:2\n```\n````\n",
