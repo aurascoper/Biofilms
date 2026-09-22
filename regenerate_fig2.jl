@@ -23,7 +23,7 @@
 # rest. The 16-seed sweep is read as well, so the two committed artifacts must agree at
 # MCS 100. The script REFUSES to copy on any mismatch, and --self-test proves the refusal
 # bites by mutating a value taken from the reference itself.
-using Printf
+using Printf, SHA
 
 const HERE   = @__DIR__
 const OUT    = joinpath(HERE, "preprint", "figures")
@@ -115,12 +115,28 @@ function validate_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64},
     bad = mismatches(traj, ref)
     isempty(bad) || error("REFUSING TO COPY: the render does not match the committed reference:\n  " *
                           join(bad, "\n  ") * "\nThe figure would plot numbers no committed run supports.")
+    Sys.which("pdftotext") === nothing &&
+        error("REFUSING TO COPY: pdftotext is needed to refresh the text sidecar, and the claims " *
+              "guard reads that extraction rather than the PDF")
     tmp = mktempdir(; cleanup = false)
     export_figures(traj, nothing, params; outdir = tmp)
     for ext in ("pdf", "png")
         cp(joinpath(tmp, "$NAME.$ext"), joinpath(outdir, "$NAME.$ext"); force = true)
     end
     rm(tmp; recursive = true)
+
+    # THE SIDECARS ARE PART OF THE COPY, not a printed follow-up. The retracted-vocabulary
+    # guard scans the .txt extraction, so a rebuilt image beside last render's text would let
+    # it report a clean result over withdrawn wording.
+    pdf, txt = joinpath(outdir, "$NAME.pdf"), joinpath(outdir, "$NAME.txt")
+    run(`pdftotext -layout $pdf $txt`)
+    body = read(txt, String)
+    isempty(strip(body)) && error("REFUSING: the text sidecar came out empty, and an empty file " *
+                                  "greps the same as a clean one")
+    occursin("SEED42-SCOPE-01", body) ||
+        error("REFUSING: the text sidecar does not name the ledger row the caption cites, so the " *
+              "extraction is not of the figure this run drew")
+    write(joinpath(outdir, "$NAME.sha256"), bytes2hex(SHA.sha256(read(pdf))) * "\n")
     return sort(readdir(outdir))
 end
 
@@ -168,10 +184,11 @@ if "--self-test" in ARGS
     must_refuse("a non-finite overlap value", traj, params, ref, nan)
 
     allowed = mktempdir(; cleanup = false)
-    validate_and_copy(traj, params, ref, overlap, allowed) == ["$NAME.pdf", "$NAME.png"] ||
+    validate_and_copy(traj, params, ref, overlap, allowed) ==
+        ["$NAME.pdf", "$NAME.png", "$NAME.sha256", "$NAME.txt"] ||
         error("SELF-TEST: the committed artifacts did not copy the figure: $(readdir(allowed))")
     rm(allowed; recursive = true)
-    println("  self-test: the committed artifacts copy both files, so the boundary refuses by evidence")
+    println("  self-test: the committed artifacts write all four files, so the boundary refuses by evidence")
     exit(0)
 end
 
@@ -181,8 +198,6 @@ for mcs in 0:STEP:MCS, n in SPECIES_NAMES[[1, 3, 5]]
 end
 validate_and_copy(traj, params, ref, reference(SWEEP), OUT)
 
-@printf("\n  every plotted point matches the committed reference; copied %s.{pdf,png} into %s\n", NAME, OUT)
-println("\n  Now refresh the sidecars:")
-println("    cd preprint/figures")
-println("    pdftotext -layout $NAME.pdf $NAME.txt")
-println("    sha256sum $NAME.pdf | cut -d' ' -f1 > $NAME.sha256")
+@printf("\n  every plotted point matches the committed reference\n")
+@printf("  wrote %s.{pdf,png,txt,sha256} into %s\n", NAME, OUT)
+@printf("  sha256 %s\n", strip(read(joinpath(OUT, "$NAME.sha256"), String)))
