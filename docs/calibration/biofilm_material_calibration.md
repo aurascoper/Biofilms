@@ -34,7 +34,7 @@ Set out in full in the basis contract. In brief: site occupancy (dimensionless),
 and X_red (all g cm⁻³). Three of them can plausibly read `0.05`.
 
 The defect this branch exists to stop is live. `compute_radial_biomass`
-(`biofilms_potts.jl:1341–1342`) returns occupancy fractions; their **unweighted** mean is assigned
+(biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`) returns occupancy fractions; their **unweighted** mean is assigned
 to `RadiolysisParams.X_total` and `.X_red` — declared `g cm⁻³` — at L1445–1446 and L1797, then
 multiplied by rates in `cm³ g⁻¹ s⁻¹` at L1241. The product is `s⁻¹` only if X is a mass
 concentration.

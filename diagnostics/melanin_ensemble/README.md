@@ -72,7 +72,7 @@ one pooled number for both would be wrong in opposite directions.
 ## What the observable is
 
 Mean melanin over **occupied sites**, read straight from `take_snapshot`
-(`biofilms_potts.jl:1049`). Every occupied voxel contributes one term, so this is already
+(biofilms_potts.jl@`function take_snapshot(state::CPMState, mcs::Int)`). Every occupied voxel contributes one term, so this is already
 volume-weighted: a parcel of 200 sites counts 200 times a parcel of 1.
 
 The mean of **per-parcel means**, weighting each parcel equally, is a different quantity.

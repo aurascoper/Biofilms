@@ -1,3 +1,5 @@
+RECORD: line numbers refer to fd5348e
+
 # Red-team: two commissioned external reviews vs. what this repository already holds
 
 2026-08-31 · not a calibration, not a claims-ledger entry, not a dataset candidate.

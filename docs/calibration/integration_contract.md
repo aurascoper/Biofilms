@@ -38,7 +38,7 @@ because neither holds both halves. Only the join does:
 |---|---|
 | organism-scale entity + `hydrated_bulk_biofilm` material | a cell interior is not bulk biofilm; pick one scale |
 | `biomass_parcel` + `cytoplasm` material | a parcel bundles cells with water and EPS, so its contents are not cytoplasm |
-| `biological` lineage + `biomass_parcel` | parcel ancestry is not organism ancestry (`biofilms_potts.jl:1578-1583`) |
+| `biological` lineage + `biomass_parcel` | parcel ancestry is not organism ancestry (biofilms_potts.jl@`divide_cell! is a MANUALLY INVOKED demonstration primitive`) |
 | `computational` lineage + organism-scale entity | if the entity is an organism, say whether its lineage is too |
 | `dry_solid` + `hydrated_effective_medium` | the effective medium includes the water |
 | `explicit_components` bound to a voxel | the mapper assigns one class per voxel; separate phases need sub-voxel homogenization that does not exist |
@@ -175,7 +175,7 @@ configuration file.
 > *C. sphaerospermum*'s MCS-100 melanin runs from 1.2596 to 2.5613, mean 1.6595. Seed 42's value
 > of 1.437157 is the 31st lowest of the 256.
 >
-> The bias follows from the code, not from a fit. `biofilms_potts.jl:593` sets
+> The bias follows from the code, not from a fit. biofilms_potts.jl@`ΔH_mel -= 0.5 * M_local # melanin-rich site preferred` sets
 > `ΔH_mel -= 0.5 * M_local`. Line 81 sets `T_cpm = 5.0`, and line 806 accepts on
 > `exp(-ΔH / T_cpm)`. So the bias equals `exp(0.1 × M)`, which gives 1.1546 at seed 42.
 >

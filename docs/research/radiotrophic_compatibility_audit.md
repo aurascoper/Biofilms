@@ -106,7 +106,7 @@ PMC11567843, PMC11788442, PMC12941786, PMC1866175, PMC1347324.
 
 ## 3. Exact-species candidates, per species
 
-The seven modelled species are `biofilms_potts.jl:21-31`. Coverage is uneven to the point of being
+The seven modelled species are biofilms_potts.jl@`const SPECIES_NAMES = [`. Coverage is uneven to the point of being
 the finding.
 
 ### Cryptococcus neoformans
@@ -296,7 +296,7 @@ this repository, and it earns no phenotype at all.
 
 ### Two unsourced repository claims
 
-`biofilms_potts.jl:22` and `:24` describe *C. neoformans* and *C. sphaerospermum* as "radiotrophic"
+biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` describe *C. neoformans* and *C. sphaerospermum* as "radiotrophic"
 in inline comments with no citation; `data/calibration/spatial/entity_semantics.csv` repeats
 "Radiotrophic melanized yeast" for CN with `evidence_basis=declared`. This audit locates the primary
 source those comments trace to — Dadachova 2007 — and simultaneously locates three same-species or
@@ -305,11 +305,11 @@ downgraded; that is a documentation finding, reported and not fixed.
 
 Two further in-repo claims are refuted rather than merely unsourced:
 
-- `preprint/modeling_radiotrophic_fitness.md:31` asserts *A. niger* melanin "confers substantial
+- preprint/modeling_radiotrophic_fitness.md@5980dc5@`confers substantial` asserts *A. niger* melanin "confers substantial
   radioprotection". Cortesão 2020 states the opposite for every ionizing modality it tested:
   *"deficiency in pigmentation did not alter survivability after exposure to ionizing radiation
   (X-rays or cosmic radiation)."*
-- `preprint/modeling_radiotrophic_fitness.md:178` tabulates a melanin production rate
+- preprint/modeling_radiotrophic_fitness.md@5980dc5@`α_M | *A. niger* | 0.03–0.10` tabulates a melanin production rate
   α_M = 0.03-0.10 µg/cell/Gy for *A. niger*. No located measurement supports it — Cortesão 2020
   quantifies no melanin at all — and a per-cell basis is not one the CPM entity semantics admit,
   since a cell ID is a computational biomass parcel.
@@ -555,7 +555,7 @@ from viable cell count**, and therefore a fortiori from taxonomic abundance and 
 occupancy. That is direct empirical support for the existing refusal in `active_from_taxonomic()`,
 and against the model's hard-coded default `X_red = 0.3` labelled "(Shewanella proxy)". Note also
 that even a perfect `f_red,dry` measurement would not unblock the RADIODIALYSIS gate, which is
-blocked by a units error at `biofilms_potts.jl:1341-1342` and `:1445-1446`, not by missing data.
+blocked by a units error at biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]` and biofilms_potts.jl@`X_tot, X_rd = compute_radial_biomass(state, rp.Nr)`, not by missing data.
 
 ## 9. Evidence contradicting simplified melanin assumptions
 
@@ -995,7 +995,7 @@ be requested from anyone, because nobody has made it. The one retrieval that wou
 the picture, Zhdanova 2004, bears on *radiotropism*, not radiotrophy, and its own remaining blocker
 is whether its dose gradient was measured or calculated. Until such an experiment is run, the
 repository should carry `radiotrophic` for **no** species, and the unsourced inline comments at
-`biofilms_potts.jl:22` and `:24` should become cited-and-contested or be removed.
+biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` should become cited-and-contested or be removed.
 
 ### CPM calibration
 

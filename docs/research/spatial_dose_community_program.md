@@ -434,8 +434,8 @@ the evidence register; it cannot clear the design gate.
 
 **What enforces this gate, precisely, because "an unenforced paragraph" understates it.**
 Nothing in the suite reads D3 — it is prose with a declared type. But the *precondition* it
-rests on is guarded: `coupling/biofilm_openmc/model.py:79` sets `particle="photon"` and
-`coupling/tests/test_model_build.py:25` asserts it, so switching the transport to a neutron
+rests on is guarded: coupling/biofilm_openmc/model.py@`particle="photon")` sets `particle="photon"` and
+coupling/tests/test_model_build.py@`assert src.particle == "photon"` asserts it, so switching the transport to a neutron
 or mixed field fails a test loudly. **The gate cannot be walked past silently, only
 deliberately** — and the deliberate case is a person reading a failing assertion and deciding
 what to do, which lands them here. For a judgement that cannot be mechanised, a guarded

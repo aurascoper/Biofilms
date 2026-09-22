@@ -68,9 +68,9 @@ the same as a field nobody ever wrote.
 Two things the snapshot does not carry, with the dataset list written at those lines as the scope. One is
 the nutrient field, which is only in the restart checkpoint (`fields/nutrient`), the other is the OpenMC
 dose field. The per-source-particle field never reaches a file at the transport stage
-(`coupling/biofilm_openmc/drivers.py:185` and `:328`); what `transport_result_*.h5` holds is
+(coupling/biofilm_openmc/drivers.py@`is written: that schema is Gy/s.` and coupling/biofilm_openmc/drivers.py@`no transport_result.h5 written — that schema is Gy/s`); what `transport_result_*.h5` holds is
 `mesh/dose_rate_mean_Gy_s`, in Gy/s with the source activity applied
-(`coupling/biofilm_openmc/results.py:51`). The exporter takes both as optional inputs and
+(coupling/biofilm_openmc/results.py@`f["mesh/dose_rate_mean_Gy_s"] = _logical_to_h5py(result.dose_rate_mean_Gy_s)`). The exporter takes both as optional inputs and
 labels the dose array by that dataset name.
 
 ## GLMakie `voxels`
@@ -291,7 +291,7 @@ measured inventory of that dated ParaView run, and this note states what moved r
 renumbering a recorded observation.
 
 **Step 7 is the first GLMakie render on Apple Silicon in this repository.** `--still`, not
-interactive: the standing Codex P2 at `viewer/visualize_lattice.jl:53` — `display(fig)` on one
+interactive: the standing Codex P2 at viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())` — `display(fig)` on one
 figure while waiting on a different `GLMakie.Screen()` — bites hardest on macOS, where OpenGL
 4.1 is deprecated and the event loop is main-thread-only. The still path never opens a second
 screen and is unaffected.
@@ -322,8 +322,8 @@ committing.
 
 **It is not an unused dependency, and an earlier revision of this paragraph said it was.**
 That claim came from grepping for `using AMDGPU` / `import AMDGPU`, which returns zero hits --
-but `biofilms_potts_jacc.jl:25` calls `JACC.@init_backend`, which loads whichever backend
-`LocalPreferences.toml` names, and `:13` documents `JACC.set_backend("amdgpu"; storage=:host)`
+but biofilms_potts_jacc.jl@`JACC.@init_backend` calls `JACC.@init_backend`, which loads whichever backend
+`LocalPreferences.toml` names, and biofilms_potts_jacc.jl@`JACC.set_backend("amdgpu"; storage=:host)` documents `JACC.set_backend("amdgpu"; storage=:host)`
 as a supported configuration. AMDGPU is therefore an **indirect runtime dependency of the
 amdgpu backend path**, not a declaration nothing reaches. A grep for direct imports cannot see
 a dependency loaded through a macro, and reporting that absence as general was wrong.

@@ -1,3 +1,5 @@
+RECORD: line numbers refer to 69eea21
+
 # Red-team: unsourced session claims vs. the existing evidence audit
 
 2026-08-24 · not a calibration, not a claims-ledger entry, not a dataset candidate.

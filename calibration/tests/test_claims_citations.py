@@ -97,7 +97,19 @@ MD_BARE_ALLOWED = {("docs/metal_feasibility_macos_arm64.md", "JACC/src/threads/t
 # citation. An edit to that element fails the gate until someone rereads the claim beside
 # the cited text and updates one digest here. The digest reads raw text, markup and comments
 # included, so a comment cannot hide words from it (issue #53 was that gap in another pin).
-CONTEXT_PINS: set = set()
+# The pins are data, in data/markdown_citation_pins.csv beside the ledger. They name documents
+# and quote old code, and a test file holding those words is a source to the retracted-word
+# scan (GUARD-SCOPE-01), which reads no .csv. Pinned 2026-09-21, after each claim was read
+# beside its cited text: 45 citations and 9 tails converted from `file:line`, in 15 documents.
+PINS = Path("data") / "markdown_citation_pins.csv"
+
+
+def _load_pins(root: Path) -> set:
+    with open(root / PINS, encoding="utf-8", newline="") as fh:
+        return {(r["document"], r["citation"], r["digest"]) for r in csv.DictReader(fh)}
+
+
+CONTEXT_PINS = _load_pins(REPO)
 
 
 def _flat(text: str) -> str:
@@ -230,8 +242,13 @@ def markdown_problems(root: Path = REPO) -> list:
     `file:line`, a detached number, and a stale pin or allowance. A document whose first line
     is `RECORD: line numbers refer to <commit>` keeps its bare citations, and each must
     name a line that existed at that commit."""
+    from test_guide_citations import citations as guide_rows
     out, seen, allowed = [], set(), set()
     for doc, text in _md_docs(root):
+        # A guide's table rows are checked by test_guide_citations: the fragment must be on
+        # the cited line, and the guide's render is pinned. Only the rows its parser reads
+        # are left to it, so a line citation in a guide's prose is still reported here.
+        guide = {f"{c['path']}:{c['line']}" for c in guide_rows(text)} if doc.startswith("docs/guides/") else set()
         record = RECORD.match(text.split("\n", 1)[0])
         record_ok = record is not None and _revision_ok(root, record.group(1))
         if record and not record_ok:
@@ -254,6 +271,8 @@ def markdown_problems(root: Path = REPO) -> list:
             for m in BARE.finditer(rest):
                 if (doc, m.group(0)) in MD_BARE_ALLOWED:
                     allowed.add((doc, m.group(0)))
+                elif m.group(0) in guide:
+                    continue
                 elif record:
                     out += _record_problems(root, doc, record.group(1), m.group(0)) if record_ok else []
                 else:
@@ -268,8 +287,6 @@ def markdown_problems(root: Path = REPO) -> list:
     return out
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="evidence: the live Markdown still cites by line number; the next commit converts it")
 def test_every_citation_in_live_markdown_resolves_and_keeps_its_context():
     assert markdown_problems() == []
 
@@ -471,3 +488,15 @@ def test_a_stale_pin_and_a_stale_allowance_are_reported(tmp_path, monkeypatch):
     monkeypatch.setitem(globals(), "MD_BARE_ALLOWED", {("notes.md", "deck.tex:3")})
     got = markdown_problems(root)
     assert len(got) == 2 and "CONTEXT_PINS names" in got[0] and "MD_BARE_ALLOWED names" in got[1], got
+
+
+def test_a_guide_row_is_left_to_its_own_check_and_guide_prose_is_not(tmp_path, monkeypatch):
+    """test_guide_citations checks a guide's table rows, fragment on the cited line. The row
+    is skipped here because that parser reads it, not because the file is in docs/guides/."""
+    row = "| the step | `stepper.jl:2` | `s.t += 1` |\n"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "docs/guides/g.md": row, "notes.md": row})
+    got = markdown_problems(root)
+    assert len(got) == 1 and got[0].startswith("notes.md") and "bare citation stepper.jl:2" in got[0], got
+    (root / "docs/guides/g.md").write_text(row + "\nAnd in prose, `stepper.jl:6`.\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 2 and got[0].startswith("docs/guides/g.md") and "stepper.jl:6" in got[0], got

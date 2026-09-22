@@ -58,7 +58,7 @@ calibration. Why, in each case:
   `HydratedVolume.require_whole_biofilm()` has nothing to refuse because nothing was
   measured.
 
-The pilot's actual purpose is **corrective**: `biofilms_potts.jl:21-31` labels species 3
+The pilot's actual purpose is **corrective**: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` labels species 3
 a *"radiotrophic filamentous fungus"* in an unsourced inline comment, and
 `data/calibration/spatial/entity_semantics.csv` repeats declared radiotrophy language
 for CN. This pilot makes the flagship study behind that word citable, and makes visible
@@ -165,7 +165,7 @@ This pilot exercises **no calibration module**, and that is the finding. It exer
   k values must live in prose cells, not numeric columns.
 - `data/calibration/spatial/sources.csv` — one new `*_SCREEN_2026`-pattern source row,
   branch-local, pinning url + document_version + accessed_date + sha256.
-- Documentation targets, flagged not fixed: `biofilms_potts.jl:21-31` and
+- Documentation targets, flagged not fixed: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` and
   `data/calibration/spatial/entity_semantics.csv` row CS.
 
 ### 1.6 The OpenMC modality reconciliation, and what it would require
@@ -526,7 +526,7 @@ not exist here.
   `PROVISIONAL` with the held-out, surrogate, paired-sample and threshold blockers named.
 - `calibration/biofilm_calibration/acquisition.py` — the `institutional_approval_id` and
   biosafety-follows-strains rules, for the campaign this pilot is designing.
-- `calibration/biofilm_calibration/spatial/representability.py:49-53` — B. subtilis is
+- calibration/biofilm_calibration/spatial/representability.py@`"needs a surface-area or elongation term; B. subtilis is "` — B. subtilis is
   already named there as a morphology the model cannot hold at any pitch.
 
 ### 3.6 Expected outputs
