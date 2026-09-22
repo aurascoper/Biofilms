@@ -6,6 +6,3 @@ tests.test_pilot::test_an_uncalibrated_file_is_refused_rather_than_read_as_one_m
 tests.test_pilot::test_a_single_plane_time_lapse_is_not_a_stack	not present; Dryad
 tests.test_pilot::test_three_channels_force_an_explicit_choice	not present; Dryad
 tests.test_pilot::test_a_stack_with_no_time_axis_raises_no_time_axis_error_by_name	not present; Dryad
-# Evidence for #54, removed by the commit that fixes it.
-tests.test_claims_citations::test_guide_prose_repeating_a_row_citation_is_still_read	evidence: Codex P1 on #54 at 5ad0802
-tests.test_claims_citations::test_a_fence_indented_up_to_three_spaces_is_not_read	evidence: Codex P2 on #54 at 5ad0802
