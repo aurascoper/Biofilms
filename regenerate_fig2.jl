@@ -87,6 +87,23 @@ function render()
     return params, traj
 end
 
+"""Every reason the second sweep fails to confirm the first, named rather than assumed. A
+missing row, a non-finite value and a disagreement are three different artifacts, and a
+comparison written as `> tol` would read NaN as agreement, because NaN compares false."""
+function overlap_problems(overlap::Dict{Tuple{Int,String},Float64}, ref::Dict{Tuple{Int,String},Float64})
+    out = String[]
+    for n in SPECIES_NAMES
+        if !haskey(overlap, (MCS, n))
+            push!(out, "no MCS $MCS row for $n")
+        elseif !isfinite(overlap[(MCS, n)])
+            push!(out, "$n has a non-finite value at MCS $MCS: $(overlap[(MCS, n)])")
+        elseif !(abs(overlap[(MCS, n)] - ref[(MCS, n)]) <= 5e-7)
+            push!(out, @sprintf("%s disagrees at MCS %d: %.6f against %.6f", n, MCS, overlap[(MCS, n)], ref[(MCS, n)]))
+        end
+    end
+    return out
+end
+
 """The production boundary: compare every plotted point, then copy, or refuse and copy
 nothing. The self-test drives THIS, so a refusal that stopped refusing could not pass it."""
 function check_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64}, outdir::String)
@@ -131,18 +148,29 @@ if "--self-test" in ARGS
     check_and_copy(traj, params, ref, allowed) == ["$NAME.pdf", "$NAME.png"] ||
         error("SELF-TEST: the unmutated reference did not copy the figure: $(readdir(allowed))")
     rm(refused; recursive = true); rm(allowed; recursive = true)
+
+    # The overlap guard gets its own known-bad, both shapes, from the artifact: one row
+    # removed, and one value replaced by NaN, which a `> tol` comparison would read as
+    # agreement.
+    overlap = reference(SWEEP)
+    isempty(overlap_problems(overlap, ref)) || error("SELF-TEST: the committed sweeps already disagree")
+    dropped = filter(kv -> kv.first != (MCS, SPECIES_NAMES[1]), overlap)
+    length(dropped) == length(overlap) - 1 || error("SELF-TEST: the row was not dropped")
+    any(occursin(SPECIES_NAMES[1], m) for m in overlap_problems(dropped, ref)) ||
+        error("SELF-TEST: a missing overlap row was not refused")
+    nan = copy(overlap); nan[(MCS, SPECIES_NAMES[1])] = NaN
+    any(occursin("non-finite", m) for m in overlap_problems(nan, ref)) ||
+        error("SELF-TEST: a non-finite overlap value was not refused")
+
     println("  self-test: a mutated reference is refused at the copy boundary, and nothing is written")
     println("  self-test: the unmutated reference copies both files, so the check refuses by evidence")
+    println("  self-test: a dropped overlap row and a non-finite overlap value are both refused")
     exit(0)
 end
 
-# The two committed sweeps must agree where they overlap. A row MISSING from the second
-# sweep is a truncated artifact, not agreement: NaN compares false against any bound.
-overlap = reference(SWEEP)
-absent = [n for n in SPECIES_NAMES if !haskey(overlap, (MCS, n))]
-isempty(absent) || error("REFUSING: $SWEEP has no MCS $MCS row for $absent")
-disagree = [n for n in SPECIES_NAMES if abs(overlap[(MCS, n)] - ref[(MCS, n)]) > 5e-7]
-isempty(disagree) || error("REFUSING: the two committed sweeps disagree at MCS $MCS for $disagree")
+problems = overlap_problems(reference(SWEEP), ref)
+isempty(problems) || error("REFUSING: the second committed sweep does not confirm the first:\n  " *
+                           join(problems, "\n  "))
 
 params, traj = render()
 for mcs in 0:STEP:MCS, n in SPECIES_NAMES[[1, 3, 5]]
