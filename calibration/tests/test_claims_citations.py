@@ -231,9 +231,11 @@ def _record_problems(root: Path, doc: str, commit: str, lit: str) -> list:
     path = name if name in listed else beside if beside in listed else same[0] if len(same) == 1 else None
     if path is None:
         return [f"{doc}: {lit} names no file at {commit}"]
-    n_lines = len((_text(root, path, commit) or "").split("\n"))
-    ends = [int(t.group(2) or t.group(1)) for t in TAIL.finditer(lit[len(name):])]
-    return [f"{doc}: {lit} is past the end of {path} at {commit} ({n_lines} lines)" for e in ends if e > n_lines][:1]
+    # splitlines, not split("\n"): a file that ends in a newline has no line after it.
+    n_lines = len((_text(root, path, commit) or "").splitlines())
+    parts = [(int(t.group(1)), int(t.group(2) or t.group(1))) for t in TAIL.finditer(lit[len(name):])]
+    return [f"{doc}: {lit} is not a line of {path} at {commit} ({n_lines} lines)"
+            for a, b in parts if not 1 <= a <= b <= n_lines][:1]
 
 
 def markdown_problems(root: Path = REPO) -> list:
@@ -243,7 +245,7 @@ def markdown_problems(root: Path = REPO) -> list:
     is `RECORD: line numbers refer to <commit>` keeps its bare citations, and each must
     name a line that existed at that commit."""
     from test_guide_citations import citations as guide_rows
-    out, seen, allowed = [], set(), set()
+    out, found, allowed = [], [], set()
     for doc, text in _md_docs(root):
         # A guide's table rows are checked by test_guide_citations: the fragment must be on
         # the cited line, and the guide's render is pinned. Only the rows its parser reads
@@ -260,13 +262,7 @@ def markdown_problems(root: Path = REPO) -> list:
                 if verdict != "resolves":
                     out.append(f"{where} {m.group(0)}: {verdict}")
                 if record is None:
-                    key = (doc, m.group(0), context_digest(el))
-                    seen.add(key[:2])
-                    if key not in CONTEXT_PINS:
-                        known = any(p[:2] == key[:2] for p in CONTEXT_PINS)
-                        out.append(f"{where} {m.group(0)}: " + (
-                            f"context changed, digest now {key[2]}; reread the claim, then update its pin" if known
-                            else f"no context pin; read the claim beside the cited text, then pin {key[2]}"))
+                    found.append(((doc, m.group(0), context_digest(el)), where))
             rest = CITATION.sub(" ", el)
             for m in BARE.finditer(rest):
                 if (doc, m.group(0)) in MD_BARE_ALLOWED:
@@ -280,8 +276,21 @@ def markdown_problems(root: Path = REPO) -> list:
             if record is None:
                 out += [f"{where}: detached line number {m.group(0)!r}; give it a file and a snippet"
                         for m in MD_DETACHED.finditer(BARE.sub(" ", rest))]
-    out += [f"CONTEXT_PINS names {lit} in {doc}, and the document no longer has it"
-            for doc, lit, _ in sorted(CONTEXT_PINS) if (doc, lit) not in seen]
+    # A pin is matched by its full key, digest included: two uses of one citation are two pins,
+    # and deleting one use must leave its pin stale (Codex on #54). An unmatched use and an
+    # unmatched pin of the same citation pair off, one to one, as a changed element.
+    spare = sorted(set(CONTEXT_PINS) - {key for key, _ in found})
+    for key, where in found:
+        if key in CONTEXT_PINS:
+            continue
+        partner = next((p for p in spare if p[:2] == key[:2]), None)
+        if partner:
+            spare.remove(partner)
+        out.append(f"{where} {key[1]}: " + (
+            f"context changed, digest now {key[2]}; reread the claim, then update its pin" if partner
+            else f"no context pin; read the claim beside the cited text, then pin {key[2]}"))
+    out += [f"CONTEXT_PINS names {lit} in {doc} with digest {digest}, and no element has that text"
+            for doc, lit, digest in spare]
     out += [f"MD_BARE_ALLOWED names {lit} in {doc}, and the document no longer has it"
             for doc, lit in sorted(MD_BARE_ALLOWED - allowed)]
     return out
@@ -475,7 +484,8 @@ def test_a_record_keeps_its_line_numbers_and_each_must_have_existed(tmp_path, mo
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "none\n"})
     then = _git(root, "rev-parse", "--short=7", "HEAD")
     for body, want in ((f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:2` and `:6`.\n", []),
-                       (f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:99`.\n", ["past the end"]),
+                       (f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:99`.\n", ["is not a line of"]),
+                       (f"RECORD: line numbers refer to {then}\n\nAt `stepper.jl:7`.\n", []),
                        ("RECORD: line numbers refer to 0123456\n\nAt `stepper.jl:2`.\n", ["revision missing"])):
         (root / "notes.md").write_text(body, encoding="utf-8")
         got = markdown_problems(root)
@@ -503,8 +513,6 @@ def test_a_guide_row_is_left_to_its_own_check_and_guide_prose_is_not(tmp_path, m
 
 
 # Codex on pull request #54, at 7684792, two P1 findings, both reproduced here before the fix.
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="evidence: Codex P1 on #54; the next commit keys the stale check on the digest")
 def test_deleting_one_of_two_pinned_uses_of_a_citation_is_reported(tmp_path, monkeypatch):
     """The stale check read (document, citation) alone. With one citation pinned in two
     paragraphs, deleting one paragraph left its pin unreported, because the other paragraph
@@ -520,8 +528,6 @@ def test_deleting_one_of_two_pinned_uses_of_a_citation_is_reported(tmp_path, mon
     assert len(got) == 1 and "CONTEXT_PINS names" in got[0] and context_digest(two) in got[0], got
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="evidence: Codex P1 on #54; the next commit counts lines without the final newline")
 @pytest.mark.parametrize("ref", ["stepper.jl:0", "stepper.jl:8", "stepper.jl:7-8"])
 def test_a_record_line_that_never_existed_is_reported(tmp_path, monkeypatch, ref):
     """STEPPER has seven lines and ends in a newline. split("\\n") counted an eighth, and
