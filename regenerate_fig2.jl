@@ -87,48 +87,68 @@ function render()
     return params, traj
 end
 
+"""The production boundary: compare every plotted point, then copy, or refuse and copy
+nothing. The self-test drives THIS, so a refusal that stopped refusing could not pass it."""
+function check_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64}, outdir::String)
+    bad = mismatches(traj, ref)
+    isempty(bad) || error("REFUSING TO COPY: the render does not match the committed reference:\n  " *
+                          join(bad, "\n  ") * "\nThe figure would plot numbers no committed run supports.")
+    tmp = mktempdir(; cleanup = false)
+    export_figures(traj, nothing, params; outdir = tmp)
+    for ext in ("pdf", "png")
+        cp(joinpath(tmp, "$NAME.$ext"), joinpath(outdir, "$NAME.$ext"); force = true)
+    end
+    rm(tmp; recursive = true)
+    return sort(readdir(outdir))
+end
+
 ref = reference(REF)
 gaps = reference_gaps(ref)
 isempty(gaps) || error("REFUSING: the reference in $REF does not cover $(length(gaps)) of the " *
                        "plotted points: $(first(gaps, 5))")
 
 if "--self-test" in ARGS
-    # The known-bad is taken from the artifact, never typed: one value from the reference,
-    # moved by 1e-3. A mutation that lands nowhere would pass silently, so the mutated
-    # reference is asserted to differ first.
+    # The known-bad is taken from the artifact, never typed: one value of the reference,
+    # moved by 1e-3. The mutation is asserted to apply, and the run goes through
+    # check_and_copy, the boundary the real run uses, into a scratch directory that must
+    # stay empty. Testing `mismatches` alone would leave a bypassed refusal green.
     params, traj = render()
-    isempty(mismatches(traj, ref)) || error("SELF-TEST: the unmutated reference already mismatches")
     victim = (STEP, SPECIES_NAMES[3])
     mutated = copy(ref)
     mutated[victim] = ref[victim] + 1e-3
     mutated[victim] == ref[victim] && error("SELF-TEST: the mutation did not apply at $victim")
-    bad = mismatches(traj, mutated)
-    length(bad) == 1 && occursin(SPECIES_NAMES[3], bad[1]) ||
-        error("SELF-TEST: a mutated reference produced $(length(bad)) mismatches: $bad")
-    println("  self-test: a mutated reference value is refused, and names $(SPECIES_NAMES[3]) at MCS $STEP")
-    println("  self-test: the unmutated reference passes, so the check is not refusing everything")
+
+    refused, allowed = mktempdir(; cleanup = false), mktempdir(; cleanup = false)
+    threw = try
+        check_and_copy(traj, params, mutated, refused)
+        false
+    catch err
+        occursin("REFUSING TO COPY", sprint(showerror, err)) || rethrow(err)
+        true
+    end
+    threw || error("SELF-TEST: a mutated reference was copied")
+    isempty(readdir(refused)) || error("SELF-TEST: the refusal still wrote $(readdir(refused))")
+    check_and_copy(traj, params, ref, allowed) == ["$NAME.pdf", "$NAME.png"] ||
+        error("SELF-TEST: the unmutated reference did not copy the figure: $(readdir(allowed))")
+    rm(refused; recursive = true); rm(allowed; recursive = true)
+    println("  self-test: a mutated reference is refused at the copy boundary, and nothing is written")
+    println("  self-test: the unmutated reference copies both files, so the check refuses by evidence")
     exit(0)
 end
 
-# The two committed sweeps must agree where they overlap, at MCS 100.
+# The two committed sweeps must agree where they overlap. A row MISSING from the second
+# sweep is a truncated artifact, not agreement: NaN compares false against any bound.
 overlap = reference(SWEEP)
-disagree = [n for n in SPECIES_NAMES if abs(get(overlap, (MCS, n), NaN) - ref[(MCS, n)]) > 5e-7]
+absent = [n for n in SPECIES_NAMES if !haskey(overlap, (MCS, n))]
+isempty(absent) || error("REFUSING: $SWEEP has no MCS $MCS row for $absent")
+disagree = [n for n in SPECIES_NAMES if abs(overlap[(MCS, n)] - ref[(MCS, n)]) > 5e-7]
 isempty(disagree) || error("REFUSING: the two committed sweeps disagree at MCS $MCS for $disagree")
 
 params, traj = render()
-bad = mismatches(traj, ref)
 for mcs in 0:STEP:MCS, n in SPECIES_NAMES[[1, 3, 5]]
     @printf("  MCS %3d  %-20s committed %.6f\n", mcs, n, ref[(mcs, n)])
 end
-isempty(bad) || error("REFUSING TO COPY: the render does not match the committed reference:\n  " *
-                      join(bad, "\n  ") * "\nThe figure would plot numbers no committed run supports.")
-
-tmp = mktempdir(; cleanup = false)
-export_figures(traj, nothing, params; outdir = tmp)
-for ext in ("pdf", "png")
-    cp(joinpath(tmp, "$NAME.$ext"), joinpath(OUT, "$NAME.$ext"); force = true)
-end
-rm(tmp; recursive = true)
+check_and_copy(traj, params, ref, OUT)
 
 @printf("\n  every plotted point matches the committed reference; copied %s.{pdf,png} into %s\n", NAME, OUT)
 println("\n  Now refresh the sidecars:")
