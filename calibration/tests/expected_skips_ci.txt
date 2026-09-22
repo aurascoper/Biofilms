@@ -6,9 +6,3 @@ tests.test_pilot::test_an_uncalibrated_file_is_refused_rather_than_read_as_one_m
 tests.test_pilot::test_a_single_plane_time_lapse_is_not_a_stack	not present; Dryad
 tests.test_pilot::test_three_channels_force_an_explicit_choice	not present; Dryad
 tests.test_pilot::test_a_stack_with_no_time_axis_raises_no_time_axis_error_by_name	not present; Dryad
-# Evidence for #54, removed by the commit that fixes it.
-tests.test_claims_citations::test_text_that_is_not_fenced_is_read[four spaces of backticks is not a fence]	evidence: Codex P1 on #54 at ce93466
-tests.test_claims_citations::test_text_that_is_not_fenced_is_read[a fence never closed is read]	evidence: Codex P1 on #54 at ce93466
-tests.test_claims_citations::test_a_line_that_starts_no_block_does_not_split_its_paragraph[a hash without a space]	evidence: Codex P1 on #54 at ce93466
-tests.test_claims_citations::test_a_line_that_starts_no_block_does_not_split_its_paragraph[a pipe outside a table]	evidence: Codex P1 on #54 at ce93466
-tests.test_claims_citations::test_a_line_that_starts_no_block_does_not_split_its_paragraph[an ordered item other than 1]	evidence: Codex P1 on #54 at ce93466
