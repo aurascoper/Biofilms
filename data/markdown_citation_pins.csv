@@ -1,57 +1,57 @@
 document,citation,digest
-AGENTS.md,"README.md@`The linear rise is structural, because the field equation has no saturation`",d3746e2c9cb0cb09
-AGENTS.md,coupling/biofilm_openmc/mesh.py@`An earlier report stated`,0c6dd3b1ca6bc514
-AGENTS.md,docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries`,d3746e2c9cb0cb09
-AGENTS.md,docs/research/radiotrophic_compatibility_audit.md@`comparison is **not performed here**`,1d12733a0de5d1f0
-README.md,biofilms_potts.jl@`Hamiltonian: H = H_adh + H_vol + H_rad + H_mel`,1b2d8f5c8ad38676
-README.md,"biofilms_potts.jl@`const RADIOTROPIC = Set([CN, CS])`",6e105410ec998f49
-README.md,"biofilms_potts.jl@`println(""  H = H_adh + H_vol + H_rad + H_mel`",1b2d8f5c8ad38676
-README.md,"biofilms_potts.jl@`Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)`",1b2d8f5c8ad38676
-README.md,"biofilms_potts_jacc.jl@`src = split(src, ""# 13. Figure export"")[1]`",1056db64c877b704
-README.md,"tests/runtests.jl@`src = split(src, ""# 13. Figure export"")[1]`",1056db64c877b704
-README.md,"validate_serial.jl@`src = split(src, ""# 13. Figure export"")[1]`",1056db64c877b704
-diagnostics/melanin_ensemble/README.md,"biofilms_potts.jl@`function take_snapshot(state::CPMState, mcs::Int)`",60b1f7d60dd09c81
-diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@7003916@`@test s1.V < V_MAX && s2.V < V_MAX`,d7c2d8158e874757
-diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@`Asserted SEPARATELY`,d7c2d8158e874757
-diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@`indexes both spatial class and sequence position`,c4e5cdb0ad559a1f
-docs/calibration/biofilm_material_calibration.md,biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`,168c5583e4d3706e
+AGENTS.md,"README.md@`The linear rise is structural, because the field equation has no saturation`",41cffa33ca607d6c
+AGENTS.md,coupling/biofilm_openmc/mesh.py@`An earlier report stated`,bb1783b2fb292f28
+AGENTS.md,docs/preprint_revision_plan.md@`It is a scatter of Table 2's own entries`,41cffa33ca607d6c
+AGENTS.md,docs/research/radiotrophic_compatibility_audit.md@`comparison is **not performed here**`,270da23567b75e51
+README.md,biofilms_potts.jl@`Hamiltonian: H = H_adh + H_vol + H_rad + H_mel`,8da695de2d6bb1dd
+README.md,"biofilms_potts.jl@`const RADIOTROPIC = Set([CN, CS])`",018c855d39ca7af7
+README.md,"biofilms_potts.jl@`println(""  H = H_adh + H_vol + H_rad + H_mel`",8da695de2d6bb1dd
+README.md,"biofilms_potts.jl@`Ḋ(R)=%.1f (placeholder, no seconds_per_mcs conversion — not Gy/s)`",8da695de2d6bb1dd
+README.md,"biofilms_potts_jacc.jl@`src = split(src, ""# 13. Figure export"")[1]`",07200371bd4026af
+README.md,"tests/runtests.jl@`src = split(src, ""# 13. Figure export"")[1]`",07200371bd4026af
+README.md,"validate_serial.jl@`src = split(src, ""# 13. Figure export"")[1]`",07200371bd4026af
+diagnostics/melanin_ensemble/README.md,"biofilms_potts.jl@`function take_snapshot(state::CPMState, mcs::Int)`",03a7eacd9cc37839
+diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@7003916@`@test s1.V < V_MAX && s2.V < V_MAX`,75a7b14d3ffb9fd3
+diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@`Asserted SEPARATELY`,75a7b14d3ffb9fd3
+diagnostics/volume_conflict/README.md,tests/jacc_parity_tests.jl@`indexes both spatial class and sequence position`,3cc40b89722ee37f
+docs/calibration/biofilm_material_calibration.md,biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`,546de05848f2b8a2
 docs/calibration/integration_contract.md,biofilms_potts.jl@`divide_cell! is a MANUALLY INVOKED demonstration primitive`,9892bfe800a61b58
-docs/calibration/integration_contract.md,biofilms_potts.jl@`ΔH_mel -= 0.5 * M_local # melanin-rich site preferred`,f4c557189ef573b0
-docs/calibration/material_basis_contract.md,biofilms_potts.jl@`Compute radial-band-averaged biomass density from the CPM lattice.`,84d5a91ea5eefc01
-docs/calibration/sop/harvest_dewatering.md,docs/research/radiotrophic_lab_gap.md@`THIS IS THE MOST CONSEQUENTIAL ITEM IN THE TABLE`,29b462c09482e8e5
-docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`Base.@kwdef struct RadiolysisParams`,4d7c5a4af53f39e7
-docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`JACC.@init_backend`,b8bd6f88f24fcc2d
-docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`mutable struct RadiolysisState`,4d7c5a4af53f39e7
-docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`σt > Int32(0) && (JACC.@atomic vols[σt] -= Int32(1)) σs > Int32(0) && (JACC.@atomic vols[σs] += Int32(1))`,aaabcb6fd2a716bf
-docs/metal_feasibility_macos_arm64.md,docs/jacc_coupling_port.md@`Apple GPUs support only 32-bit floating point`,4d7c5a4af53f39e7
-docs/metal_feasibility_macos_arm64.md,tests/jacc_parity_tests.jl@`@test Threads.nthreads() == 1`,14648ecafaa28594
-docs/metal_feasibility_macos_arm64.md,tests/jacc_parity_tests.jl@`@test Threads.nthreads() == 1`,c5c3a4e58fa41487
-docs/research/radiotrophic_calibration_map.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,eba53bb1a76e419a
-docs/research/radiotrophic_calibration_map.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",eba53bb1a76e419a
-docs/research/radiotrophic_calibration_map.md,biofilms_potts.jl@`divide_cell! is a MANUALLY INVOKED demonstration primitive`,d2b440be253d564d
-docs/research/radiotrophic_calibration_map.md,config/coupling_template.toml@`declared calibration; no default exists.`,47b8781ccc4529b9
-docs/research/radiotrophic_calibration_map.md,"coupling/biofilm_openmc/config.py@`FieldSpec(""normalization"", ""hamiltonian_scale"", ""hamiltonian_scale"", ""float"", ""cpm_feedback""),`",47b8781ccc4529b9
-docs/research/radiotrophic_calibration_map.md,data/parameter_provenance.csv@`Dose response of viable biomass`,04ce4b1cacb652b9
-docs/research/radiotrophic_calibration_map.md,"data/parameter_provenance.csv@`none,response.hamiltonian,`",47b8781ccc4529b9
-docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,0abb59992d5894f0
-docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,8dc081b4a98802dc
-docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",0abb59992d5894f0
-docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",8dc081b4a98802dc
-docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@`X_tot, X_rd = compute_radial_biomass(state, rp.Nr)`",f4a665606f7539bd
-docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`,f4a665606f7539bd
-docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`const SPECIES_NAMES = [`,a858da988246c754
-docs/research/radiotrophic_compatibility_audit.md,preprint/modeling_radiotrophic_fitness.md@5980dc5@`confers substantial`,61789b7ebda51970
-docs/research/radiotrophic_compatibility_audit.md,preprint/modeling_radiotrophic_fitness.md@5980dc5@`α_M | *A. niger* | 0.03–0.10`,b4471367ac7e1ac2
+docs/calibration/integration_contract.md,biofilms_potts.jl@`ΔH_mel -= 0.5 * M_local # melanin-rich site preferred`,352566d7032c0aee
+docs/calibration/material_basis_contract.md,biofilms_potts.jl@`Compute radial-band-averaged biomass density from the CPM lattice.`,472893352d2bcc07
+docs/calibration/sop/harvest_dewatering.md,docs/research/radiotrophic_lab_gap.md@`THIS IS THE MOST CONSEQUENTIAL ITEM IN THE TABLE`,ed8f3b9dfcbd6e40
+docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`Base.@kwdef struct RadiolysisParams`,82cbc4b8a6415746
+docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`JACC.@init_backend`,ec350ea428c58f04
+docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`mutable struct RadiolysisState`,82cbc4b8a6415746
+docs/metal_feasibility_macos_arm64.md,biofilms_potts_jacc.jl@`σt > Int32(0) && (JACC.@atomic vols[σt] -= Int32(1)) σs > Int32(0) && (JACC.@atomic vols[σs] += Int32(1))`,7116b5b17dd14912
+docs/metal_feasibility_macos_arm64.md,docs/jacc_coupling_port.md@`Apple GPUs support only 32-bit floating point`,82cbc4b8a6415746
+docs/metal_feasibility_macos_arm64.md,tests/jacc_parity_tests.jl@`@test Threads.nthreads() == 1`,087d768c55963e17
+docs/metal_feasibility_macos_arm64.md,tests/jacc_parity_tests.jl@`@test Threads.nthreads() == 1`,612a2d21b51b278d
+docs/research/radiotrophic_calibration_map.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,1b9368b77c204ffd
+docs/research/radiotrophic_calibration_map.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",1b9368b77c204ffd
+docs/research/radiotrophic_calibration_map.md,biofilms_potts.jl@`divide_cell! is a MANUALLY INVOKED demonstration primitive`,176522a5ed301b56
+docs/research/radiotrophic_calibration_map.md,config/coupling_template.toml@`declared calibration; no default exists.`,0eae4a4400fe5129
+docs/research/radiotrophic_calibration_map.md,"coupling/biofilm_openmc/config.py@`FieldSpec(""normalization"", ""hamiltonian_scale"", ""hamiltonian_scale"", ""float"", ""cpm_feedback""),`",0eae4a4400fe5129
+docs/research/radiotrophic_calibration_map.md,data/parameter_provenance.csv@`Dose response of viable biomass`,1a078b740f7d7524
+docs/research/radiotrophic_calibration_map.md,"data/parameter_provenance.csv@`none,response.hamiltonian,`",0eae4a4400fe5129
+docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,9ae6b754c13b8c5b
+docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,cdcaea63454b8fab
+docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",9ae6b754c13b8c5b
+docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized`",cdcaea63454b8fab
+docs/research/radiotrophic_compatibility_audit.md,"biofilms_potts.jl@`X_tot, X_rd = compute_radial_biomass(state, rp.Nr)`",3b8eb1d18d6b7cde
+docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`X_total = [counts[i] > 0 ? total_cells[i] / counts[i] : 0.0 for i in 1:Nr]`,3b8eb1d18d6b7cde
+docs/research/radiotrophic_compatibility_audit.md,biofilms_potts.jl@`const SPECIES_NAMES = [`,fc6e698a30513b41
+docs/research/radiotrophic_compatibility_audit.md,preprint/modeling_radiotrophic_fitness.md@5980dc5@`confers substantial`,79322c4ac916a6ef
+docs/research/radiotrophic_compatibility_audit.md,preprint/modeling_radiotrophic_fitness.md@5980dc5@`α_M | *A. niger* | 0.03–0.10`,24b8dec7fafbcf79
 docs/research/radiotrophic_lab_gap.md,"calibration/biofilm_calibration/acquisition.py@`BIOSAFETY FOLLOWS STRAINS, NOT SPECIES.`",91a6bc45b5cf7614
-docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,cf0d9fe8d7fdf5e1
-docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,e1cfe08fe7c881fd
-docs/research/radiotrophic_pilot_recommendations.md,"calibration/biofilm_calibration/spatial/representability.py@`""needs a surface-area or elongation term; B. subtilis is ""`",ad095e2e5de3ffcd
-docs/research/spatial_dose_community_program.md,"coupling/biofilm_openmc/model.py@`particle=""photon"")`",145e948c096b58b4
-docs/research/spatial_dose_community_program.md,"coupling/tests/test_model_build.py@`assert src.particle == ""photon""`",145e948c096b58b4
-docs/visualization/lattice_viewer.md,biofilms_potts_jacc.jl@`JACC.@init_backend`,2d1c6a7524cbafea
-docs/visualization/lattice_viewer.md,"biofilms_potts_jacc.jl@`JACC.set_backend(""amdgpu""; storage=:host)`",2d1c6a7524cbafea
-docs/visualization/lattice_viewer.md,coupling/biofilm_openmc/drivers.py@`is written: that schema is Gy/s.`,6a6a1845a22d83ae
-docs/visualization/lattice_viewer.md,coupling/biofilm_openmc/drivers.py@`no transport_result.h5 written — that schema is Gy/s`,6a6a1845a22d83ae
-docs/visualization/lattice_viewer.md,"coupling/biofilm_openmc/results.py@`f[""mesh/dose_rate_mean_Gy_s""] = _logical_to_h5py(result.dose_rate_mean_Gy_s)`",6a6a1845a22d83ae
-docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())`,01689bd0608aa587
-docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@`wait(out)`,01689bd0608aa587
+docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,c1d5818482f890e1
+docs/research/radiotrophic_pilot_recommendations.md,biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus`,cf85c883592ebcd7
+docs/research/radiotrophic_pilot_recommendations.md,"calibration/biofilm_calibration/spatial/representability.py@`""needs a surface-area or elongation term; B. subtilis is ""`",4cc4198b5442c11e
+docs/research/spatial_dose_community_program.md,"coupling/biofilm_openmc/model.py@`particle=""photon"")`",9d62882f801cbfef
+docs/research/spatial_dose_community_program.md,"coupling/tests/test_model_build.py@`assert src.particle == ""photon""`",9d62882f801cbfef
+docs/visualization/lattice_viewer.md,biofilms_potts_jacc.jl@`JACC.@init_backend`,93e1283feabf6f3e
+docs/visualization/lattice_viewer.md,"biofilms_potts_jacc.jl@`JACC.set_backend(""amdgpu""; storage=:host)`",93e1283feabf6f3e
+docs/visualization/lattice_viewer.md,coupling/biofilm_openmc/drivers.py@`is written: that schema is Gy/s.`,9f9544ea82ec308c
+docs/visualization/lattice_viewer.md,coupling/biofilm_openmc/drivers.py@`no transport_result.h5 written — that schema is Gy/s`,9f9544ea82ec308c
+docs/visualization/lattice_viewer.md,"coupling/biofilm_openmc/results.py@`f[""mesh/dose_rate_mean_Gy_s""] = _logical_to_h5py(result.dose_rate_mean_Gy_s)`",9f9544ea82ec308c
+docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())`,fbc7a49dae9c1515
+docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@`wait(out)`,fbc7a49dae9c1515
