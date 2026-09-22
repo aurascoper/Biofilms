@@ -527,9 +527,11 @@ removal**.
 
 ![Fig 4 — Contaminant penetration](preprint/figures/fig4_contaminant_penetration.png)
 
-**Stale figure and label notice.** All four committed figures predate the 2026-08-14 correction that
+**Stale figure and label notice.** Figures 1, 3 and 4 predate the 2026-08-14 correction that
 neutralised the reversed biological zone labels and removed the hard-coded dose annotation, so they
-differ from current `export_figures` output. In addition, the embedded Fig 4 prints
+differ from current `export_figures` output. Figure 2 was rebuilt on 2026-09-22 by
+`regenerate_fig2.jl`, which refuses to copy unless every plotted point matches the committed
+ensemble, so it is current. In addition, the embedded Fig 4 prints
 `(1.0 − c_mean) * 100` under the label "% depleted" — the figure says *depleted* where the model
 supports only *non-penetrated*. The preview image above `assets/preview_bioreactor_3d.png` likewise
 predates the 2026-08-14 radiation sign fix.
