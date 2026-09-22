@@ -684,3 +684,18 @@ def test_a_line_no_block_covers_is_still_read(tmp_path, monkeypatch):
     root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "Text [ref].\n\n[ref]: stepper.jl:2\n"})
     got = markdown_problems(root)
     assert len(got) == 1 and "bare citation stepper.jl:2" in got[0], got
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P1 on #54 at 63c23e7; the next commit digests raw text")
+def test_moving_a_cited_line_out_of_indented_code_changes_its_digest(tmp_path, monkeypatch):
+    """Codex on #54 at 63c23e7: the digest flattened whitespace, so a cited line moved from a
+    four-space code block into prose kept its digest, though Markdown turned an example into
+    a claim."""
+    code = "    stepper.jl@`s.t += 1` is how a citation looks."
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": f"Example:\n\n{code}\n"})
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", "stepper.jl@`s.t += 1`", context_digest(code))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(f"Example:\n\n{code.strip()}\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "context changed" in got[0], got

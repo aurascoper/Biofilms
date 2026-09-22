@@ -3,3 +3,5 @@
 # calibration-unit job installs poppler-utils and RUNS this test; its own list does not
 # declare it. Read by scripts/assert_skips.py: the test id, a tab, text the reason must contain.
 tests.test_claims_ledger::test_the_sidecars_are_what_pdftotext_actually_produces	pdftotext absent
+# Evidence for #54, removed by the commit that fixes it.
+tests.test_claims_citations::test_moving_a_cited_line_out_of_indented_code_changes_its_digest	evidence: Codex P1 on #54 at 63c23e7
