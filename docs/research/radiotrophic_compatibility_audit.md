@@ -298,10 +298,10 @@ this repository, and it earns no phenotype at all.
 
 biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` described *C. neoformans* and *C. sphaerospermum* as "radiotrophic"
 in inline comments with no citation, and `data/calibration/spatial/entity_semantics.csv` repeated
-the word for CN with `evidence_basis=declared`. `01b0f4d` removed both on 2026-08-15. This audit locates the primary
+the word for CN with `evidence_basis=declared`. `01b0f4d` rewrote both on 2026-08-15, without the word. This audit locates the primary
 source those comments trace to — Dadachova 2007 — and simultaneously locates three same-species or
 same-genus results pointing the other way. This audit recommended that the comments become cited-and-contested or be
-downgraded; `01b0f4d` removed them instead.
+downgraded; `01b0f4d` rewrote them instead, replacing the word with "radiotropic".
 
 Two further in-repo claims are refuted rather than merely unsourced:
 
@@ -996,7 +996,7 @@ the picture, Zhdanova 2004, bears on *radiotropism*, not radiotrophy, and its ow
 is whether its dose gradient was measured or calculated. Until such an experiment is run, the
 repository should carry `radiotrophic` for **no** species. This audit recommended that the unsourced
 inline comments at biofilms_potts.jl@69eea21@`radiotrophic yeast, melanized` and biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` become cited-and-contested or be removed,
-and `01b0f4d` removed them on 2026-08-15.
+and `01b0f4d` rewrote them on 2026-08-15, without the word.
 
 ### CPM calibration
 

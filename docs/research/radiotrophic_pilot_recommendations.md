@@ -61,7 +61,7 @@ calibration. Why, in each case:
 The pilot's actual purpose is **corrective**: biofilms_potts.jl@69eea21@`radiotrophic filamentous fungus` labelled species 3
 that way in an unsourced inline comment, and
 `data/calibration/spatial/entity_semantics.csv` repeated declared radiotrophy language
-for CN, until `01b0f4d` removed both on 2026-08-15. This pilot makes the flagship study behind that word citable, and makes visible
+for CN, until `01b0f4d` rewrote both on 2026-08-15 without the word. This pilot makes the flagship study behind that word citable, and makes visible
 that peer review removed "radiotrophic" from its own title between the 2020 preprint and
 the 2022 article.
 
