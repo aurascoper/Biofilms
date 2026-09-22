@@ -104,9 +104,14 @@ function overlap_problems(overlap::Dict{Tuple{Int,String},Float64}, ref::Dict{Tu
     return out
 end
 
-"""The production boundary: compare every plotted point, then copy, or refuse and copy
-nothing. The self-test drives THIS, so a refusal that stopped refusing could not pass it."""
-function check_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64}, outdir::String)
+"""The production boundary: confirm the second sweep, compare every plotted point, then
+copy, or refuse and copy nothing. The self-test drives THIS with every known-bad, so a
+refusal that stopped refusing could not pass it."""
+function validate_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64},
+                           overlap::Dict{Tuple{Int,String},Float64}, outdir::String)
+    problems = overlap_problems(overlap, ref)
+    isempty(problems) || error("REFUSING TO COPY: the second committed sweep does not confirm the " *
+                               "first:\n  " * join(problems, "\n  "))
     bad = mismatches(traj, ref)
     isempty(bad) || error("REFUSING TO COPY: the render does not match the committed reference:\n  " *
                           join(bad, "\n  ") * "\nThe figure would plot numbers no committed run supports.")
@@ -119,64 +124,62 @@ function check_and_copy(traj, params, ref::Dict{Tuple{Int,String},Float64}, outd
     return sort(readdir(outdir))
 end
 
+"""Run the boundary with one known-bad and require a refusal that wrote nothing."""
+function must_refuse(label, traj, params, ref, overlap)
+    dir = mktempdir(; cleanup = false)
+    threw = try
+        validate_and_copy(traj, params, ref, overlap, dir)
+        false
+    catch err
+        occursin("REFUSING TO COPY", sprint(showerror, err)) || rethrow(err)
+        true
+    end
+    threw || error("SELF-TEST: $label was copied")
+    isempty(readdir(dir)) || error("SELF-TEST: $label still wrote $(readdir(dir))")
+    rm(dir; recursive = true)
+    println("  self-test: $label is refused at the copy boundary, and nothing is written")
+end
+
 ref = reference(REF)
 gaps = reference_gaps(ref)
 isempty(gaps) || error("REFUSING: the reference in $REF does not cover $(length(gaps)) of the " *
                        "plotted points: $(first(gaps, 5))")
 
 if "--self-test" in ARGS
-    # The known-bad is taken from the artifact, never typed: one value of the reference,
-    # moved by 1e-3. The mutation is asserted to apply, and the run goes through
-    # check_and_copy, the boundary the real run uses, into a scratch directory that must
-    # stay empty. Testing `mismatches` alone would leave a bypassed refusal green.
+    # Every known-bad is taken from an artifact, never typed, and every one goes through
+    # validate_and_copy, the boundary the real run uses. Testing the helpers alone would
+    # leave a bypassed refusal green.
     params, traj = render()
-    victim = (STEP, SPECIES_NAMES[3])
-    mutated = copy(ref)
-    mutated[victim] = ref[victim] + 1e-3
-    mutated[victim] == ref[victim] && error("SELF-TEST: the mutation did not apply at $victim")
-
-    refused, allowed = mktempdir(; cleanup = false), mktempdir(; cleanup = false)
-    threw = try
-        check_and_copy(traj, params, mutated, refused)
-        false
-    catch err
-        occursin("REFUSING TO COPY", sprint(showerror, err)) || rethrow(err)
-        true
-    end
-    threw || error("SELF-TEST: a mutated reference was copied")
-    isempty(readdir(refused)) || error("SELF-TEST: the refusal still wrote $(readdir(refused))")
-    check_and_copy(traj, params, ref, allowed) == ["$NAME.pdf", "$NAME.png"] ||
-        error("SELF-TEST: the unmutated reference did not copy the figure: $(readdir(allowed))")
-    rm(refused; recursive = true); rm(allowed; recursive = true)
-
-    # The overlap guard gets its own known-bad, both shapes, from the artifact: one row
-    # removed, and one value replaced by NaN, which a `> tol` comparison would read as
-    # agreement.
     overlap = reference(SWEEP)
-    isempty(overlap_problems(overlap, ref)) || error("SELF-TEST: the committed sweeps already disagree")
-    dropped = filter(kv -> kv.first != (MCS, SPECIES_NAMES[1]), overlap)
-    length(dropped) == length(overlap) - 1 || error("SELF-TEST: the row was not dropped")
-    any(occursin(SPECIES_NAMES[1], m) for m in overlap_problems(dropped, ref)) ||
-        error("SELF-TEST: a missing overlap row was not refused")
-    nan = copy(overlap); nan[(MCS, SPECIES_NAMES[1])] = NaN
-    any(occursin("non-finite", m) for m in overlap_problems(nan, ref)) ||
-        error("SELF-TEST: a non-finite overlap value was not refused")
 
-    println("  self-test: a mutated reference is refused at the copy boundary, and nothing is written")
-    println("  self-test: the unmutated reference copies both files, so the check refuses by evidence")
-    println("  self-test: a dropped overlap row and a non-finite overlap value are both refused")
+    victim = (STEP, SPECIES_NAMES[3])
+    moved = copy(ref)
+    moved[victim] = ref[victim] + 1e-3
+    moved[victim] == ref[victim] && error("SELF-TEST: the mutation did not apply at $victim")
+    must_refuse("a moved reference value", traj, params, moved, overlap)
+
+    dropped = filter(kv -> kv.first != (MCS, SPECIES_NAMES[1]), overlap)
+    length(dropped) == length(overlap) - 1 || error("SELF-TEST: the overlap row was not dropped")
+    must_refuse("a dropped overlap row", traj, params, ref, dropped)
+
+    nan = copy(overlap)
+    nan[(MCS, SPECIES_NAMES[1])] = NaN
+    isnan(nan[(MCS, SPECIES_NAMES[1])]) || error("SELF-TEST: the NaN did not apply")
+    must_refuse("a non-finite overlap value", traj, params, ref, nan)
+
+    allowed = mktempdir(; cleanup = false)
+    validate_and_copy(traj, params, ref, overlap, allowed) == ["$NAME.pdf", "$NAME.png"] ||
+        error("SELF-TEST: the committed artifacts did not copy the figure: $(readdir(allowed))")
+    rm(allowed; recursive = true)
+    println("  self-test: the committed artifacts copy both files, so the boundary refuses by evidence")
     exit(0)
 end
-
-problems = overlap_problems(reference(SWEEP), ref)
-isempty(problems) || error("REFUSING: the second committed sweep does not confirm the first:\n  " *
-                           join(problems, "\n  "))
 
 params, traj = render()
 for mcs in 0:STEP:MCS, n in SPECIES_NAMES[[1, 3, 5]]
     @printf("  MCS %3d  %-20s committed %.6f\n", mcs, n, ref[(mcs, n)])
 end
-check_and_copy(traj, params, ref, OUT)
+validate_and_copy(traj, params, ref, reference(SWEEP), OUT)
 
 @printf("\n  every plotted point matches the committed reference; copied %s.{pdf,png} into %s\n", NAME, OUT)
 println("\n  Now refresh the sidecars:")
