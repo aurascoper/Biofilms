@@ -464,8 +464,14 @@ per species is a **contract**; the collective drift is a **result**; the test ke
 *C. sphaerospermum* reaches 1.44 at seed 42, and 1.26 to 2.56 across seeds 42–297.
 
 The ordering among the three producers was *corrected* in 2026-09-17: it fails in 19 of those 256
-seeds, so the input `α_M` (0.14 versus 0.10 and 0.065) does not fix it. The linear rise is
-structural, because the field equation has no saturation, decay or substrate-limitation term.
+seeds, so the input `α_M` (0.14 versus 0.10 and 0.065) does not fix it. The field equation has no
+saturation, decay or substrate-limitation term (ledger row RM-G11-01).
+
+> **Corrected 2026-09-22.** This paragraph called the rise linear and structural. The absence of a
+> saturation term does not make it linear, and the figure's increments fall: *C. sphaerospermum*
+> gains about 0.53 over MCS 0 to 20 and about 0.14 over 80 to 100. Melanin diffuses, its source
+> follows occupancy, and the mean is taken over occupied sites that move. RM-G11-01 holds the
+> wording.
 
 What is **not** set anywhere in the parameters is the spatial distribution and magnitude of $M$.
 Those are outcomes of where parcels went under the acceptance test, multiplied by the field,

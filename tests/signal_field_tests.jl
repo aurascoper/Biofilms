@@ -90,7 +90,9 @@ include(joinpath(DIAG, "guard.jl"))
     # scoby_3d.jl ever gains content it enters the census and this line says so.
     @test basename.(filter(p -> filesize(p) == 0, sources)) == ["scoby_3d.jl"]
     live = filter(p -> filesize(p) > 0, sources)
-    @test length(live) == 10
+    # 11 since regenerate_fig2.jl joined the root-level sources this census walks. The
+    # count is a tripwire: a new root .jl file enters the census and says so here.
+    @test length(live) == 11
 
     # Regression, not a control. This passes today because the branch makes no CPM
     # edits, so its entire value is in the future edit it catches; nothing here shows

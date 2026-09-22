@@ -1,20 +1,20 @@
                                                                 Melanin field at occupied sites — dimensionless model units
                                              1.5
-                                                                                                                                           1.44
+                                                                                                                                                                1.44
 
 
 
 
 Mean melanin field value at occupied sites
-                                             1.0                                                                                           0.97
-                                                                                                                                           0.94
+                                             1.0                                                                                                                0.97
+                                                                                                                                                                0.94
 
 
-                                                                                                                                                  C. neoformans
+                                                                                                                                                                       C. neoformans
 
-                                                                                                                                                  C. sphaerospermum
+                                                                                                                                                                       C. sphaerospermum
 
-                                                                                                                                                  A. niger
+                                                                                                                                                                       A. niger
 
                                              0.5
 
@@ -22,8 +22,8 @@ Mean melanin field value at occupied sites
 
 
                                              0.0
-                                                   Ordering follows the hand-specified alpha_M_species scales; not a measured quantity
+                                                   Seed 42, one run. The ordering is not a measured quantity: it fails in 19 of 256 seeds (SEED42-SCOPE-01)
 
-                                                   0                                                       50                            100
-                                                                                                     Monte Carlo Steps
+                                                   0                                                        50                                                100
+                                                                                                      Monte Carlo Steps
 
