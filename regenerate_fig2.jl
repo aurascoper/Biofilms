@@ -200,6 +200,10 @@ if "--self-test" in ARGS
     must_refuse("a non-finite overlap value", traj, params, ref, nan)
     must_refuse("an extraction that writes nothing", traj, params, ref, overlap;
                 extract = (pdf, txt) -> write(txt, ""))
+    # Nonempty text from the wrong figure: the empty case above is refused one line earlier,
+    # so without this the identity check could be deleted and every outcome would be the same.
+    must_refuse("an extraction of another figure", traj, params, ref, overlap;
+                extract = (pdf, txt) -> write(txt, "Mean melanin field value at occupied sites\n"))
 
     allowed = mktempdir(; cleanup = false)
     validate_and_copy(traj, params, ref, overlap, allowed) ==
