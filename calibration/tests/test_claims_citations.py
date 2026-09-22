@@ -500,3 +500,36 @@ def test_a_guide_row_is_left_to_its_own_check_and_guide_prose_is_not(tmp_path, m
     (root / "docs/guides/g.md").write_text(row + "\nAnd in prose, `stepper.jl:6`.\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 2 and got[0].startswith("docs/guides/g.md") and "stepper.jl:6" in got[0], got
+
+
+# Codex on pull request #54, at 7684792, two P1 findings, both reproduced here before the fix.
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P1 on #54; the next commit keys the stale check on the digest")
+def test_deleting_one_of_two_pinned_uses_of_a_citation_is_reported(tmp_path, monkeypatch):
+    """The stale check read (document, citation) alone. With one citation pinned in two
+    paragraphs, deleting one paragraph left its pin unreported, because the other paragraph
+    still had the citation."""
+    one, two = f"First: {CLAIM}", f"Second: {CLAIM}"
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": f"{one}\n\n{two}\n"})
+    lit = "stepper.jl@`s.t += 1`"
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", {("notes.md", lit, context_digest(one)),
+                                                    ("notes.md", lit, context_digest(two))})
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(f"{one}\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "CONTEXT_PINS names" in got[0] and context_digest(two) in got[0], got
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P1 on #54; the next commit counts lines without the final newline")
+@pytest.mark.parametrize("ref", ["stepper.jl:0", "stepper.jl:8", "stepper.jl:7-8"])
+def test_a_record_line_that_never_existed_is_reported(tmp_path, monkeypatch, ref):
+    """STEPPER has seven lines and ends in a newline. split("\\n") counted an eighth, and
+    nothing refused line 0, so a record could name a line that never existed."""
+    if not (STEPPER.endswith("\n") and STEPPER.count("\n") == 7):
+        raise RuntimeError("the fixture is not the seven-line file this control assumes")   # plumbing
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": "none\n"})
+    then = _git(root, "rev-parse", "--short=7", "HEAD")
+    (root / "notes.md").write_text(f"RECORD: line numbers refer to {then}\n\nAt `{ref}`.\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and ref in got[0] and "is not a line of" in got[0], got
