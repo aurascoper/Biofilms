@@ -45,6 +45,7 @@ Markdown. Line references into the superseded preprint ("lines 711-721") name no
 are out of scope, as the ledger header says. A reference with no file name at all, such as
 `.tex:580`, matches no pattern here and is read by nothing.
 """
+import collections
 import csv
 import hashlib
 import re
@@ -539,3 +540,21 @@ def test_a_record_line_that_never_existed_is_reported(tmp_path, monkeypatch, ref
     (root / "notes.md").write_text(f"RECORD: line numbers refer to {then}\n\nAt `{ref}`.\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 1 and ref in got[0] and "is not a line of" in got[0], got
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="evidence: Codex P1 on #54 at 50cf7e3; the next commit counts identical uses")
+def test_each_of_two_identical_pinned_paragraphs_needs_its_own_pin(tmp_path, monkeypatch):
+    """Codex on #54 at 50cf7e3: two byte-identical paragraphs give one key twice, and a set let
+    one pin row cover both. So a second copy needed no pin, and deleting a copy was not
+    reported. Each use is a row."""
+    root = _md_scratch(tmp_path, monkeypatch, {"stepper.jl": STEPPER, "notes.md": f"{CLAIM}\n\n{CLAIM}\n"})
+    key = ("notes.md", "stepper.jl@`s.t += 1`", context_digest(CLAIM))
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", collections.Counter({key: 1}))
+    got = markdown_problems(root)
+    assert len(got) == 1 and "no context pin" in got[0], got
+    monkeypatch.setitem(globals(), "CONTEXT_PINS", collections.Counter({key: 2}))
+    assert markdown_problems(root) == []
+    (root / "notes.md").write_text(f"{CLAIM}\n", encoding="utf-8")
+    got = markdown_problems(root)
+    assert len(got) == 1 and "CONTEXT_PINS names" in got[0], got
