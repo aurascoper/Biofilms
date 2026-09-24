@@ -581,8 +581,8 @@ function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
     # acceptance bias of 1.000010. That is one role of one pair of species and
     # is NOT the term's reach: signed by role, the extremum over source/target
     # pairings is 7.505e-2 (see §6.2 and tests/prose_bounds.jl). This term at
-    # the reported M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of
-    # 9.6 in ΔH, NOT by four orders. CORRECTED 2026-08-30: this comment carried
+    # seed 42's M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of 9.6 in ΔH, NOT by four orders.
+    # SEED42-SCOPE-01 scopes those three to one seed: over 42-297, M 1.26-2.56, bias 1.134-1.292, ratio 8.39-17.06. CORRECTED 2026-08-30: this comment carried
     # the version-1.1 claim in a file the manuscript sweep never covered, which
     # is what a sweep bounded to one file cannot find.
     # The radial stratification is still melanin-mediated, not β_ion-mediated. Radiation still drives it, but only indirectly:
@@ -2425,7 +2425,7 @@ function export_figures(trajectory::Vector{<:Any},
            titlesize    = 11)
     # Override first two labels to add star
     text!(ax2, mcs_vec[1], -0.05;
-          text = "Ordering follows the hand-specified alpha_M_species scales; not a measured quantity",
+          text = "Seed 42, one run. The ordering is not a measured quantity: it fails in 19 of 256 seeds (SEED42-SCOPE-01)",
           fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
 
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)
