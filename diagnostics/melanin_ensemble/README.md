@@ -126,6 +126,46 @@ The occupancy totals in that draft are exactly right: 1,612 sites at MCS 4 and 1
 237 is still fixed biomass to about ±2.4%. The stated range is simply narrower than what the
 model does.
 
+## The radial ensemble: does either radiation term move a parcel?
+
+The manuscript's only radiotropism result is seed 42 alone, and it says of itself that the
+exact null must come from replicate simulations. `radial_sweep.jl` runs those replicates
+under four arms of the acceptance rule on the same seeds, with the same placement per seed:
+
+| arm | zeroed | dH_rad | dH_mel |
+|---|---|---|---|
+| `full` | nothing | on | on |
+| `no_rad` | `beta_ion`, every species | 0 | on |
+| `no_mel` | `alpha_M_species`, every species, so M stays 0 | on | 0 |
+| `null` | both radiation-derived terms | 0 | 0 |
+
+```sh
+julia diagnostics/melanin_ensemble/radial_sweep.jl diagnostics/melanin_ensemble/radial_n40_p6_seeds42-297.csv \
+      --seeds 42:297 --reference diagnostics/melanin_ensemble/sweep_n40_p6_seeds42-57.csv
+julia diagnostics/melanin_ensemble/radial_analyse.jl diagnostics/melanin_ensemble/radial_n40_p6_seeds42-297.csv \
+      > diagnostics/melanin_ensemble/radial_analysis_n40_p6.txt
+```
+
+Four arms of 256 seeds is about four times one `parcel_sweep.jl` pass. The observable is
+`take_snapshot`'s `mean_r`, the mean over a species' parcels of the centre-of-mass radius,
+each parcel weighted equally, and `mean_r_over_R` divides it by R = N/2. That is a
+per-parcel mean; `mean_melanin` in the same row is a per-site mean, as above.
+
+**The tests were registered before the run**, in `PREDICTION_radial_n40_p6.md`, with a
+minimum effect of 0.05 r/R (one lattice unit at N = 40) for "moves" and the same value as
+the equivalence bound for "does not move". `radial_analyse.jl` carries them as constants
+and `test_statistics.jl` asserts the prose and the constants agree. Ledger row RAD-ENS-01
+holds the question while it is open.
+
+**Controls the producer runs on every seed and arm:** the mean radius recomputed from the
+cell registry equals the snapshot's exactly; an arm with production zeroed prints a
+melanin field of exactly 0; the MCS 0 seeding frame is identical across arms; and, with
+`--reference`, the `full` arm's melanin at the read MCS prints identically to the
+committed sweep's (six decimals) for every shared seed, and a reference sharing no seed
+is refused as a check that never ran. **The header records `julia_version` and
+`machine`**: Julia's streams match across platforms, floating-point results on Apple ARM
+and x86 need not, and the manuscript will quote this file.
+
 ## Files
 
 | | |
@@ -134,7 +174,11 @@ model does.
 | `analyse.jl` | paired statistics, ordering counts, exact binomial sign test (ties leave the test) |
 | `parcel_melanin.jl` | both melanin estimators from one lattice visit; no model, no data |
 | `parcel_sweep.jl` | runs the seeds for `mel_parcel`, and compares two files by column |
-| `test_statistics.jl` | 150 assertions, none needing a data file |
+| `stats.jl` | the sign test and the paired difference, shared by both analyses |
+| `radial_sweep.jl` | the four-arm radial ensemble, with its per-seed controls |
+| `radial_analyse.jl` | the pre-registered tests and the exploratory cells |
+| `PREDICTION_radial_n40_p6.md` | the tests and thresholds, recorded before the run |
+| `test_statistics.jl` | assertions needing no data file; two testsets run the producers for four MCS |
 | `sweep_seeds42-57.csv`, `analysis.txt` | committed receipts of the run above |
 
 The assertion count rose from 114 to 150. Sixteen of the new ones cover the estimator, and
