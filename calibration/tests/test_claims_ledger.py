@@ -1169,10 +1169,13 @@ def test_the_hash_check_rejects_a_png_hash_and_a_moved_pdf(tmp_path):
     """THE CONTROL for the check above, on the figure that failed it unseen.
 
     Until 2026-09-24 diagnostics/melanin_ensemble/figure.jl wrote the PNG's hash
-    into `<name>.sha256` and said that made it compliant here. The PNG's hash IS
-    that old receipt, byte for byte, so it is taken from the committed PNG rather
-    than recalled. A copy with the PDF's hash must pass, or the two rejections
-    below could be the copy's fault rather than the check's.
+    into `<name>.sha256` and said that made it compliant here. The known-bad is the
+    CURRENT PNG's hash, taken from the committed PNG rather than recalled: it is
+    what a return to hashing the PNG would write. It is not the old receipt
+    (6ce26f0f), because the re-render changed the PNG, and the old receipt would be
+    rejected even by a check that hashed the PNG, so it would prove less. A copy
+    with the PDF's hash must pass, or the two rejections below could be the copy's
+    fault rather than the check's.
     """
     import hashlib
     import shutil
