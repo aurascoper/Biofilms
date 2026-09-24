@@ -245,10 +245,11 @@ end
     @test_throws ErrorException read_at(csv("alpha.csv", [good; replace(row(57, 3, 1.0), "0.1400" => "0.2000");
                                                            row(57, 1, 0.5); row(57, 5, 0.1)]), 100)
 
-    # The title claims "every seed" only when every seed does.
-    @test ordering_title(16, 16) == "Every seed descends: 16 of 16 display the α_M ordering"
-    @test ordering_title(15, 16) == "15 of 16 display the α_M ordering"
-    @test !occursin("Every seed", ordering_title(0, 2))
+    # The title states the count over the seeds plotted and never says "every seed", even
+    # at 16 of 16: over seeds 42:297 the ordering fails in 19 of 256 (SEED42-SCOPE-01).
+    @test ordering_title(16, 16, "42:57") == "16 of 16 seeds (42:57) display the α_M ordering"
+    @test ordering_title(15, 16, "42:57") == "15 of 16 seeds (42:57) display the α_M ordering"
+    @test !occursin(r"every"i, ordering_title(16, 16, "42:57"))
     # The provenance line prints the seeds that were plotted, not the interval between them.
     @test seed_set_label(42:57) == "42:57"
     @test seed_set_label([57, 42]) == "42,57"
@@ -263,10 +264,11 @@ end
     r2, _, _ = read_at(csv("inverted.csv", inverted), 100)
     seeds = sort(collect(keys(r2)))
     ordered = count(s -> r2[s][3] > r2[s][1] > r2[s][5], seeds)
-    @test ordering_title(ordered, length(seeds)) == "1 of 2 display the α_M ordering"
+    @test ordering_title(ordered, length(seeds), seed_set_label(seeds)) ==
+          "1 of 2 seeds (42,57) display the α_M ordering"
     @test seed_set_label(seeds) == "42,57"
-    # The all-ordered contiguous control keeps the committed wording byte for byte.
-    @test ordering_title(2, 2) == "Every seed descends: 2 of 2 display the α_M ordering"
+    # The all-ordered contiguous control is scoped like any other count.
+    @test ordering_title(2, 2, "42:43") == "2 of 2 seeds (42:43) display the α_M ordering"
     @test seed_set_label([42, 43]) == "42:43"
     # Panel B: rank one is "the smallest", not "the smallest smallest".
     @test rank_title(1, 2) == "The published seed is the smallest of 2"

@@ -144,7 +144,15 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 # (RM-G08-01, RM-G10-01, PP-65-08, the last saying in as many words that "the
 # committed PNGs still carry the old reversed zone labels"); the artifact went on
 # saying the retracted thing for two weeks because nothing could fail.
-FIGURES = REPO / "preprint" / "figures"
+# The directories whose figures carry the <name>.pdf/.sha256/.txt contract. The second
+# is a diagnostic, not a manuscript figure; its generator said it was already compliant
+# while hashing its PNG, and nothing here read it (MEL-FIG-HASH-01).
+FIGURES = (REPO / "preprint" / "figures",
+           REPO / "diagnostics" / "melanin_ensemble")
+
+
+def figure_pdfs() -> list[Path]:
+    return sorted(p for d in FIGURES for p in d.glob("*.pdf"))
 
 
 def document_path(document: str) -> Path | None:
@@ -999,7 +1007,8 @@ RETRACTED_IN_FIGURES = ("radiotroph", "gy cumulative",
 
 
 def figure_sidecars() -> list[Path]:
-    return sorted(FIGURES.glob("*.txt"))
+    # Beside a PDF, not every .txt: the diagnostic directory also holds analysis text.
+    return [p.with_suffix(".txt") for p in figure_pdfs()]
 
 
 def retracted_vocabulary_hits(paths) -> list[tuple]:
@@ -1123,6 +1132,22 @@ def test_no_figure_row_is_reachable_by_the_phrase_guard(rows):
         f"not fire on every known-bad artifact: {sorted(covered)}")
 
 
+def stale_figure_hashes(pdfs) -> list[str]:
+    """Names of the PDFs whose `<name>.sha256` is not the sha256 of the PDF's own
+    bytes. Takes PATHS so the control can drive it with a known-bad copy."""
+    import hashlib
+
+    stale = []
+    for pdf in pdfs:
+        recorded = pdf.with_suffix(".sha256")
+        assert recorded.is_file(), f"{pdf.name} has no committed hash"
+        actual = hashlib.sha256(pdf.read_bytes()).hexdigest()
+        if actual != recorded.read_text(encoding="utf-8").strip():
+            stale.append(pdf.name)
+        assert pdf.with_suffix(".txt").is_file(), f"{pdf.name} has no text sidecar"
+    return stale
+
+
 def test_every_committed_figure_matches_its_hash():
     """THE HALF THAT MAKES THE SIDECAR WORTH ANYTHING.
 
@@ -1133,20 +1158,55 @@ def test_every_committed_figure_matches_its_hash():
     it. So the PDF's own bytes are pinned, in pure stdlib, and a figure that
     moves without its sidecar fails here.
     """
-    import hashlib
-
-    stale = []
-    for pdf in sorted(FIGURES.glob("*.pdf")):
-        recorded = pdf.with_suffix(".sha256")
-        assert recorded.is_file(), f"{pdf.name} has no committed hash"
-        actual = hashlib.sha256(pdf.read_bytes()).hexdigest()
-        if actual != recorded.read_text(encoding="utf-8").strip():
-            stale.append(pdf.name)
-        assert pdf.with_suffix(".txt").is_file(), f"{pdf.name} has no text sidecar"
+    stale = stale_figure_hashes(figure_pdfs())
     assert not stale, (
         "these figures changed without their sidecar and hash being "
         f"regenerated, so every text check above read the OLD figure: {stale}. "
         "Re-run the export, then `pdftotext -layout` and `sha256sum` for each.")
+
+
+def test_the_hash_check_rejects_a_png_hash_and_a_moved_pdf(tmp_path):
+    """THE CONTROL for the check above, on the figure that failed it unseen.
+
+    Until 2026-09-24 diagnostics/melanin_ensemble/figure.jl wrote the PNG's hash
+    into `<name>.sha256` and said that made it compliant here. The PNG's hash IS
+    that old receipt, byte for byte, so it is taken from the committed PNG rather
+    than recalled. A copy with the PDF's hash must pass, or the two rejections
+    below could be the copy's fault rather than the check's.
+    """
+    import hashlib
+    import shutil
+
+    name = "melanin_ensemble_n40_p6"
+    pdfs = [p for p in figure_pdfs() if p.stem == name]
+    assert len(pdfs) == 1, f"the widened glob did not reach {name}.pdf"
+    src = pdfs[0]
+    pdf = tmp_path / src.name
+    shutil.copy(src, pdf)
+    shutil.copy(src.with_suffix(".txt"), pdf.with_suffix(".txt"))
+    receipt = pdf.with_suffix(".sha256")
+
+    def digest(b: bytes) -> str:
+        return hashlib.sha256(b).hexdigest()
+
+    receipt.write_text(digest(src.read_bytes()) + "\n", encoding="utf-8")
+    assert stale_figure_hashes([pdf]) == []
+
+    # 1. The receipt figure.jl wrote before this change: the PNG's hash.
+    png_hash = digest(src.with_suffix(".png").read_bytes())
+    assert png_hash != digest(src.read_bytes())            # the mutation applied
+    receipt.write_text(png_hash + "\n", encoding="utf-8")
+    assert stale_figure_hashes([pdf]) == [pdf.name]
+
+    # 2. The right receipt, and a PDF that moved by one byte after it was written.
+    receipt.write_text(digest(src.read_bytes()) + "\n", encoding="utf-8")
+    body = bytearray(src.read_bytes())
+    at = len(body) // 2
+    body[at] ^= 0xFF
+    pdf.write_bytes(bytes(body))
+    original = src.read_bytes()
+    assert [i for i in range(len(body)) if body[i] != original[i]] == [at]
+    assert stale_figure_hashes([pdf]) == [pdf.name]
 
 
 def test_the_sidecars_are_what_pdftotext_actually_produces():
@@ -1165,7 +1225,7 @@ def test_the_sidecars_are_what_pdftotext_actually_produces():
         pytest.skip("pdftotext absent: hash + vocabulary tiers still cover this")
 
     drifted = []
-    for pdf in sorted(FIGURES.glob("*.pdf")):
+    for pdf in figure_pdfs():
         got = subprocess.run(["pdftotext", "-layout", str(pdf), "-"],
                              capture_output=True, text=True)
         assert got.returncode == 0, f"pdftotext failed on {pdf.name}"
