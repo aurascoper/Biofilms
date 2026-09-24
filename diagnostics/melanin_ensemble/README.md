@@ -157,6 +157,17 @@ the equivalence bound for "does not move". `radial_analyse.jl` carries them as c
 and `test_statistics.jl` asserts the prose and the constants agree. Ledger row RAD-ENS-01
 holds the question while it is open.
 
+**The answer (2026-09-24, `radial_analysis_n40_p6.txt`).** Neither term moves a parcel. P1
+failed: `full − no_mel` shifts *C. neoformans* by +0.0001 r/R (p = 0.95) and *C. sphaerospermum*
+by −0.0004 (p = 0.75). P2 held: `full − no_rad` is inside ±0.05 r/R for all seven species, the
+widest interval being [−0.0029, −0.0006]. `full − null` is within ±0.002 r/R everywhere with
+within-seed correlation above 0.98, and the inward drift from the seeding frame (0.53 r/R) to about
+0.51 r/R appears with both terms off. The *C. neoformans* − *B. subtilis* separation is −0.006
+r/R with sd 0.11 over seeds; seed 42's +0.16 was one draw. Run on x86_64-conda-linux-gnu under
+Julia 1.12.7, the full arm matching the Mac-generated melanin sweep on all 112 shared rows.
+`radial_figure.py` renders the manuscript's Figure 1 from the CSV with matplotlib and writes the
+PDF, `pdftotext -layout` sidecar, sha256 and PNG.
+
 **Controls the producer runs on every seed and arm:** the mean radius recomputed from the
 cell registry equals the snapshot's exactly; an arm with production zeroed prints a
 melanin field of exactly 0; the MCS 0 seeding frame is identical across arms; and, with
@@ -177,7 +188,9 @@ and x86 need not, and the manuscript will quote this file.
 | `stats.jl` | the sign test and the paired difference, shared by both analyses |
 | `radial_sweep.jl` | the four-arm radial ensemble, with its per-seed controls |
 | `radial_analyse.jl` | the pre-registered tests and the exploratory cells |
-| `PREDICTION_radial_n40_p6.md` | the tests and thresholds, recorded before the run |
+| `PREDICTION_radial_n40_p6.md` | the tests and thresholds, recorded before the run, and the result after it |
+| `radial_n40_p6_seeds42-297.csv`, `radial_analysis_n40_p6.txt` | committed receipts of the run |
+| `radial_figure.py` | the manuscript's Figure 1, rendered from the CSV |
 | `test_statistics.jl` | assertions needing no data file; two testsets run the producers for four MCS |
 | `sweep_seeds42-57.csv`, `analysis.txt` | committed receipts of the run above |
 

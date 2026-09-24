@@ -43,7 +43,7 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 # assertion below refused the stale window rather than silently reading two wrong lines.
 # 593-606 until 2026-09-24, when the Symplectic Integration subsection moved into Appendix A
 # of the same file; the paragraph is unchanged and the window follows it.
-FIRST_LINE, LAST_LINE = 1159, 1172
+FIRST_LINE, LAST_LINE = 1244, 1257
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the

@@ -59,6 +59,17 @@ mis-predicted the dynamics and the melanin coupling does not stratify at this
 configuration. P2 failing means the direct term does more than its ΔH reach suggests,
 which is a finding about the acceptance rule.
 
+> **Result, added after the run (2026-09-24; everything above is preserved as written).**
+> P1 failed: under `full − no_mel` the paired mean shift is +0.0001 r/R for *C. neoformans*
+> (129 of 256 seeds positive, p = 0.95) and −0.0004 r/R for *C. sphaerospermum* (125 of 256,
+> p = 0.75). The prediction that both move inward was wrong. P2 held: under `full − no_rad`
+> every species' 90% interval lies inside ±0.05 r/R, the widest being [−0.0029, −0.0006].
+> Exploratory: `full − null` is within ±0.002 r/R for every species with within-seed
+> correlation above 0.98, so the arms track one another and the inward drift from 0.53 to
+> about 0.51 r/R is present with both terms off. Run on x86_64-conda-linux-gnu under Julia
+> 1.12.7; the reference check matched 112 of 112 rows of the Mac-generated melanin sweep.
+> Receipts: `radial_n40_p6_seeds42-297.csv`, `radial_analysis_n40_p6.txt`; ledger RAD-ENS-01.
+
 ## Exploratory, reported but not tested
 
 Every other species × contrast cell (`full − null`, `no_rad − null`, the five species not
