@@ -1,19 +1,19 @@
-                                         Every seed descends: 16 of 16 display the α_M ordering                                                                                                         The published seed is the third smallest of 16
-
-                                                                                                                                                                                                  0.8
+                                         16 of 16 seeds (42:57) display the α_M ordering
+                                         Over seeds 42:297 the ordering fails in 19 of 256 (SEED42-SCOPE-01)                                                                                            The published seed is the third smallest of 16
 
 
 
 
                                                                                                                                                    C. neoformans − A. niger, paired within seed
-                                   2.0
+                                                                                                                                                                                                  0.8
 
 
 
 
 mean melanin over occupied sites
-                                                                                                                                                                                                  0.6
+                                   2.0
 
+                                                                                                                                                                                                  0.6
 
 
                                    1.5

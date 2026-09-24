@@ -19,11 +19,20 @@
 # takes the published figure as representative of the model is reading its
 # weakest draw for this pair.
 #
-# Not a manuscript artifact. It lives in diagnostics/ and writes its own .sha256
-# (of the PNG: cairo stamps a CreationDate into the PDF, so two renders of one
-# drawing hash differently there and identically here) and .txt (pdftotext
-# -layout of the PDF) sidecars, so it is already compliant if it ever moves to
-# preprint/figures/, where the staleness guards would apply to it.
+# Not a manuscript artifact. It lives in diagnostics/ and writes the two sidecars
+# preprint/figures/ requires of every figure: .sha256 (of the PDF's bytes) and .txt
+# (pdftotext -layout of the same PDF). calibration/tests/test_claims_ledger.py
+# holds this directory to that contract as well, so the figure could move there
+# unchanged, and that is checked rather than asserted.
+#
+# The hash was of the PNG until 2026-09-24, and this comment called that compliant.
+# It was not: the guard compares <name>.sha256 against the PDF. The PNG was chosen
+# because cairo stamps a CreationDate into the PDF, so two renders of one drawing
+# hash differently there, and the PNG carries no timestamp. That bought a hash
+# stable across renders, which nothing checked, at the cost of leaving the PDF the
+# .txt is read from bound by nothing. A re-render now changes the hash, as it already
+# changed the PDF. The hash says the files have not moved since the run that wrote
+# them, not that a render reproduces them. No guard reads the PNG, here or there.
 #
 #   julia --project=diagnostics/melanin_ensemble diagnostics/melanin_ensemble/figure.jl [sweep.csv]
 #
@@ -56,6 +65,9 @@ const PUBLISHED  = 42          # the seed tests/fixtures/serial_seed42.csv pins
 const PRODUCERS  = [(3, "C. sphaerospermum", 0.140),
                     (1, "C. neoformans",     0.100),
                     (5, "A. niger",          0.065)]
+# Printed under panel A's title. Not computed here: it is the 256-seed result recorded in
+# ledger row SEED42-SCOPE-01, the result Fig 2's label also states (biofilms_potts.jl).
+const WIDER      = "Over seeds 42:297 the ordering fails in 19 of 256 (SEED42-SCOPE-01)"
 
 # Validated with the dataviz palette validator, light surface: worst adjacent
 # CVD dE 24.7 (protan), normal-vision dE 33.6, both well above the >= 8 target.
@@ -95,7 +107,8 @@ function main()
 
     axA = Axis(fig[1, 1], xticks = (collect(xs), [p[2] for p in PRODUCERS]),
                ylabel = "mean melanin over occupied sites",
-               title = ordering_title(ordered, length(seeds)),
+               title = ordering_title(ordered, length(seeds), seed_set_label(seeds)),
+               subtitle = WIDER, subtitlecolor = MUTED,
                titlealign = :left, xgridvisible = false,
                ygridcolor = (:black, 0.06), leftspinevisible = false,
                topspinevisible = false, rightspinevisible = false,
@@ -157,7 +170,7 @@ function main()
     save(OUTBASE * ".png", fig; px_per_unit = 2)
     # The sidecars the header promises. Written here, by the same run, so a changed CSV
     # cannot leave a stale extraction and checksum beside a fresh image.
-    write(OUTBASE * ".sha256", bytes2hex(sha256(read(OUTBASE * ".png"))) * "\n")
+    write(OUTBASE * ".sha256", bytes2hex(sha256(read(OUTBASE * ".pdf"))) * "\n")
     run(pipeline(`pdftotext -layout $(OUTBASE * ".pdf") -`; stdout = OUTBASE * ".txt"))
     @printf("wrote %s.{pdf,png}\n  %d of %d seeds ordered; CN-AN mean %+.4f, seed %d %+.4f (rank %d)\n",
             OUTBASE, ordered, length(seeds), mg, PUBLISHED, pubgap, pubrank)

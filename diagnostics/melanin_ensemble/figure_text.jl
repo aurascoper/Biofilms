@@ -55,14 +55,16 @@ function read_at(path, at)
 end
 
 """
-    ordering_title(ordered, nseeds) -> String
+    ordering_title(ordered, nseeds, label) -> String
 
-Panel A's title. "Every seed descends" is said only when every seed does; otherwise the
-title states the computed count and nothing more.
+Panel A's title: the computed count, scoped to the seeds plotted (`label` is
+`seed_set_label(seeds)`). It never says "every seed". Until 2026-09-24 it read "Every seed
+descends" when all sixteen of 42:57 did, and SEED42-SCOPE-01 later found the ordering fails
+in 19 of 256 over 42:297, so an unscoped "every" was a claim about the model that this
+sweep could not make.
 """
-ordering_title(ordered::Integer, nseeds::Integer) =
-    (ordered == nseeds ? "Every seed descends: " : "") *
-    "$(ordered) of $(nseeds) display the α_M ordering"
+ordering_title(ordered::Integer, nseeds::Integer, label::AbstractString) =
+    "$(ordered) of $(nseeds) seeds ($(label)) display the α_M ordering"
 
 """
     seed_set_label(seeds) -> String
