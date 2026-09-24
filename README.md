@@ -7,23 +7,27 @@
 A mechanistic modelling framework for a seven-species biofilm community under ionising radiation,
 plus the calibration and transport machinery that decides what the framework is allowed to claim.
 
-![Seven-species consortium, MCS 4 to 400](assets/consortium_400mcs.gif)
+![Seven-species consortium, seed 42, full model beside both radiation-derived terms off, MCS 0 to 100](assets/consortium_seed42_full_vs_null.gif)
 
-**The consortium, 100 frames from MCS 4 to MCS 400.** A 20 × 20 × 20 lattice, with 1,633 of 8,000
-sites occupied at the last frame. Colours name the seven species, in the order `biofilms_potts.jl`
-declares them. `viewer/paraview_species.py` rendered the frames from snapshots stamped `039b7a2`.
+**The consortium at the ensemble configuration, seed 42, MCS 0 to 100, two arms side by side.**
+A 40 × 40 × 40 lattice, six parcels per species; left, the full model; right, `β_ion = 0` and
+`α_M = 0`, so the acceptance rule keeps adhesion and volume only. Both arms start from the same
+seeding frame. Colours name the seven species, in the order `biofilms_potts.jl` declares them.
+The frames were written by `diagnostics/melanin_ensemble/consortium_frames.jl` (occupied sites
+per MCS, gzipped, with a manifest naming the seed, configuration, arms, git commit, Julia version
+and machine) on the same machine and tree as the ensemble CSV, and rendered by
+`tools/render_consortium.py` with matplotlib and ffmpeg in the palette `biofilms_potts.jl`
+declares. The manuscript's consortium figure is the MCS 0, 50 and 100 columns of the same frames.
 
 Axes count lattice sites, not lengths. The pitch is `D-PITCH`, still `awaiting_measurement`, and
-the snapshots record `physical_time_s` as `NaN`. Accumulated dose is zero in every frame. So this
-run shows the Cellular Potts model under its static radial field alone, with no transport coupling.
+no physical time exists (`seconds_per_mcs` is `NaN`). Accumulated dose is zero in every frame. So
+this shows the Cellular Potts model under its static radial field alone, with no transport
+coupling, and every reported number comes from the 256-seed ensemble, never from this one seed.
 
-The snapshots stamped `039b7a2` do not record the seed. Read the animation as a picture of the
-mechanism, not as a reproducible case.
-
-*Corrected 2026-09-17:* this paragraph gave the cause as an empty `config_toml`. That cause is
-wrong. A populated config declares `[transport] seed`, which is OpenMC's Monte Carlo seed and not
-the CPM run seed. Snapshots written from 2026-09-17 record `cpm_seed` and `cpm_seed_source`
-instead, alongside `cpm_params` and `rd_params`.
+*Replaced 2026-09-24:* the animation this replaces, `assets/consortium_400mcs.gif`, was N = 20
+with two parcels per species and came from snapshots that recorded no seed, so it could not be
+regenerated; it stays in `assets/` and is embedded nowhere. The paragraph it carried, and its
+2026-09-17 correction about `cpm_seed`, are in git history.
 
 Four things run. A **3D Cellular Potts model** (`biofilms_potts.jl`) evolves biomass parcels on a
 cylindrical lattice under a four-term Metropolis acceptance functional — adhesion, volume, radiation
