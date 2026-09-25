@@ -1,6 +1,6 @@
-# Modeling Radioresistance and Radiotropic Fitness — Simulation Suite
+# Multispecies Biofilm Cellular-Potts Model — Simulation Suite
 
-**Kinder & Faulkner** · manuscript draft, not submitted · branch `research/observable-split-and-pilot-hardening`
+**Kinder & Faulkner** · manuscript draft, version 2.0, not submitted · source of record `preprint/modeling_radioresistance_and_radiotropic_fitness.tex`
 
 ## What this is
 

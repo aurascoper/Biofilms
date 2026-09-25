@@ -111,11 +111,11 @@ times smaller than the melanin term rather than four orders smaller; only the pr
 coupling reaches the dynamics, so the two are not separately identifiable. The paper's question is
 then put to an ensemble, with the tests declared before it ran: 256 seeds at the published
 configuration, each run under four arms of the acceptance rule that zero the direct term, the
-melanin production, both, or neither, paired within seed. Neither term moves a parcel. Switching
+melanin production, both, or neither, paired within seed. At the shipped constants, neither term moves a parcel. Switching
 the melanin path off shifts the mean radius of the two species it acts on by $+0.0001$ and
 $-0.0004$ of the cylinder radius (paired sign tests $p = 0.95$ and $0.75$; the pre-registered
 prediction that both move inward was wrong), and switching the direct term off is equivalent to
-leaving it on within a pre-registered bound of $0.05$ radii for every species. The inward drift
+leaving it on within a pre-registered bound of $0.05$ radii for every species. The direct term itself works: a positive control that amplifies its coefficient $4\times10^{5}$-fold for \textit{C.~neoformans}, at a smaller configuration, moves that species toward the source on average, so for that term the null is consistent with a coefficient too small to act at this configuration within 100~MCS rather than with a missing mechanism. The melanin path has no positive control. The inward drift
 every arm shares is adhesion-and-volume relaxation, present with both terms off. The single-seed
 radial pattern of earlier versions, a separation of $0.15$ radii between two species, is one draw
 from a per-seed spread of standard deviation $0.11$ centred at $-0.006$. The ensemble runs under the
@@ -123,9 +123,9 @@ analytic field; the transport path contributes no number to it.
 
 The boundaries are declared rather than discovered late. A proposed partial stochastic
 differential equation organises diffusion, directed motility, nutrient, radiation, melanin,
-interaction and forcing terms; it is a specification, and the four executed
-simulations---two Langevin models, the CPM, and a radial membrane-transport solver---realise only
-subsets of it. The CPM represents seven named species as computational biomass parcels rather
+interaction and forcing terms; it is a specification, and the executed simulations---the CPM,
+two Langevin programs described once in Methods, and a radial transport solver now in a
+companion paper---realise only subsets of it. The CPM represents seven named species as computational biomass parcels rather
 than individual organisms, and has neither biomass growth nor a dose-dependent survival process,
 so the implemented phenotype is radiotropism and the model cannot test radiotrophy or
 radioresistance. The transport workflow is explicitly non-calibrating: no target physical
@@ -745,7 +745,7 @@ component, and the per-voxel statistics are too thin to say more: at 400~MCS the
 was written to at all received three accepted moves. A spatial map of which term dominates where is
 therefore not reported, and would be noise if it were.
 
-\subsection{Radial Ensemble: Neither Radiation-Derived Term Moves a Parcel}
+\subsection{Radial Ensemble: At the Shipped Constants, Neither Radiation-Derived Term Moves a Parcel}
 \label{sec:radial_ensemble}
 
 Versions 1.0 to 1.2 of this paper reported one run --- seed 42, a $40^3$ lattice, six parcels
@@ -783,7 +783,7 @@ is $+0.0001\,r/R$ for \textit{C.~neoformans} (129 of 256 seeds positive, $p = 0.
 $-0.0004\,r/R$ for \textit{C.~sphaerospermum} (125 of 256, $p = 0.75$); the prediction that the
 melanin path moves both inward was wrong. Under full minus $\beta_{s,\mathrm{ion}} = 0$ the 90\%
 interval of the paired mean lies inside the bound for all seven species, the widest being
-$[-0.0029, -0.0006]$ for \textit{S.~oneidensis}; the bound is forty times the observed shifts.
+$[-0.0029, -0.0006]$ for \textit{S.~oneidensis}; the bound is forty times the observed shifts. The direct term's mechanism is not absent: \texttt{tests/deterministic\_radiation.jl} sets $\beta_{s,\mathrm{ion}} = -20$ for \textit{C.~neoformans} and $+20$ for \textit{S.~oneidensis}, $4\times10^{5}$ and about $270$ times their shipped values, and at $N = 24$ with one parcel per species over 60~MCS and five seeds the first moves toward the axis on average and the second away. No such control exists for the melanin path.
 Exploratory: full minus both-off is within $\pm0.002\,r/R$ for every species, with within-seed
 correlation above $0.98$, so the four arms track one another. All seven species drift from a
 seeding frame of about $0.53\,r/R$ to about $0.51\,r/R$ by MCS 100 in every arm, the arm with
@@ -1003,15 +1003,15 @@ advance. The active CPM represents seven species as computational biomass parcel
 contains adhesion, volume, radiation and melanin terms. At the shipped constants, the melanin term
 is the dominant radiation-derived contribution to Metropolis acceptance, exceeding the direct
 species-specific radiation term by about an order of magnitude in $\Delta H$ rather than rendering it
-negligible. Neither term moves a parcel: over 256 seeds run under four arms of the acceptance
+negligible. At the shipped constants, neither term moves a parcel: over 256 seeds run under four arms of the acceptance
 rule, zeroing the direct term, the melanin production, or both leaves every species' mean radius
 within $0.002$ of the cylinder radius of where the full model puts it, and the pre-registered
 prediction that the melanin path stratifies the two species it acts on was wrong. The inward
 drift every arm shares is adhesion-and-volume relaxation. The single-seed pattern of earlier
 versions was one draw.
 
-The implemented phenotype is radiotropism alone, and at this configuration the model does not
-express it. Radiotrophy and radioresistance remain outside the current state space because the
+The implemented phenotype is radiotropism alone. The direct term's mechanism is present --- amplified, it moves parcels along the dose gradient in the direction its sign sets ---
+but at the shipped constants and 100~MCS neither radiation-derived term produces a displacement distinguishable from the null, and the melanin path has no positive control. Radiotrophy and radioresistance remain outside the current state space because the
 model has no biomass growth or dose-dependent survival. The radial membrane-transport model is
 withdrawn to a companion paper with the measurements that would calibrate it. The synthetic one-way
 CPM--OpenMC path has executed through geometry export, photon transport, exact-volume dose
