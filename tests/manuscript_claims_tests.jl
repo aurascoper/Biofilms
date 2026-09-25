@@ -937,3 +937,190 @@ end
         @test !occursin("tens of keV", bare)
     end
 end
+
+# ------------------------------------------------- the model table is the struct
+#
+# SCOPE: Table tab:params in the manuscript, against CPMParams(), build_J_matrix(),
+# main_coupled()'s configuration and the hard-coded melanin coupling.
+#
+# WHY. Until version 2.0 the paper's parameter table described the specification and not the
+# model that ran: literature ranges in physical units, a carrying capacity the CPM has no growth
+# to bound, and none of the constants that decide the dynamics. The replacement table lists what
+# the CPM runs with, and this reads every row back from the code so the table cannot drift from
+# the struct, in either direction: a value edited in one place and not the other fails here.
+#
+# THE REACHES-ΔH COLUMN IS A CLAIM AND IS CHECKED THE SAME WAY. "directly" means the field is
+# read inside compute_delta_H_terms or mcs_step!; "through $M$" and "through $I_\gamma$" mean
+# it is read by the function that builds that field and the field is read by ΔH; "no" means
+# neither. Each row's word is checked against the function bodies.
+function _tex_numbers(cell::AbstractString)
+    # Every $...$ group in a table cell, as a Float64. \times10^{k} and bare 10^{k} both parse.
+    vals = Float64[]
+    for m in eachmatch(r"\$([^$]*)\$", cell)
+        g = m[1]
+        if (n = match(r"^\s*(-?[0-9.]*)\\times10\^\{(-?\d+)\}\s*$", g)) !== nothing
+            push!(vals, parse(Float64, n[1]) * 10.0^parse(Int, n[2]))
+        elseif (n = match(r"^\s*10\^\{(-?\d+)\}\s*$", g)) !== nothing
+            push!(vals, 10.0^parse(Int, n[1]))
+        elseif (n = match(r"^\s*(-?[0-9.]+)\s*$", g)) !== nothing
+            push!(vals, parse(Float64, n[1]))
+        else
+            break                       # a formula, not a value: stop at the first one
+        end
+    end
+    vals
+end
+
+"The rows of the tab:params table: parameter name => (value cell, reaches cell)."
+function _model_table_rows(tex::AbstractString)
+    i = findfirst("\\label{tab:params}", tex)
+    i === nothing && error("tab:params not found")
+    j = findnext("\\end{tabular}", tex, last(i))
+    body = tex[last(i):first(j)]
+    rows = Dict{String, Tuple{String, String}}()
+    for line in split(body, "\n")
+        occursin(r"\\\\\s*$", line) || continue
+        cells = strip.(split(replace(line, r"\\\\\s*$" => ""), "&"))
+        length(cells) == 5 || continue
+        startswith(cells[1], "\\textbf") && continue
+        rows[String(cells[1])] = (String(cells[3]), String(cells[4]))
+    end
+    rows
+end
+
+"The body of a top-level `function name(` in the model source."
+function _function_body(src::AbstractString, name::AbstractString)
+    m = match(Regex("(?ms)^function $(name)\\(.*?^end"), src)
+    m === nothing && error("function $name not found in biofilms_potts.jl")
+    m.match
+end
+
+"""
+Every mismatch between the table and the code, as strings. Empty means the table is the struct.
+"""
+function _model_table_mismatches(tex::AbstractString, src::AbstractString, p, J)
+    rows = _model_table_rows(tex)
+    out = String[]
+    scalar = Dict("Acceptance temperature" => :T_cpm, "Volume stiffness" => :λ_V,
+                  "Target volume" => :V_target, "Field intensity at the axis" => :I0,
+                  "Field attenuation" => :κ, "Melanin diffusion" => :D_M,
+                  "Field time step" => :dt_field, "Nutrient diffusion" => :D_C,
+                  "Nutrient at the wall" => :C_wall, "Pairwise attraction" => :γ_mutual,
+                  "Pairwise range" => :σ_mutual)
+    vector = Dict("Direct radiation coefficient" => :β_ion, "Melanin production scale" => :α_M_species,
+                  "Nutrient uptake" => :uptake, "Species diffusion" => :D_s)
+    for (row, field) in scalar
+        haskey(rows, row) || (push!(out, "row missing: $row"); continue)
+        v = _tex_numbers(rows[row][1])
+        isempty(v) && (push!(out, "$row: no value parsed from $(rows[row][1])"); continue)
+        isapprox(v[1], Float64(getfield(p, field)); rtol = 1e-9) ||
+            push!(out, "$row: table $(v[1]) versus CPMParams.$field $(getfield(p, field))")
+    end
+    for (row, field) in vector
+        haskey(rows, row) || (push!(out, "row missing: $row"); continue)
+        v = _tex_numbers(rows[row][1])
+        want = Float64.(getfield(p, field))
+        (length(v) == length(want) && all(isapprox.(v, want; rtol = 1e-9))) ||
+            push!(out, "$row: table $(v) versus CPMParams.$field $(want)")
+    end
+    # The physical-time contract: NaN, stated as the word.
+    haskey(rows, "Seconds per MCS") || push!(out, "row missing: Seconds per MCS")
+    haskey(rows, "Seconds per MCS") && (occursin("NaN", rows["Seconds per MCS"][1]) && isnan(p.seconds_per_mcs) ||
+        push!(out, "Seconds per MCS: table $(rows["Seconds per MCS"][1]) versus $(p.seconds_per_mcs)"))
+    # The melanin coupling, read from the ΔH source the same way prose_bounds.jl reads it.
+    c = match(r"ΔH_mel\s*-=\s*([0-9.]+)\s*\*\s*M_local", src)
+    haskey(rows, "Melanin coupling") || push!(out, "row missing: Melanin coupling")
+    if haskey(rows, "Melanin coupling") && c !== nothing
+        v = _tex_numbers(rows["Melanin coupling"][1])
+        (!isempty(v) && isapprox(v[1], parse(Float64, c[1]))) ||
+            push!(out, "Melanin coupling: table $(v) versus source $(c[1])")
+    end
+    # The adhesion matrix: index 1 is medium, species s is s + 1.
+    CN, DR, CS, BS, AN, SO, OI = 1, 2, 3, 4, 5, 6, 7
+    jrows = [("Adhesion, default pair", J[CN + 1, BS + 1]), ("Adhesion, same parcel", J[CN + 1, CN + 1]),
+             ("Adhesion, parcel--medium", J[1, CN + 1]),
+             ("Adhesion, mutualistic pairs", J[CN + 1, DR + 1]), ("Adhesion, antagonistic pairs", J[CN + 1, SO + 1])]
+    for (row, want) in jrows
+        haskey(rows, row) || (push!(out, "row missing: $row"); continue)
+        v = _tex_numbers(rows[row][1])
+        (!isempty(v) && isapprox(v[1], want)) || push!(out, "$row: table $(v) versus J $(want)")
+    end
+    # The listed pairs, each checked against the matrix rather than against a memory of it.
+    pairs = Dict("CN" => CN, "DR" => DR, "CS" => CS, "BS" => BS, "AN" => AN, "SO" => SO, "OI" => OI)
+    for (row, want) in (("Adhesion, mutualistic pairs", 4.0), ("Adhesion, antagonistic pairs", 20.0))
+        haskey(rows, row) || continue
+        listed = [(m[1], m[2]) for m in eachmatch(r"([A-Z]{2})--([A-Z]{2})", rows[row][1])]
+        isempty(listed) && push!(out, "$row: no pairs listed")
+        for (a, b) in listed
+            J[pairs[a] + 1, pairs[b] + 1] == want || push!(out, "$row: $a--$b is $(J[pairs[a] + 1, pairs[b] + 1]) in J")
+        end
+        # And every pair at that value is listed: an omitted pair is a table that under-describes.
+        for (a, ia) in pairs, (b, ib) in pairs
+            ia < ib || continue
+            J[ia + 1, ib + 1] == want && ((a, b) in listed || (b, a) in listed ||
+                push!(out, "$row: J has $a--$b at $want and the table omits it"))
+        end
+    end
+    # The reported run's configuration, read from main_coupled.
+    cfg = match(r"CPMParams\(N = (\d+), n_cells_per_species = (\d+), snapshot_interval = \d+\)", _function_body(src, "main_coupled"))
+    nm = match(r"n_mcs = (\d+)", _function_body(src, "main_coupled"))
+    for (row, want) in (("Lattice side", cfg[1]), ("Parcels per species", cfg[2]), ("Monte Carlo steps", nm[1]))
+        haskey(rows, row) || (push!(out, "row missing: $row"); continue)
+        v = _tex_numbers(rows[row][1])
+        (!isempty(v) && v[1] == parse(Float64, want)) || push!(out, "$row: table $(v) versus main_coupled $want")
+    end
+    # THE REACHES-ΔH COLUMN.
+    dH = _function_body(src, "compute_delta_H_terms") * _function_body(src, "mcs_step!")
+    rad = _function_body(src, "init_radiation!")
+    mel = _function_body(src, "update_melanin!")
+    reads(body, field) = occursin(Regex("\\bp\\.$(field)\\b"), body) || occursin(Regex("\\bparams\\.$(field)\\b"), body)
+    for (row, field) in merge(scalar, vector)
+        haskey(rows, row) || continue
+        word = rows[row][2]
+        direct = reads(dH, field)
+        via_rad = reads(rad, field) && occursin("state.radiation", dH)
+        via_mel = reads(mel, field) && occursin("state.melanin", dH)
+        expected = direct ? "directly" : via_rad ? "through \$I_\\gamma\$" : via_mel ? "through \$M\$" : "no"
+        word == expected || push!(out, "$row: reaches column says '$word', code says '$expected'")
+    end
+    occursin("J = state.J", dH) || push!(out, "compute_delta_H_terms no longer reads state.J; the adhesion rows' 'directly' is stale")
+    out
+end
+
+@testset "the model table is the struct, and its reaches column is the code" begin
+    tex = read(joinpath(REPO, "preprint", "modeling_radioresistance_and_radiotropic_fitness.tex"), String)
+    src = read(joinpath(REPO, "biofilms_potts.jl"), String)
+    p = SR.CPMParams()
+    J = SR.build_J_matrix()
+    mismatches = _model_table_mismatches(tex, src, p, J)
+    isempty(mismatches) || foreach(println, mismatches)
+    @test isempty(mismatches)
+
+    # The number parser, on the forms the table uses.
+    @test _tex_numbers(raw"$-5\times10^{-5}$, $2.5\times10^{-5}$, $10^{-2}$") ≈ [-5e-5, 2.5e-5, 1e-2]
+    @test _tex_numbers(raw"$120$ sites") == [120.0]
+    @test _tex_numbers(raw"$2.0$; $I_\gamma = I_0\exp(-\kappa r/N)$") == [2.0]   # stops at the formula
+
+    @testset "the controls: one value moved, one pair dropped, one reaches word wrong" begin
+        moved = replace(tex, raw"Acceptance temperature & $T_{\mathrm{CPM}}$ & $5.0$" =>
+                             raw"Acceptance temperature & $T_{\mathrm{CPM}}$ & $5.5$")
+        @test moved != tex
+        @test any(occursin("Acceptance temperature", m) for m in _model_table_mismatches(moved, src, p, J))
+
+        vec = replace(tex, raw"$0.10$, $0$, $0.14$, $0$, $0.065$, $0$, $0$" => raw"$0.10$, $0$, $0.15$, $0$, $0.065$, $0$, $0$")
+        @test vec != tex
+        @test any(occursin("Melanin production scale", m) for m in _model_table_mismatches(vec, src, p, J))
+
+        dropped = replace(tex, "CN--DR, CN--CS, CS--AN, SO--OI, DR--BS" => "CN--DR, CN--CS, CS--AN, SO--OI")
+        @test dropped != tex
+        @test any(occursin("omits it", m) for m in _model_table_mismatches(dropped, src, p, J))
+
+        wrong = replace(tex, raw"Nutrient diffusion & $D_C$ & $0.2$ & no &" => raw"Nutrient diffusion & $D_C$ & $0.2$ & directly &")
+        @test wrong != tex
+        @test any(occursin("Nutrient diffusion: reaches", m) for m in _model_table_mismatches(wrong, src, p, J))
+
+        # And the code side: a struct value that moved is caught from the other direction.
+        p2 = SR.CPMParams(T_cpm = 4.0)
+        @test any(occursin("Acceptance temperature", m) for m in _model_table_mismatches(tex, src, p2, J))
+    end
+end

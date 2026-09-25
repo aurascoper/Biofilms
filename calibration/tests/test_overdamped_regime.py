@@ -41,7 +41,11 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 
 # 571-584 until 2026-09-01, when four \label lines were inserted above and the anchor
 # assertion below refused the stale window rather than silently reading two wrong lines.
-FIRST_LINE, LAST_LINE = 593, 606
+# 593-606 until 2026-09-24, when the Symplectic Integration subsection moved into Appendix A
+# of the same file; the paragraph is unchanged and the window follows it.
+# 1159-1172 until ad50fca added 100 lines above it. That commit set 1244-1257, fifteen short
+# of where its own tex put the paragraph, and the anchor assertion refused it in CI.
+FIRST_LINE, LAST_LINE = 1259, 1272
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the

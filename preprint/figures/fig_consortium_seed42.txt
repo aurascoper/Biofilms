@@ -1,0 +1,18 @@
+                      One realisation of the ensemble configuration under two arms of the acceptance rule
+                            seed 42, N = 40, 6 parcels per species, to MCS 100; commit de8d88e-dirty; julia 1.12.7 on x86_64-conda-linux-gnu
+
+  (a) full model, MCS 0, the shared seeding frame                       (b) full model, MCS 50                                    (c) full model, MCS 100
+
+
+
+
+(d) both terms off, MCS 0, the shared seeding frame                   (e) both terms off, MCS 50                                (f) both terms off, MCS 100
+
+
+
+
+                                          C. neoformans           C. sphaerospermum           A. niger              O. intermedium
+                                          D. radiodurans          B. subtilis                 S. oneidensis
+                  Bottom row: both radiation-derived vectors zeroed (beta_ion = 0 and alpha_M = 0); the acceptance rule keeps adhesion and volume only.
+                           Every reported number comes from the 256-seed ensemble; this single realisation is what those curves average over.
+
