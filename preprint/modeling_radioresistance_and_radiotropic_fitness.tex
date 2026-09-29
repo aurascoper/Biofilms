@@ -105,14 +105,14 @@ nuclear-engineering multiphysics. This work therefore extends an established par
 transport code and a new biological target rather than introducing the paradigm.
 
 Auditing the CPM's radiation-linked terms against their shipped parameterisation gives two
-measured results. The melanin term changes Metropolis acceptance by 13.4\% to 29.2\% across 256 seeds, whereas
+measured term scales. The melanin term changes the unclipped Metropolis factor by 13.4\% to 29.2\% across 256 seeds, whereas
 the direct per-species radiation term reaches $7.505\times10^{-2}$ in $\Delta H$ (a 1.5\% acceptance bias), about ten
-times smaller than the melanin term rather than four orders smaller; only the product of melanin production and melanin
+times smaller than the melanin term rather than four orders smaller; these biases are unclipped factors, with actual acceptance capped at one. Only the product of melanin production and melanin
 coupling reaches the dynamics, so the two are not separately identifiable. The paper's question is
 then put to an ensemble, with the tests declared before it ran: 256 seeds at the published
 configuration, each run under four arms of the acceptance rule that zero the direct term, the
-melanin production, both, or neither, paired within seed. At the shipped constants, neither term moves a parcel. Switching
-the melanin path off shifts the mean radius of the two species it acts on by $+0.0001$ and
+melanin production, both, or neither, paired within seed. At the shipped constants, the predicted melanin shifts are unsupported and the direct-term mean shifts meet the equivalence bound. Under full minus
+melanin-production-off, the paired mean-radius differences for the two species it acts on are $+0.0001$ and
 $-0.0004$ of the cylinder radius (paired sign tests $p = 0.95$ and $0.75$; the pre-registered
 prediction that both move inward was wrong), and switching the direct term off is equivalent to
 leaving it on within a pre-registered bound of $0.05$ radii for every species. The direct term itself works: a positive control that amplifies its coefficient $4\times10^{5}$-fold for \textit{C.~neoformans}, at a smaller configuration, moves that species toward the source on average, so for that term the null is consistent with a coefficient too small to act at this configuration within 100~MCS rather than with a missing mechanism. The melanin path has no positive control. The inward drift
@@ -466,7 +466,7 @@ provenance and whether it reaches the Metropolis acceptance rule. The values are
 \texttt{CPMParams} and \texttt{build\_J\_matrix} in \texttt{biofilms\_potts.jl}, and
 \texttt{tests/manuscript\_claims\_tests.jl} compares the table to the struct so the two cannot
 drift apart. The literature ranges from which the species vectors take their midpoints are in
-Appendix~\ref{app:priors}, Table~\ref{tab:priors}. Three declarations govern how
+Appendix~\ref{app:priors}, Table~\ref{tab:priors}. Four declarations govern how
 Table~\ref{tab:params} should be read.
 
 \emph{These are declared inputs and literature priors.} No value in Table~\ref{tab:params} or
@@ -488,7 +488,7 @@ acceptance term applies a coupling of $0.5$ against the local melanin field. It 
 call site in \texttt{compute\_delta\_H\_terms}, has no citation, and no configuration file exposes
 it; it is recorded as a declared modelling choice (\texttt{PP-T2-29}, \texttt{flagged\_weak}, in
 \texttt{data/species\_parameter\_provenance.csv}) and it has a row in Table~\ref{tab:params}.
-Stating it here matters because the 13.4\% to 29.2\% acceptance shift reported in
+Stating it here matters because the 13.4\% to 29.2\% unclipped-factor increase reported in
 Section~\ref{sec:results} is this coefficient's effect: the largest measured quantity in the
 manuscript rests on the least evidenced parameter in it. Only the product of $\alpha_M$ and this
 coupling reaches the dynamics, so the two are not separately identifiable.
@@ -625,7 +625,7 @@ look like $5\times10^{-5}$. The rows are single roles; the reach of the term is 
 \label{tab:term_magnitudes}
 \begin{tabular}{@{}llr@{}}
 \toprule
-\textbf{Term} & $\Delta H$ & \textbf{Acceptance bias} \\
+\textbf{Term} & $\Delta H$ & \textbf{Unclipped factor} \\
 \midrule
 $\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=-5\times10^{-5}$ & $-5.0\times10^{-5}$ & $1.000010$ \\
 $\Delta H_{\mathrm{rad}}$, source \emph{gains}, $\beta_{\mathrm{ion}}=7.5\times10^{-2}$ & $+7.5\times10^{-2}$ & $0.985$ \\
@@ -636,8 +636,8 @@ $\Delta H_{\mathrm{mel}}$ over 256 seeds, $M=1.26$ to $2.56$ & $-0.630$ to $-1.2
 \end{table}
 
 For the two negatively signed species \emph{occupying} a site, the direct radiation term changes
-acceptance by about one part in $10^5$, which is not that term's reach, whereas the melanin term
-changes it by 13.4\% to 29.2\% across seeds 42--297. That
+the unclipped Metropolis factor by about one part in $10^5$, which is not that term's reach, whereas the melanin term
+changes that factor by 13.4\% to 29.2\% at the reported mean melanin fields across seeds 42--297. Actual proposals use local fields and acceptance is capped at one. That
 comparison is between one role of one pair of species and the melanin term, and it does not bound
 $\Delta H_{\mathrm{rad}}$: the third row is the same term at $1.5\times10^{3}$ times the magnitude
 and in the acceptance-favouring direction, smaller than the melanin term by a factor of $8.39$ to
@@ -745,7 +745,7 @@ component, and the per-voxel statistics are too thin to say more: at 400~MCS the
 was written to at all received three accepted moves. A spatial map of which term dominates where is
 therefore not reported, and would be noise if it were.
 
-\subsection{Radial Ensemble: At the Shipped Constants, Neither Radiation-Derived Term Moves a Parcel}
+\subsection{Radial Ensemble: Small Mean-Radius Contrasts at the Shipped Constants}
 \label{sec:radial_ensemble}
 
 Versions 1.0 to 1.2 of this paper reported one run --- seed 42, a $40^3$ lattice, six parcels
@@ -782,23 +782,23 @@ Predicted: all equivalent. Every other cell was declared exploratory.
 is $+0.0001\,r/R$ for \textit{C.~neoformans} (129 of 256 seeds positive, $p = 0.95$) and
 $-0.0004\,r/R$ for \textit{C.~sphaerospermum} (125 of 256, $p = 0.75$); the prediction that the
 melanin path moves both inward was wrong. Under full minus $\beta_{s,\mathrm{ion}} = 0$ the 90\%
-interval of the paired mean lies inside the bound for all seven species, the widest being
-$[-0.0029, -0.0006]$ for \textit{S.~oneidensis}; the bound is forty times the observed shifts. The direct term's mechanism is not absent: \texttt{tests/deterministic\_radiation.jl} sets $\beta_{s,\mathrm{ion}} = -20$ for \textit{C.~neoformans} and $+20$ for \textit{S.~oneidensis}, $4\times10^{5}$ and about $270$ times their shipped values, and at $N = 24$ with one parcel per species over 60~MCS and five seeds the first moves toward the axis on average and the second away. No such control exists for the melanin path.
+interval of the paired mean lies inside the bound for all seven species, the interval farthest from zero being
+$[-0.0029, -0.0006]$ for \textit{S.~oneidensis}; the bound is about thirty times the largest absolute paired mean shift. The direct term's mechanism is not absent: \texttt{tests/deterministic\_radiation.jl} sets $\beta_{s,\mathrm{ion}} = -20$ for \textit{C.~neoformans} and $+20$ for \textit{S.~oneidensis}, $4\times10^{5}$ and about $270$ times their shipped values, and at $N = 24$ with one parcel per species over 60~MCS and five seeds the first moves toward the axis on average and the second away. No such control exists for the melanin path.
 Exploratory: full minus both-off is within $\pm0.002\,r/R$ for every species, with within-seed
 correlation above $0.98$, so the four arms track one another. All seven species drift from a
 seeding frame of about $0.53\,r/R$ to about $0.51\,r/R$ by MCS 100 in every arm, the arm with
 both terms off included, so that drift is adhesion-and-volume relaxation. The
-\textit{C.~neoformans}--\textit{B.~subtilis} separation is $-0.006\,r/R$ in every arm with a
+\textit{C.~neoformans}--\textit{B.~subtilis} ensemble-mean separation ranges from $-0.0057$ to $-0.0048\,r/R$ across the four arms, with a
 standard deviation of $0.11$ over seeds; seed 42's $+0.16$ is one draw from that spread
 (Figure~\ref{fig:radial}). Figure~\ref{fig:consortium} shows that realisation on the lattice,
 under the full model and with both terms off.
 
-\paragraph{What it establishes.} At the shipped constants and this configuration, the acceptance
-bias the melanin term carries --- 13.4\% to 29.2\% at the field values the run produces --- does
-not become a radial displacement of the parcels it acts on within 100~MCS, and the direct term's
-$1.5\%$ bias does not either. The term-magnitude audit ordered the two terms correctly and said
-nothing about whether either moves anything; this measures that, and the answer is that neither
-does. A reading consistent with the mechanism, stated as a reading and not a result: melanin is
+\paragraph{What it establishes.} At the shipped constants and this configuration, the two tests
+concern the ensemble mean of parcel centre-of-mass radius at 100~MCS. The melanin contrast does
+not meet its pre-registered sign-and-size criterion; the direct-term contrast meets equivalence
+within $\pm0.05\,r/R$. Equivalence at that bound permits smaller nonzero shifts. The term audit
+ranks the two contributions to the unclipped Metropolis factor and does not determine parcel motion.
+A reading consistent with the mechanism, stated as a reading and not a result: melanin is
 produced at the sites the producers already occupy and diffuses slowly, so a term that favours
 melanin-rich sites favours the sites a parcel already holds. Whether a stronger drive, a longer
 run, or a field with a gradient across a parcel would change the answer is a separate experiment
@@ -825,11 +825,11 @@ Lattice units divided by $R = N/2$; nothing here is a claim about organisms.}
 \includegraphics[width=0.99\linewidth]{fig_consortium_seed42}
 \caption{One realisation of the ensemble configuration, seed 42, $N = 40$, six parcels per
 species, under the full model (top) and with both radiation-derived terms off (bottom), at
-MCS 0, 50 and 100. The MCS 0 column is the shared seeding frame. Every reported number in this
-paper comes from the 256-seed ensemble of Figure~\ref{fig:radial}; this single realisation is
-what those curves average over, shown so that the lattice the acceptance rule acts on is in the
-paper. Frames were written by \texttt{consortium\_frames.jl} on the machine and commit the
-ensemble CSV names, and rendered from them by \texttt{tools/render\_consortium.py}; a video of
+MCS 0, 50 and 100. The MCS 0 column is the shared seeding frame. Figure~\ref{fig:radial}
+reports the 256-seed radial ensemble; these images show seed 42. Other diagnostics use the
+separate runs identified in their sections. The frame archive preserves its original producer
+revision, Julia version and machine in \texttt{consortium\_seed42/manifest.txt}. A separate
+render receipt records the clean renderer revision and archived input hashes; a video of
 the same two arms to MCS 100 is in the repository under \texttt{assets/}.}
 \label{fig:consortium}
 \end{figure}
@@ -878,26 +878,26 @@ reported here as executed, with no result of its own.
 
 The implemented programs support a narrower conclusion than the full PSDE specification. The CPM term audit establishes that,
 within its radiation-derived pathway, the melanin term exceeds the direct species-specific
-radiation term by about an order of magnitude in $\Delta H$ ($8.39$ to $17.06$ across 256 seeds), not by several. The radial ensemble establishes that neither term moves a
-parcel at this configuration: switching either off, or both, leaves every species' mean radius
-where the full model puts it to within $0.002\,r/R$ over 256 paired seeds, and the single-seed
-separation earlier versions reported is one draw from a spread forty times wider than any
-between-arm shift.
+radiation term by about an order of magnitude in $\Delta H$ ($8.39$ to $17.06$ across 256 seeds), not by several. In the radial ensemble, each full-minus-ablation contrast in
+ensemble mean parcel centre-of-mass radius is smaller than $0.002\,r/R$ over 256 paired seeds.
+The melanin prediction fails its stated criterion; the direct-term contrast meets the declared
+$\pm0.05\,r/R$ equivalence bound. The earlier single-seed species separation is one draw from a
+spread with standard deviation $0.11\,r/R$; these results permit smaller effects.
 
 \subsection{Phenotype Boundary}
 
-Radiotropism, radiotrophy and radioresistance refer to different observables. The present CPM can
-represent only directional redistribution in a spatial field. It cannot test radiotrophy because it
-has no biomass-growth process, and it cannot test radioresistance because it has no dose-dependent
-survival process. The published $D_{10}$ and LD$_{90}$ measurements in
-Table~\ref{tab:priors} remain biologically informative, but using them to set a tropism coefficient
-is a declared modelling analogy rather than a calibration of the phenotype they measured.
+The CPM represents radiotropism by including a directional radiation term in its acceptance rule; this states a capability, not a measured effect.
+It has no biomass-growth or dose-dependent survival process, so it cannot test radiotrophy or radioresistance. At the shipped coefficients,
+over 256 seeds and 100~MCS, the melanin prediction fails its stated criterion and the direct-term mean-radius contrast meets the declared equivalence bound.
+The amplified direct-term control produces the expected shifts in occupied-site mean radius at a smaller configuration; it establishes directional response but does not locate a threshold for the parcel endpoint.
+The $D_{10}$ and LD$_{90}$ measurements in Table~\ref{tab:priors} anchor a declared analogy for the tropism coefficients, not a calibration of directional redistribution.
+Thus the measured result concerns these coefficients, this endpoint and this horizon; it does not establish absence of a mechanism or of smaller effects.
 
 Melanisation is likewise not a universal proxy for either radiotrophy or survival. The literature
 contains organism-, genotype-, substrate- and radiation-modality-specific effects, including
 isogenic comparisons with little or no detectable pigmentation advantage. In the present CPM,
-melanin is best understood as an internal model field whose coupling dominates the direct radiation
-term; its physical mass, chemistry and radiobiological response remain uncalibrated.
+melanin is an internal model field with an uncalibrated coupling; local retention around producing parcels is a hypothesis, not an inference from a small mean-radius contrast.
+A coefficient sweep at the ensemble configuration and a separate parcel-clustering endpoint would test the response threshold and that hypothesis; neither is reported here.
 
 \subsection{Implications for Bioremediation and Transport Modelling}
 
@@ -914,7 +914,7 @@ one-way dosimetry is still meaningful once the physical system is specified; dos
 membrane transport requires a separate constitutive and experimental programme.
 
 The regime in which those inputs are obtainable is not the one this paper's motivating sites
-occupy. Section~\ref{sec:planned_feedback} put the gap at about ten orders of magnitude: a
+occupy. Section~\ref{sec:planned_feedback} puts the gap at nearly nine orders of magnitude: a
 reactor irradiation delivers of order $\mathrm{Gy}\,\mathrm{min}^{-1}$ and the environmental
 settings cited in Section~\ref{sec:intro} are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, so a sensitivity
 constant calibrated in one is not transferable to the other. Engineered nuclear facilities lie
@@ -1003,15 +1003,15 @@ advance. The active CPM represents seven species as computational biomass parcel
 contains adhesion, volume, radiation and melanin terms. At the shipped constants, the melanin term
 is the dominant radiation-derived contribution to Metropolis acceptance, exceeding the direct
 species-specific radiation term by about an order of magnitude in $\Delta H$ rather than rendering it
-negligible. At the shipped constants, neither term moves a parcel: over 256 seeds run under four arms of the acceptance
+negligible. At the shipped constants, the ensemble mean-radius contrasts are small: over 256 seeds run under four arms of the acceptance
 rule, zeroing the direct term, the melanin production, or both leaves every species' mean radius
 within $0.002$ of the cylinder radius of where the full model puts it, and the pre-registered
 prediction that the melanin path stratifies the two species it acts on was wrong. The inward
 drift every arm shares is adhesion-and-volume relaxation. The single-seed pattern of earlier
 versions was one draw.
 
-The implemented phenotype is radiotropism alone. The direct term's mechanism is present --- amplified, it moves parcels along the dose gradient in the direction its sign sets ---
-but at the shipped constants and 100~MCS neither radiation-derived term produces a displacement distinguishable from the null, and the melanin path has no positive control. Radiotrophy and radioresistance remain outside the current state space because the
+The implemented phenotype is radiotropism alone. The direct term's directional response is present --- amplified, it shifts occupied-site mean radius in the expected directions at the smaller control configuration ---
+but at the shipped constants and 100~MCS the melanin prediction is unsupported and the direct-term mean-radius contrast meets the declared equivalence bound; the melanin path has no positive control. Radiotrophy and radioresistance remain outside the current state space because the
 model has no biomass growth or dose-dependent survival. The radial membrane-transport model is
 withdrawn to a companion paper with the measurements that would calibrate it. The synthetic one-way
 CPM--OpenMC path has executed through geometry export, photon transport, exact-volume dose
@@ -1027,16 +1027,16 @@ whether plausible biological material changes are large enough to justify any on
 \section*{Author Contributions}
 Stated under the CRediT taxonomy. H.K.: conceptualisation, software, investigation, validation,
 data curation, writing --- original draft, writing --- review and editing. B.F.: conceptualisation,
-methodology, writing --- review and editing. Both authors approved the version submitted. The
+methodology, writing --- review and editing. The
 allocation above is a draft for the authors to confirm before posting; it is recorded here so that
 the statement exists in the source of record.
 
 \section*{Software and Data Availability}
 All source code, configuration schemas, tests, provenance ledgers, and figure-generation materials
-are available in the public repository at
-\url{https://github.com/aurascoper/Biofilms/tree/preprint-v2.0}. Version 1.0 was prepared against repository
+are held in the private repository below; access is available on request:
+\url{https://github.com/aurascoper/Biofilms}. Version 1.0 was prepared against repository
 revision \texttt{c7539a9}, version 1.2.1 against \texttt{4bf1ba9}, and this revision against
-\texttt{de8d88e}. Each names the
+\texttt{24cd3ec}. Each names the
 parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.
@@ -1058,7 +1058,7 @@ position. The earlier text said the null had to be simulated, and it now is. The
 paper (Section~\ref{sec:radiodialysis}); the specification subsections and the literature priors
 moved to appendices; the parameter table is the executed model's. The correction notes below are
 kept as written, with the two withdrawn figures named by description because they no longer carry
-figure numbers here.
+figure numbers here. \par \emph{Correction, 29 September 2026 (\texttt{PRE-SEND-01} to \texttt{PRE-SEND-07}).} The signed melanin comparison is full minus production-off. The direct-term interval cited in Section~\ref{sec:radial_ensemble} is the one farthest from zero; the equivalence bound is about thirty times the largest absolute paired mean. Species separation is reported as a range across arms. The two dose-rate comparisons now use their unit-conversion ratio. Figures~\ref{fig:radial} and~\ref{fig:consortium} and the supplementary video are re-rendered with scoped claims; the consortium assets carry separate archive/render provenance. Acceptance percentages denote unclipped factors. Author-role confirmation is pending, and repository access is by request. Appendix and parameter-provenance revisions remain open in \texttt{PRE-SEND-08}.
 
 \emph{Correction, version 1.1: the radial figure and Figure~\ref{fig:melanin} were replaced.} The versions distributed with
 version 1.0 carried claims inside the images that the surrounding text retracts. Figure~\ref{fig:melanin}
@@ -1458,7 +1458,7 @@ the dominant damage pathway is indirect, through radiolysis products whose stead
 concentration is set by competing generation and recombination kinetics --- both rate-dependent.
 The regimes involved are far apart: a reactor irradiation delivers of order
 $\mathrm{Gy}\,\mathrm{min}^{-1}$, while the environmental settings this work cites as motivation
-are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, roughly ten orders of magnitude apart. A
+are closer to $\mathrm{mGy}\,\mathrm{yr}^{-1}$, nearly nine orders of magnitude apart. A
 sensitivity constant calibrated in one regime is not transferable to the other by construction,
 and that is a statement with a number attached rather than a general caution.
 

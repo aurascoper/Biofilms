@@ -151,7 +151,7 @@ def render(csv_path, outdir):
     ax.invert_yaxis()
     ax.set_xlim(-MEOI * 1.4, MEOI * 1.4)
     ax.set_xlabel("paired mean difference in r/R, 90% interval")
-    ax.set_title("(b) Switching a term off moves nothing")
+    ax.set_title("(b) Paired mean-radius contrasts\n(90% intervals)")
     ax.text(0.5, 0.995, "shaded: the pre-registered bound, ±0.05 r/R", transform=ax.transAxes, ha="center", va="top", fontsize=7, color=INK)
     ax.grid(axis="x", lw=0.3, alpha=0.5)
 
@@ -174,7 +174,8 @@ def render(csv_path, outdir):
             va="top", fontsize=7.5)
     ax.set_xticks([])
 
-    fig.suptitle("Neither radiation-derived term moves a parcel: four arms on the same 256 seeds", fontsize=12, y=0.975)
+    # Correction RAD-FIG-01: this endpoint does not describe every parcel's motion.
+    fig.suptitle("Small ensemble mean-radius shifts across four paired arms", fontsize=12, y=0.975)
     fig.text(0.5, 0.905, f"N = 40, six parcels per species, read at MCS {read_at}, seeds {seeds[0]} to {seeds[-1]}; "
              f"paired within seed; produced by julia {meta.get('julia_version','?')} on {meta.get('machine','?')}",
              ha="center", fontsize=8)

@@ -2,7 +2,7 @@
 """Render the consortium panel, the per-MCS frames and the video from seeded frame files.
 
     python3 tools/render_consortium.py [diagnostics/melanin_ensemble/consortium_seed42] \
-        [--figures preprint/figures] [--video assets]
+        --figures /tmp/biofilms-render/figures --video /tmp/biofilms-render/assets
 
 Reads the frames consortium_frames.jl wrote (occupied sites per arm and MCS, plus a manifest
 naming seed, configuration, arms, git commit, Julia version and machine) and writes:
@@ -15,13 +15,17 @@ naming seed, configuration, arms, git commit, Julia version and machine) and wri
 
 Voxels are drawn with matplotlib as tools/render_label_trajectory.py draws them, in the same
 categorical palette, so the picture needs no ParaView: Julia to make the frames, Python and
-ffmpeg to render them. The provenance line inside the image is printed from the manifest.
+ffmpeg to render them. Render from a clean checkout to external output directories.
+The image names the committed frame archive and the clean render revision separately.
+The .render.json receipt preserves the original run metadata, including its dirty marker;
+rendering archived frames does not establish a new simulation origin.
 Written 2026-09-24.
 """
 import argparse
 import csv
 import gzip
 import hashlib
+import json
 import shutil
 import subprocess
 import sys
@@ -85,12 +89,48 @@ def draw(ax, species, n, title):
     ax.set_title(title, fontsize=9)
 
 
-def provenance(m):
+def clean_render_record(frames):
+    """Bind a clean render revision to its archived inputs; never relabel the run."""
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(REPO), *args], text=True).strip()
+
+    if git("status", "--porcelain", "--untracked-files=no"):
+        raise SystemExit("tracked source files differ from HEAD; commit them before claiming a clean render revision")
+    try:
+        relative = frames.resolve().relative_to(REPO)
+    except ValueError:
+        raise SystemExit("frames must be the committed archive inside this checkout")
+    tracked = set(git("ls-files", "--", relative.as_posix()).splitlines())
+    actual = {p.relative_to(REPO).as_posix() for p in frames.resolve().rglob("*") if p.is_file()}
+    if not actual or actual != tracked:
+        raise SystemExit("the frame directory must contain exactly its committed files")
+    sources = ("tools/render_consortium.py", "tools/render_label_trajectory.py",
+               "calibration/tests/test_claims_ledger.py")
+    m = manifest(frames)
+    return {
+        "schema_version": 1,
+        "render_git_commit": git("rev-parse", "HEAD"),
+        "frame_archive_tree": git("rev-parse", f"HEAD:{relative.as_posix()}"),
+        "original_run": {key: m[key] for key in (
+            "git_commit", "julia_version", "machine", "seed", "N", "parcels_per_species", "n_mcs", "arms")},
+        "source_sha256": {p: hashlib.sha256((REPO / p).read_bytes()).hexdigest() for p in sources},
+        "input_sha256": {p: hashlib.sha256((REPO / p).read_bytes()).hexdigest() for p in sorted(actual)},
+    }
+
+
+def external_output(path):
+    path = Path(path).resolve()
+    if path == REPO or REPO in path.parents:
+        raise SystemExit("render outputs must be outside the source checkout; copy them back after validation")
+    return path
+
+
+def provenance(m, record):
     return (f"seed {m['seed']}, N = {m['N']}, {m['parcels_per_species']} parcels per species, to MCS {m['n_mcs']}; "
-            f"commit {m['git_commit']}; julia {m['julia_version']} on {m['machine']}")
+            f"frame archive {record['frame_archive_tree'][:10]}; render revision {record['render_git_commit'][:10]}")
 
 
-def panel(frames, m, figdir):
+def panel(frames, m, figdir, record):
     n = int(m["N"])
     arms = m["arms"].split(",")
     if arms != ["full", "null"]:
@@ -108,8 +148,9 @@ def panel(frames, m, figdir):
     fig.suptitle("One realisation of the ensemble configuration under two arms of the acceptance rule", fontsize=12, y=0.965)
     fig.text(0.5, 0.045, "Bottom row: both radiation-derived vectors zeroed (beta_ion = 0 and alpha_M = 0); the acceptance rule keeps adhesion and volume only.",
              ha="center", fontsize=8)
-    fig.text(0.5, 0.915, provenance(m), ha="center", fontsize=8)
-    fig.text(0.5, 0.015, "Every reported number comes from the 256-seed ensemble; this single realisation is what those curves average over.",
+    fig.text(0.5, 0.915, provenance(m, record), ha="center", fontsize=8)
+    # Correction RAD-FIG-02: the ensemble scope belongs to Figure 1.
+    fig.text(0.5, 0.015, "Figure 1 reports the 256-seed ensemble; these frames show seed 42.",
              ha="center", fontsize=8)
     figdir.mkdir(parents=True, exist_ok=True)
     base = figdir / NAME
@@ -136,7 +177,7 @@ def retracted_figure_terms():
     return re.findall(r'"([^"]+)"', m.group(1))
 
 
-def video(frames, m, videodir):
+def video(frames, m, videodir, record):
     if shutil.which("ffmpeg") is None:
         raise SystemExit("ffmpeg not found: the video could not be assembled, refusing to leave frames")
     n = int(m["N"])
@@ -150,7 +191,7 @@ def video(frames, m, videodir):
             for i, arm in enumerate(arms):
                 ax = fig.add_subplot(gs[0, i], projection="3d")
                 draw(ax, lattice(frames, arm, k, n), n, f"{ARM_TITLE[arm]}, MCS {k}")
-            fig.suptitle(provenance(m), fontsize=8, y=0.96)
+            fig.suptitle(provenance(m, record), fontsize=8, y=0.96)
             fig.savefig(Path(tmp) / f"frame{k:04d}.png", dpi=110)
             plt.close(fig)
             if k % 20 == 0:
@@ -172,12 +213,28 @@ def video(frames, m, videodir):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("frames", nargs="?", default=str(DEFAULT_FRAMES))
-    ap.add_argument("--figures", default=str(REPO / "preprint" / "figures"))
-    ap.add_argument("--video", default=str(REPO / "assets"))
+    ap.add_argument("--figures", required=True, help="output directory outside the source checkout")
+    ap.add_argument("--video", help="video output directory outside the source checkout")
     ap.add_argument("--no-video", action="store_true")
     a = ap.parse_args()
-    fr = Path(a.frames)
+    if not a.no_video and not a.video:
+        ap.error("--video is required unless --no-video is given")
+    fr = Path(a.frames).resolve()
+    figdir = external_output(a.figures)
+    videodir = external_output(a.video) if not a.no_video else None
+    record = clean_render_record(fr)
     m = manifest(fr)
-    panel(fr, m, Path(a.figures))
+    panel(fr, m, figdir, record)
     if not a.no_video:
-        video(fr, m, Path(a.video))
+        video(fr, m, videodir, record)
+    if clean_render_record(fr) != record:
+        raise SystemExit("source or inputs changed during rendering; no render receipt will be written")
+    outputs = [(f"preprint/figures/{NAME}.{ext}", figdir / f"{NAME}.{ext}")
+               for ext in ("pdf", "txt", "sha256", "png")]
+    if not a.no_video:
+        outputs.extend((f"assets/{VIDEO}.{ext}", videodir / f"{VIDEO}.{ext}")
+                       for ext in ("mp4", "gif", "mp4.sha256", "gif.sha256"))
+    record["output_sha256"] = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in outputs}
+    receipt = figdir / f"{NAME}.render.json"
+    receipt.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote {receipt}")
