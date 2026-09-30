@@ -27,7 +27,7 @@ def build(run, output, clip=False):
     layout=pv.CreateLayout(name='CPM scientific views')
     layout.SplitHorizontal(0,0.5);layout.SplitVertical(1,0.5);layout.SplitVertical(2,0.5)
     specs=[('species_id','occupied',1,7,'Species / parcel geometry'),
-           ('net_biomass_rate_proxy','alive',-.06,.05,'Net biomass-rate proxy [1/MCS]'),
+           ('net_biomass_rate_proxy','alive',-.06,.05,'Growth rate − mortality hazard [1/MCS]'),
            ('phase_rad','phase_valid',0,2*math.pi,'Phase [rad]; invalid parcels excluded'),
            ('dose_rate','interior_mask',0,.01,'Synthetic dose rate [Gy/s]')]
     colors=[.25,.7,.45, .93,.69,.13, .12,.65,.86, .8,.42,.3, .68,.48,.76, .89,.53,.77, .6,.6,.6]
