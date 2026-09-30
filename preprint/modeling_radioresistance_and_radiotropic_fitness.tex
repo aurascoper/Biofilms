@@ -237,12 +237,16 @@ approaches, exemplified
 by the iDynoMiCS platform of Lardon et al.\ \cite{lardon2011}, complement continuum models by
 resolving cell-level stochastic interactions. Cross-diffusion biofilm models have been analyzed
 by Sonner et al.\ \cite{sonner2015}, who established mathematical properties of volume-filling
-multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framework is specified to
-extend these precedents with radiation-dependent fitness terms and phase-locking dynamics
-coupling species interactions to external radiation fields, moving beyond the
-substrate-limited growth paradigms that dominate existing biofilm models. Both additions remain
-unexercised: Section~\ref{sec:psde} identifies missing definitions in the phase-locking
-adjustment and reports the fitness field as absent from the audited simulation sources.
+multispecies systems that exhibit porous-medium-type degeneracy. The PSDE proposes a
+radiation-dependent fitness field and a phase-locking adjustment beyond the substrate-limited
+growth paradigms that dominate existing biofilm models. Both proposals are specified but not
+executed here.
+Section~\ref{sec:psde} identifies missing definitions in the phase adjustment and reports the
+fitness field as absent from the audited simulation sources. Appendices~\ref{app:synthetic_survival}
+and~\ref{app:phase_passenger} instead specify two new synthetic analogues: a per-parcel survival
+hazard driven by physical dose and a read-only phase diagnostic with radiation coupling disabled.
+A prospective four-arm study would exercise each analogue alone and both together; it would not
+constitute integration of the PSDE.
 
 \subsection{Hamiltonian and Stochastic Approaches in Theoretical Ecology}
 
@@ -256,12 +260,11 @@ phenomena in biological systems, from neural networks to circadian rhythms. Aceb
 \cite{acebron2005} reviewed the model as a paradigm for synchronization, noting its
 generalization to systems with time delays, frequency-weighted coupling, and heterogeneous
 interaction topologies. Blasius et al.\ \cite{blasius1999} treat phase synchronization in
-spatially extended ecological systems, which is the setting our phase-locking kernel
-$\Gamma_s(t,\mathbf{x})$ is written for: it is specified within this tradition, extended to
-multispecies microbial communities in which species-level oscillatory dynamics in growth and
-resource acquisition would couple through shared radiation and nutrient fields. It remains
-unexercised and is unimplementable as specified: its phase evolution and coupling laws are
-not defined (Section~\ref{sec:psde}). The use of Langevin stochastic dynamics to describe microbial population
+spatially extended ecological systems, which is the setting the proposed phase-locking kernel
+$\Gamma_s(t,\mathbf{x})$ was written toward. The manuscript does not define how phase would couple
+through radiation or nutrient fields. The term remains unexercised and is unimplementable as
+specified because its phase evolution and coupling laws are not defined
+(Section~\ref{sec:psde}). The use of Langevin stochastic dynamics to describe microbial population
 fluctuations follows naturally from the Fokker-Planck formalism and has been applied to
 competing microbial populations in chemostat systems \cite{campillo2017}, where stochastic
 differential equations revealed long-term competitive outcomes differing from deterministic
@@ -1426,6 +1429,21 @@ exercise the declared oscillator model only. Liu et al. observed coupled oscilla
 \cite{liu2017biofilm}. That is a two-community empirical precedent. It does not provide a
 parcel-level coupling law, and the accessible main article does not display the equation needed
 to verify the narrower label ``Kuramoto-type.''
+
+\paragraph{Prospective joint exercise.}
+The survival analogue and phase passenger can be tested in a registered two-by-two design:
+baseline, survival only, phase only and combined. All four arms must share the initial lattice,
+mechanical seed and declared physical field. Survival uses its own hazard generator; the phase
+layer is deterministic unless a separately specified diagnostic noise generator is added. In the
+first combined model, a survival commitment removes the parcel from the active phase graph, but
+phase cannot change the hazard, dose, lattice or acceptance rule. The combined and survival-only
+arms must therefore have identical survival events and mechanical trajectories under matched
+seeds. Their phase outputs may differ from phase-only because the active graph loses nodes. This
+tests joint execution and the compositional effect of selective loss. It does not test a biological
+phase--survival interaction. Any phase-dependent hazard or survival-dependent coupling law is a
+new model requiring its own equation, evidence boundary and pre-registration. The complete arm,
+stream and outcome contract is recorded in
+\texttt{docs/research/survival\_phase\_factorial\_spec.md}. No arm has been run here.
 
 \subsection{Symplectic Integration}
 \label{app:symplectic}

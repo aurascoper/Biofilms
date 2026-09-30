@@ -46,7 +46,7 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 # of where its own tex put the paragraph, and the anchor assertion refused it in CI.
 # 1259-1272 until new prospective appendices were added above it.
 # 1449-1462 until the protected-phenotype contract was added to Appendix A.2.
-FIRST_LINE, LAST_LINE = 1465, 1478
+FIRST_LINE, LAST_LINE = 1483, 1496
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the

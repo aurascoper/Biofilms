@@ -1,4 +1,4 @@
-# Ellen review package, 2026-09-29
+# Ellen review package, 2026-09-30
 
 This is the repository-built review draft. It is separate from the CopyDesk PDF and from the stable 2026-09-29 review artifact.
 
@@ -8,10 +8,15 @@ This is the repository-built review draft. It is separate from the CopyDesk PDF 
 - corrected synthetic-survival specification with separate survival, survivor-radius and identified-parcel-displacement outcomes;
 - a Dsup-inspired protection contrast at fixed absorbed dose, including the ortholog-specific bacterial result and the reason it does not supply a generic protection coefficient, with repair and dormancy deferred to their own state models;
 - a read-only phase passenger specification and its open evidence gates;
+- a four-arm design for testing synthetic survival and the phase passenger alone
+  and together, with the first combined model limited to removal of nonviable
+  parcels from the active phase graph;
 - a public-data ART and microbially influenced corrosion study plan; and
 - ART motif and mechanism questions for Ellen.
 
-The survival, protection and phase sections are prospective specifications. No hazard, protection, repair, dormancy or phase result is reported.
+The survival, protection, phase and four-arm sections are prospective
+specifications. No hazard, protection, repair, dormancy, phase or factorial
+result is reported.
 
 ## Validation
 
