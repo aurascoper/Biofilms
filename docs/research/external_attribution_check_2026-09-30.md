@@ -1,4 +1,6 @@
-RECORD: line numbers refer to the preprint tex as committed together with this file (the same commit). At `56b2380` the tex differed by 213 added and 200 removed lines and eight of the cited passages did not exist. Each citation also names the enclosing label and a phrase `grep -F` finds, so it can be re-resolved if the tex changes again.
+RECORD: line numbers refer to the preprint tex at d7b7c28, the commit that added this file.
+
+The same commit holds the preprint tex revision it cites. At `56b2380` the tex differed by 213 added and 200 removed lines and eight of the cited passages did not exist. Each citation also names the enclosing label and a phrase `grep -F` finds, so it can be re-resolved if the tex changes again.
 
 # An outside generator cited this preprint for four real passages, distorted five and invented one
 
@@ -100,7 +102,7 @@ Verdict vocabulary is the closed set from `data/claims_ledger.csv` (`keep | rest
 
 ## Claim 11 — "The order parameter R = |Σ eⁱᶿ| / N measures coherence"
 
-**What the code and tex say:** `diagnostics/fitness_phase/phase.jl:40` computes exactly that. `app:phase_passenger`, lines 1384–1392, phrase "Coherence is reported with active count": coherence with active count, edges, isolates and components, and a locking verdict that requires endpoint drift at most 0.01 rad/MCS, relative-phase range at most 0.5 rad, no full winding, and a fall of at least 50 % in effective-frequency SD against a zero-coupling replay.
+**What the code and tex say:** diagnostics/fitness_phase/phase.jl@`coherence(ids,theta) = isempty(ids) ? NaN : abs(sum(cis(theta[id])` computes exactly that. `app:phase_passenger`, lines 1384–1392, phrase "Coherence is reported with active count": coherence with active count, edges, isolates and components, and a locking verdict that requires endpoint drift at most 0.01 rad/MCS, relative-phase range at most 0.5 rad, no full winding, and a fall of at least 50 % in effective-frequency SD against a zero-coupling replay.
 
 **Verdict:** `supported` for the formula. The paper's verdict is stricter than "R drops below baseline", and it never uses the words "order parameter".
 

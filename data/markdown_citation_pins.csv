@@ -54,3 +54,4 @@ docs/visualization/lattice_viewer.md,coupling/biofilm_openmc/drivers.py@`no tran
 docs/visualization/lattice_viewer.md,"coupling/biofilm_openmc/results.py@`f[""mesh/dose_rate_mean_Gy_s""] = _logical_to_h5py(result.dose_rate_mean_Gy_s)`",9f9544ea82ec308c
 docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())`,fbc7a49dae9c1515
 docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@`wait(out)`,fbc7a49dae9c1515
+docs/research/external_attribution_check_2026-09-30.md,"diagnostics/fitness_phase/phase.jl@`coherence(ids,theta) = isempty(ids) ? NaN : abs(sum(cis(theta[id])`",522e9ad3c52ac057
