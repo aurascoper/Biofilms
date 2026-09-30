@@ -1,0 +1,182 @@
+{
+  "scope": "All supplied rows and printed fields; six-decimal floating outputs, not unrounded states.",
+  "external_runtime": "1.12.7 (supplied metadata)",
+  "local_runtime": "1.12.6",
+  "studies": {
+    "beta": {
+      "rows": 28672,
+      "fields_equal": 286720,
+      "exact_at_printed_precision": true,
+      "compared_mcs": [
+        0,
+        100
+      ],
+      "external_only_rows": 0,
+      "external_only_mcs": []
+    },
+    "alpha": {
+      "rows": 28672,
+      "fields_equal": 286720,
+      "exact_at_printed_precision": true,
+      "compared_mcs": [
+        0,
+        100
+      ],
+      "external_only_rows": 0,
+      "external_only_mcs": []
+    },
+    "horizon": {
+      "rows": 10752,
+      "fields_equal": 107520,
+      "exact_at_printed_precision": true,
+      "compared_mcs": [
+        0,
+        100,
+        400
+      ],
+      "external_only_rows": 7168,
+      "external_only_mcs": [
+        200,
+        300
+      ]
+    }
+  },
+  "inputs": {
+    "followup_beta_n40_p6_seeds42-297.csv": "8db864a2325029157a6a3f7477122fa718e85289e99c84b2d28d2a0187d23667",
+    "followup_alpha_n40_p6_seeds42-297.csv": "3c9224d2776c4316e82a6dd57b1d13781c1b459232dc7ca7609d922e67ab3c12",
+    "followup_horizon_n40_p6_seeds42-297.csv": "fe33575c850e697e792427023302dfed5142d7f001810dc82a4391654f9ebfe9"
+  },
+  "alpha_summary": [
+    {
+      "factor": 1,
+      "species": 1,
+      "mean_shift": 0.00020387109375000006,
+      "positive_seeds": 131,
+      "mean_melanin": 1.2683998125,
+      "min_melanin": 0.973334,
+      "max_melanin": 1.982745
+    },
+    {
+      "factor": 1,
+      "species": 3,
+      "mean_shift": 0.0006123945312499967,
+      "positive_seeds": 124,
+      "mean_melanin": 1.6594692109375,
+      "min_melanin": 1.259581,
+      "max_melanin": 2.56131
+    },
+    {
+      "factor": 10,
+      "species": 1,
+      "mean_shift": -0.00045158203125000005,
+      "positive_seeds": 124,
+      "mean_melanin": 12.72784924609375,
+      "min_melanin": 9.649294,
+      "max_melanin": 19.807903
+    },
+    {
+      "factor": 10,
+      "species": 3,
+      "mean_shift": 0.0002041835937499969,
+      "positive_seeds": 132,
+      "mean_melanin": 16.64683085546875,
+      "min_melanin": 12.501172,
+      "max_melanin": 25.879064
+    },
+    {
+      "factor": 100,
+      "species": 1,
+      "mean_shift": -0.007503808593750004,
+      "positive_seeds": 74,
+      "mean_melanin": 130.52284624609376,
+      "min_melanin": 98.359532,
+      "max_melanin": 203.182142
+    },
+    {
+      "factor": 100,
+      "species": 3,
+      "mean_shift": -0.005343519531250003,
+      "positive_seeds": 88,
+      "mean_melanin": 168.871250671875,
+      "min_melanin": 127.638306,
+      "max_melanin": 260.284948
+    },
+    {
+      "factor": 1000,
+      "species": 1,
+      "mean_shift": -0.03133911328125,
+      "positive_seeds": 31,
+      "mean_melanin": 1398.3099202734375,
+      "min_melanin": 1011.849669,
+      "max_melanin": 2040.819359
+    },
+    {
+      "factor": 1000,
+      "species": 3,
+      "mean_shift": -0.014344050781250004,
+      "positive_seeds": 76,
+      "mean_melanin": 1720.0216591289063,
+      "min_melanin": 1310.866339,
+      "max_melanin": 2588.718813
+    },
+    {
+      "factor": 10000,
+      "species": 1,
+      "mean_shift": -0.0814887890625,
+      "positive_seeds": 11,
+      "mean_melanin": 16199.792208539062,
+      "min_melanin": 11145.980022,
+      "max_melanin": 22211.117081
+    },
+    {
+      "factor": 10000,
+      "species": 3,
+      "mean_shift": -0.0428235703125,
+      "positive_seeds": 38,
+      "mean_melanin": 18676.198847148436,
+      "min_melanin": 14693.525252,
+      "max_melanin": 25410.822254
+    },
+    {
+      "factor": 100000,
+      "species": 1,
+      "mean_shift": -0.08986246484375,
+      "positive_seeds": 15,
+      "mean_melanin": 176148.13843852736,
+      "min_melanin": 143362.69605,
+      "max_melanin": 215710.481829
+    },
+    {
+      "factor": 100000,
+      "species": 3,
+      "mean_shift": -0.029430734375000003,
+      "positive_seeds": 78,
+      "mean_melanin": 200316.3104928672,
+      "min_melanin": 160502.890766,
+      "max_melanin": 247137.082969
+    },
+    {
+      "factor": 1000000,
+      "species": 1,
+      "mean_shift": -0.0031252265625000024,
+      "positive_seeds": 121,
+      "mean_melanin": 1774081.5994945508,
+      "min_melanin": 1333027.816717,
+      "max_melanin": 2105903.299291
+    },
+    {
+      "factor": 1000000,
+      "species": 3,
+      "mean_shift": 0.03516133984375,
+      "positive_seeds": 172,
+      "mean_melanin": 2034227.2761203437,
+      "min_melanin": 1689612.948194,
+      "max_melanin": 2512068.889522
+    }
+  ],
+  "status": "passed",
+  "model_blob_sha256": {
+    "24cd3ec": "dcdd049ecc947541b99e3dc4fa6f1924ef16d63a37739ad2445277ee717fc8f9",
+    "66ffe9f": "dcdd049ecc947541b99e3dc4fa6f1924ef16d63a37739ad2445277ee717fc8f9"
+  }
+}

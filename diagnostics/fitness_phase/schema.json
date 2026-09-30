@@ -1,0 +1,212 @@
+{
+  "schema": "cpm-sp-vti-1",
+  "voxel_center": "origin + (Julia_index - 0.5) * spacing",
+  "points_per_axis": "voxel_count + 1",
+  "tuple_order": "x-fastest",
+  "undefined_float": "NaN",
+  "undefined_integer": "0, interpreted only with validity/mode mask",
+  "time": "actual MCS; exposure conversion is synthetic",
+  "fields": {
+    "survival_enabled": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "parent_id": {
+      "dtype": "Int64",
+      "association": "CellData",
+      "units": "stable identifier; 0 is background (parent 0 means founder)",
+      "validity": "all voxels"
+    },
+    "biomass_valid": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "interior_mask": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "target_volume": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "synthetic length^3",
+      "validity": "occupied"
+    },
+    "radiation_cpm": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "legacy dimensionless CPM radiation signal",
+      "validity": "all voxels"
+    },
+    "species_id": {
+      "dtype": "Int64",
+      "association": "CellData",
+      "units": "stable identifier; 0 is background (parent 0 means founder)",
+      "validity": "all voxels"
+    },
+    "net_biomass_rate_proxy": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "MCS^-1",
+      "validity": "occupied"
+    },
+    "conditional_survival": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "probability",
+      "validity": "occupied"
+    },
+    "phase_sin": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "dimensionless",
+      "validity": "phase_valid"
+    },
+    "biomass_density": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "synthetic mass/synthetic length^3",
+      "validity": "biomass_valid"
+    },
+    "melanin": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "legacy melanin score",
+      "validity": "all voxels"
+    },
+    "occupied": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "phase_rad": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "radian",
+      "validity": "phase_valid"
+    },
+    "graph_degree": {
+      "dtype": "Int64",
+      "association": "CellData",
+      "units": "neighbour count; defined only with phase_valid",
+      "validity": "phase_valid"
+    },
+    "cumulative_hazard": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "dimensionless",
+      "validity": "occupied"
+    },
+    "local_coherence_valid": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "growth_rate": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "MCS^-1",
+      "validity": "occupied"
+    },
+    "growth_enabled": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "biomass": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "synthetic mass; parcel total repeated per voxel",
+      "validity": "biomass_valid"
+    },
+    "contact_strength": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "Boolean degree for contact26; face area for face6",
+      "validity": "phase_valid"
+    },
+    "ambient_cum_dose": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "Gy",
+      "validity": "all voxels"
+    },
+    "local_coherence": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "dimensionless",
+      "validity": "local_coherence_valid"
+    },
+    "phase_valid": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "alive": {
+      "dtype": "UInt8",
+      "association": "CellData",
+      "units": "binary mode or membership mask",
+      "validity": "all voxels"
+    },
+    "nutrient": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "legacy score when growth OFF; synthetic nutrient amount per synthetic volume when growth ON",
+      "validity": "all voxels"
+    },
+    "parcel_cum_dose": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "Gy",
+      "validity": "occupied"
+    },
+    "lineage_id": {
+      "dtype": "Int64",
+      "association": "CellData",
+      "units": "stable identifier; 0 is background (parent 0 means founder)",
+      "validity": "all voxels"
+    },
+    "cell_id": {
+      "dtype": "Int64",
+      "association": "CellData",
+      "units": "stable identifier; 0 is background (parent 0 means founder)",
+      "validity": "all voxels"
+    },
+    "phase_cos": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "dimensionless",
+      "validity": "phase_valid"
+    },
+    "mortality_hazard": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "MCS^-1",
+      "validity": "occupied"
+    },
+    "natural_frequency": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "radian/MCS",
+      "validity": "phase_valid"
+    },
+    "dose_rate": {
+      "dtype": "Float64",
+      "association": "CellData",
+      "units": "Gy/s (synthetic exposure)",
+      "validity": "all voxels"
+    }
+  },
+  "biomass_warning": "Parcel biomass is repeated on each occupied voxel. Integrate biomass_density*voxel_volume or sum the parcel table.",
+  "conditional_survival": "exp(-integrated hazard since parcel birth), held at commitment; not realized viability.",
+  "rates": "End-boundary rates conditional on current living state; growth minus mortality is a proxy, not realized population fitness."
+}

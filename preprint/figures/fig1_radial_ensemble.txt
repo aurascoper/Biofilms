@@ -1,0 +1,42 @@
+                                                          Small ensemble mean-radius shifts across four paired arms
+                                N = 40, six parcels per species, read at MCS 100, seeds 42 to 297; paired within seed; produced by julia 1.12.7 on x86_64-conda-linux-gnu
+
+                                                                                                               (b) Paired mean-radius contrasts
+                       (a) Every arm relaxes inward together                                                            (90% intervals)                                                                            (c) Seed 42 was one draw
+
+
+
+
+                                                                                                                                                              C. neoformans − B. subtilis (r/R), full arm
+                                                                                           C. neoformans        shaded: the pre-registered bound, ±0.05 r/R
+                                                                                          full − (βion = 0)                                                                                                        mean -0.006, sd 0.11
+     C. neoformans                                                                                                                                                                                           0.3
+                                                                                           D. radiodurans
+                                                                                          full − (βion = 0)                                                                                                                       seed 42: +0.16
+     D. radiodurans                                                                 C. sphaerospermum                                                                                                        0.2
+                                                                                          full − (βion = 0)
+C. sphaerospermum                                                                                B. subtilis                                                                                                 0.1
+                                                                                          full − (βion = 0)
+                                                                                                   A. niger
+         B. subtilis                                                                      full − (βion = 0)                                                                                                  0.0
+                                                                                             S. oneidensis
+           A. niger                                                                       full − (βion = 0)
+                                                                                                                                                                                                            −0.1
+                                                                                    O. intermedium AM7
+                                                                                          full − (βion = 0)
+      S. oneidensis
+                                                                                           C. neoformans                                                                                                    −0.2
+                                                                                       full − (αM = 0), P1
+O. intermedium AM7                                                                  C. sphaerospermum
+                                                                                       full − (αM = 0), P1                                                                                                  −0.3
+                        0.50      0.51       0.52        0.53       0.54                                      −0.050−0.025 0.000 0.025 0.050                                                                              seeds, sorted (256)
+                               mean r/R over parcels                                                      paired mean difference in r/R, 90% interval
+                 (ensemble mean, 95% interval of the mean, 256 seeds)
+
+                         centre-only null, 2/3 of 0.8R          βion = 0, MCS 100
+                         seeding frame, MCS 0                   αM = 0, MCS 100
+                         full, MCS 100                          both off, MCS 100
+
+
+                                  Lattice units divided by R = N/2. Arms zero CPMParams vectors only. A model output about the acceptance rule, with no organism in it.
+

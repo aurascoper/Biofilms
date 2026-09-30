@@ -603,7 +603,9 @@ def exempt_code_lines(root: Path, rel: str) -> list:
 # read the function and confirmed that every removal in it still depends on volume alone.
 # Control flow in a CALLER of these functions is not read by anything here.
 STEPPER_REMOVAL_FUNCTIONS = {
-    "mcs_step!": "b5f1f5e0812e1f6e11c3d375e1a2b16b2254e9ba9256155af8850a32117b621c",
+    # Callback added; this function still removes on volume alone. The extension
+    # changes individual targets after hazard commitment, outside this function.
+    "mcs_step!": "de630a6ced80f8fb31576d887b09f305a11e582cea96f1d7986b4e1687e47b42",
     "divide_cell!": "60c744c42cbbe2b3b36c06a92c740077788865f47f0c8b3878e3b957bf1355f4",
 }
 
@@ -782,15 +784,21 @@ def landed_terms(root: Path = REPO, *, terms=None) -> list:
             if t in keys and not all(p(root) for p in preds)]
 
 
+PROMOTED_TERMS = {"dose-dependent survival": "diagnostics/fitness_phase/model.jl"}
+
+
 def test_every_registered_absence_still_holds():
     """THE PROMOTION TRIGGER, AT OPPOSITE POLARITY. A failure here is not a broken
     test: it means the term has landed and the rows blocked on it are now
     buildable. Fix by promoting those rows, never by deleting the entry."""
     landed = landed_terms()
-    assert not landed, (
+    assert set(landed) == set(PROMOTED_TERMS), (
         f"these registered absences no longer hold, so the rows blocked on them "
         f"should promote: {landed}; removal identifiers {removal_tokens()}; "
         f"files naming {CAPABILITY}: {capability_claims()}")
+    for term, implementation in PROMOTED_TERMS.items():
+        assert implementation in removal_tokens(), term
+        assert (REPO / implementation).is_file(), term
 
 
 def test_the_absence_predicates_can_fail():
@@ -821,6 +829,9 @@ def test_a_check_whose_signal_is_declared_absent_is_not_buildable(index):
     for r in index:
         src = r.get("signal_source", "").strip()
         if src and src in ABSENT_TERMS:
+            if src in PROMOTED_TERMS:
+                assert r["coverage"] == "sop" and r["sop_path"], r["sop_id"]
+                continue
             why = ABSENT_TERMS[src][0]
             assert r["blocked_by"].strip(), (
                 f"{r['sop_id']} names a signal source this repository declares absent "

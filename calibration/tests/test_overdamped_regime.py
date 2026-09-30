@@ -1,7 +1,6 @@
 """Section 3.4's overdamped paragraph states numbers; this binds them to the producer.
 
-SCOPE: the numeric literals in the paragraph at
-preprint/modeling_radioresistance_and_radiotropic_fitness.tex lines 571-584, and
+SCOPE: the numeric literals in the paragraph at the line window declared below, and
 the receipt analysis/overdamped_regime.py emits. Nothing else in section 3.4.
 
 THE PARAGRAPH ENDS BY CLAIMING ITS OWN VERIFIABILITY -- "analysis/overdamped_regime.py
@@ -41,7 +40,14 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 
 # 571-584 until 2026-09-01, when four \label lines were inserted above and the anchor
 # assertion below refused the stale window rather than silently reading two wrong lines.
-FIRST_LINE, LAST_LINE = 593, 606
+# 593-606 until 2026-09-24, when the Symplectic Integration subsection moved into Appendix A
+# of the same file; the paragraph is unchanged and the window follows it.
+# 1159-1172 until ad50fca added 100 lines above it. That commit set 1244-1257, fifteen short
+# of where its own tex put the paragraph, and the anchor assertion refused it in CI.
+# 1259-1272 until new prospective appendices were added above it.
+# 1449-1462 until the protected-phenotype contract was added to Appendix A.2.
+# 1492-1505 until the synthetic-extension outcome paragraph was added above it, 2026-09-30.
+FIRST_LINE, LAST_LINE = 1506, 1519
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the

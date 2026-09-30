@@ -1,0 +1,50 @@
+{
+  "corrected-species-table-rows.md": {
+    "bytes": 8779,
+    "sha256": "d93a58acf4be6dccc2760f569f633623f1cf127dd8880e8f4cdab0609573ff1e"
+  },
+  "READOUTS.md": {
+    "bytes": 5987,
+    "sha256": "bc4096c45a97a4cb7fb6414a43f5420e7edfcaea760448b2c6e7a2dae614038d"
+  },
+  "PREDICTION.md": {
+    "bytes": 6998,
+    "sha256": "2fcc82a339d15de0e9c86a4c3d546bfc31ab2a6b2a6f30b335b97c40b991b30b"
+  },
+  "sweep.jl": {
+    "bytes": 19007,
+    "sha256": "055d1534d189b157f4feca1bfd8608e954d53fd6213e0ca8b71037414a7cf659"
+  },
+  "analyse.jl": {
+    "bytes": 10280,
+    "sha256": "69ac851d1082395196d3214b05af8d870cee943e7ea66d369285a5a741562728"
+  },
+  "test_followups.jl": {
+    "bytes": 7772,
+    "sha256": "fd4fabf9bece5c6b9072fbe2cb88a0f7f72e75c9f1359a423a9469a09dfafa39"
+  },
+  "followup_alpha_n40_p6_seeds42-297.csv": {
+    "bytes": 1967219,
+    "sha256": "3c9224d2776c4316e82a6dd57b1d13781c1b459232dc7ca7609d922e67ab3c12"
+  },
+  "followup_alpha_analysis_n40_p6.txt": {
+    "bytes": 8705,
+    "sha256": "d62b2a5b401aa6da87daf7284f62d57ea27583f11520439aefe79e7d7abccfe8"
+  },
+  "followup_beta_n40_p6_seeds42-297.csv": {
+    "bytes": 1913059,
+    "sha256": "8db864a2325029157a6a3f7477122fa718e85289e99c84b2d28d2a0187d23667"
+  },
+  "followup_beta_analysis_n40_p6.txt": {
+    "bytes": 8684,
+    "sha256": "c029e15cc37b53aee2c8b4994d9562f3b5e953cdd781c25b308da642a2a28747"
+  },
+  "followup_horizon_n40_p6_seeds42-297.csv": {
+    "bytes": 1119656,
+    "sha256": "fe33575c850e697e792427023302dfed5142d7f001810dc82a4391654f9ebfe9"
+  },
+  "followup_horizon_analysis_n40_p6.txt": {
+    "bytes": 5939,
+    "sha256": "4d3bf781a9e92f19c93aee39131cc3023cd1a3b2a3ce0a4cc6c5732c3695068b"
+  }
+}

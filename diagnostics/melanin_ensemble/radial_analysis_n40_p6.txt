@@ -1,0 +1,79 @@
+radial ensemble radial_n40_p6_seeds42-297.csv, MCS 100, 256 seeds, arms full,no_rad,no_mel,null
+produced by julia 1.12.7 on x86_64-conda-linux-gnu
+thresholds: alpha 0.05 two-sided, MEOI 0.05 r/R, equivalence bound +-0.05 r/R (90% CI)
+
+seeding frame (MCS 0, identical across arms), mean r/R over seeds:
+  C. neoformans           mean 0.5259   sd 0.0784
+  D. radiodurans          mean 0.5304   sd 0.0761
+  C. sphaerospermum       mean 0.5322   sd 0.0815
+  B. subtilis             mean 0.5296   sd 0.0793
+  A. niger                mean 0.5264   sd 0.0757
+  S. oneidensis           mean 0.5347   sd 0.0784
+  O. intermedium AM7      mean 0.5340   sd 0.0727
+
+per arm, marginal mean r/R at MCS 100:
+                                    full          no_rad          no_mel            null
+  C. neoformans           0.5067 +-0.0798  0.5072 +-0.0792  0.5065 +-0.0801  0.5064 +-0.0794
+  D. radiodurans          0.5074 +-0.0777  0.5075 +-0.0784  0.5066 +-0.0784  0.5078 +-0.0779
+  C. sphaerospermum       0.5116 +-0.0841  0.5121 +-0.0837  0.5121 +-0.0840  0.5110 +-0.0830
+  B. subtilis             0.5124 +-0.0805  0.5121 +-0.0814  0.5122 +-0.0803  0.5115 +-0.0820
+  A. niger                0.5095 +-0.0757  0.5090 +-0.0757  0.5097 +-0.0758  0.5082 +-0.0764
+  S. oneidensis           0.5193 +-0.0817  0.5211 +-0.0800  0.5198 +-0.0813  0.5210 +-0.0797
+  O. intermedium AM7      0.5136 +-0.0737  0.5131 +-0.0737  0.5134 +-0.0737  0.5125 +-0.0734
+
+PRIMARY: full - no_mel, CN and CS (pre-registered: MOVES if p < alpha and |mean| >= MEOI)
+  C. neoformans           mean +0.0001  paired sd 0.0083  129 of 256 seeds positive, p = 0.9502  ->  does not meet the criterion
+  C. sphaerospermum       mean -0.0004  paired sd 0.0084  125 of 256 seeds positive, p = 0.7547  ->  does not meet the criterion
+
+PRIMARY: full - no_rad, every species (pre-registered: EQUIVALENT if the 90% CI is inside the bound)
+  C. neoformans           mean -0.0006  90% CI [-0.0019, +0.0008]  ->  EQUIVALENT within the bound
+  D. radiodurans          mean -0.0001  90% CI [-0.0014, +0.0012]  ->  EQUIVALENT within the bound
+  C. sphaerospermum       mean -0.0005  90% CI [-0.0019, +0.0008]  ->  EQUIVALENT within the bound
+  B. subtilis             mean +0.0003  90% CI [-0.0007, +0.0013]  ->  EQUIVALENT within the bound
+  A. niger                mean +0.0006  90% CI [-0.0007, +0.0018]  ->  EQUIVALENT within the bound
+  S. oneidensis           mean -0.0018  90% CI [-0.0029, -0.0006]  ->  EQUIVALENT within the bound
+  O. intermedium AM7      mean +0.0006  90% CI [-0.0006, +0.0017]  ->  EQUIVALENT within the bound
+
+EXPLORATORY: every species x contrast, paired within seed
+  full - no_mel
+    C. neoformans           mean +0.0001  paired sd 0.0083  within-run r +0.995  129 of 256 positive, p = 0.9502
+    D. radiodurans          mean +0.0008  paired sd 0.0099  within-run r +0.992  134 of 256 positive, p = 0.4918
+    C. sphaerospermum       mean -0.0004  paired sd 0.0084  within-run r +0.995  125 of 256 positive, p = 0.7547
+    B. subtilis             mean +0.0001  paired sd 0.0081  within-run r +0.995  132 of 256 positive, p = 0.6618
+    A. niger                mean -0.0002  paired sd 0.0083  within-run r +0.994  127 of 256 positive, p = 0.9502
+    S. oneidensis           mean -0.0005  paired sd 0.0064  within-run r +0.997  120 of 256 positive, p = 0.3485
+    O. intermedium AM7      mean +0.0003  paired sd 0.0091  within-run r +0.992  135 of 256 positive, p = 0.4166
+  full - no_rad
+    C. neoformans           mean -0.0006  paired sd 0.0132  within-run r +0.986  130 of 256 positive, p = 0.8513
+    D. radiodurans          mean -0.0001  paired sd 0.0129  within-run r +0.986  118 of 256 positive, p = 0.235
+    C. sphaerospermum       mean -0.0005  paired sd 0.0131  within-run r +0.988  124 of 256 positive, p = 0.6618
+    B. subtilis             mean +0.0003  paired sd 0.0100  within-run r +0.992  129 of 256 positive, p = 0.9502
+    A. niger                mean +0.0006  paired sd 0.0125  within-run r +0.986  134 of 256 positive, p = 0.4918
+    S. oneidensis           mean -0.0018  paired sd 0.0113  within-run r +0.990  110 of 256 positive, p = 0.02851
+    O. intermedium AM7      mean +0.0006  paired sd 0.0114  within-run r +0.988  128 of 256 positive, p = 1
+  full - null
+    C. neoformans           mean +0.0002  paired sd 0.0122  within-run r +0.988  131 of 256 positive, p = 0.7547
+    D. radiodurans          mean -0.0004  paired sd 0.0122  within-run r +0.988  121 of 256 positive, p = 0.4166
+    C. sphaerospermum       mean +0.0006  paired sd 0.0127  within-run r +0.989  124 of 256 positive, p = 0.6618
+    B. subtilis             mean +0.0008  paired sd 0.0101  within-run r +0.992  132 of 256 positive, p = 0.6618
+    A. niger                mean +0.0013  paired sd 0.0125  within-run r +0.987  136 of 256 positive, p = 0.3485
+    S. oneidensis           mean -0.0017  paired sd 0.0127  within-run r +0.988  112 of 256 positive, p = 0.05247
+    O. intermedium AM7      mean +0.0012  paired sd 0.0113  within-run r +0.988  135 of 256 positive, p = 0.4166
+  no_rad - null
+    C. neoformans           mean +0.0008  paired sd 0.0119  within-run r +0.989  137 of 256 positive, p = 0.288
+    D. radiodurans          mean -0.0003  paired sd 0.0129  within-run r +0.986  118 of 256 positive, p = 0.235
+    C. sphaerospermum       mean +0.0011  paired sd 0.0111  within-run r +0.991  139 of 256 positive, p = 0.1892
+    B. subtilis             mean +0.0005  paired sd 0.0101  within-run r +0.992  127 of 256 positive, p = 0.9502
+    A. niger                mean +0.0007  paired sd 0.0115  within-run r +0.989  137 of 256 positive, p = 0.288
+    S. oneidensis           mean +0.0000  paired sd 0.0107  within-run r +0.991  122 of 256 positive, p = 0.4918
+    O. intermedium AM7      mean +0.0006  paired sd 0.0105  within-run r +0.990  135 of 256 positive, p = 0.4166
+
+CN - BS separation within each arm (the single-seed figure's quantity), paired within seed:
+  full      mean -0.0057  sd 0.1104  119 of 256 seeds positive, p = 0.288
+  no_rad    mean -0.0048  sd 0.1106  115 of 256 seeds positive, p = 0.118
+  no_mel    mean -0.0057  sd 0.1104  118 of 256 seeds positive, p = 0.235
+  null      mean -0.0051  sd 0.1096  120 of 256 seeds positive, p = 0.3485
+  full - null of that separation: mean -0.0006  paired sd 0.0145  122 of 256 positive, p = 0.4918
+
+The arms are declared inputs. These numbers say whether switching a term off moves the
+mean radius the model computes; they say nothing about organisms.

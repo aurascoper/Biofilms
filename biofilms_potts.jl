@@ -12,7 +12,7 @@
 #  has no trigger and no cell is ever removed. Radioresistance evidence
 #  motivates the per-species magnitudes below; it is not what the term computes.
 #
-#  Maps the paper's Hamiltonian (Eq. 2, Section 3.3) to CPM energy:
+#  Maps the paper's Hamiltonian (label eq:hamiltonian) to CPM energy:
 #    H_CPM = H_adhesion + H_volume + H_radiation + H_melanin
 #
 #  FOUR TERMS, NOT FIVE. compute_delta_H_terms returns (adh, vol, rad, mel) and
@@ -24,8 +24,8 @@
 #  was applied to README and not to this comment, because the ledger guard
 #  resolves a row's `document` column and nothing reads source comments.
 #
-#  Coupled fields (melanin, nutrient, radiation) updated each MCS
-#  per Eq. 7 (melanin RD) and Eq. 5 (radiation field).
+#  Coupled fields (melanin, nutrient, radiation) are updated each MCS.
+#  See manuscript labels eq:melanin and eq:gamma_field.
 #
 #  Pure Julia — requires only: LinearAlgebra, Statistics, Random, Printf
 # ============================================================
@@ -82,11 +82,11 @@ Base.@kwdef struct CPMParams
     λ_V::Float64 = 10.0                  # volume constraint strength (H_volume)
     V_target::Int = 120                  # target volume per cell (sites)
 
-    # --- Radiation field (Eq. 5: I_γ = I₀ exp(-κ‖x‖)) ---
+    # --- Radiation field (manuscript label eq:gamma_field) ---
     I0::Float64 = 1.0                    # source intensity at axis
     κ::Float64 = 2.0                     # attenuation coefficient
 
-    # --- Melanin diffusion (Eq. 7) ---
+    # --- Melanin diffusion (manuscript label eq:melanin) ---
     D_M::Float64 = 0.1                   # melanin diffusion coefficient
     dt_field::Float64 = 0.5              # time step for field updates
 
@@ -138,7 +138,7 @@ Base.@kwdef struct CPMParams
         0.01, 0.02, 0.01, 0.03, 0.01, 0.03, 0.02
     ]
 
-    # --- Pairwise mutualistic interaction (Eq. 3: V_ij = -γ exp(-r²/σ²)) ---
+    # --- Pairwise mutualistic interaction proposed in the manuscript ---
     γ_mutual::Float64 = 2.0              # attraction strength
     σ_mutual::Float64 = 10.0             # interaction range (lattice units)
 
@@ -183,7 +183,7 @@ function build_J_matrix()
         J[s, 1] = 16.0
     end
 
-    # Mutualistic pairs — lower J (attractive, from paper's V_ij Eq. 3)
+    # Mutualistic pairs — lower J (attractive, from the proposed V_ij form)
     mutualistic = [(CN, DR), (CN, CS), (CS, AN), (SO, OI), (DR, BS)]
     for (a, b) in mutualistic
         J[a + 1, b + 1] = 4.0
@@ -268,8 +268,8 @@ mutable struct CPMState
     cells::Dict{Int, CellInfo}
 
     # Coupled fields (same dimensions as lattice)
-    radiation::Array{Float64, 3}  # I_γ(x,y,z) — Eq. 5
-    melanin::Array{Float64, 3}    # M(x,y,z)   — Eq. 7
+    radiation::Array{Float64, 3}  # I_γ(x,y,z); manuscript label eq:gamma_field
+    melanin::Array{Float64, 3}    # M(x,y,z); manuscript label eq:melanin
     nutrient::Array{Float64, 3}   # C(x,y,z)
 
     # Cylinder mask: true = interior (updatable), false = wall
@@ -325,7 +325,7 @@ end
 
 """
 Initialize the radiation field: I_γ(r) = I₀ exp(-κ r/N).
-Radiation source along z-axis (center), attenuated radially (Eq. 5).
+Radiation source along z-axis (center), attenuated radially as in manuscript label eq:gamma_field.
 """
 function init_radiation!(state::CPMState)
     p = state.params
@@ -557,7 +557,7 @@ function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
     end
 
     # ---- H_radiation: β_{s,ion} * I_γ(r) per site ----
-    # (Eq. 5 + Table 2: negative β = drawn up the dose gradient)
+    # (analytic radiation field + parameter table: negative β = drawn up the dose gradient)
     ΔH_rad = 0.0
     I_local = state.radiation[tx, ty, tz]
     if σ_source > 0
@@ -570,7 +570,7 @@ function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
     end
 
     # ---- H_melanin: α_M * M(x) modulates local energy ----
-    # (Eq. 7: melanin-rich sites are preferred by the radiotropic species —
+    # (melanin field: melanin-rich sites are preferred by the radiotropic species —
     #  again a spatial preference, not energy transduction)
     ΔH_mel = 0.0
     M_local = state.melanin[tx, ty, tz]
@@ -581,8 +581,8 @@ function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
     # acceptance bias of 1.000010. That is one role of one pair of species and
     # is NOT the term's reach: signed by role, the extremum over source/target
     # pairings is 7.505e-2 (see §6.2 and tests/prose_bounds.jl). This term at
-    # the reported M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of
-    # 9.6 in ΔH, NOT by four orders. CORRECTED 2026-08-30: this comment carried
+    # seed 42's M = 1.44 is -0.72, a bias of 1.155 — larger by a factor of 9.6 in ΔH, NOT by four orders.
+    # SEED42-SCOPE-01 scopes those three to one seed: over 42-297, M 1.26-2.56, bias 1.134-1.292, ratio 8.39-17.06. CORRECTED 2026-08-30: this comment carried
     # the version-1.1 claim in a file the manuscript sweep never covered, which
     # is what a sweep bounded to one file cannot find.
     # The radial stratification is still melanin-mediated, not β_ion-mediated. Radiation still drives it, but only indirectly:
@@ -748,7 +748,7 @@ reference. Linear sites are Julia xyz indices, 1-based; proposal_index counts
 all N^3 attempts, including skipped attempts. The observer must be inert.
 """
 function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
-                   on_proposal = nothing, on_accepted = nothing)
+                   on_proposal = nothing, on_accepted = nothing, energy_terms = compute_delta_H_terms, ordered_cleanup = false)
     p = state.params
     N = p.N
     lat = state.lattice
@@ -786,7 +786,7 @@ function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
         end
 
         # 4. Compute ΔH
-        terms = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+        terms = energy_terms(state, sx, sy, sz, tx, ty, tz)
         ΔH = terms.adh + terms.vol + terms.rad + terms.mel
 
         # Evaluated, not attempted: the skip conditions above have already
@@ -835,7 +835,7 @@ function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
     end
 
     # Clean up dead cells (volume = 0) — archived, never silently dropped
-    for (id, cell) in state.cells
+    for (id, cell) in (ordered_cleanup ? sort!(collect(state.cells); by=first) : state.cells)
         if cell.volume <= 0
             push!(state.death_log,
                   DeathEvent(state.current_mcs, state.physical_time_s, id,
@@ -895,10 +895,10 @@ Returns uptake rate if cell present, else 0.
 end
 
 """
-Update melanin field M(x,y,z) via reaction-diffusion (Eq. 7):
+Update melanin field M(x,y,z) via the reaction-diffusion law at manuscript label eq:melanin:
   ∂M/∂t = D_M ∇²M + α_M · n_RF(x) · I_γ(x)
 """
-function update_melanin!(state::CPMState)
+function update_melanin!(state::CPMState; active = nothing)
     p = state.params
     N = p.N
     dt = p.dt_field
@@ -915,7 +915,7 @@ function update_melanin!(state::CPMState)
         n_rf = rf_density(state.lattice, state.cells, x, y, z)
         σ = state.lattice[x, y, z]
         α = 0.0
-        if σ > 0 && haskey(state.cells, Int(σ))
+        if σ > 0 && haskey(state.cells, Int(σ)) && (active === nothing || Int(σ) in active)
             sp = state.cells[Int(σ)].species
             α = p.α_M_species[sp]
         end
@@ -931,7 +931,7 @@ Update nutrient field C(x,y,z):
   ∂C/∂t = D_C ∇²C - Σ_s uptake_s · n_s(x)
 Boundary: C = C_wall at wall sites.
 """
-function update_nutrient!(state::CPMState)
+function update_nutrient!(state::CPMState; active = nothing)
     p = state.params
     N = p.N
     dt = p.dt_field
@@ -945,7 +945,7 @@ function update_nutrient!(state::CPMState)
             continue
         end
         diff = p.D_C * laplacian_3d(C, x, y, z, N)
-        consumption = local_uptake(state.lattice, state.cells, p.uptake, x, y, z)
+        consumption = (active === nothing || Int(state.lattice[x,y,z]) in active) ? local_uptake(state.lattice, state.cells, p.uptake, x, y, z) : 0.0
         C_new[x, y, z] = max(0.0, C[x, y, z] + dt * (diff - consumption))
     end
 
@@ -1019,7 +1019,7 @@ function update_centers_of_mass!(state::CPMState)
 end
 
 # ============================================================
-#  8. Pairwise interaction energy (Eq. 3)
+#  8. Pairwise interaction energy proposed in the manuscript
 #     V_ij = -γ exp(-r_ij²/σ²) for mutualistic pairs
 #     Computed between cell centers, not per-site.
 # ============================================================
@@ -1035,7 +1035,7 @@ const MUTUALISTIC_PAIRS = Set([
 
 """
 Total pairwise interaction energy between all cell pairs.
-V_ij^mutual = -γ exp(-r_ij²/σ²)  (Eq. 3)
+V_ij^mutual = -γ exp(-r_ij²/σ²)
 """
 function total_pairwise_energy(state::CPMState)
     p = state.params
@@ -1974,25 +1974,76 @@ Install a physical dose-rate field (Gy/s, CPM lattice shape). The
 Hamiltonian signal (`state.radiation`) and melanin drive are updated
 ONLY if the corresponding transform is supplied — passing `nothing`
 keeps the legacy dimensionless signals untouched, so importing dose
-never silently changes the dynamics.
+never silently changes the dynamics. Both inputs must have the exact lattice
+shape and finite, nonnegative values. Validation and optional transforms finish
+before any state field is written; transforms must return finite signals.
 """
 function import_dose_field!(state::CPMState,
                             dose_mean_Gy_s::Array{Float64, 3},
                             dose_sd_Gy_s::Array{Float64, 3};
                             hamiltonian_transform = nothing,
                             melanin_transform = nothing)
-    size(dose_mean_Gy_s) == size(state.lattice) ||
-        error("import_dose_field!: dose field shape $(size(dose_mean_Gy_s)) ≠ lattice $(size(state.lattice))")
-    copyto!(state.dose_rate_mean_Gy_s, dose_mean_Gy_s)
-    copyto!(state.dose_rate_sd_Gy_s, dose_sd_Gy_s)
-    if hamiltonian_transform !== nothing
-        state.radiation .= hamiltonian_transform.(dose_mean_Gy_s)
+    shape = size(state.lattice)
+    _check_dose_array(dose_mean_Gy_s, shape, "dose mean")
+    _check_dose_array(dose_sd_Gy_s, shape, "dose SD")
+    _check_dose_destinations(state)
+    dose_mean = copy(dose_mean_Gy_s)
+    dose_sd = copy(dose_sd_Gy_s)
+    # Stage both transforms. A failed second transform must not leave the first
+    # signal or either dose field changed. Callbacks must not mutate state.
+    radiation = hamiltonian_transform === nothing ? nothing :
+        Float64.(hamiltonian_transform.(dose_mean))
+    drive = melanin_transform === nothing ? nothing :
+        Float64.(melanin_transform.(dose_mean))
+    for signal in (radiation, drive)
+        signal === nothing || all(isfinite, signal) ||
+            error("import_dose_field!: transformed signals must be finite")
     end
-    if melanin_transform !== nothing
-        state.melanin_drive .= melanin_transform.(dose_mean_Gy_s)
-    end
+    copyto!(state.dose_rate_mean_Gy_s, dose_mean)
+    copyto!(state.dose_rate_sd_Gy_s, dose_sd)
+    radiation === nothing || copyto!(state.radiation, radiation)
+    drive === nothing || copyto!(state.melanin_drive, drive)
     state.dose_active = true
     return state
+end
+
+function _check_dose_array(values, shape, name)
+    size(values) == shape || error("$name shape $(size(values)) ≠ lattice $shape")
+    all(x -> isfinite(x) && x >= 0, values) ||
+        error("$name must contain only finite, nonnegative values")
+    return nothing
+end
+
+function _check_dose_destinations(state::CPMState)
+    shape = size(state.lattice)
+    shape == (state.params.N, state.params.N, state.params.N) ||
+        error("dose lattice shape $shape disagrees with N=$(state.params.N)")
+    for name in (:dose_rate_mean_Gy_s, :dose_rate_sd_Gy_s, :dose_increment_Gy,
+                 :accumulated_dose_Gy, :radiation, :melanin_drive)
+        size(getfield(state, name)) == shape ||
+            error("$name shape $(size(getfield(state, name))) ≠ lattice $shape")
+    end
+    return nothing
+end
+
+function _check_physical_clock(dt)
+    isnan(dt) &&
+        error("accrue_dose!: seconds_per_mcs is not configured (physical unit contract, audit §5)")
+    isfinite(dt) && dt > 0 ||
+        error("seconds_per_mcs must be finite and strictly positive")
+    return nothing
+end
+
+function _check_dose_accrual(state::CPMState)
+    _check_physical_clock(state.params.seconds_per_mcs)
+    _check_dose_destinations(state)
+    shape = size(state.lattice)
+    _check_dose_array(state.dose_rate_mean_Gy_s, shape, "dose mean")
+    _check_dose_array(state.dose_rate_sd_Gy_s, shape, "dose SD")
+    _check_dose_array(state.accumulated_dose_Gy, shape, "accumulated dose")
+    all(c -> isfinite(c.lifetime_dose_Gy) && c.lifetime_dose_Gy >= 0,
+        values(state.cells)) || error("parcel dose must be finite and nonnegative")
+    return nothing
 end
 
 """
@@ -2003,26 +2054,35 @@ CURRENT voxel labels (cells move between transport solves; attributing
 only at transport checkpoints would misassign the interval's exposure to
 endpoint geometry). Cell lifetime dose accrues the unweighted site-mean
 increment.
+Invalid active inputs or nonfinite computed totals leave all state unchanged.
+An inactive dose field is a no-op, including when the physical clock is unset.
 """
 function accrue_dose!(state::CPMState)
     state.dose_active || return state
+    _check_dose_accrual(state)
     dt = state.params.seconds_per_mcs
-    isnan(dt) &&
-        error("accrue_dose!: seconds_per_mcs is not configured (physical unit contract, audit §5)")
     N = state.params.N
+    increments = state.dose_rate_mean_Gy_s .* dt
+    accumulated = state.accumulated_dose_Gy .+ increments
+    all(isfinite, accumulated) || error("accrue_dose!: computed dose is not finite")
+    parcel_dose = Dict(id => c.lifetime_dose_Gy for (id, c) in state.cells)
     # ponytail: unweighted site-mean cell dose — equal voxel masses assumed
     # until the material config supplies densities; replace with mass weights then.
     @inbounds for z in 1:N, y in 1:N, x in 1:N
-        ΔD = state.dose_rate_mean_Gy_s[x, y, z] * dt
-        state.dose_increment_Gy[x, y, z] = ΔD
-        state.accumulated_dose_Gy[x, y, z] += ΔD
+        ΔD = increments[x, y, z]
         σ = state.lattice[x, y, z]
         if σ > 0
             c = get(state.cells, Int(σ), nothing)
             if c !== nothing
-                c.lifetime_dose_Gy += ΔD / max(c.volume, 1)
+                parcel_dose[Int(σ)] += ΔD / max(c.volume, 1)
             end
         end
+    end
+    all(isfinite, values(parcel_dose)) || error("accrue_dose!: computed parcel dose is not finite")
+    copyto!(state.dose_increment_Gy, increments)
+    copyto!(state.accumulated_dose_Gy, accumulated)
+    for (id, dose) in parcel_dose
+        state.cells[id].lifetime_dose_Gy = dose
     end
     return state
 end
@@ -2166,6 +2226,12 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int;
     state = sim.state
     rd = sim.rd
     N = state.params.N
+    if n_mcs > 0
+        # Reject an invalid physical configuration before moving a parcel or RNG.
+        state.dose_active && _check_dose_accrual(state)
+        isnan(state.params.seconds_per_mcs) ||
+            _check_physical_clock(state.params.seconds_per_mcs)
+    end
     for _ in 1:n_mcs
         sim.mcs += 1
         mcs = sim.mcs
@@ -2425,7 +2491,7 @@ function export_figures(trajectory::Vector{<:Any},
            titlesize    = 11)
     # Override first two labels to add star
     text!(ax2, mcs_vec[1], -0.05;
-          text = "Ordering follows the hand-specified alpha_M_species scales; not a measured quantity",
+          text = "Seed 42, one run. The ordering is not a measured quantity: it fails in 19 of 256 seeds (SEED42-SCOPE-01)",
           fontsize = 8.5, color = (:gray40, 1.0), align = (:left, :top))
 
     save(joinpath(outdir, "fig2_melanin_accumulation.pdf"), fig2)

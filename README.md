@@ -1,29 +1,35 @@
-# Modeling Radioresistance and Radiotropic Fitness — Simulation Suite
+# Multispecies Biofilm Cellular-Potts Model — Simulation Suite
 
-**Kinder & Faulkner** · manuscript draft, not submitted · branch `research/observable-split-and-pilot-hardening`
+**Kinder & Faulkner** · manuscript draft, version 2.0, not submitted · source of record `preprint/modeling_radioresistance_and_radiotropic_fitness.tex`
+
+The movement results and calibration gates below describe the original CPM. A separate synthetic survival, passive phase and nutrient-growth implementation is documented in [diagnostics/fitness_phase](diagnostics/fitness_phase/README.md). Its frozen production run completed from source 841d052 and its results are appended in [PREDICTION.md](diagnostics/fitness_phase/PREDICTION.md); it supplies no biological calibration and does not implement the original fitness-field PSDE.
 
 ## What this is
 
 A mechanistic modelling framework for a seven-species biofilm community under ionising radiation,
 plus the calibration and transport machinery that decides what the framework is allowed to claim.
 
-![Seven-species consortium, MCS 4 to 400](assets/consortium_400mcs.gif)
+![Seven-species consortium, seed 42, full model beside both radiation-derived terms off, MCS 0 to 100](assets/consortium_seed42_full_vs_null.gif)
 
-**The consortium, 100 frames from MCS 4 to MCS 400.** A 20 × 20 × 20 lattice, with 1,633 of 8,000
-sites occupied at the last frame. Colours name the seven species, in the order `biofilms_potts.jl`
-declares them. `viewer/paraview_species.py` rendered the frames from snapshots stamped `039b7a2`.
+**The consortium at the ensemble configuration, seed 42, MCS 0 to 100, two arms side by side.**
+A 40 × 40 × 40 lattice, six parcels per species; left, the full model; right, `β_ion = 0` and
+`α_M = 0`, so the acceptance rule keeps adhesion and volume only. Both arms start from the same
+seeding frame. Colours name the seven species, in the order `biofilms_potts.jl` declares them.
+The frames were written by `diagnostics/melanin_ensemble/consortium_frames.jl` (occupied sites
+per MCS, gzipped, with a manifest naming the seed, configuration, arms, git commit, Julia version
+and machine). A separate receipt records the clean renderer revision and input hashes for
+`tools/render_consortium.py` with matplotlib and ffmpeg in the palette `biofilms_potts.jl`
+declares. The manuscript's consortium figure is the MCS 0, 50 and 100 columns of the same frames.
 
 Axes count lattice sites, not lengths. The pitch is `D-PITCH`, still `awaiting_measurement`, and
-the snapshots record `physical_time_s` as `NaN`. Accumulated dose is zero in every frame. So this
-run shows the Cellular Potts model under its static radial field alone, with no transport coupling.
+no physical time exists (`seconds_per_mcs` is `NaN`). Accumulated dose is zero in every frame. So
+this shows the Cellular Potts model under its static radial field alone, with no transport
+coupling. Figure 1 reports the 256-seed radial ensemble; these images show seed 42. Other diagnostics identify their own runs. Correction PRE-SEND-06 scopes this caption and records the separate clean render provenance.
 
-The snapshots stamped `039b7a2` do not record the seed. Read the animation as a picture of the
-mechanism, not as a reproducible case.
-
-*Corrected 2026-09-17:* this paragraph gave the cause as an empty `config_toml`. That cause is
-wrong. A populated config declares `[transport] seed`, which is OpenMC's Monte Carlo seed and not
-the CPM run seed. Snapshots written from 2026-09-17 record `cpm_seed` and `cpm_seed_source`
-instead, alongside `cpm_params` and `rd_params`.
+*Replaced 2026-09-24:* the animation this replaces, `assets/consortium_400mcs.gif`, was N = 20
+with two parcels per species and came from snapshots that recorded no seed, so it could not be
+regenerated; it stays in `assets/` and is embedded nowhere. The paragraph it carried, and its
+2026-09-17 correction about `cpm_seed`, are in git history.
 
 Four things run. A **3D Cellular Potts model** (`biofilms_potts.jl`) evolves biomass parcels on a
 cylindrical lattice under a four-term Metropolis acceptance functional — adhesion, volume, radiation
@@ -444,11 +450,22 @@ terms, where the acceptance path has four and `H_pair` is a diagnostic — and b
 banners and the code beyond the fix itself, so re-check them if the Hamiltonian terms or the
 dose-rate handling change again.
 
-**Fig 1 — radial mean position by species over 100 MCS** (N = 40, 6 parcels/species, seed 42). The
-plotted observable is the mean parcel distance from the cylinder axis, in lattice units normalised by
-R, sampled every 20 MCS. The radiation field is maximal on the axis, so the high-radiation region is
-the **core**, not the wall; `β_ion` is negative for the two radiotropic fungi and positive for
-*B. subtilis*.
+**Fig 1 — the radial ensemble: small mean-radius contrasts at the shipped constants** (N = 40,
+6 parcels/species, read at MCS 100, seeds 42 to 297, four arms of the acceptance rule on the same
+seeds, paired within seed; `diagnostics/melanin_ensemble/radial_sweep.jl`, tests declared before
+the run in `PREDICTION_radial_n40_p6.md`, ledger row RAD-ENS-01). The observable is the mean
+parcel distance from the cylinder axis divided by R. Zeroing `β_ion`, zeroing `α_M` (so the melanin
+field stays 0), or both, leaves every species' mean r/R within 0.002 of the full model's over 256
+seeds; the pre-registered prediction that the melanin path moves the two radiotropic fungi inward
+was wrong (full minus melanin-production-off paired shifts +0.0001 and −0.0004 r/R, p = 0.95 and 0.75). The inward drift every arm
+shares, from 0.53 to about 0.51 r/R, is present with both terms off and is adhesion-and-volume
+relaxation. The radiation field is maximal on the axis, so the high-radiation region is the
+**core**, not the wall; `β_ion` is negative for the two radiotropic fungi and positive for
+*B. subtilis*. Produced on x86_64 Linux under Julia 1.12.7, as the CSV header records; the full
+arm's melanin printed identically to the Mac-generated melanin sweep for all 112 shared rows.
+
+The single-seed figure this replaces (seed 42, *C. neoformans* 0.15 R outside *B. subtilis*)
+was one draw: the ensemble mean separation ranges from −0.0057 to −0.0048 r/R across arms, with a per-seed standard deviation of about 0.11.
 
 Spatial sorting is dominated by the hand-specified adhesion matrix `J`. Within the radiation-derived
 pathway, melanin exceeds `β_ion` by about an order of magnitude — 8.39 to 17.06 in ΔH across
@@ -458,14 +475,20 @@ the melanin finding above).
 $\beta$ to make multi-seed drift detectable, because the production values are not. The local ΔH sign
 per species is a **contract**; the collective drift is a **result**; the test keeps them separate.
 
-![Fig 1 — Radial stratification](preprint/figures/fig1_radial_stratification.png)
+![Fig 1 — Radial ensemble](preprint/figures/fig1_radial_ensemble.png)
 
 **Fig 2 — mean melanin field value over occupied sites, per producing species, to MCS 100.**
 *C. sphaerospermum* reaches 1.44 at seed 42, and 1.26 to 2.56 across seeds 42–297.
 
 The ordering among the three producers was *corrected* in 2026-09-17: it fails in 19 of those 256
-seeds, so the input `α_M` (0.14 versus 0.10 and 0.065) does not fix it. The linear rise is
-structural, because the field equation has no saturation, decay or substrate-limitation term.
+seeds, so the input `α_M` (0.14 versus 0.10 and 0.065) does not fix it. The field equation has no
+saturation, decay or substrate-limitation term (ledger row RM-G11-01).
+
+> **Corrected 2026-09-22.** This paragraph asserted more about the shape of the rise than the
+> equation gives. Ledger row RM-G11-01 holds the withdrawn wording. The figure's increments
+> fall: *C. sphaerospermum* gains about 0.53 over MCS 0 to 20 and about 0.14 over 80 to 100.
+> Melanin diffuses, its source follows occupancy, and the mean is taken over occupied sites
+> that move.
 
 What is **not** set anywhere in the parameters is the spatial distribution and magnitude of $M$.
 Those are outcomes of where parcels went under the acceptance test, multiplied by the field,
@@ -484,7 +507,11 @@ string and evaluating the first half in a sandbox module whose imports are hard-
 `LinearAlgebra, Statistics, Random, Printf`. The two rules are: never edit that line, and add nothing
 *above* it that needs a non-stdlib package.
 
-### 2 · Radiodialysis membrane transport — `biofilms_radiodialysis.R`
+### 2 · Radiodialysis membrane transport — `biofilms_radiodialysis.R` (not in the paper)
+
+Withdrawn from the manuscript at version 2.0 and carried in `preprint/radiodialysis_model.tex`,
+the model section of a companion experimental paper. Nothing below is a result of the
+computational paper.
 
 Shiny app. Method-of-lines finite-volume solver for the three-equation system, LSODA adaptive stiff
 integration (`deSolve`), Robin condition at the wall and L'Hôpital treatment at $r = 0$. Four tabs:
@@ -521,9 +548,16 @@ removal**.
 
 ![Fig 4 — Contaminant penetration](preprint/figures/fig4_contaminant_penetration.png)
 
-**Stale figure and label notice.** All four committed figures predate the 2026-08-14 correction that
+**Stale figure and label notice.** Figures 3 and 4 predate the 2026-08-14 correction that
 neutralised the reversed biological zone labels and removed the hard-coded dose annotation, so they
-differ from current `export_figures` output. In addition, the embedded Fig 4 prints
+differ from current `export_figures` output; they are no longer in the manuscript, which withdrew
+the radial transport model to `preprint/radiodialysis_model.tex` at version 2.0, and they are
+shown here under that model's own heading. Figure 1 was replaced on 2026-09-24 by the ensemble
+figure, rendered from the committed CSV by `diagnostics/melanin_ensemble/radial_figure.py`;
+`preprint/figures/fig1_radial_stratification.*` stays on disk because ledger rows name it.
+Figure 2 was rebuilt on 2026-09-22 by
+`regenerate_fig2.jl`, which refuses to copy unless every plotted point matches the committed
+ensemble, so it is current. In addition, the embedded Fig 4 prints
 `(1.0 − c_mean) * 100` under the label "% depleted" — the figure says *depleted* where the model
 supports only *non-penetrated*. The preview image above `assets/preview_bioreactor_3d.png` likewise
 predates the 2026-08-14 radiation sign fix.
@@ -768,11 +802,11 @@ centimetres or grams, because no conversion to any of those exists.
 | Result | Value | Status |
 |---|---|---|
 | *C. sphaerospermum* melanin, MCS 100 | 1.26 to 2.56 over 256 seeds | **Dimensionless field units.** Mean of a dimensionless field over occupied sites. Seed 42 gives 1.437157, the 31st lowest of the 256. CORRECTED 2026-09-17: the row read 1.44, one seed's value. The ordering among the three producers fails in 19 of the 256, so `α_M` does not fix it; magnitude and spatial distribution are emergent. |
-| Melanin acceptance bias over that range | 1.134 to 1.292 (13.4% to 29.2%) | **Dimensionless.** Computed from the shipped `0.5` coefficient and `T_cpm = 5.0`, so the bias equals exp(0.1 × M); about an order of magnitude above the `β_ion` bias AT THE TERM'S REACH, 1.0151. Not above 1.000010, which is one ROLE of one pair of species occupying a site -- comparing against it is the withdrawn comparison. CORRECTED 2026-09-17: the row read 1.155 (15.5%) and a 10.2x ratio of excesses, all from seed 42 alone. The dominant radiation-derived term, and undeclared until 2026-08-15. |
+| Melanin unclipped Metropolis factor over that range | 1.134 to 1.292 (13.4% to 29.2%) | **Dimensionless.** Computed from the shipped `0.5` coefficient and `T_cpm = 5.0`, so the bias equals exp(0.1 × M); about an order of magnitude above the `β_ion` bias AT THE TERM'S REACH, 1.0151. Not above 1.000010, which is one ROLE of one pair of species occupying a site -- comparing against it is the withdrawn comparison. CORRECTED 2026-09-17: the row read 1.155 (15.5%) and a 10.2x ratio of excesses, all from seed 42 alone. The dominant radiation-derived term, and undeclared until 2026-08-15. |
 | Membrane integrity after 100 MCS | m = 0.779 | **Dimensionless.** No physical dose exists: `Ḋ = 1.0` is a placeholder, `dt_rd = 0.5` is an uncalibrated MCS→second knob, `seconds_per_mcs` is `NaN`, and `accrue_dose!` raises rather than run without it. There is no value of Gy this corresponds to. |
 | Permeability ratio | P_eff / P₀ = e ≈ 2.72 | **Dimensionless, and exact by construction.** A closed-form function of four hand-set constants ($\alpha_P \dot{D} \Delta t_{rd} n_{MCS} = 1$); the simulation computes no permeability in cm s⁻¹. The former "0.010 → 0.027 cm s⁻¹" was the Nafion-117 literature prior `P₀` rescaled by that factor, and a literature prior is not a calibration. |
 | Interior contaminant, unweighted node mean | c / c_ext = 0.024 | **Dimensionless ratio.** Measures **non-penetration, not depletion**: `c(t=0) ≡ 0` everywhere, so the interior never held contaminant to remove. The mean is unweighted over radial nodes, not volume-weighted. The embedded figure labels this "% depleted"; the figure is wrong and the model supports only non-penetration. |
-| Radial position of parcels | *C. neoformans* mean r/R = 0.65; *B. subtilis* mean r/R = 0.50 | **Dimensionless, and not yet evidence.** Both terms are lattice units, so the ratio is legitimate. But the figures come from `main_coupled()` at `N = 40`, six parcels, 100 MCS, so `R = 20` and parcel centres are rejection-sampled uniformly over `radial_dist < R − 4` = 16 = 0.8R, giving a centres-only null of E[r/R] = ⅔(0.8) ≈ 0.53 — the *B. subtilis* value sits 0.43 SE from it, indistinguishable from the initial condition; n = 6 parcels on one seed gives SE ≈ 0.077 against a 0.15 gap, ≈ 1.4 SE of the difference; and the direction is **opposite** to the implemented physics, since a negative `β_ion` biases *C. neoformans* toward the high-radiation axis. Note that 0.58 is itself only an approximation: parcels occupy volume and grow toward `V_target`, so the mean over occupied *sites* is not the mean over seed *centres*, and the true null has to be simulated rather than derived. No multi-seed run against a uniform-seeding control exists in the repository. |
+| Radial position of parcels | *C. neoformans* mean r/R = 0.65; *B. subtilis* mean r/R = 0.50 | **Dimensionless, and one seed's draw.** REPLICATED 2026-09-24 (RAD-ENS-01): over 256 seeds the full-arm means are 0.507 and 0.512 r/R; across the four arms the *C. neoformans* − *B. subtilis* mean separation ranges from −0.0057 to −0.0048 r/R, with per-seed sd about 0.11. The earlier 0.15 gap is one draw from that spread. The melanin prediction fails its stated criterion, and each direct-term paired mean-radius contrast meets the ±0.05 r/R equivalence bound; smaller effects remain possible. CORRECTED 2026-09-29 (PRE-SEND-01, PRE-SEND-02). The original reading stands as written: Both terms are lattice units, so the ratio is legitimate. But the figures come from `main_coupled()` at `N = 40`, six parcels, 100 MCS, so `R = 20` and parcel centres are rejection-sampled uniformly over `radial_dist < R − 4` = 16 = 0.8R, giving a centres-only null of E[r/R] = ⅔(0.8) ≈ 0.53 — the *B. subtilis* value sits 0.43 SE from it, indistinguishable from the initial condition; n = 6 parcels on one seed gives SE ≈ 0.077 against a 0.15 gap, ≈ 1.4 SE of the difference; and the direction is **opposite** to the implemented physics, since a negative `β_ion` biases *C. neoformans* toward the high-radiation axis. Note that 0.58 is itself only an approximation: parcels occupy volume and grow toward `V_target`, so the mean over occupied *sites* is not the mean over seed *centres*, and the true null has to be simulated rather than derived. The paired four-arm ensemble now supplies the simulated comparison from shared initial placements. |
 | Pairwise community energy | −34.4 → −41.5 | **Model units, diagnostic only.** `total_pairwise_energy` never enters Metropolis acceptance, so nothing in the simulation minimises it. It records mutualistic-pair proximity under adhesion, not a selected-for outcome. |
 | Parcel persistence | 42 / 42 seeded **biomass parcels**, where 42 = 7 species × 6 parcels is the ceiling as well as the floor | **A property of the model, not a survival result.** There is no division (`divide_cell!` has no trigger) and the only death path is volume erosion under a volume constraint that opposes it. Parcels are not cells. `response.growth_survival` is `unsupported_by_current_model`. |
 
@@ -903,10 +937,12 @@ What the tests pin:
 ## Preprint
 
 `preprint/modeling_radioresistance_and_radiotropic_fitness.tex` is the source of record:
-*Modeling Radioresistance and Radiotropic Fitness in Multispecies Biofilms — A Computational
-Framework, Implementation Audit, and One-Way Radiation-Transport Foundation*.
+*Does a Dose Gradient Move Biomass Parcels? A Seed Ensemble of a Multispecies Cellular-Potts
+Biofilm with an Executed One-Way OpenMC Interface* (version 2.0; versions 1.0 to 1.2.1 were titled
+*Modeling Radioresistance and Radiotropic Fitness in Multispecies Biofilms*).
 
-It reports executed computational work and an implementation audit. It infers no target physical
+It reports executed computational work, one ensemble answer about the model's own acceptance
+rule, and an implementation audit. It infers no target physical
 parameter, and its transport section reports that the one-way CPM–OpenMC path *executed* rather
 than reporting results from it — no gate verdict, no lever magnitude, no dose in physical units.
 The Ethics statement records that the work involved no culture, no recombinant or synthetic

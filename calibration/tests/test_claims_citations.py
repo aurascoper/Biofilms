@@ -74,7 +74,7 @@ BARE_ALLOWED = {("HANDOUT-02", "wan-deck.tex:153-155")}
 
 # A tripwire, not a target. A new citation changes it; update it in the same commit. It is
 # here so that a pattern which silently stops matching cannot pass on zero citations.
-N_CITATIONS = 160
+N_CITATIONS = 161
 
 # A pinned commit must be an ancestor of this ref. CI fetches with depth 0, so it is there.
 ANCESTOR_OF = "origin/master"

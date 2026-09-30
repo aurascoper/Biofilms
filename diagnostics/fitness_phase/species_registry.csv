@@ -1,0 +1,8 @@
+species_id,species,alpha_Gy_inv,uptake_max,monod_K,yield,maintenance,density,division_mass,evidence_status
+1,C. neoformans,0.01,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated
+2,D. radiodurans,0.002,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated
+3,C. sphaerospermum,0.015,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated
+4,B. subtilis,0.04,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated
+5,A. niger,0.02,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated
+6,S. oneidensis,0.06,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated
+7,O. intermedium AM7,0.03,0.04,0.5,1.0,0.002,1.0,240.0,assumed synthetic design; not biologically calibrated

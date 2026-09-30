@@ -248,9 +248,16 @@ jobs:
       - name: Compile the manuscript from source
         working-directory: preprint
         run: latexmk -pdf -interaction=nonstopmode -halt-on-error modeling_radioresistance_and_radiotropic_fitness.tex
+      - name: Compile the withdrawn radial transport model, which builds standalone
+        # Withdrawn from the manuscript at version 2.0 and kept for a companion paper. It is
+        # built here so that the withdrawal cannot silently leave it uncompilable.
+        working-directory: preprint
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error radiodialysis_model.tex
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: manuscript-pdf
-          path: preprint/modeling_radioresistance_and_radiotropic_fitness.pdf
+          path: |
+            preprint/modeling_radioresistance_and_radiotropic_fitness.pdf
+            preprint/radiodialysis_model.pdf
           if-no-files-found: error

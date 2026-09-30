@@ -40,6 +40,8 @@ include("radiodialysis_basis_gate.jl")
     include("genealogy_tests.jl")
 end
 
+include("dose_validation_tests.jl")
+
 @testset "Exchange schemas (snapshot + restart)" begin
     include("checkpoint_io_tests.jl")
 end
