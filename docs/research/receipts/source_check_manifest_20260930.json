@@ -1,0 +1,26 @@
+{
+  "aguilar-primary.txt": {
+    "local_path": "/tmp/cpm-aguilar-primary.txt",
+    "sha256": "dad56e893ba842b0846bbf1256fb4733ee4acbf5fef2ca58c618a1f88eecf7d8"
+  },
+  "clark-primary.txt": {
+    "local_path": "/tmp/cpm-clark-primary.txt",
+    "sha256": "d0cc00fb0e07d78cf88eac6e85288fc5a6a684dd11da6ed5cb61dca51621cd02"
+  },
+  "moeller.txt": {
+    "local_path": "/tmp/cpm-moeller.txt",
+    "sha256": "73b9e19527e4ddd65eb5032c377a1088cb4e5fbda235e650de715f2fe1524341"
+  },
+  "dadachova2004.pdf": {
+    "local_path": "/tmp/cpm-dadachova2004.pdf",
+    "sha256": "3851746f2a967735517591ea72b649b68fcd85aa11b414d0677772da057739c5"
+  },
+  "dadachova2008.pdf": {
+    "local_path": "/tmp/cpm-dadachova2008.pdf",
+    "sha256": "2570fb326d58e1be71baa440184b4b940786b2af51b91d364518acc4d530b975"
+  },
+  "cortesao.txt": {
+    "local_path": "/tmp/cpm-cortesao.txt",
+    "sha256": "aaca8f8adb7cfa608805c30d6c175eafecdbc8abe98c5972b75583af631cfce2"
+  }
+}
