@@ -2,7 +2,7 @@
 
 This specification defines a phase calculation that can be attached to a CPM run without changing that run. It does not implement the phase layer, report a phase result, or discretise the manuscript's fitness-field equation.
 
-Status: design specification, 2026-09-29. The reported CPM has no phase state. The first implementation must remain diagnostic: it reads parcel geometry after each completed CPM step and cannot write the lattice, fields, acceptance terms, parcel records, checkpoints or mechanical random-number generator.
+Status: design specification, 2026-09-29; paired invariants and selection analysis refined 2026-09-30. The reported CPM has no phase state. The first implementation must remain diagnostic: it reads parcel geometry after each completed CPM step and cannot write the lattice, fields, acceptance terms, parcel records, checkpoints or mechanical random-number generator.
 
 ## 1. State and configuration
 
@@ -11,6 +11,8 @@ Store one phase `theta_i` and one intrinsic angular frequency `omega_i` in a sid
 `PhaseConfig` is immutable and has no biological defaults. It must require an explicit time step, initial phases, intrinsic frequencies, graph rule, coupling matrix and radiation-coupling mode. Time, frequency and coupling must use one declared unit system. Every scalar and matrix entry must be finite. The time step must be positive. Couplings may be zero but cannot be inferred from the CPM's adhesion matrix. The only accepted radiation-coupling mode in this version is `none`.
 
 Attach and update operations receive the CPM state as read-only input. With the layer attached or absent, a run with the same initial state and mechanical seed must produce byte-identical CPM state, event output and mechanical RNG state at every checkpoint.
+
+The factorial requires two explicit comparisons at each completed MCS and after restart: baseline versus phase only must have identical survival and CPM trajectories; survival only versus combined must have identical deaths, dose histories and CPM trajectories. Phase must not consume either the mechanical or hazard RNG. The full per-ID comparison and selection controls are specified in `survival_phase_factorial_spec.md`.
 
 ## 2. The update is synchronous and degree normalised
 
@@ -25,6 +27,8 @@ The reference graph is the undirected parcel contact graph induced by the CPM ad
 A centroid k-nearest-neighbour graph is a separate, declared fallback for data without contact geometry. Symmetrise it before updating: an edge exists when either endpoint selects the other. The graph rule is fixed before a run. It cannot change because a result is weak or a graph is disconnected.
 
 The order parameter is `r(t) = abs(sum_i exp(im*theta_i(t))) / N` over the declared active population. Report effective frequencies over a declared late-time window as phase increments before wrapping divided by elapsed time. Report their spread together with `r`; either one alone can mislabel a transient alignment as locking.
+
+Record survivor IDs and count, graph edges, component membership and sizes, isolates and largest-component fraction alongside coherence and pairwise relative-phase drift. Preserve unwrapped phase paths for drift and slip analysis. Report both global and component coherence. When mortality is enabled, compute coherence before removal, after removal with phases held fixed, and after phase evolution. Also analyse fixed survivor cohorts against a zero-coupling replay using the same geometry and removals. The factorial specification defines these estimators and their missing-data rules. A coherence increase caused by removal of discordant parcels cannot establish dynamical locking.
 
 ## 3. Reference calculation and positive controls
 
@@ -64,13 +68,17 @@ The implementation test set must include controls that reject:
 12. a k-nearest-neighbour fallback that is not symmetrised;
 13. a graph-rule switch during a run;
 14. reuse of the mechanical RNG by the diagnostic;
-15. mutation of CPM state, fields, events or checkpoint bytes; and
-16. a status or manuscript guard that calls the layer exercised before a registered run exists.
+15. mutation of CPM state, fields, events or checkpoint bytes;
+16. a status or manuscript guard that calls the layer exercised before a registered run exists;
+17. reuse of the hazard RNG or a phase-induced change to deaths or dose histories in the combined arm;
+18. a locking verdict based only on rising coherence after frozen-phase removal;
+19. omitted isolates or changing survivor/pair sets within a fixed-cohort comparison; and
+20. a singleton locking verdict or a drift calculation that misses an unwrapped phase slip.
 
 Each test needs a mutant or bad input that reaches the production entry point and is rejected. A control that calls only a helper does not protect attachment to the CPM.
 
 ## 5. Checkpoint and reporting boundary
 
-The first passenger implementation need not alter CPM checkpoints. Its own restart record must contain the source revision, phase schema, full `PhaseConfig`, graph rule, active and archived ID tables, old phase vector, intrinsic frequencies, diagnostic step index and any diagnostic RNG state added later. Restore must validate IDs against the CPM checkpoint before either state becomes runnable.
+The first passenger implementation need not alter CPM checkpoints. Its own restart record must contain the source revision, phase schema, full `PhaseConfig`, graph rule, active and archived ID tables, old phase vector, intrinsic frequencies, diagnostic step index and any diagnostic RNG state added later. Include unwrapped phases and a verified reference to the phase, graph and removal records needed to reproduce windowed analysis across the restart. Restore must validate IDs against the CPM checkpoint before either state becomes runnable.
 
 The manuscript may describe this specification as a prospective diagnostic. It must continue to say that the reported simulation did not execute phase dynamics. The words `exercised`, `validated` and `radiation entrainment` remain unavailable until their separate evidence requirements are met.

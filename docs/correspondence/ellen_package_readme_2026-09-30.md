@@ -10,7 +10,8 @@ This is the repository-built review draft. It is separate from the CopyDesk PDF 
 - a read-only phase passenger specification and its open evidence gates;
 - a four-arm design for testing synthetic survival and the phase passenger alone
   and together, with the first combined model limited to removal of nonviable
-  parcels from the active phase graph;
+  parcels from the active phase graph, paired checks for unchanged survival and
+  CPM trajectories, and analysis that separates selective removal from locking;
 - a public-data ART and microbially influenced corrosion study plan; and
 - ART motif and mechanism questions for Ellen.
 
@@ -20,9 +21,17 @@ result is reported.
 
 ## Validation
 
-- the full Julia test suite exited successfully;
-- all 675 Python calibration, manuscript, claims, figure, vocabulary and scope guards passed;
-- three consecutive `pdflatex` passes completed without undefined references; and
-- Figure 1 passed its render-staleness guards, and the revised result, future-work, survival, phase and reference pages were inspected after rendering.
+- the preceding `2ffa9ea` build passed the Julia test entry point and all 675
+  Python calibration tests;
+- this specification refinement passed all 142 Julia manuscript assertions and
+  135 Python manuscript, claims, citation, vocabulary and figure checks;
+- three consecutive `pdflatex` passes completed without undefined references
+  or overfull boxes; and
+- the revised joint-exercise page and its following page were inspected after
+  rendering. Figure 1 passed its render-staleness guards.
+
+These checks cover the documents and existing implementation. The paired
+survival/phase invariants and selection controls are specified for the future
+implementation; they have not been executed.
 
 The repository remains private. Access is available on request.

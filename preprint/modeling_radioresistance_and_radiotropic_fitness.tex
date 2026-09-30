@@ -1436,11 +1436,20 @@ baseline, survival only, phase only and combined. All four arms must share the i
 mechanical seed and declared physical field. Survival uses its own hazard generator; the phase
 layer is deterministic unless a separately specified diagnostic noise generator is added. In the
 first combined model, a survival commitment removes the parcel from the active phase graph, but
-phase cannot change the hazard, dose, lattice or acceptance rule. The combined and survival-only
-arms must therefore have identical survival events and mechanical trajectories under matched
-seeds. Their phase outputs may differ from phase-only because the active graph loses nodes. This
-tests joint execution and the compositional effect of selective loss. It does not test a biological
-phase--survival interaction. Any phase-dependent hazard or survival-dependent coupling law is a
+phase cannot change the hazard, dose, lattice or acceptance rule. Under matched seeds and isolated
+random streams, baseline and phase-only must have identical survival and CPM trajectories;
+survival-only and combined must have identical deaths, dose histories and CPM trajectories.
+The implementation checks must compare these identities at each completed MCS and after restart.
+Combined phase output may differ from phase-only because mortality changes the active graph.
+Survivor count and graph connectivity must accompany coherence and relative-phase drift.
+Removing discordant parcels can raise coherence without any oscillator changing phase. The
+analysis therefore separates the coherence change at removal with phases held fixed from the
+subsequent phase update. It also follows fixed survivor cohorts and their unwrapped relative
+phases against a zero-coupling replay on the same geometry and removal schedule. Increased
+coherence alone cannot establish dynamical locking. Empty and singleton cohorts cannot yield a
+locking verdict. This tests joint execution and the effect of mortality on phase dynamics through
+the active graph. It does not test a biological
+phase--survival interaction. Any phase-dependent hazard or extra change to coupling weights is a
 new model requiring its own equation, evidence boundary and pre-registration. The complete arm,
 stream and outcome contract is recorded in
 \texttt{docs/research/survival\_phase\_factorial\_spec.md}. No arm has been run here.
