@@ -47,7 +47,8 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 # 1259-1272 until new prospective appendices were added above it.
 # 1449-1462 until the protected-phenotype contract was added to Appendix A.2.
 # 1492-1505 until the synthetic-extension outcome paragraph was added above it, 2026-09-30.
-FIRST_LINE, LAST_LINE = 1506, 1519
+# 1506-1519 until the selection-versus-movement sentences were added to Phenotype Boundary.
+FIRST_LINE, LAST_LINE = 1513, 1526
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the
