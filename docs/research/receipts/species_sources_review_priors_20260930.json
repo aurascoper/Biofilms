@@ -1,0 +1,125 @@
+{
+ "daly2007": {
+  "id": "17373858",
+  "source": "MED",
+  "pmid": "17373858",
+  "pmcid": "PMC1828145",
+  "fullTextIdList": {
+   "fullTextId": [
+    "PMC1828145"
+   ]
+  },
+  "doi": "10.1371/journal.pbio.0050092",
+  "title": "Protein oxidation implicated as the primary determinant of bacterial radioresistance.",
+  "authorString": "Daly MJ, Gaidamakova EK, Matrosova VY, Vasilenko A, Zhai M, Leapman RD, Lai B, Ravel B, Li SM, Kemner KM, Fredrickson JK.",
+  "journalInfo": {
+   "issue": "4",
+   "volume": "5",
+   "journalIssueId": 1387313,
+   "dateOfPublication": "2007 Apr",
+   "monthOfPublication": 4,
+   "yearOfPublication": 2007,
+   "journal": {
+    "medlineAbbreviation": "PLoS Biol",
+    "title": "PLoS biology",
+    "essn": "1545-7885",
+    "issn": "1544-9173",
+    "nlmid": "101183755",
+    "isoabbreviation": "PLoS Biol"
+   },
+   "printPublicationDate": "2007-04-01"
+  },
+  "pubYear": "2007",
+  "pageInfo": "e92",
+  "isOpenAccess": "Y",
+  "inEPMC": "Y",
+  "inPMC": "Y",
+  "citedByCount": 313,
+  "firstPublicationDate": "2007-04-01",
+  "read_pdf_sha256": "791483af4461809517363257e2dbb0fdfc6e26045314f36120f0890728e5fdc7",
+  "verified_quotes": [
+   "In vivo, the 10% survival value (D10) [1] of D. radiodurans cells grown, irradiated, and recovered at pH 7 was 16 kGy, whereas the D10 was 6 kGy for cells grown at pH 7, irradiated at pH 10.5, and recovered at pH 7 (Figure 6B, top)",
+   "Top, cells were grown in TGY (pH 7), irradiated (60Co) in TGY (0 8C) at the indicated pH, neutralized, and then recovered on TGY (pH 7).",
+   "Shewanella oneidensis is killed by levels of IR (0.07 kGy) that result in less than 1 DSB per genome [1]"
+  ]
+ },
+ "brown2015": {
+  "id": "26098880",
+  "source": "MED",
+  "pmid": "26098880",
+  "pmcid": "PMC4476702",
+  "fullTextIdList": {
+   "fullTextId": [
+    "PMC4476702"
+   ]
+  },
+  "doi": "10.1371/journal.pone.0131249",
+  "title": "Phenotypic Characterisation of Shewanella oneidensis MR-1 Exposed to X-Radiation.",
+  "authorString": "Brown AR, Correa E, Xu Y, AlMasoud N, Pimblott SM, Goodacre R, Lloyd JR.",
+  "journalInfo": {
+   "issue": "6",
+   "volume": "10",
+   "journalIssueId": 2380984,
+   "dateOfPublication": "2015 ",
+   "monthOfPublication": 0,
+   "yearOfPublication": 2015,
+   "journal": {
+    "medlineAbbreviation": "PLoS One",
+    "title": "PloS one",
+    "essn": "1932-6203",
+    "issn": "1932-6203",
+    "isoabbreviation": "PLoS One",
+    "nlmid": "101285081"
+   },
+   "printPublicationDate": "2015-01-01"
+  },
+  "pubYear": "2015",
+  "pageInfo": "e0131249",
+  "isOpenAccess": "Y",
+  "inEPMC": "Y",
+  "inPMC": "Y",
+  "citedByCount": 3,
+  "firstPublicationDate": "2015-06-22",
+  "read_pdf_sha256": "49cdd988985f8ac2d56f32233072c5b1f8fd861dc1c988e8f4274447c6ee9494",
+  "verified_quotes": [
+   "The dose yielding 10% CFU survival (D10) was ~84 Gy and D20 (20% survival) was ~57 Gy (Fig 1C).",
+   "These values are higher than those observed in previous studies using a 60Co gamma source: D10 = 70 Gy [21] and D20 = 40 Gy [23].",
+   "Faxitron CP-160 Cabinet X-radiator (160kV; 6 mA; tungsten target)",
+   "the dose rate was determined as 0.79 Gy min-1 using Fricke dosimetry"
+  ],
+  "note": "Reference [21] is Daly et al. 2007 PLoS Biol; Daly 2007 in turn attributes S. oneidensis D10 values to its reference [1], Daly et al. 2004 Science."
+ },
+ "daly2004": {
+  "id": "15459345",
+  "source": "MED",
+  "pmid": "15459345",
+  "doi": "10.1126/science.1103185",
+  "title": "Accumulation of Mn(II) in Deinococcus radiodurans facilitates gamma-radiation resistance.",
+  "authorString": "Daly MJ, Gaidamakova EK, Matrosova VY, Vasilenko A, Zhai M, Venkateswaran A, Hess M, Omelchenko MV, Kostandarithes HM, Makarova KS, Wackett LP, Fredrickson JK, Ghosal D.",
+  "journalInfo": {
+   "issue": "5698",
+   "volume": "306",
+   "journalIssueId": 1207364,
+   "dateOfPublication": "2004 Nov",
+   "monthOfPublication": 11,
+   "yearOfPublication": 2004,
+   "journal": {
+    "medlineAbbreviation": "Science",
+    "title": "Science (New York, N.Y.)",
+    "essn": "1095-9203",
+    "issn": "0036-8075",
+    "nlmid": "0404511",
+    "isoabbreviation": "Science"
+   },
+   "printPublicationDate": "2004-11-01"
+  },
+  "pubYear": "2004",
+  "pageInfo": "1025-1028",
+  "isOpenAccess": "N",
+  "inEPMC": "N",
+  "inPMC": "N",
+  "citedByCount": 452,
+  "firstPublicationDate": "2004-09-30",
+  "note": "Not open access; abstract read via Europe PMC, full text and figures NOT read. The gamma D10 of about 70 Gy for S. oneidensis traces to this paper and remains unverified here."
+ }
+}

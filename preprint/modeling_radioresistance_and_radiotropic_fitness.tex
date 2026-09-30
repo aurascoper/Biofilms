@@ -1905,11 +1905,11 @@ Motility coeff. & $\mu_s$ & \textit{C.\ sphaerospermum}& $0.00$--$0.005$ & $\mu$
 Motility coeff. & $\mu_s$ & \textit{S.\ oneidensis}    & $10$--$40$      & $\mu$m s$^{-1}$ & Polar flagellum; comparable to \textit{E.\ coli} & \cite{heidelberg2002} \\
 \midrule
 Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ neoformans}     & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Unresolved lethality anchors; see provenance note & \cite{dadachova2004,khajo2011} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{D.\ radiodurans}    & $5\!\times\!10^{-6}$--$5\!\times\!10^{-5}$ & Gy$^{-1}$ & Review-based prior; primary not verified here & \cite{slade2011,daly2009} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{D.\ radiodurans}    & $5\!\times\!10^{-6}$--$5\!\times\!10^{-5}$ & Gy$^{-1}$ & $^{60}$Co $D_{10}=16$\,kGy at pH 7; see provenance note & \cite{daly2007} \\
 Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{B.\ subtilis}       & $10^{-3}$--$5\!\times\!10^{-3}$  & Gy$^{-1}$ & Dry-spore X-ray $D_{10}=838.1\pm98.0$\,Gy; not vegetative & \cite{moeller2007} \\
 Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ sphaerospermum} & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Assumed proxy; dose response not verified here & \cite{zhdanova2000,shunk2022} \\
 Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{A.\ niger}          & $5\!\times\!10^{-5}$--$5\!\times\!10^{-4}$ & Gy$^{-1}$ & Conidial X-ray LD$_{90}$: 366\,Gy saline; 187\,Gy dry & \cite{cortesao2020} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{S.\ oneidensis}     & $5\!\times\!10^{-2}$--$10^{-1}$  & Gy$^{-1}$ & Review-based prior; primary not verified here & \cite{daly2009} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{S.\ oneidensis}     & $5\!\times\!10^{-2}$--$10^{-1}$  & Gy$^{-1}$ & X-ray $D_{10}\approx84$\,Gy; see provenance note & \cite{brown2015} \\
 \midrule
 Melanin rate & $\alpha_M$ & \textit{C.\ neoformans}     & $0.05$--$0.15$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & Substrate-dependent; enhanced by radiation & \cite{dadachova2007} \\
 Melanin rate & $\alpha_M$ & \textit{C.\ sphaerospermum} & $0.08$--$0.20$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & Constitutively melanised; high production rate & \cite{zhdanova2000,shunk2022} \\
@@ -1937,6 +1937,16 @@ An exponential through $D_{10}=4$~kGy predicts 81.3\% survival at 360~Gy, but ne
 that family nor interchangeable assay conditions follow from the endpoint. Khajo et al.
 measure melanin chemistry, not a new survival curve. For \textit{A. niger}, the cited
 endpoints concern conidia and cannot calibrate hyphal biomass \cite{cortesao2020}.
+For \textit{D. radiodurans}, Daly et al.\ measured $D_{10}=16$~kGy for cells grown, irradiated
+with $^{60}$Co at 0\,$^\circ$C and recovered at pH 7, and 6~kGy when irradiated at pH 10.5
+\cite{daly2007}. Irradiation pH alone changes that $D_{10}$ by a factor of 2.7, and air drying
+roughly halves the \textit{A. niger} LD$_{90}$; each sensitivity note in Table~\ref{tab:priors}
+is therefore a property of its condition, not a species constant. For \textit{S. oneidensis}
+MR-1, Brown et al.\ measured an X-ray $D_{10}$ of about 84~Gy at 160~kV and 0.79~Gy\,min$^{-1}$;
+at that rate the dose takes about 106~min, a protracted exposure rather than an acute one. The
+$^{60}$Co value of 70~Gy they cite traces to an earlier paper not read here \cite{brown2015}. Under a single-hit exponential these endpoints
+would give survival sensitivities of about $1.4\times10^{-4}$ and $2.7\times10^{-2}$~Gy$^{-1}$,
+outside both listed ranges: the ranges are tropism priors, not conversions of $D_{10}$.
 Other unverified notes remain priors or proxies, not measured parcel sensitivities.
 No coefficient was changed by this source correction; the separate survival ensembles
 use explicitly assumed $\alpha_s$ values.
@@ -2074,6 +2084,19 @@ Daly, M.J. (2009).
 A new perspective on radiation resistance based on \textit{Deinococcus radiodurans}.
 \textit{Nature Reviews Microbiology}, 7(3), 237--245.
 \url{https://doi.org/10.1038/nrmicro2073}
+
+\bibitem{daly2007}
+Daly, M.J., Gaidamakova, E.K., Matrosova, V.Y., Vasilenko, A., Zhai, M., Leapman, R.D., Lai, B.,
+Ravel, B., Li, S.-M., Kemner, K.M., Fredrickson, J.K. (2007).
+Protein oxidation implicated as the primary determinant of bacterial radioresistance.
+\textit{PLoS Biology}, 5(4), e92.
+\url{https://doi.org/10.1371/journal.pbio.0050092}
+
+\bibitem{brown2015}
+Brown, A.R., Correa, E., Xu, Y., AlMasoud, N., Pimblott, S.M., Goodacre, R., Lloyd, J.R. (2015).
+Phenotypic characterisation of \textit{Shewanella oneidensis} MR-1 exposed to X-radiation.
+\textit{PLoS ONE}, 10(6), e0131249.
+\url{https://doi.org/10.1371/journal.pone.0131249}
 
 \bibitem{daly2010}
 Daly, M.J., et al. (2010).
