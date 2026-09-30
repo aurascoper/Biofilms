@@ -7,7 +7,7 @@ from paraview import simple as pv
 from paraview import servermanager
 from validate_exports import validate_run, sha
 
-def build(run, output):
+def build(run, output, clip=False):
     receipt=validate_run(run)
     manifest=json.loads((run/'run_manifest.json').read_text())
     output.mkdir(parents=True,exist_ok=True)
@@ -16,6 +16,14 @@ def build(run, output):
     times=list(reader.TimestepValues)
     if times != receipt['times']: raise ValueError('ParaView time mismatch')
     scene=pv.GetAnimationScene();scene.UpdateAnimationUsingDataTimeSteps()
+    n=manifest['config']['N'];source=reader
+    if clip:
+        # Cut away the half facing the camera so the axis, where dose peaks, is visible.
+        # Crinkle clip keeps whole voxels: IDs and categories are never interpolated.
+        source=pv.Clip(registrationName='Axis clip',Input=reader);source.ClipType='Plane'
+        source.ClipType.Origin=[n/2,n/2,n/2];source.ClipType.Normal=[1,-1,0];source.Crinkleclip=1;source.Invert=1
+        full=servermanager.Fetch(reader).GetNumberOfCells();kept=servermanager.Fetch(source).GetNumberOfCells()
+        if not 0<kept<full:raise ValueError(f'clip kept {kept} of {full} cells')
     layout=pv.CreateLayout(name='CPM scientific views')
     layout.SplitHorizontal(0,0.5);layout.SplitVertical(1,0.5);layout.SplitVertical(2,0.5)
     specs=[('species_id','occupied',1,7,'Species / parcel geometry'),
@@ -27,7 +35,7 @@ def build(run, output):
     for slot,(name,mask,lo,hi,title) in zip((3,4,5,6),specs):
         view=pv.CreateView('RenderView');pv.AssignViewToLayout(view=view,layout=layout,hint=slot)
         view.Background=[.08,.09,.12];view.OrientationAxesVisibility=0
-        filt=pv.Threshold(registrationName=f'{title}: {mask}',Input=reader)
+        filt=pv.Threshold(registrationName=f'{title}: {mask}',Input=source)
         filt.Scalars=['CELLS',mask];filt.LowerThreshold=.5;filt.UpperThreshold=1.5;filt.ThresholdMethod='Between'
         display=pv.Show(filt,view);display.Representation='Surface';pv.ColorBy(display,('CELLS',name))
         lut=pv.GetColorTransferFunction(name);lut.RescaleTransferFunction(lo,hi)
@@ -48,12 +56,12 @@ def build(run, output):
         clock=pv.AnnotateTimeFilter(Input=reader);clock.Format='MCS: {time:.0f}'
         clocks.append(clock)
         stamp=pv.Show(clock,view);stamp.WindowLocation='Lower Left Corner';stamp.FontSize=12
-        n=manifest['config']['N'];view.CameraPosition=[2.2*n,-2.2*n,1.7*n];view.CameraFocalPoint=[n/2,n/2,n/2]
+        view.CameraPosition=[2.2*n,-2.2*n,1.7*n];view.CameraFocalPoint=[n/2,n/2,n/2]
         view.CameraViewUp=[0,0,1];view.CameraParallelProjection=1;view.CameraParallelScale=.95*n
         views.append(view)
     # Saved, named toggles share the net-rate view but start hidden.
     for name,hi in [('conditional_survival',1.0),('mortality_hazard',.06)]:
-        filt=pv.Threshold(registrationName=f'Toggle: {name}',Input=reader)
+        filt=pv.Threshold(registrationName=f'Toggle: {name}',Input=source)
         filt.Scalars=['CELLS','alive'];filt.LowerThreshold=.5;filt.UpperThreshold=1.5;filt.ThresholdMethod='Between'
         display=pv.Show(filt,views[1]);pv.ColorBy(display,('CELLS',name))
         lut=pv.GetColorTransferFunction(name);lut.RescaleTransferFunction(0,hi);lut.AutomaticRescaleRangeMode='Never'
@@ -75,7 +83,7 @@ def build(run, output):
     state=output/'review.pvsm';pv.SaveState(str(state))
     record={'run_id':manifest['run_id'],'source':manifest['source'],'manifest_sha256':sha(run/'run_manifest.json'),
             'times':times,'paraview':str(pv.GetParaViewVersion()),'views':specs,'images':images,'state_sha256':sha(state),
-            'reopened':False,'pipeline_sha256':sha(__file__),'time_annotations_verified':True,
+            'reopened':False,'pipeline_sha256':sha(__file__),'time_annotations_verified':True,'axis_clip':clip,
             'note':'Only recorded simulation frames; fixed color limits and common camera.'}
     (output/'render_receipt.json').write_text(json.dumps(record,indent=2)+'\n')
     return record
@@ -113,4 +121,6 @@ def reopen(run, output):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['build','reopen']);parser.add_argument('run',type=Path);parser.add_argument('output',type=Path)
-    a=parser.parse_args();print(json.dumps((build if a.mode=='build' else reopen)(a.run.resolve(),a.output.resolve())))
+    parser.add_argument('--clip',action='store_true',help='build only: cut away the camera-facing half to show the axis')
+    a=parser.parse_args()
+    print(json.dumps(build(a.run.resolve(),a.output.resolve(),a.clip) if a.mode=='build' else reopen(a.run.resolve(),a.output.resolve())))
