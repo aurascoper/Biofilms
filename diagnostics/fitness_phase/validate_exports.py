@@ -71,6 +71,13 @@ def validate_run(directory):
         occupied = a['cell_id'] > 0
         if not np.array_equal(a['occupied'], occupied) or np.any(occupied & ~a['interior_mask'].astype(bool)):
             raise ValueError('incorrect occupied/domain mask')
+        for name in ('interior_mask','occupied','alive','phase_valid','biomass_valid','local_coherence_valid','growth_enabled','survival_enabled'):
+            if np.any((a[name]!=0)&(a[name]!=1)):raise ValueError(f'{name}: nonbinary mask')
+        if np.any((a['alive']>0)&~occupied):raise ValueError('living medium voxel')
+        if not np.array_equal(a['biomass_valid'],occupied if manifest['growth'] else np.zeros_like(occupied)):
+            raise ValueError('biomass validity mismatch')
+        if np.any(a['growth_enabled']!=int(manifest['growth'])) or np.any(a['survival_enabled']!=int(manifest['arm'] in ('survival_only','combined'))):
+            raise ValueError('mode mask mismatch')
         rows = {x['id']: x for x in metrics[frame['mcs']]['parcels'] if x['volume'] > 0}
         if set(np.unique(a['cell_id'][occupied])) != set(rows):
             raise ValueError('parcel inventory mismatch')
@@ -87,6 +94,11 @@ def validate_run(directory):
             raise ValueError('invalid phase mask')
         if np.any(np.isfinite(a['phase_rad'][a['phase_valid'] == 0])):
             raise ValueError('undefined phase presented as a value')
+        if np.any(~np.isfinite(a['phase_rad'][a['phase_valid']>0])):
+            raise ValueError('valid phase is not finite')
+        local=(a['phase_valid']>0)&(a['contact_strength']>0)
+        if not np.array_equal(a['local_coherence_valid'],local) or np.any(np.isfinite(a['local_coherence'][~local])):
+            raise ValueError('local coherence validity mismatch')
         if manifest['growth']:
             from_table = sum(row['biomass'] for row in rows.values())
             integrated = np.nansum(a['biomass_density'])*np.prod(frame['spacing'])
@@ -102,7 +114,7 @@ def validate_run(directory):
                 raise ValueError('parcel-count coherence mismatch')
     return {'run_id':manifest['run_id'],'source':manifest['source'],'config_hash':manifest['config_hash'],
             'manifest_sha256':sha(directory/'run_manifest.json'),'vtk':vtk.vtkVersion.GetVTKVersion(),
-            'frames_checked':len(frames),'times':times,'status':'passed'}
+            'frames_checked':len(frames),'times':times,'status':'passed','validator_sha256':sha(__file__)}
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser();parser.add_argument('run',type=Path)

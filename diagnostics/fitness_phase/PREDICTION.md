@@ -19,3 +19,9 @@ Stop only after all declared runs complete or on a failed verification, reportin
 ## Results (append after execution)
 
 Pending. Preserve all text above when appending results.
+
+## Execution amendment: deterministic removal records
+
+The first batch at `ae67192` was stopped when the growth arms failed restart equality at MCS 101 (seeds 44, 46 and 48). A field-by-field probe of seed 44 found identical lattice, fields, parcel values and RNGs; only the order of mechanical-removal events in the death log and archive differed. Julia serialization can rebuild Dict buckets in a different order after division. The default legacy cleanup remains unchanged. The enabled extension now requests cleanup in ascending parcel-ID order. This is an event-order correction, not a failure to remove entries while iterating. A regression replays the actual failed seed across MCS 100–103.
+
+All outputs of the stopped batch remain under `artifacts/fitness_phase/ae67192`, with `ABORTED.json`; none enters outcome analysis. No primary outcome analysis was performed. The same configuration hash, seeds, horizons, observation windows, thresholds and export schedules will be rerun from the corrected source. This amendment preserves the original prediction rather than replacing it.

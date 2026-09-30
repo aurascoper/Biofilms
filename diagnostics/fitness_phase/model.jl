@@ -219,7 +219,7 @@ function step!(r::Run)
     if r.fixed
         s.current_mcs+=1
     elseif survival(r) || r.growth
-        CPM.mcs_step!(s,r.movement_rng;energy_terms=(args...)->energy_terms(r,args...))
+        CPM.mcs_step!(s,r.movement_rng;energy_terms=(args...)->energy_terms(r,args...),ordered_cleanup=true)
     else
         CPM.mcs_step!(s,r.movement_rng)
     end

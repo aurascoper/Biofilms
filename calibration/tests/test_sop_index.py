@@ -605,7 +605,7 @@ def exempt_code_lines(root: Path, rel: str) -> list:
 STEPPER_REMOVAL_FUNCTIONS = {
     # Callback added; this function still removes on volume alone. The extension
     # changes individual targets after hazard commitment, outside this function.
-    "mcs_step!": "299c90ada0eaebe49550841798b37b6506604907916af4fb5d982833415b605b",
+    "mcs_step!": "de630a6ced80f8fb31576d887b09f305a11e582cea96f1d7986b4e1687e47b42",
     "divide_cell!": "60c744c42cbbe2b3b36c06a92c740077788865f47f0c8b3878e3b957bf1355f4",
 }
 

@@ -748,7 +748,7 @@ reference. Linear sites are Julia xyz indices, 1-based; proposal_index counts
 all N^3 attempts, including skipped attempts. The observer must be inert.
 """
 function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
-                   on_proposal = nothing, on_accepted = nothing, energy_terms = compute_delta_H_terms)
+                   on_proposal = nothing, on_accepted = nothing, energy_terms = compute_delta_H_terms, ordered_cleanup = false)
     p = state.params
     N = p.N
     lat = state.lattice
@@ -835,7 +835,7 @@ function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
     end
 
     # Clean up dead cells (volume = 0) — archived, never silently dropped
-    for (id, cell) in state.cells
+    for (id, cell) in (ordered_cleanup ? sort!(collect(state.cells); by=first) : state.cells)
         if cell.volume <= 0
             push!(state.death_log,
                   DeathEvent(state.current_mcs, state.physical_time_s, id,

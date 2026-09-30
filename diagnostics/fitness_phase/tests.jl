@@ -7,6 +7,21 @@ function altered(changes)
     d=TOML.parsefile(CONFIG);merge!(d,changes)
     p=tempname();open(io->TOML.print(io,d),p,"w");F.read_config(p)
 end
+
+@testset "restart after division preserves removal event order" begin
+    # Reproduces the failed production seed, not a hand-made surrogate. At the
+    # next MCS several parcels vanish mechanically. Serialization changes Dict
+    # bucket order; enabled cleanup must not let that reorder the event log.
+    a=F.new_run(c;seed=44,arm="baseline",growth=true)
+    for _ in 1:100;F.step!(a);end
+    checkpoint=tempname();F.save_checkpoint(checkpoint,a;source="regression")
+    b=F.restore_checkpoint(checkpoint;source="regression",config_hash=c.hash)
+    previous=length(a.state.death_log)
+    for _ in 1:3
+        F.step!(a);F.step!(b);@test F.state_hash(a;phase=true)==F.state_hash(b;phase=true)
+    end
+    @test length(a.state.death_log)>previous
+end
 @testset "configuration refusal before mutation" begin
     for (k,v) in [("phase_step_mcs",0.),("seconds_per_mcs",NaN),("axis_rate_Gy_s",-1.),("alpha_Gy_inv",[.1]),("backend","jacc"),("graph_rule","periodic"),("phase_noise",.1),("radiation_coupling","dose"),("density",zeros(7))]
         @test_throws Exception altered(Dict(k=>v))
