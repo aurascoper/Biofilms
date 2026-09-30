@@ -40,6 +40,16 @@ Install the physical field as `axis_rate * I(r)/I0`, with I0 positive and the or
 
 `diagnostics/synthetic_response/config.jl` requires a seven-entry alpha vector in CN, DR, CS, BS, AN, SO, OI order, an explicit positive clock, and a finite nonnegative axis rate. It stores an immutable copy and supplies no biological defaults. A later manifest must give each coefficient's provenance or label it assumed. Zero is permitted for controls; it is not a substitute for an unknown species coefficient. No seven-species calibrated vector is established here.
 
+### 2.1 A protected phenotype changes damage yield, not absorbed dose
+
+The first mechanism study adds a dimensionless factor `q_i` to the hazard,
+
+`p_i = -expm1(-alpha_s * q_i * delta_D_i)`.
+
+The unprotected control has `q_i = 1`; a protected synthetic parcel has a declared `0 < q_i < 1`. The physical dose map, clock, direct radiation acceptance term and melanin field stay fixed. The factor has no biological default. A Dsup-inspired value remains assumed until it is measured in a matching host, exposure and endpoint. Whole-tardigrade survival, cultured-cell DNA damage and yeast oxidative-stress survival cannot calibrate a microbial parcel directly.
+
+This contrast tests damage prevention only. TDR1 and TRID1 motivate a later explicit damage-and-repair state, while CAHS proteins motivate a separate osmotic-stress dormancy and recovery model. Biomolecular phase separation in those studies is not oscillator phase locking. The evidence boundary, controls and order of work are in `docs/research/tardigrade_protection_repair_spec.md`.
+
 ## 3. Controls isolate the declared paths
 
 The experiment design must distinguish the physical dose map, the direct acceptance term and the radiation-derived melanin path. Use paired initial states and declared seeds. Keep adhesion, target volumes and all unvaried parameters fixed.
@@ -52,6 +62,7 @@ The experiment design must distinguish the physical dose map, the direct accepta
 | Equal sensitivity | Set all alpha entries equal; keep the dose gradient | Spatial selection can persist without species-specific sensitivity |
 | Disabled extension | Original driver versus the extension disabled | Identical lattice, fields, events, observables and mechanical RNG bytes |
 | Zero exposure or sensitivity | Set the physical dose or alpha to zero | No hazard commitments, with the original mechanical trajectory preserved |
+| Protected phenotype | Change only the declared damage-yield factor `q`; keep physical dose and alpha fixed | Damage prevention without changing absorbed dose or movement terms |
 
 The uniform-map value and any common alpha must be fixed before results. A melanin on/off contrast, if added, is a separate arm; equal alpha does not isolate that path. Do not require exact stochastic extinction order across species. The fixed-position control measures viable counts without clearing or shrinking sites, so the geometry remains fixed by construction.
 
