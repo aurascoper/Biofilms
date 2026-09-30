@@ -23,7 +23,7 @@ def build(run, output):
            ('phase_rad','phase_valid',0,2*math.pi,'Phase [rad]; invalid parcels excluded'),
            ('dose_rate','interior_mask',0,.01,'Synthetic dose rate [Gy/s]')]
     colors=[.25,.7,.45, .93,.69,.13, .12,.65,.86, .8,.42,.3, .68,.48,.76, .89,.53,.77, .6,.6,.6]
-    views=[]
+    views=[];clocks=[]
     for slot,(name,mask,lo,hi,title) in zip((3,4,5,6),specs):
         view=pv.CreateView('RenderView');pv.AssignViewToLayout(view=view,layout=layout,hint=slot)
         view.Background=[.08,.09,.12];view.OrientationAxesVisibility=0
@@ -45,7 +45,8 @@ def build(run, output):
         bar=pv.GetScalarBar(lut,view);bar.Title=title;bar.ComponentTitle=''
         text=pv.Text();text.Text=f"{manifest['arm']} | growth={int(manifest['growth'])} | {title}"
         label=pv.Show(text,view);label.FontSize=11
-        clock=pv.AnnotateTimeFilter(Input=reader);clock.Format='MCS: %g'
+        clock=pv.AnnotateTimeFilter(Input=reader);clock.Format='MCS: {time:.0f}'
+        clocks.append(clock)
         stamp=pv.Show(clock,view);stamp.WindowLocation='Lower Left Corner';stamp.FontSize=12
         n=manifest['config']['N'];view.CameraPosition=[2.2*n,-2.2*n,1.7*n];view.CameraFocalPoint=[n/2,n/2,n/2]
         view.CameraViewUp=[0,0,1];view.CameraParallelProjection=1;view.CameraParallelScale=.95*n
@@ -63,6 +64,10 @@ def build(run, output):
     for t in selected:
         scene.AnimationTime=t
         for v in views:v.ViewTime=t
+        for clock in clocks:
+            clock.UpdatePipeline(time=t)
+            if servermanager.Fetch(clock).GetColumn(0).GetValue(0)!=f'MCS: {t:.0f}':
+                raise ValueError('displayed time does not match the data')
         pv.RenderAllViews()
         target=output/f'frame_{int(t):06}.png'
         pv.SaveScreenshot(str(target),layout,ImageResolution=[1400,1000])
@@ -70,7 +75,8 @@ def build(run, output):
     state=output/'review.pvsm';pv.SaveState(str(state))
     record={'run_id':manifest['run_id'],'source':manifest['source'],'manifest_sha256':sha(run/'run_manifest.json'),
             'times':times,'paraview':str(pv.GetParaViewVersion()),'views':specs,'images':images,'state_sha256':sha(state),
-            'reopened':False,'note':'Only recorded simulation frames; fixed color limits and common camera.'}
+            'reopened':False,'pipeline_sha256':sha(__file__),'time_annotations_verified':True,
+            'note':'Only recorded simulation frames; fixed color limits and common camera.'}
     (output/'render_receipt.json').write_text(json.dumps(record,indent=2)+'\n')
     return record
 
@@ -92,6 +98,12 @@ def reopen(run, output):
     if len([v for v in views if v.IsA('vtkSMRenderViewProxy')])!=4:raise ValueError('view count changed')
     for view in views:
         if hasattr(view,'ViewTime'):view.ViewTime=scene.AnimationTime
+    clocks=[proxy for proxy in pv.GetSources().values() if proxy.SMProxy.GetXMLName()=='TimeToTextConvertor']
+    if len(clocks)!=4:raise ValueError('time annotations missing')
+    for clock in clocks:
+        clock.UpdatePipeline(time=scene.AnimationTime)
+        if servermanager.Fetch(clock).GetColumn(0).GetValue(0)!=f'MCS: {scene.AnimationTime:.0f}':
+            raise ValueError('relocated displayed time mismatch')
     pv.RenderAllViews()
     pv.SaveScreenshot(str(output/'relocated_final.png'),pv.GetLayout(),ImageResolution=[1400,1000])
     receipt.update({'reopened':True,'paraview':str(pv.GetParaViewVersion()),'state_sha256':sha(output/'review.pvsm'),

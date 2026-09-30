@@ -31,6 +31,17 @@ def analyse(root,first,last,horizon,growth):
         for a,b in [('baseline','phase_only'),('survival_only','combined')]:
             if [x['nonphase_hash'] for x in rows[a]['metrics']]!=[x['nonphase_hash'] for x in rows[b]['metrics']]:
                 raise ValueError('canonical history mismatch')
+        # Retain endpoints and sufficient summaries after checking the complete
+        # histories. Loading all 1,088 trajectories together exceeds this host's
+        # memory budget; the statistical calculation itself is unchanged.
+        for row in rows.values():
+            history=row['metrics']
+            selections=[x['phase'].get('selection') for x in history[1:] if x['phase'] is not None]
+            row['selection_sum']=sum(selections) if selections and all(x is not None for x in selections) else None
+            row['budget_max']={k:max(abs(x['budget'][k]) for x in history) for k in ('nutrient_residual','biomass_residual')} if growth else None
+            row['metrics']=[history[0],history[-1]]
+            if row['window'] is not None:
+                row['window']={k:v for k,v in row['window'].items() if k in ('count','locking','coupling_supported')}
         groups.append(rows)
     if len(sources)!=1 or len(configs)!=1:raise ValueError('mixed revisions/configurations')
     result={'source':sources.pop(),'config_hash':configs.pop(),'seeds':[first,last],'seed_count':len(groups),'horizon':horizon,'growth':growth,
@@ -57,7 +68,7 @@ def analyse(root,first,last,horizon,growth):
             'fixed_cohort_evaluable':sum(w['count']>=2 for w in windows),
             'finite_window_locking':sum(w['locking'] is True for w in windows),
             'coupling_supported':sum(w.get('coupling_supported') is True for w in windows),
-            'selection_sum_complete_trajectories':interval([sum(x['phase']['selection'] for x in g[arm]['metrics'][1:]) for g in groups if all(x['phase'].get('selection') is not None for x in g[arm]['metrics'][1:])],rng),
+            'selection_sum_complete_trajectories':interval([g[arm]['selection_sum'] for g in groups if g[arm]['selection_sum'] is not None],rng),
             'interpretation':'finite-window synthetic diagnostics; selection and division can change coherence without locking'}
     result['deaths']={arm:sum(sum(e['kind']=='hazard_commitment' for e in g[arm]['events']) for g in groups) for arm in ARMS}
     matched=[];phase_deltas=[]
@@ -78,7 +89,7 @@ def analyse(root,first,last,horizon,growth):
     result['nonphase_factorial_interaction']='exactly zero for every defined shared endpoint, established by paired full-state identity'
     result['divisions']={arm:sum(sum(e['kind']=='division' for e in g[arm]['events']) for g in groups) for arm in ARMS}
     if growth:
-        budgets=[x['budget'] for g in groups for arm in ARMS for x in g[arm]['metrics']]
+        budgets=[g[arm]['budget_max'] for g in groups for arm in ARMS]
         result['max_abs_nutrient_residual']=max(abs(x['nutrient_residual']) for x in budgets)
         result['max_abs_biomass_residual']=max(abs(x['biomass_residual']) for x in budgets)
         if result['max_abs_nutrient_residual']>1e-6 or result['max_abs_biomass_residual']>1e-6:raise ValueError('budget tolerance exceeded')
@@ -89,25 +100,33 @@ def plot_diagnostic(root,growth,seed,output):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     fig,axes=plt.subplots(2,3,figsize=(13,7),layout='constrained')
+    colors={'baseline':'#4477aa','survival_only':'#ee7733','phase_only':'#228833','combined':'#cc3311'}
     for arm in ARMS:
         rows=json.loads((Path(root)/f'growth_{int(growth)}_seed_{seed}'/arm/'metrics.json').read_text())
         t=[x['mcs'] for x in rows]
-        axes[0,0].plot(t,[sum(s['alive'] for s in x['species']) for x in rows],label=arm)
-        axes[0,1].plot(t,[x['budget']['biomass'] if x['budget'] else np.nan for x in rows],label=arm)
+        color=colors[arm]
+        axes[0,0].plot(t,[sum(s['alive'] for s in x['species']) for x in rows],label=arm,color=color)
+        if growth:axes[0,1].plot(t,[x['budget']['biomass'] for x in rows],label=arm,color=color)
         if arm in ('phase_only','combined'):
-            axes[0,2].plot(t,[x['phase']['coherence'] for x in rows],label=arm)
-            axes[1,0].plot(t,[len(x['phase']['component_sizes']) for x in rows],label=arm)
-            axes[1,1].plot(t,np.cumsum([0.]+[x['phase'].get('selection') if x['phase'].get('selection') is not None else np.nan for x in rows[1:]]),label=arm)
+            axes[0,2].plot(t,[x['phase']['coherence'] for x in rows],label=arm,color=color)
+            axes[1,0].plot(t,[len(x['phase']['component_sizes']) for x in rows],label=arm,color=color)
+            axes[1,1].plot(t,np.cumsum([0.]+[x['phase'].get('selection') if x['phase'].get('selection') is not None else np.nan for x in rows[1:]]),label=arm+' loss',color=color)
+            if growth:axes[1,1].plot(t,np.cumsum([0.]+[x['phase'].get('birth') if x['phase'].get('birth') is not None else np.nan for x in rows[1:]]),label=arm+' birth',color=color,linestyle=':')
             # Same fixed IDs for every value in this window; retain unwrapped drift.
             selected=rows[len(rows)//2:];ids=set(selected[0]['phase']['ids'])
             for row in selected:ids.intersection_update(row['phase']['ids'])
             if len(ids)>=2:
-                ids=sorted(ids);theta=np.array([[row['phase']['theta'][row['phase']['ids'].index(i)] for i in ids] for row in selected])
-                delta=theta[:,1:]-theta[:,[0]]
-                axes[1,2].plot([x['mcs'] for x in selected],np.max(np.abs(delta-delta[0]),axis=1),label=arm)
-    titles=['Viable parcels','Occupied biomass (synthetic units)','Count-weighted coherence','Graph components','Cumulative immediate selection effect','Max unwrapped relative-phase change\n(fixed survivor cohort, reference ID)']
+                ids=sorted(ids)
+                for field,style in [('theta','-'),('replay','--')]:
+                    theta=np.array([[row['phase'][field][row['phase']['ids'].index(i)] for i in ids] for row in selected])
+                    delta=theta[:,1:]-theta[:,[0]]
+                    axes[1,2].plot([x['mcs'] for x in selected],np.max(np.abs(delta-delta[0]),axis=1),label=arm+(' zero K' if field=='replay' else ''),color=color,linestyle=style)
+    titles=['Viable parcels (paired paths coincide)','Occupied biomass (synthetic units)','Count-weighted coherence','Graph components','Cumulative membership contribution','Max unwrapped relative-phase change\n(fixed cohort; dashed = zero K)']
     for ax,title in zip(axes.flat,titles):ax.set_title(title);ax.set_xlabel('MCS');ax.grid(alpha=.25)
     axes[0,0].legend(fontsize=8);axes[0,2].set_ylim(0,1)
+    if growth:axes[1,1].legend(fontsize=7)
+    if not growth:
+        axes[0,1].set_axis_off();axes[0,1].text(.5,.5,'Growth OFF\nBiomass is not defined',ha='center',va='center',transform=axes[0,1].transAxes)
     fig.suptitle(f'Synthetic model: seed {seed}, growth={int(growth)}; diagnostic, not ensemble evidence')
     fig.savefig(output,dpi=160);plt.close(fig)
 
