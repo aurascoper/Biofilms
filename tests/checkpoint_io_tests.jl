@@ -2,6 +2,7 @@
 # and restart checkpoint bit-exact resume (RNG included).
 
 using HDF5
+using Serialization
 
 include(joinpath(REPO, "export_checkpoint.jl"))   # CLI-guarded; functions only
 
@@ -164,8 +165,14 @@ end
 
 # ---------- restart checkpoint: resumed ≡ unbroken (bit-exact) ----------
 
-let
-    simA = SR.init_coupled_simulation(p, rp; seed = 13)
+for physical in (false, true)
+    active_p = physical ? SR.CPMParams(N = 20, n_cells_per_species = 2,
+        snapshot_interval = 100, seconds_per_mcs = 2.0) : p
+    simA = SR.init_coupled_simulation(active_p, rp; seed = 13)
+    if physical
+        dose = [Float64(x) / 100 for x in 1:20, y in 1:20, z in 1:20]
+        SR.import_dose_field!(simA.state, dose, fill(0.01, 20, 20, 20))
+    end
     SR.advance_window!(simA, 15)
     ckpt = joinpath(tmp, "restart.h5")
     export_restart_checkpoint(SR, simA, ckpt)
@@ -185,6 +192,16 @@ let
     @test simB.rd.m == simA.rd.m
     @test simB.mcs == simA.mcs
     @test length(simB.state.archive) == length(simA.state.archive)
+    @test simB.physical_time_s == simA.physical_time_s
+    @test isequal(simB.state.physical_time_s, simA.state.physical_time_s)
+    @test simB.state.dose_active == simA.state.dose_active == physical
+    for field in (:dose_rate_mean_Gy_s, :dose_rate_sd_Gy_s,
+                  :dose_increment_Gy, :accumulated_dose_Gy)
+        @test getfield(simB.state, field) == getfield(simA.state, field)
+    end
+    a = IOBuffer(); b = IOBuffer()
+    serialize(a, simA.rng); serialize(b, simB.rng)
+    @test take!(a) == take!(b)
 
     # live-cell registries agree exactly
     @test sort(collect(keys(simB.state.cells))) == sort(collect(keys(simA.state.cells)))
@@ -192,5 +209,6 @@ let
         cB = simB.state.cells[id]
         @test (cB.species, cB.volume, cB.lineage_id, cB.generation) ==
               (cA.species, cA.volume, cA.lineage_id, cA.generation)
+        @test cB.lifetime_dose_Gy == cA.lifetime_dose_Gy
     end
 end

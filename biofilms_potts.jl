@@ -1974,25 +1974,76 @@ Install a physical dose-rate field (Gy/s, CPM lattice shape). The
 Hamiltonian signal (`state.radiation`) and melanin drive are updated
 ONLY if the corresponding transform is supplied — passing `nothing`
 keeps the legacy dimensionless signals untouched, so importing dose
-never silently changes the dynamics.
+never silently changes the dynamics. Both inputs must have the exact lattice
+shape and finite, nonnegative values. Validation and optional transforms finish
+before any state field is written; transforms must return finite signals.
 """
 function import_dose_field!(state::CPMState,
                             dose_mean_Gy_s::Array{Float64, 3},
                             dose_sd_Gy_s::Array{Float64, 3};
                             hamiltonian_transform = nothing,
                             melanin_transform = nothing)
-    size(dose_mean_Gy_s) == size(state.lattice) ||
-        error("import_dose_field!: dose field shape $(size(dose_mean_Gy_s)) ≠ lattice $(size(state.lattice))")
-    copyto!(state.dose_rate_mean_Gy_s, dose_mean_Gy_s)
-    copyto!(state.dose_rate_sd_Gy_s, dose_sd_Gy_s)
-    if hamiltonian_transform !== nothing
-        state.radiation .= hamiltonian_transform.(dose_mean_Gy_s)
+    shape = size(state.lattice)
+    _check_dose_array(dose_mean_Gy_s, shape, "dose mean")
+    _check_dose_array(dose_sd_Gy_s, shape, "dose SD")
+    _check_dose_destinations(state)
+    dose_mean = copy(dose_mean_Gy_s)
+    dose_sd = copy(dose_sd_Gy_s)
+    # Stage both transforms. A failed second transform must not leave the first
+    # signal or either dose field changed. Callbacks must not mutate state.
+    radiation = hamiltonian_transform === nothing ? nothing :
+        Float64.(hamiltonian_transform.(dose_mean))
+    drive = melanin_transform === nothing ? nothing :
+        Float64.(melanin_transform.(dose_mean))
+    for signal in (radiation, drive)
+        signal === nothing || all(isfinite, signal) ||
+            error("import_dose_field!: transformed signals must be finite")
     end
-    if melanin_transform !== nothing
-        state.melanin_drive .= melanin_transform.(dose_mean_Gy_s)
-    end
+    copyto!(state.dose_rate_mean_Gy_s, dose_mean)
+    copyto!(state.dose_rate_sd_Gy_s, dose_sd)
+    radiation === nothing || copyto!(state.radiation, radiation)
+    drive === nothing || copyto!(state.melanin_drive, drive)
     state.dose_active = true
     return state
+end
+
+function _check_dose_array(values, shape, name)
+    size(values) == shape || error("$name shape $(size(values)) ≠ lattice $shape")
+    all(x -> isfinite(x) && x >= 0, values) ||
+        error("$name must contain only finite, nonnegative values")
+    return nothing
+end
+
+function _check_dose_destinations(state::CPMState)
+    shape = size(state.lattice)
+    shape == (state.params.N, state.params.N, state.params.N) ||
+        error("dose lattice shape $shape disagrees with N=$(state.params.N)")
+    for name in (:dose_rate_mean_Gy_s, :dose_rate_sd_Gy_s, :dose_increment_Gy,
+                 :accumulated_dose_Gy, :radiation, :melanin_drive)
+        size(getfield(state, name)) == shape ||
+            error("$name shape $(size(getfield(state, name))) ≠ lattice $shape")
+    end
+    return nothing
+end
+
+function _check_physical_clock(dt)
+    isnan(dt) &&
+        error("accrue_dose!: seconds_per_mcs is not configured (physical unit contract, audit §5)")
+    isfinite(dt) && dt > 0 ||
+        error("seconds_per_mcs must be finite and strictly positive")
+    return nothing
+end
+
+function _check_dose_accrual(state::CPMState)
+    _check_physical_clock(state.params.seconds_per_mcs)
+    _check_dose_destinations(state)
+    shape = size(state.lattice)
+    _check_dose_array(state.dose_rate_mean_Gy_s, shape, "dose mean")
+    _check_dose_array(state.dose_rate_sd_Gy_s, shape, "dose SD")
+    _check_dose_array(state.accumulated_dose_Gy, shape, "accumulated dose")
+    all(c -> isfinite(c.lifetime_dose_Gy) && c.lifetime_dose_Gy >= 0,
+        values(state.cells)) || error("parcel dose must be finite and nonnegative")
+    return nothing
 end
 
 """
@@ -2003,26 +2054,35 @@ CURRENT voxel labels (cells move between transport solves; attributing
 only at transport checkpoints would misassign the interval's exposure to
 endpoint geometry). Cell lifetime dose accrues the unweighted site-mean
 increment.
+Invalid active inputs or nonfinite computed totals leave all state unchanged.
+An inactive dose field is a no-op, including when the physical clock is unset.
 """
 function accrue_dose!(state::CPMState)
     state.dose_active || return state
+    _check_dose_accrual(state)
     dt = state.params.seconds_per_mcs
-    isnan(dt) &&
-        error("accrue_dose!: seconds_per_mcs is not configured (physical unit contract, audit §5)")
     N = state.params.N
+    increments = state.dose_rate_mean_Gy_s .* dt
+    accumulated = state.accumulated_dose_Gy .+ increments
+    all(isfinite, accumulated) || error("accrue_dose!: computed dose is not finite")
+    parcel_dose = Dict(id => c.lifetime_dose_Gy for (id, c) in state.cells)
     # ponytail: unweighted site-mean cell dose — equal voxel masses assumed
     # until the material config supplies densities; replace with mass weights then.
     @inbounds for z in 1:N, y in 1:N, x in 1:N
-        ΔD = state.dose_rate_mean_Gy_s[x, y, z] * dt
-        state.dose_increment_Gy[x, y, z] = ΔD
-        state.accumulated_dose_Gy[x, y, z] += ΔD
+        ΔD = increments[x, y, z]
         σ = state.lattice[x, y, z]
         if σ > 0
             c = get(state.cells, Int(σ), nothing)
             if c !== nothing
-                c.lifetime_dose_Gy += ΔD / max(c.volume, 1)
+                parcel_dose[Int(σ)] += ΔD / max(c.volume, 1)
             end
         end
+    end
+    all(isfinite, values(parcel_dose)) || error("accrue_dose!: computed parcel dose is not finite")
+    copyto!(state.dose_increment_Gy, increments)
+    copyto!(state.accumulated_dose_Gy, accumulated)
+    for (id, dose) in parcel_dose
+        state.cells[id].lifetime_dose_Gy = dose
     end
     return state
 end
@@ -2166,6 +2226,12 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int;
     state = sim.state
     rd = sim.rd
     N = state.params.N
+    if n_mcs > 0
+        # Reject an invalid physical configuration before moving a parcel or RNG.
+        state.dose_active && _check_dose_accrual(state)
+        isnan(state.params.seconds_per_mcs) ||
+            _check_physical_clock(state.params.seconds_per_mcs)
+    end
     for _ in 1:n_mcs
         sim.mcs += 1
         mcs = sim.mcs

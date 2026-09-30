@@ -237,9 +237,8 @@ multispecies systems that exhibit porous-medium-type degeneracy. Our PSDE framew
 extend these precedents with radiation-dependent fitness terms and phase-locking dynamics
 coupling species interactions to external radiation fields, moving beyond the
 substrate-limited growth paradigms that dominate existing biofilm models. Both additions remain
-unexercised: Section~\ref{sec:psde} places the phase-locking adjustment among the four terms it
-classes as unrepresentable, and the fitness field is reported there as absent from this
-repository's simulation sources.
+unexercised: Section~\ref{sec:psde} identifies missing definitions in the phase-locking
+adjustment and reports the fitness field as absent from the audited simulation sources.
 
 \subsection{Hamiltonian and Stochastic Approaches in Theoretical Ecology}
 
@@ -257,8 +256,8 @@ spatially extended ecological systems, which is the setting our phase-locking ke
 $\Gamma_s(t,\mathbf{x})$ is written for: it is specified within this tradition, extended to
 multispecies microbial communities in which species-level oscillatory dynamics in growth and
 resource acquisition would couple through shared radiation and nutrient fields. It remains
-unexercised, and Section~\ref{sec:framework} places the phase-locking adjustment among the four
-terms it classes as unrepresentable. The use of Langevin stochastic dynamics to describe microbial population
+unexercised and is unimplementable as specified: its phase evolution and coupling laws are
+not defined (Section~\ref{sec:psde}). The use of Langevin stochastic dynamics to describe microbial population
 fluctuations follows naturally from the Fokker-Planck formalism and has been applied to
 competing microbial populations in chemostat systems \cite{campillo2017}, where stochastic
 differential equations revealed long-term competitive outcomes differing from deterministic
@@ -435,10 +434,10 @@ what does and does not correspond to it in the executed code; the body of this p
 only what the CPM runs. They are: the fitness PSDE of Eq.~\ref{eq:psde}, whose field $F_s$
 exists in no source file (Section~\ref{sec:psde}); symplectic integration, which the overdamped
 regime at cell scale makes inappropriate as well as absent (Section~\ref{app:symplectic}); the
-adaptive nutrient-feedback term $A_s(t)$ of Eq.~\ref{eq:adaptive}, whose phase variable has no
-state (Section~\ref{sec:nutrient}); the phase-weighted neighbour sum $H_{\mathrm{kNN}}$ of
+adaptive nutrient-feedback term $A_s(t)$ of Eq.~\ref{eq:adaptive}, whose phase evolution is
+unspecified and unexercised (Section~\ref{sec:nutrient}); the phase-weighted neighbour sum $H_{\mathrm{kNN}}$ of
 Eq.~\ref{eq:knn}, specified and unexercised (Section~\ref{sec:knn}); the damage
-equation~\ref{eq:damage}, which the CPM cannot execute because it has no survival process
+equation~\ref{eq:damage}, whose fitness field is absent from the reported CPM
 (Section~\ref{app:damage}); the FENE and Kelvin--Voigt mechanics, for which no stress, strain
 or modulus exists in any source (Section~\ref{app:mechanics}); and the planned two-way
 radiation--transport feedback with the assumptions it would rest on
@@ -1195,8 +1194,9 @@ $N \equiv N(t,\mathbf{x})$.  The nine terms encode:
 \end{itemize}
 
 \paragraph{This subsection is specification, not method.}
-No program in this work integrates Eq.~\ref{eq:psde}. There is no fitness field $F_s$ in any
-source file. A case-insensitive search for the identifier \texttt{F\_s} across this repository's
+% SYN-NOTE-01: bound the source audit and account for all nine terms.
+No program reported here integrates Eq.~\ref{eq:psde}. Its units, initial and boundary
+conditions, and several closures remain unspecified. A case-insensitive search for the identifier \texttt{F\_s} across the audited
 Julia and R simulation sources --- \texttt{biofilms\_potts.jl}, \texttt{biofilms\_potts\_jacc.jl},
 the three R codes, and the supporting scripts \texttt{validate\_serial.jl},
 \texttt{export\_checkpoint.jl} and \texttt{scoby\_3d.jl} --- returns no match at all. The word
@@ -1207,15 +1207,27 @@ advance is a set of particle positions under overdamped first-order Euler steps,
 advances a lattice configuration by Metropolis acceptance --- neither is a discretisation of a
 field equation in $F_s$.
 
-Four of the nine terms are additionally unrepresentable rather than merely unimplemented. The
-deterministic reaction $R_s$ is nutrient-dependent \emph{growth}, and the CPM has none:
+Four of the nine terms have analogies in the reported models: diffusion, directed motility,
+noise and the ionising term. None is a discretisation of the fitness-field equation; the
+CPM's radiation term is an acceptance bias, not a fitness sink. Three further terms lack
+the required process or field. The deterministic reaction $R_s$ is nutrient-dependent
+\emph{growth}, and the reported CPM has none:
 \texttt{state.nutrient} is written each step but never read by \texttt{compute\_delta\_H}, and
-\texttt{divide\_cell!} has no trigger. The phase-locking adjustment $\gamma_s\Delta_s$ depends on
-the $H_{\mathrm{kNN}}$ machinery of Section~\ref{sec:knn}, which is specified and unexercised. The
-non-ionising term $\alpha_{s,\mathrm{nir}}N$ and the external forcing $C_s$ have no counterpart in
-any state variable. Only diffusion, directed motility, noise and the ionising term have anything
-in the implemented models that corresponds to them, and even those correspond by analogy rather
-than by discretisation --- the CPM's radiation term is an acceptance bias, not a fitness sink.
+\texttt{divide\_cell!} has no trigger. The non-ionising term $\alpha_{s,\mathrm{nir}}N$ and the
+external forcing $C_s$ have no corresponding field in the reported CPM.
+
+The phase-locking adjustment $\gamma_s\Delta_s$ remains unexercised and is unimplementable as
+specified. There is no phase-evolution law or closure for $\Delta_s$ and $\Gamma_s$, no values
+for $\omega_s$, and conflicting stated roles for $P_{sj}$ and $\theta_s$. A parcel model can
+carry a phase variable, but its dynamics and radiation coupling require a new specification.
+The limitation is in these equations, not in the lattice representation. The remaining
+Hamiltonian source $\theta_s H_s$ is also unimplemented: using energy differences to accept
+lattice moves does not execute an additive source for $F_s$.
+
+A separate per-parcel survival hazard would likewise be a declared analogue, not a
+discretisation of Eq.~\ref{eq:psde}. It would add a survival endpoint to a synthetic model
+without adding growth or establishing biological calibration. No such hazard was used in
+the reported simulations.
 
 Eq.~\ref{eq:psde} is therefore the framework this work proposes, and the simulations reported in
 Section~\ref{sec:results} are separate, simpler models that share its vocabulary. Presenting the
@@ -1287,12 +1299,12 @@ where $\phi_s(t) = \cos(\omega_s t - \theta_s)$ is the phase-alignment function 
 the adaptive feedback driven by phase-locking and local radiation stress.
 
 \paragraph{The adaptive-feedback term is specification, not method.}
-A nutrient field is integrated at every step by \texttt{update\_nutrient!}, so this uptake law
-is not wholly unimplemented; the adaptive term $A_s(t)$ is the part that remains unexercised.
-Its phase-alignment factor requires a phase variable, and Section~\ref{sec:psde} places the
-phase-locking adjustment among the four terms it classes as unrepresentable, while the fitness
-field $F_s$ in the saturation factor is reported there as absent from this repository's
-simulation sources.
+% SYN-NOTE-01: nutrient transport does not execute either displayed equation.
+Both Eqs.~\ref{eq:nutrient} and~\ref{eq:adaptive} remain unimplemented. The function
+\texttt{update\_nutrient!} advances diffusion, fixed species-dependent uptake, clipping and
+wall supply. It computes none of the $F_s$ saturation, $R_s$ or $A_s$ terms shown here.
+The adaptive phase-locking term remains unexercised and unimplementable as specified for
+the reasons in Section~\ref{sec:psde}.
 
 \subsection{Hamiltonian kNN Decision Tree}
 \label{sec:knn}
@@ -1310,8 +1322,9 @@ under the weight $P_{sj}$, which makes it a phase-weighted neighbour sum rather 
 among neighbours. It is likewise a single product with no split, so \emph{Decision Tree}
 describes nothing in the form either. Section~\ref{sec:intro} holds each word to the endpoint it
 names; that discipline was written for the five phenomenon terms, and it applies to method names
-on the same grounds. The established description of this expression is a phase-weighted
-neighbour sum over a transition matrix. $F_j$ is the fitness field of
+on the same grounds. The expression is a weighted sum, but the intended role of $P_{sj}$
+as a permutation or as general mixing weights needs to be resolved. A permutation matrix
+would select one entry for each species. $F_j$ is the fitness field of
 Section~\ref{sec:psde}, reported there as absent from this repository's simulation sources, so
 the quantity aggregated here is itself specified rather than implemented.
 
