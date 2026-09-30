@@ -49,8 +49,17 @@ def assemble(raw,output,source_repo):
             for name in ('run_manifest.json','export_validation.json'):
                 shutil.copy2(run/name,target/name)
             shutil.copy2(run.parent/'invariants.json',target.parent/'invariants.json')
-    for name in ('controls','verification','logs'):
+    for growth,_,_,_ in plans:
+        for arm in ARMS:
+            record=json.loads((raw/'views'/f'growth_{growth}_{arm}'/'render_receipt.json').read_text())
+            manifest=raw/f'growth_{growth}_seed_42'/arm/'run_manifest.json'
+            if record['manifest_sha256']!=hashlib.sha256(manifest.read_bytes()).hexdigest() or not record.get('time_annotations_verified'):
+                raise ValueError('missing/stale verified render')
+    for name in ('controls','verification','logs','views'):
         shutil.copytree(raw/name,output/name)
+    tools=output/'review_tools';tools.mkdir()
+    for name in ('analyse.py','validate_exports.py','pv_workflow.py','package_review.py','schema.json','species_registry.csv'):
+        shutil.copy2(Path(__file__).parent/name,tools/name)
     for p in raw.glob('*analysis.*'):shutil.copy2(p,output/p.name)
     shutil.copy2(raw/'execution_jobs.json',output/'execution_jobs.json')
     manifest={'source':source,'config_hash':configs.pop(),'primary_runs':len(runs),'diagnostic_runs':8,

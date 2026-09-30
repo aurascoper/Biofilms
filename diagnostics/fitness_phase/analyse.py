@@ -119,8 +119,9 @@ def plot_diagnostic(root,growth,seed,output):
                 ids=sorted(ids)
                 for field,style in [('theta','-'),('replay','--')]:
                     theta=np.array([[row['phase'][field][row['phase']['ids'].index(i)] for i in ids] for row in selected])
-                    delta=theta[:,1:]-theta[:,[0]]
-                    axes[1,2].plot([x['mcs'] for x in selected],np.max(np.abs(delta-delta[0]),axis=1),label=arm+(' zero K' if field=='replay' else ''),color=color,linestyle=style)
+                    changes=theta-theta[0]
+                    # max_ij |change_i-change_j| = max(change)-min(change).
+                    axes[1,2].plot([x['mcs'] for x in selected],np.ptp(changes,axis=1),label=arm+(' zero K' if field=='replay' else ''),color=color,linestyle=style)
     titles=['Viable parcels (paired paths coincide)','Occupied biomass (synthetic units)','Count-weighted coherence','Graph components','Cumulative membership contribution','Max unwrapped relative-phase change\n(fixed cohort; dashed = zero K)']
     for ax,title in zip(axes.flat,titles):ax.set_title(title);ax.set_xlabel('MCS');ax.grid(alpha=.25)
     axes[0,0].legend(fontsize=8);axes[0,2].set_ylim(0,1)
