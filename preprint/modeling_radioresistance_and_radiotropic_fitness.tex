@@ -127,9 +127,9 @@ same-species contact test did not support the proposed melanin-clustering mechan
 
 The boundaries are declared rather than discovered late. A proposed partial stochastic
 differential equation organises diffusion, directed motility, nutrient, radiation, melanin,
-interaction and forcing terms; it is a specification, and the executed simulations---the CPM,
+interaction and forcing terms; it is a specification, and the original simulations---the CPM,
 two Langevin programs described once in Methods, and a radial transport solver now in a
-companion paper---realise only subsets of it. The CPM represents seven named species as computational biomass parcels rather
+companion paper---realise only subsets of it. The original CPM represents seven named species as computational biomass parcels rather
 than individual organisms, and has neither biomass growth nor a dose-dependent survival process,
 so the implemented phenotype is radiotropism and the model cannot test radiotrophy or
 radioresistance. The transport workflow is explicitly non-calibrating: no target physical
@@ -243,10 +243,11 @@ growth paradigms that dominate existing biofilm models. Both proposals are speci
 executed here.
 Section~\ref{sec:psde} identifies missing definitions in the phase adjustment and reports the
 fitness field as absent from the audited simulation sources. Appendices~\ref{app:synthetic_survival}
-and~\ref{app:phase_passenger} instead specify two new synthetic analogues: a per-parcel survival
+and~\ref{app:phase_passenger} describe two implemented synthetic analogues: a per-parcel survival
 hazard driven by physical dose and a read-only phase diagnostic with radiation coupling disabled.
-A prospective four-arm study would exercise each analogue alone and both together; it would not
-constitute integration of the PSDE.
+A separate four-arm study tests each analogue alone and both together, with a further
+nutrient-to-biomass growth version (Appendix~\ref{app:synthetic_growth}). These closed
+models do not constitute integration of the PSDE.
 
 \subsection{Hamiltonian and Stochastic Approaches in Theoretical Ecology}
 
@@ -559,7 +560,7 @@ Seconds per MCS & --- & NaN & no & unset by contract; dose accrual refuses to ru
 \section{Computational Methods}
 \label{sec:methods}
 
-The repository contains four executed simulation programs: three in R and one in Julia. The PSDE
+The original comparison contains four executed simulation programs: three in R and one in Julia. The PSDE
 in Section~\ref{sec:framework} is a proposed organising formalism and is not discretised by any of these programs.
 No optimisation, Sobol analysis, or Morris screening was performed.
 
@@ -835,6 +836,13 @@ means were $-0.0013$ and $-0.0035$, rather than the required increase of at leas
 compound clustering prediction failed. This six-face boundary-contact fraction does not measure
 temporal retention, an adhesion coefficient or organisms. All 4,352 radial shards and 16 contact
 shards passed their registered completeness, provenance and baseline checks before analysis.
+A supplied rerun reporting Julia 1.12.7 reproduced the Julia 1.12.6 local archive in all
+68,096 comparable rows and every printed field (floating quantities at six decimals),
+including both coefficient ladders and the 400-MCS endpoint. This establishes agreement of
+the supplied outputs, not unrounded state identity. The cloud's intermediate 200- and 300-MCS
+rows have no local counterpart, and the repository's original predictions retain precedence.
+The comparison receipt is recorded in
+\path{docs/research/cloud_followup_comparison_2026-09-30.md}.
 A compact result record and hashes of the external run receipts are in
 \texttt{docs/research/radial\_contact\_followups\_2026-09-29.md}.
 
@@ -1055,31 +1063,17 @@ community. The full computational study contract and the questions for experimen
 recorded in \texttt{docs/research/art\_mic\_metagenome\_spec.md} and
 \texttt{docs/correspondence/ellen\_art\_questions.md}.
 
-\paragraph{Protection, repair and dormancy are separate extensions.}
-Tardigrade studies provide stronger mechanism precedents for a survival extension than ART does,
-but they do not provide transferable coefficients for the seven-species panel. Expression of
-\emph{R. cf. varieornatus} Dsup in \emph{E. coli} increased CFU survival after one 2180~Gy gamma
-exposure, whereas the \emph{H. exemplaris} ortholog did not \cite{clarkhachtel2024}. Thus bacterial
-protection is demonstrated, but its dependence on ortholog and host prevents a generic Dsup
-coefficient; the experiment supplies neither a microbial dose response nor a $D_{10}$- or
-LD$_{90}$-derived protection factor. Dsup also reduced X-ray damage in cultured human cells
-\cite{hashimoto2016dsup}. In yeast it improved survival under oxidative damage
-\cite{aguilar2025dsup}; that fungal-host evidence is closest to the basidiomycetous yeast
-\emph{C. neoformans}, but it is not an ionizing-radiation result and does not transfer to the two
-filamentous fungi. Expression in cultured primary rat neurons instead increased DNA damage and
-toxicity for the tested constructs \cite{diaz2023dsup}. The first model exercise therefore remains
-a synthetic protected/unprotected contrast in which a declared factor scales biological damage
-yield while physical absorbed dose and all movement terms remain fixed. Assigning that factor a
-biological value remains deferred until a matched ortholog--host dose response exists.
-
-Repair is a separate state model. TDR1 is a radiation-induced DNA-binding candidate whose proposed
-chromosome-organisation role remains unresolved \cite{anoud2024tdr1}. TRID1 is distinct and provides
-a more direct lead through phase separation and double-strand-break repair
-\cite{li2024trid1}. Biomolecular phase separation is not oscillator phase locking. CAHS proteins
-support a later reversible-dormancy branch under osmotic stress, with viability, metabolic activity
-and recovery reported separately \cite{sanchezmartinez2024cahs}. Whole tardigrades require a separate
-animal-ecology model. The executable boundaries and controls are recorded in
-\texttt{docs/research/tardigrade\_protection\_repair\_spec.md}.
+% Correction TARDIGRADE-AUDIT-02: limit future work to checked endpoints.
+\paragraph{Protection remains a separate research question.}
+Dsup effects depend on protein, host and stressor. In \emph{E. coli}, one Dsup ortholog improved
+survival after 2180~Gy gamma irradiation while another did not \cite{clarkhachtel2024}.
+In yeast, peroxide protection coexisted with increased sensitivity to MMS, Zeocin and UV
+\cite{aguilar2025dsup}; expression alone caused DNA damage and toxicity in the tested primary
+rat-neuron system \cite{diaz2023dsup}. These studies do not supply a transferable protection
+coefficient for this panel. No protection module is included in the synthetic ensembles.
+A future protection contrast would change biological response at fixed absorbed dose; repair
+could instead require an explicit damage state. Uncompleted mechanism audits remain unverified
+in \texttt{docs/research/tardigrade\_protection\_repair\_spec.md}.
 
 % ---- 8. Conclusion -------------------------------------------
 \section{Conclusion}
@@ -1097,9 +1091,10 @@ prediction that the melanin path stratifies the two species it acts on was wrong
 drift every arm shares is adhesion-and-volume relaxation. The single-seed pattern of earlier
 versions was one draw.
 
-The implemented phenotype is radiotropism alone. The direct term's directional response is present --- amplified, it shifts occupied-site mean radius in the expected directions at the smaller control configuration ---
-but at the shipped constants and 100~MCS the melanin prediction is unsupported and the direct-term mean-radius contrast meets the declared equivalence bound; the melanin path has no positive control. Radiotrophy and radioresistance remain outside the current state space because the
-model has no biomass growth or dose-dependent survival. The radial membrane-transport model is
+The phenotype represented in the original movement experiment is radiotropism alone. The direct term's directional response is present --- amplified, it shifts occupied-site mean radius in the expected directions at the smaller control configuration ---
+but at the shipped constants and 100~MCS the melanin prediction is unsupported and the direct-term mean-radius contrast meets the declared equivalence bound; the melanin path has no positive control. That experiment has no biomass growth or dose-dependent survival. The separate synthetic
+extension adds mortality, passive phase and nutrient-driven growth; it does not demonstrate
+radiation-supported growth or calibrate biological radioresistance. The radial membrane-transport model is
 withdrawn to a companion paper with the measurements that would calibrate it. The synthetic one-way
 CPM--OpenMC path has executed through geometry export, photon transport, exact-volume dose
 normalisation, coordinate transfer and label attribution while remaining explicitly
@@ -1123,7 +1118,9 @@ All source code, configuration schemas, tests, provenance ledgers, and figure-ge
 are held in the private repository below; access is available on request:
 \url{https://github.com/aurascoper/Biofilms}. Version 1.0 was prepared against repository
 revision \texttt{c7539a9}, version 1.2.1 against \texttt{4bf1ba9}, and this revision against
-\texttt{24cd3ec}. Each names the
+\texttt{24cd3ec} for the original study. The separate synthetic survival, phase and growth
+ensembles use execution source \texttt{841d052}; their configuration and raw-output manifests
+record its full hash. Each manuscript reference names the
 parent of the commit that adds it, because a document cannot cite the commit that contains it. No new biological specimens or experimental measurements were generated.
 Third-party public datasets are cited by their original records and are not redistributed as target
 calibration data.
@@ -1299,10 +1296,10 @@ Four of the nine terms have analogies in the reported models: diffusion, directe
 noise and the ionising term. None is a discretisation of the fitness-field equation; the
 CPM's radiation term is an acceptance bias, not a fitness sink. Three further terms lack
 the required process or field. The deterministic reaction $R_s$ is nutrient-dependent
-\emph{growth}, and the reported CPM has none:
+\emph{growth}, and the original CPM has none:
 \texttt{state.nutrient} is written each step but never read by \texttt{compute\_delta\_H}, and
 \texttt{divide\_cell!} has no trigger. The non-ionising term $\alpha_{s,\mathrm{nir}}N$ and the
-external forcing $C_s$ have no corresponding field in the reported CPM.
+external forcing $C_s$ have no corresponding field in the original CPM.
 
 The phase-locking adjustment $\gamma_s\Delta_s$ remains unexercised and is unimplementable as
 specified. There is no phase-evolution law or closure for $\Delta_s$ and $\Gamma_s$, no values
@@ -1312,147 +1309,150 @@ The limitation is in these equations, not in the lattice representation. The rem
 Hamiltonian source $\theta_s H_s$ is also unimplemented: using energy differences to accept
 lattice moves does not execute an additive source for $F_s$.
 
-A separate per-parcel survival hazard would likewise be a declared analogue, not a
-discretisation of Eq.~\ref{eq:psde}. It would add a survival endpoint to a synthetic model
-without adding growth or establishing biological calibration. No such hazard was used in
-the reported simulations.
+The separate per-parcel survival hazard below is a declared analogue, not a
+discretisation of Eq.~\ref{eq:psde}. It adds a synthetic survival endpoint without
+establishing biological calibration. No such hazard was used in the original movement
+simulations; the nutrient-to-biomass extension is separately identified.
 
 Eq.~\ref{eq:psde} is therefore the framework this work proposes, and the simulations reported in
 Section~\ref{sec:results} are separate, simpler models that share its vocabulary. Presenting the
 two as one system would be the central error this manuscript exists to avoid.
 
-\subsection{Prospective Synthetic-Survival Analogue}
+\subsection{Synthetic Survival Analogue}
 \label{app:synthetic_survival}
 
-This subsection is a specification, not a reported method. It preserves the survival-first
-conclusion of the design review while narrowing what fitness means in executable code. The
-field $F_s(t,\mathbf{x})$ has no units, initial condition, boundary condition or state in the
-reported programs. Its growth law also uses $F_s/K_s$, while $K_s$ is a cell density. The
-executable analogue is therefore a per-parcel response, not a hidden discretisation of that field.
-The CPM already carries a static radiation signal, imported physical dose-rate arrays, cumulative
-parcel dose and a physical clock that refuses to run while unset. It has no process that consumes
-physical dose to change viability. The proposed hazard is the first such consumer.
-
-A future extension treats each parcel
-as a synthetic survival unit and keeps three outcomes separate: viable fraction; mean radius of
-viable parcels; and displacement of the same identified viable parcels from their initial radii.
-The initial mean radius of those survivors is also reported, so a shift caused by selective loss
-can be separated from movement. With no survivors, viable fraction is zero and both radius
-statistics are missing; zero radius is never substituted.
-
-For a declared exponential design, a viable parcel of species $s$ receives a single hazard from
-the current step's occupied-site mean dose increment,
+The separate serial implementation in \texttt{diagnostics/fitness\_phase/} closes a
+per-parcel survival model. It does not integrate the undefined field $F_s$ or calibrate
+biological survival. Each parcel is a synthetic survival unit. The current step's
+occupied-site mean dose increment is used once in
 \begin{equation}
  p_i=-\operatorname{expm1}(-\alpha_s\,\Delta D_i).
  \label{eq:survival_hazard}
 \end{equation}
-The current increment is used exactly once. Cumulative dose is recorded and is never reused as an
-increment. A $D_{10}$ determines $\alpha_s=\ln(10)/D_{10}$ only after this survival family has been
-chosen; one endpoint does not establish the family, repair law or biological calibration. The
-proposed 60~s/MCS clock and 0.01~Gy/s axis rate are synthetic design choices. All seven
-sensitivities require a source or an explicit assumed label before production.
+Cumulative dose and hazard are recorded separately. A dedicated hazard generator draws
+in ascending parcel-ID order and does not consume the mechanical random stream.
+The assumed sensitivities, in the species order of Table~\ref{tab:params}, are
+$(0.01,0.002,0.015,0.04,0.02,0.06,0.03)$~Gy$^{-1}$.
+The assumed clock is 60~s/MCS and axis dose rate 0.01~Gy/s; the physical field is the
+analytic CPM radiation profile scaled to that rate. Thus 100~MCS corresponds to an
+assumed 60~Gy at the axis. These choices exercise a response law; they are not fitted
+species values or a calibration of mechanical time. A $D_{10}$ would give
+$\alpha_s=\ln(10)/D_{10}$ only conditional on an exponential survival family.
 
-The first mechanism-specific contrast introduces a dimensionless biological damage-yield factor
-$q_i$, replacing $\alpha_s\Delta D_i$ with $\alpha_s q_i\Delta D_i$. The unprotected control has
-$q_i=1$; a protected synthetic parcel has a declared $0<q_i<1$. This Dsup-inspired factor changes
-the hazard attributed to a fixed absorbed dose. It cannot alter the dose map or any movement term,
-has no default, and remains assumed until measured in a matching host, exposure and endpoint.
+A commitment makes a parcel nonviable immediately. It receives no subsequent hazard,
+uptake, production or division and leaves the active phase graph. Its individual target
+volume becomes zero; mechanical resorption retains contact energies until cleanup.
+Physical removal, hazard commitment and division have separate event records.
+Absorbed dose continues to accumulate in a physically present corpse, while its hazard
+is frozen. The serial energy callback supports individual targets; enabled JACC
+execution is refused. The legacy default path is unchanged.
 
-Those two time choices control whether a survival term can act within the reported horizon. At
-60~s/MCS and 0.01~Gy/s, 100~MCS delivers 60~Gy on the axis. For the illustrative
-$D_{10}=70$~Gy endpoint, the chosen exponential gives expected survival 0.138950 on the axis and
-0.483810 at the wall of the analytic field. A 0.36~s/MCS clock at the same dose rate would deliver
-only 0.36~Gy in 100~MCS. This contrast is why the clock and regime must be declared before a run.
-It is not evidence for either clock. A growth-free model cannot calibrate seconds per MCS from a
-doubling time, and an acute $D_{10}$ does not by itself validate a chronic exposure model.
+Viable fraction, survivor-weighted radius, initial radius of those same survivors and
+identified-parcel displacement are separate outcomes. Empty radii are missing. A
+centroid displacement can include deformation and is not automatically locomotion.
+Fixed-position controls permit selection to change survivor radius with exactly zero
+displacement. A separate direct-tropism on/off control holds the other paths fixed.
+The Dsup-inspired protection factor remains future work and is absent from these runs.
 
-The control set fixes parcel positions while applying survival, switches the direct tropism term
-on and off with every other path fixed, compares a declared uniform physical field with the
-gradient, sets equal sensitivities, and tests zero exposure and disabled extension. A dedicated
-hazard generator draws in ascending parcel-ID order. Disabled mode must preserve lattice, fields,
-events, observables and mechanical RNG bytes. Checkpoints must store the response configuration,
-hazard RNG, parcel status and targets, clocks, incremental and cumulative dose, commitments and
-removals. Missing extension state cannot silently restore as disabled.
-
-A hazard commitment and physical removal are separate events. A committed parcel is nonviable,
-receives no later hazard, uptake, production or division, and resorbs toward an individual target
-volume of zero while retaining the declared mechanical contact terms. The present CPM and its JACC
-kernel have only a global target volume, so an implementation must either add and validate matching
-per-parcel targets in both kernels or refuse enabled JACC execution. The full update order, restart
-contract, statistical recovery test and adapted PRRT gate table are in
-\texttt{docs/research/synthetic\_survival\_spec.md}; the mechanism evidence is in
-\texttt{docs/research/tardigrade\_protection\_repair\_spec.md}. No hazard was used in the reported
-runs.
-
-\subsection{Prospective Phase-Locking Passenger Diagnostic}
+\subsection{Passive Phase Dynamics and Selection Controls}
 \label{app:phase_passenger}
 
-This subsection is also specification, not method. It replaces the earlier statement that phase
-is unrepresentable. Mutable parcel state and a step counter can carry a phase. The manuscript's
-equations cannot yet do so: $\Delta_s$ and $\Gamma_s$ have no defining equations; $\theta_s$ is
-used as both a coefficient and a phase offset; $P_{sj}$ is called both a permutation and a weight;
-$\sigma_n$ is undefined; and no value of $\omega_s$ is assigned. The displayed
-$\phi_s(t)=\cos(\omega_s t-\theta_s)$ is an uncoupled clock, not phase locking. The limitation is
-in the specification, not the lattice.
-
-A future diagnostic stores phase and intrinsic
-frequency in a side table keyed by persistent parcel ID. It reads CPM geometry after a completed
-mechanical step and cannot write the lattice, fields, parcel records, acceptance terms or mechanical
-RNG. With old phases on a declared undirected graph, it applies the synchronous update
+The original PSDE phase adjustment remains unexercised: its $\Delta_s$ and $\Gamma_s$
+lack closures. The implemented analogue instead assigns one oscillator to each living
+parcel in a side table. Unwrapped phases evolve by the synchronous update
 \begin{equation}
- \vartheta_i(t+\Delta t)=\operatorname{wrap}\!\left[\vartheta_i(t)+\Delta t
- \left(\omega_i+\frac{1}{d_i}\sum_j A_{ij}K_{s(i),s(j)}
- \sin(\vartheta_j(t)-\vartheta_i(t))\right)\right],
+ \vartheta_i^{n+1}=\vartheta_i^n+\Delta t\left[
+ \omega_i+K\frac{\sum_j A_{ij}\sin(\vartheta_j^n-\vartheta_i^n)}{d_i}\right],
+ \qquad d_i=\sum_j A_{ij},
  \label{eq:phase_passenger}
 \end{equation}
-where $d_i=\sum_j A_{ij}$ and an isolated parcel has zero coupling. Every right-hand-side phase is
-from the old vector. The reference graph is parcel contact under the adhesion neighbourhood. A
-symmetrised centroid k-nearest-neighbour graph is a separately declared fallback and cannot be
-selected after results are seen.
+with zero coupling for an isolate. The symmetric Boolean adjacency $A$ records contacts
+under the existing 26-neighbour adhesion stencil, not shared face area. The row-normalised
+weights need not be symmetric. The graph is rebuilt after mechanical and lifecycle
+changes in both model versions. Mortality therefore affects phases through membership
+and changed contact geometry; growth also permits new nodes and rewiring.
 
-The configuration has no biological defaults and accepts only radiation-coupling mode
-\texttt{none}. Controls include the two-oscillator relation
-$\dot\delta=\Delta\omega-2K\sin\delta$, a degree-normalised star graph, a synchronous-update mutant,
-isolated parcels and byte identity of CPM state and RNG with the diagnostic attached. A future
-exercise reports both the order parameter and the late-time spread of effective frequencies. Its
-all-to-all reference uses the exact finite frequency sample; an infinite-population threshold is
-not an acceptance test for a small moving graph. The full state, test and checkpoint contract is in
-\texttt{docs/research/phase\_locking\_spec.md}; its literature and theory gates are recorded in
-\texttt{docs/research/phase\_evidence\_brief.md}. No phase result is reported here.
+All parameters are synthetic: independent uniform initial phases, Normal intrinsic
+frequencies with mean $2\pi/20$ and SD 0.05~rad/MCS, scalar $K=0.5$~MCS$^{-1}$ and
+$\Delta t=0.05$~MCS. Frequencies and phases use a separate seeded stream. Noise and
+radiation forcing are off. Phase never feeds back into survival, dose, growth, movement
+or acceptance. Only exported display phases are wrapped to $[0,2\pi)$.
+A static dose gradient supplies no temporal phase for entrainment.
+Liu et al.'s coupled whole-biofilm oscillators provide a different-scale precedent
+\cite{liu2017biofilm}, not a measured parcel-level law for this community.
 
-This diagnostic is deferred as biology because the located literature supplies no oscillation
-period for this seven-species community and no measured ionising-radiation-to-phase law. A static
-radial dose field can parameterise a spatial frequency shift if one is later measured, but it is
-not a time-varying forcing signal. Until those measurements exist, a synchronization curve would
-exercise the declared oscillator model only. Liu et al. observed coupled oscillations in pairs of
-\textit{B. subtilis} biofilms and modelled each whole biofilm as a coupled phase oscillator
-\cite{liu2017biofilm}. That is a two-community empirical precedent. It does not provide a
-parcel-level coupling law, and the accessible main article does not display the equation needed
-to verify the narrower label ``Kuramoto-type.''
+Coherence is reported with active count, edges, isolates, components and component
+coherence. At each boundary, deletion and birth contributions are computed with phases
+held fixed, separately from phase evolution. The primary late window is MCS 50--100
+without growth and 100--200 with growth. Its fixed cohort is the intersection of living
+IDs throughout that window. Empty and singleton cohorts yield no locking verdict.
+Every unordered pair must have absolute endpoint drift at most 0.01~rad/MCS, relative-phase
+range at most 0.5~rad, and no full $2\pi$ winding. To support a coupling contribution,
+the cohort's effective-frequency SD must also fall by at least 50\% relative to the
+zero-coupling replay with identical membership, frequencies and phase inheritance.
+These are finite-window synthetic criteria, not a biological synchronisation threshold.
 
-\paragraph{Prospective joint exercise.}
-The survival analogue and phase passenger can be tested in a registered two-by-two design:
-baseline, survival only, phase only and combined. All four arms must share the initial lattice,
-mechanical seed and declared physical field. Survival uses its own hazard generator; the phase
-layer is deterministic unless a separately specified diagnostic noise generator is added. In the
-first combined model, a survival commitment removes the parcel from the active phase graph, but
-phase cannot change the hazard, dose, lattice or acceptance rule. Under matched seeds and isolated
-random streams, baseline and phase-only must have identical survival and CPM trajectories;
-survival-only and combined must have identical deaths, dose histories and CPM trajectories.
-The implementation checks must compare these identities at each completed MCS and after restart.
-Combined phase output may differ from phase-only because mortality changes the active graph.
-Survivor count and graph connectivity must accompany coherence and relative-phase drift.
-Removing discordant parcels can raise coherence without any oscillator changing phase. The
-analysis therefore separates the coherence change at removal with phases held fixed from the
-subsequent phase update. It also follows fixed survivor cohorts and their unwrapped relative
-phases against a zero-coupling replay on the same geometry and removal schedule. Increased
-coherence alone cannot establish dynamical locking. Empty and singleton cohorts cannot yield a
-locking verdict. This tests joint execution and the effect of mortality on phase dynamics through
-the active graph. It does not test a biological
-phase--survival interaction. Any phase-dependent hazard or extra change to coupling weights is a
-new model requiring its own equation, evidence boundary and pre-registration. The complete arm,
-stream and outcome contract is recorded in
-\texttt{docs/research/survival\_phase\_factorial\_spec.md}. No arm has been run here.
+\subsection{Separate Nutrient-to-Biomass Growth Model}
+\label{app:synthetic_growth}
+
+The growth extension gives fitness explicit production and division observables without
+solving the original PSDE. Living parcel biomass obeys a discrete balance
+\begin{equation}
+ \Delta B_i=Y_s\Delta U_i-m_s B_i\Delta t, \qquad
+ u_i=B_iq_s\langle C/(K_s+C)\rangle_i,
+ \qquad V_i^*=B_i/(\rho_s\Delta V).
+\end{equation}
+Conservative no-flux diffusion and implicit nonnegative uptake determine one nutrient
+transfer $\Delta U_i$, used in both nutrient and biomass accounts. Maintenance satisfies
+its positivity bound. Inputs are synthetic: initial nutrient 4 per voxel, diffusivity
+0.1 lattice units squared/MCS, substep 0.1~MCS, $q_s=0.04$~MCS$^{-1}$, $K_s=0.5$,
+$Y_s=1$, $m_s=0.002$~MCS$^{-1}$ and $\rho_s=1$, for all species. The unit lattice
+spacing has no measured physical pitch. Initial biomass is 120 per parcel, even when
+initial actual volume differs from its target.
+
+Division requires biomass at least 240, age at least 10~MCS and two connected daughters
+of at least eight voxels. The existing deterministic geometric divider assigns new IDs
+and splits biomass in proportion to daughter volume. Daughters inherit phase and intrinsic
+frequency; this introduces correlation by construction. Dose since birth resets, while
+ancestral exposure is retained separately. Division retires the parent, so founder
+persistence is not a population-survival fraction. Dead biomass remains in place until
+removal and then enters the recorded sink. Nutrient and biomass budgets are checked
+separately in compatible synthetic units, with residual tolerance $10^{-6}$.
+
+\subsection{Execution, Restart and Export Contract}
+\label{app:synthetic_execution}
+
+The locally frozen protocol specifies four arms: baseline, survival only, phase only and
+combined. Growth off uses 256 seeds (42--297) through MCS 100; growth on uses 16 seeds
+(42--57) through MCS 200. Both use $N=40$ and six initial parcels per species.
+Growth versions are analysed separately. The local prediction commit precedes production;
+there is no external registration receipt. No parameter, seed set, threshold or window
+was tuned after production began.
+
+Each MCS executes mechanics, fields and growth, incremental dose, commitment, cleanup,
+division when enabled, graph construction and phase. Mechanical proposals retain the
+legacy schedule. At every boundary the baseline and phase-only nonphase states must
+match exactly, as must survival-only and combined, including random states and event
+histories. Every arm resumes from its midpoint and reproduces its second-half complete
+state, including phase, exactly. A failed first batch exposed removal-event ordering
+across dictionary serialization; it was stopped and excluded. Sorting enabled cleanup
+by parcel ID corrected the event order without changing the default core. The unchanged
+protocol was rerun from source \texttt{841d052}. This was not a deletion-during-iteration
+failure. Julia 1.12.6 and the exact source/configuration are required for these checkpoints.
+
+VTI CellData exports preserve Int64 identities, parcel-value semantics, validity masks,
+units and source-array hashes. PVD time is MCS. Repeated parcel biomass must not be summed
+over voxels; the density integral and deduplicated parcel total provide independent
+checks. Export and diagnostics consume no simulation randomness and must preserve the
+state hash. Seed 42 supplies every MCS; other seeds export start, midpoint and endpoint.
+A fixed ParaView layout shows species, a declared net-rate proxy, phase and dose rate.
+Screenshots do not establish locking. Independent VTK readback and fresh-process relocated
+ParaView reopening are separate acceptance checks.
+
+Seed-level uncertainty uses 5,000 bootstrap samples with analysis seed 9004. Missing paired
+radii are excluded with counts; no all-seed positional claim replaces an absent endpoint.
+The implementation, equations-to-code map, frozen inputs and receipts are in
+\texttt{diagnostics/fitness\_phase/}. Outcomes are appended only after complete execution.
 
 \subsection{Symplectic Integration}
 \label{app:symplectic}
@@ -1883,12 +1883,12 @@ Motility coeff. & $\mu_s$ & \textit{B.\ subtilis}      & $15$--$45$      & $\mu$
 Motility coeff. & $\mu_s$ & \textit{C.\ sphaerospermum}& $0.00$--$0.005$ & $\mu$m s$^{-1}$ & Hyphal extension; 0.1--5\,$\mu$m min$^{-1}$ tip growth & \cite{shunk2022} \\
 Motility coeff. & $\mu_s$ & \textit{S.\ oneidensis}    & $10$--$40$      & $\mu$m s$^{-1}$ & Polar flagellum; comparable to \textit{E.\ coli} & \cite{heidelberg2002} \\
 \midrule
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ neoformans}     & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Melanised; LD$_{10}$ $\sim$2--5\,kGy & \cite{dadachova2007,dadachova2008} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{D.\ radiodurans}    & $5\!\times\!10^{-6}$--$5\!\times\!10^{-5}$ & Gy$^{-1}$ & $D_{10}$ $\sim$12\,kGy; most radioresistant organism known & \cite{slade2011,daly2009} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{B.\ subtilis}       & $10^{-3}$--$5\!\times\!10^{-3}$  & Gy$^{-1}$ & Spore $D_{10}$ $\sim$1--2\,kGy; vegetative $\sim$0.2--0.6\,kGy & \cite{nicholson2000} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ sphaerospermum} & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Melanised Chernobyl isolate; $\approx$ \textit{C.\ neoformans} & \cite{zhdanova2000,shunk2022} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{A.\ niger}          & $5\!\times\!10^{-5}$--$5\!\times\!10^{-4}$ & Gy$^{-1}$ & Melanised; less resistant than Chernobyl isolates & \cite{dadachova2008} \\
-Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{S.\ oneidensis}     & $5\!\times\!10^{-2}$--$10^{-1}$  & Gy$^{-1}$ & $D_{10}$ $\sim$0.07\,kGy; extremely radiosensitive & \cite{daly2009} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ neoformans}     & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Unresolved lethality anchors; see provenance note & \cite{dadachova2004,khajo2011} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{D.\ radiodurans}    & $5\!\times\!10^{-6}$--$5\!\times\!10^{-5}$ & Gy$^{-1}$ & Review-based prior; primary not verified here & \cite{slade2011,daly2009} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{B.\ subtilis}       & $10^{-3}$--$5\!\times\!10^{-3}$  & Gy$^{-1}$ & Dry-spore X-ray $D_{10}=838.1\pm98.0$\,Gy; not vegetative & \cite{moeller2007} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{C.\ sphaerospermum} & $10^{-5}$--$10^{-4}$              & Gy$^{-1}$ & Assumed proxy; dose response not verified here & \cite{zhdanova2000,shunk2022} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{A.\ niger}          & $5\!\times\!10^{-5}$--$5\!\times\!10^{-4}$ & Gy$^{-1}$ & Conidial X-ray LD$_{90}$: 366\,Gy saline; 187\,Gy dry & \cite{cortesao2020} \\
+Ion.\ rad.\ sens. & $\beta_{s,\mathrm{ion}}$ & \textit{S.\ oneidensis}     & $5\!\times\!10^{-2}$--$10^{-1}$  & Gy$^{-1}$ & Review-based prior; primary not verified here & \cite{daly2009} \\
 \midrule
 Melanin rate & $\alpha_M$ & \textit{C.\ neoformans}     & $0.05$--$0.15$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & Substrate-dependent; enhanced by radiation & \cite{dadachova2007} \\
 Melanin rate & $\alpha_M$ & \textit{C.\ sphaerospermum} & $0.08$--$0.20$ & $\mu$g cell$^{-1}$ Gy$^{-1}$ & Constitutively melanised; high production rate & \cite{zhdanova2000,shunk2022} \\
@@ -1902,6 +1902,23 @@ Carrying cap. & $K_s$ & \textit{S.\ oneidensis}    & $10^5$--$10^7$ & cells mm$^
 Noise intensity  & $\sigma_s$ & All species & $0.001$--$0.05$ & ---           & Thermal and demographic stochasticity & \cite{campillo2017} \\
 \end{longtable}
 \end{landscape}
+
+% Correction SPECIES-NOTES-01: retain coefficients but qualify their biological rationale.
+\paragraph{Provenance of the sensitivity notes.}
+The biological notes in Table~\ref{tab:priors} are not fitted inputs. The CPM coefficient
+$\beta_{s,\mathrm{ion}}$ biases movement; it is not the survival sensitivity $\alpha_s$.
+The reviewed spore experiment reports $D_{10}=838.1\pm98.0$~Gy (mean and SD, $n=3$)
+for dry \textit{B. subtilis} spores; it supplies no vegetative $D_{10}$ \cite{moeller2007}.
+For \textit{C. neoformans}, approximately 10\% survival near 4~kGy
+\cite{dadachova2004} and later low-dose lethality claims
+\cite{dadachova2008pcmr,khajo2011} remain unresolved as a common calibration.
+An exponential through $D_{10}=4$~kGy predicts 81.3\% survival at 360~Gy, but neither
+that family nor interchangeable assay conditions follow from the endpoint. Khajo et al.
+measure melanin chemistry, not a new survival curve. For \textit{A. niger}, the cited
+endpoints concern conidia and cannot calibrate hyphal biomass \cite{cortesao2020}.
+Other unverified notes remain priors or proxies, not measured parcel sensitivities.
+No coefficient was changed by this source correction; the separate survival ensembles
+use explicitly assumed $\alpha_s$ values.
 
 % ---- References ---------------------------------------------
 \begin{thebibliography}{50}
@@ -1981,13 +1998,6 @@ Oxidative stress resistance in \textit{Deinococcus radiodurans}.
 \textit{Microbiology and Molecular Biology Reviews}, 75(1), 133--191.
 \url{https://doi.org/10.1128/MMBR.00015-10}
 
-\bibitem{hashimoto2016dsup}
-Hashimoto, T., et al. (2016).
-Extremotolerant tardigrade genome and improved radiotolerance of human cultured cells by
-tardigrade-unique protein.
-\textit{Nature Communications}, 7, 12808.
-\url{https://doi.org/10.1038/ncomms12808}
-
 \bibitem{clarkhachtel2024}
 Clark-Hachtel, C. M., Hibshman, J. D., De Buysscher, T., Stair, E. R., Hicks, L. M.,
 Goldstein, B. (2024).
@@ -2009,24 +2019,34 @@ The tardigrade damage suppressor protein Dsup promotes DNA damage in neurons.
 \textit{Molecular and Cellular Neuroscience}, 125, 103826.
 \url{https://doi.org/10.1016/j.mcn.2023.103826}
 
-\bibitem{anoud2024tdr1}
-Anoud, M., Delagoutte, E., Helleu, Q., et al. (2024).
-Comparative transcriptomics reveal a novel tardigrade-specific DNA-binding protein induced in
-response to ionizing radiation.
-\textit{eLife}, 13, RP92621.
-\url{https://doi.org/10.7554/eLife.92621}
+\bibitem{moeller2007}
+Moeller, R., Stackebrandt, E., Reitz, G., Berger, T., Rettberg, P., Doherty, A.J.,
+Horneck, G., Nicholson, W.L. (2007).
+Role of DNA repair by nonhomologous-end joining in \textit{Bacillus subtilis} spore
+resistance to extreme dryness, mono- and polychromatic UV, and ionizing radiation.
+\textit{Journal of Bacteriology}, 189(8), 3306--3311.
+\url{https://doi.org/10.1128/JB.00018-07}
 
-\bibitem{li2024trid1}
-Li, L., Ge, Z., Liu, S., et al. (2024).
-Multi-omics landscape and molecular basis of radiation tolerance in a tardigrade.
-\textit{Science}, 386(6720), eadl0799.
-\url{https://doi.org/10.1126/science.adl0799}
+\bibitem{cortesao2020}
+Cortes\~ao, M., de Haas, A., Unterbusch, R., Fujimori, A., Sch\"utze, T., Meyer, V., Moeller, R. (2020).
+\textit{Aspergillus niger} spores are highly resistant to space radiation.
+\textit{Frontiers in Microbiology}, 11, 560.
+\url{https://doi.org/10.3389/fmicb.2020.00560}
 
-\bibitem{sanchezmartinez2024cahs}
-Sanchez-Martinez, S., Nguyen, K., Biswas, S., et al. (2024).
-Labile assembly of a tardigrade protein induces biostasis.
-\textit{Protein Science}, 33(4), e4941.
-\url{https://doi.org/10.1002/pro.4941}
+\bibitem{dadachova2004}
+Dadachova, E., Howell, R.W., Bryan, R.A., Frenkel, A., Nosanchuk, J.D., Casadevall, A. (2004).
+Susceptibility of the human pathogenic fungi \textit{Cryptococcus neoformans} and
+\textit{Histoplasma capsulatum} to gamma-radiation versus radioimmunotherapy with alpha-
+and beta-emitting radioisotopes.
+\textit{Journal of Nuclear Medicine}, 45(2), 313--320.
+\url{https://pubmed.ncbi.nlm.nih.gov/14960655/}
+
+\bibitem{dadachova2008pcmr}
+Dadachova, E., Bryan, R.A., Howell, R.C., Schweitzer, A.D., Aisen, P., Nosanchuk, J.D., Casadevall, A. (2008).
+The radioprotective properties of fungal melanin are a function of its chemical composition,
+stable radical presence and spatial arrangement.
+\textit{Pigment Cell \& Melanoma Research}, 21(2), 192--199.
+\url{https://doi.org/10.1111/j.1755-148X.2007.00430.x}
 
 \bibitem{daly2009}
 Daly, M.J. (2009).
@@ -2190,13 +2210,6 @@ Guttenplan, S.B., Shaw, S., Kearns, D.B. (2013).
 The cell biology of peritrichous flagella in \textit{Bacillus subtilis}.
 \textit{Molecular Microbiology}, 87(1), 211--229.
 \url{https://doi.org/10.1111/mmi.12103}
-
-\bibitem{nicholson2000}
-Nicholson, W.L., et al. (2000).
-Resistance of \textit{Bacillus} endospores to extreme terrestrial and extraterrestrial
-environments.
-\textit{Microbiology and Molecular Biology Reviews}, 64(3), 548--572.
-\url{https://doi.org/10.1128/MMBR.64.3.548-572.2000}
 
 \bibitem{turick2011}
 Turick, C.E., et al. (2011).
