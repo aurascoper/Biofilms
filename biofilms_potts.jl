@@ -748,7 +748,7 @@ reference. Linear sites are Julia xyz indices, 1-based; proposal_index counts
 all N^3 attempts, including skipped attempts. The observer must be inert.
 """
 function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
-                   on_proposal = nothing, on_accepted = nothing)
+                   on_proposal = nothing, on_accepted = nothing, energy_terms = compute_delta_H_terms)
     p = state.params
     N = p.N
     lat = state.lattice
@@ -786,7 +786,7 @@ function mcs_step!(state::CPMState, rng::AbstractRNG; driver = nothing,
         end
 
         # 4. Compute ΔH
-        terms = compute_delta_H_terms(state, sx, sy, sz, tx, ty, tz)
+        terms = energy_terms(state, sx, sy, sz, tx, ty, tz)
         ΔH = terms.adh + terms.vol + terms.rad + terms.mel
 
         # Evaluated, not attempted: the skip conditions above have already
@@ -898,7 +898,7 @@ end
 Update melanin field M(x,y,z) via the reaction-diffusion law at manuscript label eq:melanin:
   ∂M/∂t = D_M ∇²M + α_M · n_RF(x) · I_γ(x)
 """
-function update_melanin!(state::CPMState)
+function update_melanin!(state::CPMState; active = nothing)
     p = state.params
     N = p.N
     dt = p.dt_field
@@ -915,7 +915,7 @@ function update_melanin!(state::CPMState)
         n_rf = rf_density(state.lattice, state.cells, x, y, z)
         σ = state.lattice[x, y, z]
         α = 0.0
-        if σ > 0 && haskey(state.cells, Int(σ))
+        if σ > 0 && haskey(state.cells, Int(σ)) && (active === nothing || Int(σ) in active)
             sp = state.cells[Int(σ)].species
             α = p.α_M_species[sp]
         end
@@ -931,7 +931,7 @@ Update nutrient field C(x,y,z):
   ∂C/∂t = D_C ∇²C - Σ_s uptake_s · n_s(x)
 Boundary: C = C_wall at wall sites.
 """
-function update_nutrient!(state::CPMState)
+function update_nutrient!(state::CPMState; active = nothing)
     p = state.params
     N = p.N
     dt = p.dt_field
@@ -945,7 +945,7 @@ function update_nutrient!(state::CPMState)
             continue
         end
         diff = p.D_C * laplacian_3d(C, x, y, z, N)
-        consumption = local_uptake(state.lattice, state.cells, p.uptake, x, y, z)
+        consumption = (active === nothing || Int(state.lattice[x,y,z]) in active) ? local_uptake(state.lattice, state.cells, p.uptake, x, y, z) : 0.0
         C_new[x, y, z] = max(0.0, C[x, y, z] + dt * (diff - consumption))
     end
 

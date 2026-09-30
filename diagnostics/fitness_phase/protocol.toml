@@ -1,0 +1,18 @@
+schema = "cpm-sp-plan-1"
+config_sha256 = "eb090aa3c0a971776a6e262713eb0cf5c130b53cf2b8d7720ad93dec19f50b01"
+freeze_utc = "2026-09-30T05:53:03.876385+00:00"
+registration = "local pre-outcome freeze; not external preregistration"
+[replication]
+first_seed = 42
+last_seed = 297
+horizon = 100
+dense_seeds = [42]
+[growth]
+first_seed = 42
+last_seed = 57
+horizon = 200
+dense_seeds = [42]
+[controls]
+first_seed = 7000
+last_seed = 7007
+horizon = 100
