@@ -15,9 +15,12 @@ This is the repository-built review draft. It is separate from the CopyDesk PDF 
 - a public-data ART and microbially influenced corrosion study plan; and
 - ART motif and mechanism questions for Ellen.
 
-The survival, protection, phase and four-arm sections are prospective
-specifications. No hazard, protection, repair, dormancy, phase or factorial
-result is reported.
+The survival, protection, phase and four-arm sections began as prospective
+specifications. The survival, passive-phase and growth parts were then
+implemented and executed from source `841d052` on 2026-09-30; their results
+are appended in `diagnostics/fitness_phase/PREDICTION.md`. The protection,
+repair and dormancy parts remain specifications, and no result is reported
+for them.
 
 ## Validation
 
@@ -30,8 +33,10 @@ result is reported.
 - the revised joint-exercise page and its following page were inspected after
   rendering. Figure 1 passed its render-staleness guards.
 
-These checks cover the documents and existing implementation. The paired
-survival/phase invariants and selection controls are specified for the future
-implementation; they have not been executed.
+These checks cover the documents and the implementation at the time of this
+package. The paired survival/phase invariants and selection controls were
+later executed from `841d052`: 272 of 272 seed records are paired-exact and
+restart-exact. That execution postdates this package; see
+`diagnostics/fitness_phase/PREDICTION.md`.
 
 The repository remains private. Access is available on request.
