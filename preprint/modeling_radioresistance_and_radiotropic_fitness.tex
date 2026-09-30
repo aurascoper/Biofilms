@@ -1452,7 +1452,7 @@ units and source-array hashes. PVD time is MCS. Repeated parcel biomass must not
 over voxels; the density integral and deduplicated parcel total provide independent
 checks. Export and diagnostics consume no simulation randomness and must preserve the
 state hash. Seed 42 supplies every MCS; other seeds export start, midpoint and endpoint.
-A fixed ParaView layout shows species, a declared net-rate proxy, phase and dose rate.
+A fixed ParaView layout shows species, a declared net-rate proxy, phase and dose rate. The proxy subtracts a whole-parcel mortality hazard from a biomass-specific growth rate; the two rates count different things, so their difference is not the growth rate of any quantity the model computes.
 Screenshots do not establish locking. Independent VTK readback and fresh-process relocated
 ParaView reopening are separate acceptance checks.
 

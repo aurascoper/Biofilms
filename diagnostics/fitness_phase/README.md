@@ -19,7 +19,7 @@ This standalone serial runner exercises defined synthetic mechanisms. It does no
 | Biomass | ΔB_i = Y_s ΔU_i − m_s B_i Δt | growth substeps; source/sink ledger includes removed corpses |
 | Target | V*_i = B_i/(rho_s voxel_volume) | side table `Parcel.target`; enabled serial volume energy only |
 | Division | minimum age, threshold biomass and two connected daughters | existing deterministic divider; conservative volume-proportional biomass split |
-| Net proxy | conditional growth rate minus instantaneous mortality hazard | `export.jl`; not realized biomass change or population fitness |
+| Net proxy | conditional growth rate minus instantaneous mortality hazard | `export.jl`; different currencies: a biomass-specific growth rate minus a whole-parcel death hazard, so the difference is not the growth rate of any model quantity, nor realized biomass change or population fitness |
 
 Within one MCS: validate → mechanics → fields/growth → incremental dose → commitment → physical cleanup → division when enabled → current graph → phase. Enabled mechanics records removals in ascending parcel-ID order so a restored dictionary cannot reorder events. No phase value enters mechanics, nutrient, melanin, survival or random streams. Daughter IDs are new; their phases and frequencies inherit the parent's values. Dose since birth resets and ancestral dose is retained separately. Equal daughter phases are an imposed inheritance rule.
 
