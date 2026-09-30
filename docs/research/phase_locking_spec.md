@@ -1,5 +1,7 @@
 # Phase locking as a passenger diagnostic
 
+Implementation status, 2026-09-30: the original design below is retained as a historical specification. The closed synthetic implementation, changes to its checkpoint/graph contract, frozen prediction and execution receipts are under `diagnostics/fitness_phase/` and `fitness_phase_implementation_review.md`. The legacy movement study and the original undefined PSDE terms retain their stated boundaries. Production is in progress; complete results are not yet claimed.
+
 This specification defines a phase calculation that can be attached to a CPM run without changing that run. It does not implement the phase layer, report a phase result, or discretise the manuscript's fitness-field equation.
 
 Status: design specification, 2026-09-29; paired invariants and selection analysis refined 2026-09-30. The reported CPM has no phase state. The first implementation must remain diagnostic: it reads parcel geometry after each completed CPM step and cannot write the lattice, fields, acceptance terms, parcel records, checkpoints or mechanical random-number generator.

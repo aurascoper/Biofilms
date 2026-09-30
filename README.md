@@ -2,6 +2,8 @@
 
 **Kinder & Faulkner** · manuscript draft, version 2.0, not submitted · source of record `preprint/modeling_radioresistance_and_radiotropic_fitness.tex`
 
+The movement results and calibration gates below describe the original CPM. A separate synthetic survival, passive phase and nutrient-growth implementation is documented in [diagnostics/fitness_phase](diagnostics/fitness_phase/README.md). Its frozen production run is in progress; it supplies no biological calibration and does not implement the original fitness-field PSDE.
+
 ## What this is
 
 A mechanistic modelling framework for a seven-species biofilm community under ionising radiation,

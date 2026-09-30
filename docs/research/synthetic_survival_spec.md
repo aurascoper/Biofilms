@@ -1,5 +1,7 @@
 # V3: specify synthetic survival and defer phase execution
 
+Implementation status, 2026-09-30: the original design below is retained as a historical specification. The closed synthetic implementation, changes to its checkpoint/graph contract, frozen prediction and execution receipts are under `diagnostics/fitness_phase/` and `fitness_phase_implementation_review.md`. The legacy movement study and the original undefined PSDE terms retain their stated boundaries. Production is in progress; complete results are not yet claimed.
+
 This specification separates loss of viable parcels from movement. It does not change the reported movement result or claim biological calibration.
 
 Status: corrected design, 2026-09-29; **not a production preregistration**. The accompanying patch validates physical dose and explicit response inputs. It implements no hazard, growth or phase stepper. The production sensitivity vector, analysis implementation and run manifest must be committed in a later PREDICTION before those experiments start. The existing coefficient, horizon and clustering studies retain their own protocols.
@@ -48,7 +50,7 @@ The first mechanism study adds a dimensionless factor `q_i` to the hazard,
 
 The unprotected control has `q_i = 1`; a protected synthetic parcel has a declared `0 < q_i < 1`. The physical dose map, clock, direct radiation acceptance term and melanin field stay fixed. The factor has no biological default. Clark-Hachtel et al. 2024 demonstrated that expression of *R. cf. varieornatus* Dsup increased *E. coli* CFU survival after one 2,180 Gy gamma exposure, whereas the *H. exemplaris* ortholog did not. That result establishes a bacterial-host phenotype and rejects a bacterial-impossibility claim. It also shows why a generic Dsup factor is invalid: the result is ortholog- and host-specific and provides no microbial dose response, D10, LD90 or protection ratio. A biological `q` remains deferred until it is measured for a matching ortholog, host, radiation regime and endpoint. Whole-tardigrade survival, cultured-cell DNA damage and yeast oxidative-stress survival cannot calibrate a microbial parcel directly.
 
-This contrast tests damage prevention only. TDR1 and TRID1 motivate a later explicit damage-and-repair state, while CAHS proteins motivate a separate osmotic-stress dormancy and recovery model. Biomolecular phase separation in those studies is not oscillator phase locking. The evidence boundary, controls and order of work are in `docs/research/tardigrade_protection_repair_spec.md`.
+This contrast is future work and is not part of the executed synthetic survival model. Repair and dormancy would need separate state models. The TDR1, TRID1 and CAHS evidence audit remains uncompleted; no parameters are drawn from those candidates. See `docs/research/tardigrade_protection_repair_spec.md` (correction TARDIGRADE-AUDIT-02).
 
 ## 3. Controls isolate the declared paths
 
