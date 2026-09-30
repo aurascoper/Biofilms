@@ -1,6 +1,6 @@
 # V3: specify synthetic survival and defer phase execution
 
-Implementation status, 2026-09-30: the original design below is retained as a historical specification. The closed synthetic implementation, changes to its checkpoint/graph contract, frozen prediction and execution receipts are under `diagnostics/fitness_phase/` and `fitness_phase_implementation_review.md`. The legacy movement study and the original undefined PSDE terms retain their stated boundaries. Production is in progress; complete results are not yet claimed.
+Implementation status, 2026-09-30: the original design below is retained as a historical specification. The closed synthetic implementation, changes to its checkpoint/graph contract, frozen prediction and execution receipts are under `diagnostics/fitness_phase/` and `fitness_phase_implementation_review.md`. The legacy movement study and the original undefined PSDE terms retain their stated boundaries. Production completed from source 841d052 on 2026-09-30; results are appended in `diagnostics/fitness_phase/PREDICTION.md` and summarised in the manuscript appendix on execution.
 
 This specification separates loss of viable parcels from movement. It does not change the reported movement result or claim biological calibration.
 

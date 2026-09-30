@@ -1,6 +1,6 @@
 # Prospective survival and phase factorial
 
-Implementation status, 2026-09-30: the original design below is retained as a historical specification. The closed synthetic implementation, changes to its checkpoint/graph contract, frozen prediction and execution receipts are under `diagnostics/fitness_phase/` and `fitness_phase_implementation_review.md`. The legacy movement study and the original undefined PSDE terms retain their stated boundaries. Production is in progress; complete results are not yet claimed.
+Implementation status, 2026-09-30: the original design below is retained as a historical specification. The closed synthetic implementation, changes to its checkpoint/graph contract, frozen prediction and execution receipts are under `diagnostics/fitness_phase/` and `fitness_phase_implementation_review.md`. The legacy movement study and the original undefined PSDE terms retain their stated boundaries. Production completed from source 841d052 on 2026-09-30; results are appended in `diagnostics/fitness_phase/PREDICTION.md` and summarised in the manuscript appendix on execution.
 
 This specification defines how to exercise the synthetic survival analogue and the phase passenger separately and together. It does not implement either layer or report a result.
 
