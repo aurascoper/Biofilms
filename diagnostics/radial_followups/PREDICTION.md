@@ -92,3 +92,35 @@ outputs. Record any later experiment as a new registration.
 Run implementation tests with `julia --project=. diagnostics/radial_followups/test_sweep.jl`
 and `python3 -m pytest diagnostics/radial_followups/tests/test_workflow.py`.
 The production command and resume scheduler are documented beside the producer.
+
+## Recorded result, 2026-09-29
+
+All 4,352 registered radial shards passed provenance, completeness, baseline,
+shape and finite-value checks at source revision
+`66ffe9fca8b463dad83088dc501daf23e1d7ed3d`.
+
+- P-beta failed its prediction: no tested factor through `10^6` met the inward
+  `-0.05 r/R` criterion. At `10^6`, the CN paired mean was
+  `-0.013697793 r/R`, with 95% interval
+  `[-0.0171072, -0.0102884]`.
+- P-alpha first crossed the registered boundary at `10^4`, with CN paired mean
+  `-0.081488789 r/R` and 95% interval
+  `[-0.0877778, -0.0751998]`. The crossing was lost at `10^6`, where the mean
+  was `-0.003125227 r/R`. Both coefficient grids were non-monotone.
+- H-400 supported its prediction. At the shipped coefficients and 400 MCS, the
+  CN full-minus-null paired mean was `+0.001496547 r/R`, with 95% interval
+  `[-0.0013332, +0.0043263]`, inside the declared band.
+
+The first alpha crossing is a tested grid result, not a continuous threshold or
+a calibrated coefficient. The run archive is
+`/home/aurascoper/Developer/Biofilms-runs/2026-09-29_66ffe9f/radial`.
+Named receipts are `SUMMARY.json` (SHA-256
+`5aac75bd9318bd4266f2a36578289b7861d7d203ed13ff70ac98966bd21d3fdb`),
+`ANALYSIS_RECEIPT.json`
+(`a326ff60862b665c2e5f6ddb13fff42dc5076b47602334de8c25950ca5ebebcb`),
+`BASELINE_VALIDATED.json`
+(`30fb8289a5740338bc3ba91cdc81a6252539e3c8cfbdceb6829b4a00a4e03ddb`),
+`QUEUE_PLAN.json`
+(`c3e858a364dd85b7300784514137f46ceab0bbce24dcafb49375fe0578cceb26`)
+and `QUEUE_STATUS.json`
+(`5b80a78b28a45e74a6bbadfb49c71e925ed9f9b51c0f95535579cf84a7af47ad`).

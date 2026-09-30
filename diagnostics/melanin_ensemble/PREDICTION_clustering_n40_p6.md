@@ -106,3 +106,27 @@ MCS, and seeds outside 42–297; their results cannot support this prediction.
 Even a successful result would show increased inter-parcel contact in this
 model under these declared coefficients. It would not establish adhesion in
 organisms, temporal retention, a biological mechanism, or radiotrophy.
+
+## Recorded result, 2026-09-29
+
+All 16 declared shards passed provenance, completeness, row-level contact
+reconstruction and baseline-radius checks at source revision
+`66ffe9fca8b463dad83088dc501daf23e1d7ed3d`.
+
+The compound prediction failed. Full minus no_mel gave a mean same-species
+boundary-contact difference of `-0.00130668` for CN and `-0.00348245` for CS.
+The one-sided exact sign-test p-values were `0.91270892` and `0.72389646`.
+Both paired-radius 90% intervals remained inside `+/-0.05 r/R`, but neither
+contact effect met the registered positive direction, minimum size or p-value.
+This result does not prove that the melanin path has no local effect.
+
+The run archive is
+`/home/aurascoper/Developer/Biofilms-runs/2026-09-29_66ffe9f/clustering`.
+Named receipts are `SUMMARY.txt` (SHA-256
+`33bd603f1fb0c549f66837be04d3dd57160762c0a2660a978c9af562dd4902fa`),
+`ANALYSIS_RECEIPT.json`
+(`66e6b26dc1c9ffd30e66852a5b2c7c1025681aacf4bd2d80ebf6b190e1f26b21`),
+`QUEUE_PLAN.json`
+(`f4368ded9d53699797e8129cada6a42a70ecb8596b200cb7a4ca59222d7de630`)
+and `QUEUE_STATUS.json`
+(`6b9ad4385f0b5536d7b2e5cdb815077288aef3d6c1a35b1da2634f532a50f18e`).

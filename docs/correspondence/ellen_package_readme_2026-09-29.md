@@ -6,7 +6,7 @@ This is the repository-built review draft. It is separate from the CopyDesk PDF 
 
 - completed coefficient, 400-MCS horizon and same-species-contact follow-ups;
 - corrected synthetic-survival specification with separate survival, survivor-radius and identified-parcel-displacement outcomes;
-- a Dsup-inspired protection contrast at fixed absorbed dose, with repair and dormancy deferred to their own state models;
+- a Dsup-inspired protection contrast at fixed absorbed dose, including the ortholog-specific bacterial result and the reason it does not supply a generic protection coefficient, with repair and dormancy deferred to their own state models;
 - a read-only phase passenger specification and its open evidence gates;
 - a public-data ART and microbially influenced corrosion study plan; and
 - ART motif and mechanism questions for Ellen.
@@ -16,8 +16,8 @@ The survival, protection and phase sections are prospective specifications. No h
 ## Validation
 
 - the full Julia test suite exited successfully;
-- the focused Python manuscript, claims, figure, vocabulary and scope guards passed;
+- all 675 Python calibration, manuscript, claims, figure, vocabulary and scope guards passed;
 - three consecutive `pdflatex` passes completed without undefined references; and
-- the revised result, future-work, survival, phase and reference pages were inspected after rendering.
+- Figure 1 passed its render-staleness guards, and the revised result, future-work, survival, phase and reference pages were inspected after rendering.
 
 The repository remains private. Access is available on request.

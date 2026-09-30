@@ -12,7 +12,7 @@
 #  has no trigger and no cell is ever removed. Radioresistance evidence
 #  motivates the per-species magnitudes below; it is not what the term computes.
 #
-#  Maps the paper's Hamiltonian (Eq. 2, Section 3.3) to CPM energy:
+#  Maps the paper's Hamiltonian (label eq:hamiltonian) to CPM energy:
 #    H_CPM = H_adhesion + H_volume + H_radiation + H_melanin
 #
 #  FOUR TERMS, NOT FIVE. compute_delta_H_terms returns (adh, vol, rad, mel) and
@@ -24,8 +24,8 @@
 #  was applied to README and not to this comment, because the ledger guard
 #  resolves a row's `document` column and nothing reads source comments.
 #
-#  Coupled fields (melanin, nutrient, radiation) updated each MCS
-#  per Eq. 7 (melanin RD) and Eq. 5 (radiation field).
+#  Coupled fields (melanin, nutrient, radiation) are updated each MCS.
+#  See manuscript labels eq:melanin and eq:gamma_field.
 #
 #  Pure Julia — requires only: LinearAlgebra, Statistics, Random, Printf
 # ============================================================
@@ -82,11 +82,11 @@ Base.@kwdef struct CPMParams
     λ_V::Float64 = 10.0                  # volume constraint strength (H_volume)
     V_target::Int = 120                  # target volume per cell (sites)
 
-    # --- Radiation field (Eq. 5: I_γ = I₀ exp(-κ‖x‖)) ---
+    # --- Radiation field (manuscript label eq:gamma_field) ---
     I0::Float64 = 1.0                    # source intensity at axis
     κ::Float64 = 2.0                     # attenuation coefficient
 
-    # --- Melanin diffusion (Eq. 7) ---
+    # --- Melanin diffusion (manuscript label eq:melanin) ---
     D_M::Float64 = 0.1                   # melanin diffusion coefficient
     dt_field::Float64 = 0.5              # time step for field updates
 
@@ -138,7 +138,7 @@ Base.@kwdef struct CPMParams
         0.01, 0.02, 0.01, 0.03, 0.01, 0.03, 0.02
     ]
 
-    # --- Pairwise mutualistic interaction (Eq. 3: V_ij = -γ exp(-r²/σ²)) ---
+    # --- Pairwise mutualistic interaction proposed in the manuscript ---
     γ_mutual::Float64 = 2.0              # attraction strength
     σ_mutual::Float64 = 10.0             # interaction range (lattice units)
 
@@ -183,7 +183,7 @@ function build_J_matrix()
         J[s, 1] = 16.0
     end
 
-    # Mutualistic pairs — lower J (attractive, from paper's V_ij Eq. 3)
+    # Mutualistic pairs — lower J (attractive, from the proposed V_ij form)
     mutualistic = [(CN, DR), (CN, CS), (CS, AN), (SO, OI), (DR, BS)]
     for (a, b) in mutualistic
         J[a + 1, b + 1] = 4.0
@@ -268,8 +268,8 @@ mutable struct CPMState
     cells::Dict{Int, CellInfo}
 
     # Coupled fields (same dimensions as lattice)
-    radiation::Array{Float64, 3}  # I_γ(x,y,z) — Eq. 5
-    melanin::Array{Float64, 3}    # M(x,y,z)   — Eq. 7
+    radiation::Array{Float64, 3}  # I_γ(x,y,z); manuscript label eq:gamma_field
+    melanin::Array{Float64, 3}    # M(x,y,z); manuscript label eq:melanin
     nutrient::Array{Float64, 3}   # C(x,y,z)
 
     # Cylinder mask: true = interior (updatable), false = wall
@@ -325,7 +325,7 @@ end
 
 """
 Initialize the radiation field: I_γ(r) = I₀ exp(-κ r/N).
-Radiation source along z-axis (center), attenuated radially (Eq. 5).
+Radiation source along z-axis (center), attenuated radially as in manuscript label eq:gamma_field.
 """
 function init_radiation!(state::CPMState)
     p = state.params
@@ -557,7 +557,7 @@ function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
     end
 
     # ---- H_radiation: β_{s,ion} * I_γ(r) per site ----
-    # (Eq. 5 + Table 2: negative β = drawn up the dose gradient)
+    # (analytic radiation field + parameter table: negative β = drawn up the dose gradient)
     ΔH_rad = 0.0
     I_local = state.radiation[tx, ty, tz]
     if σ_source > 0
@@ -570,7 +570,7 @@ function compute_delta_H_terms(state::CPMState, sx::Int, sy::Int, sz::Int,
     end
 
     # ---- H_melanin: α_M * M(x) modulates local energy ----
-    # (Eq. 7: melanin-rich sites are preferred by the radiotropic species —
+    # (melanin field: melanin-rich sites are preferred by the radiotropic species —
     #  again a spatial preference, not energy transduction)
     ΔH_mel = 0.0
     M_local = state.melanin[tx, ty, tz]
@@ -895,7 +895,7 @@ Returns uptake rate if cell present, else 0.
 end
 
 """
-Update melanin field M(x,y,z) via reaction-diffusion (Eq. 7):
+Update melanin field M(x,y,z) via the reaction-diffusion law at manuscript label eq:melanin:
   ∂M/∂t = D_M ∇²M + α_M · n_RF(x) · I_γ(x)
 """
 function update_melanin!(state::CPMState)
@@ -1019,7 +1019,7 @@ function update_centers_of_mass!(state::CPMState)
 end
 
 # ============================================================
-#  8. Pairwise interaction energy (Eq. 3)
+#  8. Pairwise interaction energy proposed in the manuscript
 #     V_ij = -γ exp(-r_ij²/σ²) for mutualistic pairs
 #     Computed between cell centers, not per-site.
 # ============================================================
@@ -1035,7 +1035,7 @@ const MUTUALISTIC_PAIRS = Set([
 
 """
 Total pairwise interaction energy between all cell pairs.
-V_ij^mutual = -γ exp(-r_ij²/σ²)  (Eq. 3)
+V_ij^mutual = -γ exp(-r_ij²/σ²)
 """
 function total_pairwise_energy(state::CPMState)
     p = state.params
