@@ -137,7 +137,7 @@ Base.@kwdef struct CPMParams
     uptake::Vector{Float64} = [
         0.01, 0.02, 0.01, 0.03, 0.01, 0.03, 0.02
     ]
-
+    K_C_monod::Float64 = 0.1   # Monod half-saturation of uptake, units of C_wall; see monod_factor
     # --- Pairwise mutualistic interaction proposed in the manuscript ---
     γ_mutual::Float64 = 2.0              # attraction strength
     σ_mutual::Float64 = 10.0             # interaction range (lattice units)
@@ -928,7 +928,7 @@ end
 
 """
 Update nutrient field C(x,y,z):
-  ∂C/∂t = D_C ∇²C - Σ_s uptake_s · n_s(x)
+  ∂C/∂t = D_C ∇²C - Σ_s uptake_s · n_s(x) · C/(K_C_monod + C)   (monod_factor)
 Boundary: C = C_wall at wall sites.
 """
 function update_nutrient!(state::CPMState; active = nothing)
@@ -945,7 +945,7 @@ function update_nutrient!(state::CPMState; active = nothing)
             continue
         end
         diff = p.D_C * laplacian_3d(C, x, y, z, N)
-        consumption = (active === nothing || Int(state.lattice[x,y,z]) in active) ? local_uptake(state.lattice, state.cells, p.uptake, x, y, z) : 0.0
+        consumption = (active === nothing || Int(state.lattice[x,y,z]) in active) ? local_uptake(state.lattice, state.cells, p.uptake, x, y, z) * monod_factor(C[x, y, z], p.K_C_monod) : 0.0
         C_new[x, y, z] = max(0.0, C[x, y, z] + dt * (diff - consumption))
     end
 
@@ -1705,10 +1705,28 @@ function compute_radial_biomass(state::CPMState, Nr::Int)
     return X_total, X_red
 end
 
+# ---- Monod saturation of nutrient uptake -----
+#
+# Uptake saturates in C: `uptake` is each species' MAXIMUM rate and consumption
+# is uptake_s * C/(K_C_monod + C). K_C_monod is the Monod half-saturation in
+# units of C_wall. DECLARED, not fitted, and physically unmapped: C_wall and
+# seconds_per_mcs have no physical scale, so a measured K_S cannot be converted
+# into it. Not the carrying capacity K_s of the preprint's Table 2
+# (claims_ledger PP-T2-21..24). Defined here, below the line-cited code, so that
+# adding it moved no citation.
+
+"""
+Monod saturation C/(K + C). K must be positive, so C = 0 gives exactly 0 and
+there is no 0/0 path.
+"""
+monod_factor(C, K) = K > 0 ? C / (K + C) :
+    throw(ArgumentError("K_C_monod must be > 0, got $K"))
+
 # ---- Coupled nutrient update (P_eff scales wall supply) -----
 
 """
-Like update_nutrient! but the wall boundary is scaled by membrane integrity m(t).
+Like update_nutrient! (same Monod uptake) but the wall boundary is scaled by
+membrane integrity m(t).
 Membrane damage reduces the effective nutrient import from outside.
 """
 function update_nutrient_coupled!(state::CPMState, m::Float64)
@@ -1727,7 +1745,8 @@ function update_nutrient_coupled!(state::CPMState, m::Float64)
             continue
         end
         diff = p.D_C * laplacian_3d(C, x, y, z, N)
-        consumption = local_uptake(state.lattice, state.cells, p.uptake, x, y, z)
+        consumption = local_uptake(state.lattice, state.cells, p.uptake, x, y, z) *
+                      monod_factor(C[x, y, z], p.K_C_monod)
         C_new[x, y, z] = max(0.0, C[x, y, z] + dt * (diff - consumption))
     end
 

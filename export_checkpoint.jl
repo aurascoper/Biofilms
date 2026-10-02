@@ -282,6 +282,14 @@ function restore_restart_checkpoint(SR, path; allow_version_mismatch::Bool = fal
                   "RNG state is version-pinned (allow_version_mismatch=true to override)")
         end
 
+        # _read_params fills an absent field with the struct default, so a
+        # checkpoint written before Monod uptake would resume under it, not
+        # bit-exactly. Refuse instead; there is no override, because absence
+        # cannot say which uptake law the run used.
+        haskey(f, "cpm_params/K_C_monod") || error(
+            "restart checkpoint has no cpm_params/K_C_monod: it predates Monod " *
+            "nutrient uptake, a model change, and cannot be resumed bit-exactly " *
+            "under the current dynamics")
         params = _read_params(SR, f, "cpm_params", :CPMParams)
         rp = _read_params(SR, f, "rd_params", :RadiolysisParams)
 
