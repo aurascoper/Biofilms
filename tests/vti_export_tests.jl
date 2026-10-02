@@ -325,3 +325,72 @@ end
     @test_throws ArgumentError export_transport_series(SR, sim3, d; every = 0, n_mcs = 4)
     @test_throws ArgumentError export_transport_series(SR, sim3, d; every = 5, n_mcs = 4)
 end
+
+@testset "restart companions: same state, same basename, nutrient carried exactly" begin
+    simr = SR.init_coupled_simulation(p, rp; seed = 9)
+    d = joinpath(tmp, "companion_snaps"); r = joinpath(tmp, "companion_restarts")
+    paths = export_transport_series(SR, simr, d; every = 2, n_mcs = 4, restart_dir = r)
+    @test basename.(paths) == ["snap_mcs000002.h5", "snap_mcs000004.h5"]
+    @test sort(readdir(r)) == basename.(paths)
+    for q in paths
+        rq = joinpath(r, basename(q))
+        @test h5open(g -> Int(read(attributes(g)["mcs"])), rq, "r") ==
+              h5open(g -> Int(read(attributes(g)["mcs"])), q, "r")
+    end
+
+    written = export_series(d, joinpath(tmp, "companion_run"); restart_dir = r)
+    @test length(written) == 2
+    for (q, w) in zip(paths, written)
+        cd = get_cell_data(VTKFile(w))
+        @test "nutrient" in keys(cd)
+        nut_vti = reshape(get_data(cd["nutrient"]), N)
+        @test nut_vti == h5open(g -> read(g["fields/nutrient"]), joinpath(r, basename(q)), "r")
+        @test vti_field_string(w, "nutrient_uptake_model") == "Monod"
+        fd = get_field_data(VTKFile(w))
+        @test only(get_data(fd["K_C_monod"])) == p.K_C_monod
+        @test only(get_data(fd["C_wall"])) == p.C_wall
+        @test occursin("not a physical concentration", vti_field_string(w, "nutrient_basis"))
+    end
+
+    # The two directories cannot be one: companions share basenames.
+    @test_throws ArgumentError export_transport_series(SR, SR.init_coupled_simulation(p, rp; seed = 9),
+                                                       joinpath(tmp, "one_dir"); every = 2, n_mcs = 2,
+                                                       restart_dir = joinpath(tmp, "one_dir", "."))
+end
+
+@testset "a restart from another run at the same mcs and size is refused" begin
+    # The mcs and size checks alone pass this pair; only the state can tell.
+    other_run = SR.init_coupled_simulation(p, rp; seed = 10)
+    SR.advance_window!(other_run, 2)
+    wrong = joinpath(tmp, "restart_wrong_run.h5")
+    export_restart_checkpoint(SR, other_run, wrong)
+    @test h5open(g -> Int(read(attributes(g)["mcs"])), wrong, "r") ==
+          h5open(g -> Int(read(attributes(g)["mcs"])), snap, "r")
+    err = try
+        export_vti(snap, joinpath(tmp, "wrong_run"); restart = wrong); nothing
+    catch e
+        sprint(showerror, e)
+    end
+    @test err !== nothing && occursin("another run", err)
+    @test !isfile(joinpath(tmp, "wrong_run.vti"))
+end
+
+@testset "a pre-Monod restart is labelled unrecorded, never inferred as Monod" begin
+    same = joinpath(tmp, "restart_same_premonod.h5")
+    export_restart_checkpoint(SR, sim, same)
+    h5open(g -> delete_object(g, "cpm_params/K_C_monod"), same, "r+")
+    export_vti(snap, joinpath(tmp, "premonod"); restart = same)
+    w = joinpath(tmp, "premonod.vti")
+    @test startswith(vti_field_string(w, "nutrient_uptake_model"), "unrecorded")
+    @test isnan(only(get_data(get_field_data(VTKFile(w))["K_C_monod"])))
+end
+
+@testset "without restart_dir the series writes snapshots only, as before" begin
+    d = joinpath(tmp, "no_companions")
+    paths = export_transport_series(SR, SR.init_coupled_simulation(p, rp; seed = 9), d;
+                                    every = 2, n_mcs = 4)
+    @test sort(readdir(d)) == basename.(paths)
+    written = export_series(d, joinpath(tmp, "no_companions_run"))
+    @test !("nutrient" in keys(get_cell_data(VTKFile(first(written)))))
+    @test vti_field_string(first(written), "nutrient_uptake_model") === nothing
+end

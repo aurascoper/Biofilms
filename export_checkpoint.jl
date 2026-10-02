@@ -407,11 +407,21 @@ end
 One run, a transport snapshot every `every` MCS up to `n_mcs` (and at `n_mcs` itself
 if it is not a multiple), written as `dir/snap_mcsNNNNNN.h5`. The files carry their
 own `mcs` attribute, which is what `export_vti.jl` keys a `.pvd` on. Returns the paths.
+
+With `restart_dir`, each frame also writes a restart checkpoint of the same state
+under the same basename there: the companion `export_vti.jl --restart-dir` reads
+the nutrient field from, since the transport snapshot does not carry it.
 """
 function export_transport_series(SR, sim, dir; every::Int, n_mcs::Int, config_toml_path = nothing,
-                                 cpm_seed = nothing)
+                                 cpm_seed = nothing, restart_dir = nothing)
     every >= 1 || throw(ArgumentError("every must be >= 1, got $every"))
     n_mcs >= every || throw(ArgumentError("n_mcs=$n_mcs is below every=$every; nothing would be written"))
+    if restart_dir !== nothing
+        same(a, b) = rstrip(normpath(abspath(a)), '/') == rstrip(normpath(abspath(b)), '/')
+        same(restart_dir, dir) && throw(ArgumentError("restart_dir is the snapshot directory; " *
+            "companions share basenames, so each restart would overwrite its snapshot"))
+        mkpath(restart_dir)
+    end
     mkpath(dir)
     paths = String[]
     done = 0
@@ -421,6 +431,9 @@ function export_transport_series(SR, sim, dir; every::Int, n_mcs::Int, config_to
         done += step
         path = joinpath(dir, "snap_mcs$(lpad(done, 6, '0')).h5")
         export_transport_snapshot(SR, sim, path; config_toml_path, cpm_seed)
+        # Same state: nothing advances between the two writes.
+        restart_dir === nothing ||
+            export_restart_checkpoint(SR, sim, joinpath(restart_dir, basename(path)))
         push!(paths, path)
     end
     return paths
@@ -429,7 +442,7 @@ end
 function _cli(args)
     length(args) >= 2 || begin
         println("usage: export_checkpoint.jl <transport|restart> <out.h5> [--config cfg.toml] [--seed N] [--mcs N]")
-        println("       export_checkpoint.jl transport <out_dir> --every K [--mcs N] [--seed N] [--config cfg.toml]")
+        println("       export_checkpoint.jl transport <out_dir> --every K [--mcs N] [--seed N] [--config cfg.toml] [--restart-dir d]")
         exit(1)
     end
     mode, out = args[1], args[2]
@@ -441,13 +454,17 @@ function _cli(args)
     n_mcs = parse(Int, getopt("--mcs", "20"))
     cfg = getopt("--config", nothing)
     every = getopt("--every", nothing)
+    restart_dir = getopt("--restart-dir", nothing)
+    # Refused, not ignored: a flag that silently does nothing reads as done.
+    restart_dir === nothing || (mode == "transport" && every !== nothing) ||
+        error("--restart-dir writes restart companions for `transport <dir> --every K` only")
 
     SR = load_serial()
     Base.invokelatest(_cli_export, SR, mode, out, cfg, seed, n_mcs,
-                      every === nothing ? nothing : parse(Int, every))
+                      every === nothing ? nothing : parse(Int, every), restart_dir)
 end
 
-function _cli_export(SR, mode, out, cfg, seed, n_mcs, every = nothing)
+function _cli_export(SR, mode, out, cfg, seed, n_mcs, every = nothing, restart_dir = nothing)
     sim = SR.init_coupled_simulation(
         SR.CPMParams(N = 20, n_cells_per_species = 2, snapshot_interval = 100),
         # basis_gate_ack: this CLI exports an interchange artifact rather than
@@ -460,9 +477,11 @@ function _cli_export(SR, mode, out, cfg, seed, n_mcs, every = nothing)
     if every !== nothing
         mode == "transport" || error("--every writes transport snapshots only")
         paths = export_transport_series(SR, sim, out; every, n_mcs, config_toml_path = cfg,
-                                        cpm_seed = seed)
+                                        cpm_seed = seed, restart_dir)
         @printf("wrote %d transport snapshots to %s (every %d MCS to %d, seed=%d)\n",
                 length(paths), out, every, n_mcs, seed)
+        restart_dir === nothing ||
+            @printf("wrote %d restart companions to %s\n", length(paths), restart_dir)
         return
     end
     SR.advance_window!(sim, n_mcs)

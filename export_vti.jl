@@ -18,6 +18,8 @@
 #   lineage_id, generation, interior_mask, radiation_cpm, melanin  as stored
 #   accumulated_dose_Gy      as stored; physical Gy, zero until a dose was imported
 #   nutrient                 only with --restart (the snapshot does not carry it)
+#                            and only from the same run: mcs, git_sha, cell_id,
+#                            interior_mask and melanin must match the snapshot
 #   dose_rate_mean_Gy_s      only with --dose (transport_result_*.h5, mesh/dose_rate_mean_Gy_s), labelled
 #                            from that file's own source_rate_photons_per_s and target_calibration attributes
 using HDF5, WriteVTK
@@ -76,11 +78,36 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
         end
         mcs = Int(read(a["mcs"]))
         if restart !== nothing
-            nut, rmcs = h5open(g -> (read(g["fields/nutrient"]), Int(read(attributes(g)["mcs"]))), restart, "r")
-            rmcs == mcs || throw(ArgumentError("restart $restart is at mcs=$rmcs, the snapshot at mcs=$mcs; " *
-                                               "a nutrient field from another time is not this snapshot's"))
-            size(nut) == N || throw(ArgumentError("restart nutrient field $(size(nut)) is not the lattice $N"))
-            vtk["nutrient", VTKCellData()] = nut
+            h5open(restart, "r") do g
+                ga = attributes(g)
+                rmcs = Int(read(ga["mcs"]))
+                rmcs == mcs || throw(ArgumentError("restart $restart is at mcs=$rmcs, the snapshot at mcs=$mcs; " *
+                                                   "a nutrient field from another time is not this snapshot's"))
+                nut = read(g["fields/nutrient"])
+                size(nut) == N || throw(ArgumentError("restart nutrient field $(size(nut)) is not the lattice $N"))
+                # Same time and size do not make the same run: another seed at
+                # this mcs passes both. Require the state both files carry.
+                if haskey(a, "git_sha") && haskey(ga, "git_sha")
+                    s1, s2 = String(read(a["git_sha"])), String(read(ga["git_sha"]))
+                    s1 == s2 || throw(ArgumentError("restart $restart was written at git_sha $s2, " *
+                                                    "the snapshot at $s1"))
+                end
+                for ds in ("lattice/cell_id", "lattice/interior_mask", "fields/melanin")
+                    read(g[ds]) == read(f[ds]) || throw(ArgumentError("restart $restart differs from the " *
+                        "snapshot in $ds at the same mcs: it is another run's state"))
+                end
+                vtk["nutrient", VTKCellData()] = nut
+                # Stated from the restart's own parameters, never inferred from
+                # the source tree that happens to be checked out.
+                monod = haskey(g, "cpm_params/K_C_monod")
+                vtk["nutrient_uptake_model", VTKFieldData()] = monod ? "Monod" :
+                    "unrecorded: restart predates Monod uptake"
+                vtk["K_C_monod", VTKFieldData()] = monod ? Float64(read(g["cpm_params/K_C_monod"])) : NaN
+                vtk["C_wall", VTKFieldData()] = haskey(g, "cpm_params/C_wall") ?
+                    Float64(read(g["cpm_params/C_wall"])) : NaN
+                vtk["nutrient_basis", VTKFieldData()] = "model concentration scale in units of C_wall; " *
+                    "not a physical concentration, and K_C_monod is declared, not fitted"
+            end
         end
         if dose !== nothing
             d, label = h5open(dose, "r") do g
