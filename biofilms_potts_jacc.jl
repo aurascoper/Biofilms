@@ -247,15 +247,15 @@ function melanin_k!(i, j, k, M, Mn, lat, spec, αv, rad, N, dt::Float32, D_M::Fl
     return nothing
 end
 
-# ∂C/∂t = D_C ∇²C - uptake(species)   (wall pinned to m·C_wall)
+# ∂C/∂t = D_C ∇²C - uptake(species)·C/(K_C+C)   (wall pinned to m·C_wall; K_C > 0 via _monod_K)
 function nutrient_k!(i, j, k, C, Cn, lat, spec, upt, N, dt::Float32,
-        D_C::Float32, C_wall_eff::Float32)
+        D_C::Float32, C_wall_eff::Float32, K_C::Float32)
     σ = lat[i, j, k]
     if σ == Int32(-1)
         Cn[i, j, k] = C_wall_eff
         return nothing
     end
-    u = σ > Int32(0) ? upt[Int(spec[σ])] : 0.0f0
+    u = σ > Int32(0) ? upt[Int(spec[σ])] * C[i, j, k] / (K_C + C[i, j, k]) : 0.0f0
     Cn[i, j, k] = max(0.0f0, C[i, j, k] +
         dt * (D_C * lap6(C, i, j, k, N) - u))
     return nothing
@@ -501,7 +501,7 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
         n_mcs::Int = 100, seed::Int = 42, snapshot_interval::Int = 20,
         T_cpm = 5.0f0, λ_V = 10.0f0, V_target = Int32(120),
         I0 = 1.0, κ = 2.0, D_M = 0.1f0, dt_field = 0.5f0,
-        D_C = 0.2f0, C_wall = 1.0f0, rp = RadiolysisParams(), verbose = true,
+        D_C = 0.2f0, C_wall = 1.0f0, K_C_monod = 0.1f0, rp = RadiolysisParams(), verbose = true,
         uptake = UPTAKE, color_order = 0:7, on_sweep = nothing,
         on_nutrient = nothing)
     @assert iseven(N) "checkerboard requires even N"
@@ -576,7 +576,7 @@ function run_coupled(; N::Int = 40, n_cells_per_species::Int = 6,
         mel, mel2 = mel2, mel
         JACC.parallel_for((N, N, N), nutrient_k!,
             nut, nut2, lat, spec, upt, Int32(N), dt_field, D_C,
-            Float32(rd.m) * C_wall)
+            Float32(rd.m) * C_wall, _monod_K(K_C_monod))
         nut, nut2 = nut2, nut
         on_nutrient === nothing || on_nutrient(mcs, JACC.to_host(nut))
 
@@ -625,6 +625,9 @@ function load_serial()
     return SerialRef
 end
 
+# A kernel cannot throw, so the Monod half-saturation is checked on the host.
+_monod_K(K) = K > 0 ? Float32(K) : throw(ArgumentError("K_C_monod must be > 0, got $K"))
+
 function selftest(SerialRef::Module)
     p = SerialRef.CPMParams(N = 40, n_cells_per_species = 6)
     st = SerialRef.init_state(p; seed = 42)
@@ -669,7 +672,8 @@ function selftest(SerialRef::Module)
     JACC.parallel_for((N, N, N), melanin_k!, mel, mel2, lat, spec,
         JACC.array(ALPHA_M), JACC.array(rad_h), Int32(N), 0.5f0, 0.1f0)
     JACC.parallel_for((N, N, N), nutrient_k!, nut, nut2, lat, spec,
-        JACC.array(UPTAKE), Int32(N), 0.5f0, 0.2f0, Float32(0.9))
+        JACC.array(UPTAKE), Int32(N), 0.5f0, 0.2f0, Float32(0.9),
+        _monod_K(p.K_C_monod))
 
     copyto!(st.nutrient, nut_h)  # ensure identical starting field
     SerialRef.update_melanin!(st)

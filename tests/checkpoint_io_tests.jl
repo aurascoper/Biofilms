@@ -53,6 +53,30 @@ let
     @test restore_restart_checkpoint(SR, current).rd.basis_from_occupancy === true
 end
 
+# ---------- a pre-Monod checkpoint is refused, not resumed under Monod ----------
+
+let
+    # _read_params fills a missing CPMParams field with its default, so without
+    # the refusal a zero-order checkpoint would silently resume under Monod.
+    sim = SR.init_coupled_simulation(p, rp; seed = 12)
+    SR.advance_window!(sim, 2)
+    current = joinpath(tmp, "current_monod.h5")
+    export_restart_checkpoint(SR, sim, current)
+    @test h5open(g -> read(g["cpm_params/K_C_monod"]), current, "r") == p.K_C_monod
+    @test restore_restart_checkpoint(SR, current).state.params.K_C_monod == p.K_C_monod
+
+    pre_monod = joinpath(tmp, "pre_monod.h5")
+    cp(current, pre_monod)
+    h5open(f -> delete_object(f, "cpm_params/K_C_monod"), pre_monod, "r+")
+    err = try
+        restore_restart_checkpoint(SR, pre_monod); nothing
+    catch e
+        sprint(showerror, e)
+    end
+    @test err !== nothing
+    @test occursin("predates Monod", err)
+end
+
 # ---------- the exported file declares a gated basis (rule 4) ----------
 
 let
