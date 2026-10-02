@@ -332,6 +332,70 @@ a dependency loaded through a macro, and reporting that absence as general was w
 The practical consequence: removing it locally unblocks `instantiate` on Apple Silicon **and
 disables the AMDGPU backend**. That is fine for a macOS run and is not a safe permanent edit.
 
+## macOS / Apple Silicon, 2026-10-02 — Monod nutrient + field renders
+
+This run carries the nutrient field through a series for the first time and renders melanin
+and nutrient as fields, on the same machine class as the 2026-09-11 record (macOS 27.0.1,
+arm64, Julia 1.12.6, ParaView 6.1.1). Every artifact came from commit 2c808ee on a clean
+tree, so the `git_sha` each snapshot carries names the code that produced it; all eight
+`.vti` files were checked to carry that SHA. Nutrient uptake in that commit is
+Monod-saturating, `uptake_s * C/(K_C_monod + C)` with `K_C_monod = 0.1` in units of `C_wall`,
+a declared value. The Julia environment was the repository project with its gitignored
+`Manifest.toml` resolved in place (sha256 `b0a0e5fe…c111`, `Project.toml` `ad1a3bd4…a133`,
+tracked files unchanged). AMDGPU resolved and precompiled on darwin here with an MIOpen
+warning, so the local removal the 2026-09-11 section describes was not needed on this machine.
+
+| Step | Command | Result |
+|---|---|---|
+| series | `export_checkpoint.jl transport <run>/snaps --every 5 --mcs 40 --restart-dir <run>/restarts` | 8 snapshots and 8 restart companions, identical basenames, 7.86 s |
+| export | `export_vti.jl <run>/snaps <run>/vtk/lattice --restart-dir <run>/restarts` | 8 `.vti` and one `.pvd`, timesteps exactly 5, 10, …, 40, 6.46 s |
+| species | `pvpython viewer/paraview_species.py <pvd> <out>` | 8 frames and `species_view.pvsm`, 5.86 s, script unmodified |
+| melanin | `pvpython viewer/paraview_fields.py <pvd> <out> melanin` | 8 frames, state and report, 8.33 s |
+| nutrient | `pvpython viewer/paraview_fields.py <pvd> <out> nutrient` | 8 frames, state and report, 8.20 s |
+
+Each `.vti` holds nine cell arrays, the eight of the earlier record plus `nutrient`, and in
+each the nutrient array equals its restart companion's `fields/nutrient` exactly. The field
+data states `nutrient_uptake_model = Monod`, `K_C_monod = 0.1` and `C_wall` from the restart's
+own parameters, and a basis string saying the field is on the model concentration scale. The
+exporter now attaches a restart only when its `git_sha`, `cell_id`, `interior_mask` and
+melanin match the snapshot, because a restart from another seed at the same MCS and size
+passed the old mcs-and-size check.
+
+`paraview_species.py` ran unchanged. None of the four macOS pitfalls recorded on 2026-09-11
+fired: it never calls `GetLayout`, uses no Viridis preset, never probes ray tracing, and sets
+its own text colours. No `[openvkl]` line appeared on stderr in any of the five invocations,
+so the earlier observation that every run prints it does not hold for this configuration.
+`paraview_fields.py` follows the 2026-09-11 `build_views.py` mechanics and slices a y-z plane
+through the domain centre (10, 10, 10), normal (1, 0, 0), which contains the cylinder axis,
+after thresholding `interior_mask == 1`. Its colour range is the global range over all
+frames, measured before rendering: melanin 0 to 1.7725, nutrient 0.10148 to 0.98756. A first
+version set that range before `ColorBy`, which rescales to the data in view; the reopened
+state showed a nutrient minimum of 0.1062 and a melanin maximum of 0.288 against global
+1.7725, and the PNGs carried the drifted range. The script now re-locks the range after every
+`ColorBy` and asserts it at each frame.
+
+The volume view is the original ImageData with the original cell array.
+`VolumeRenderingMode` read back as `GPU Based` after being set, which is the mode the
+representation accepted, not proof of which mapper ran; the cell-to-point fallback did not
+fire. Sites outside the cylinder sit near `C_wall`, the nutrient maximum, and drew an opaque
+box over the interior, so volume opacity comes from `interior_mask` as a separate opacity
+array (0 outside, 0.06 inside) while colour stays on the field. Ray tracing was off at render
+time in both views, as set, which a reloaded state cannot show.
+
+Controls. On the data side, nutrient changed between MCS 5 and 40 by at most 0.233; the mean
+over occupied sites fell from 0.421 to 0.353 and over unoccupied interior sites from 0.747 to
+0.716. That is a changing exported field. It does not show that the uptake law is Monod; the
+model's own tests establish that. On the image side, a fixed crop of each view that excludes
+the caption and scalar bar was at least 79% non-background in every field frame and 42% in
+every species frame, and the first and last crops differ in both nutrient views. Each saved
+state was reopened in a fresh `pvpython`: the two field states passed eleven checks each
+(reader path, timesteps, cell array, two views, slice origin and normal, locked LUT range,
+volume association) and the species state four.
+
+Coordinates are lattice sites and both fields are model-scale. Nothing here calibrates a
+nutrient concentration, a time per MCS or a length per site, and the run makes no empirical
+claim about Monod kinetics.
+
 ## Open decisions
 
 - `feat/visualize-3d` on origin: to be deleted after #25 merges; its commit stays reachable at
