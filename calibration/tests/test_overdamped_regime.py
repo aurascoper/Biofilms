@@ -48,7 +48,13 @@ PRODUCER = REPO / "analysis" / "overdamped_regime.py"
 # 1449-1462 until the protected-phenotype contract was added to Appendix A.2.
 # 1492-1505 until the synthetic-extension outcome paragraph was added above it, 2026-09-30.
 # 1506-1519 until the selection-versus-movement sentences were added to Phenotype Boundary.
-FIRST_LINE, LAST_LINE = 1513, 1526
+# 1513-1526 until the review citations merged as #72 (3954094, 2026-10-07) added 21 lines
+# above it in four hunks (482, 783, 1018, 1344: +6, +5, +6, +4); the paragraph is unchanged
+# and the window follows it. That merge reached master with this assertion red.
+# Of this file's tests only the three that call paragraph() read the window; the rest read
+# the producer's receipt against ACCOUNTED and are position-independent by design, so they
+# do not count toward the paragraph claim. The misplaced-window controls below measure that.
+FIRST_LINE, LAST_LINE = 1534, 1547
 UM = 1e-6
 
 # The one span whose literals are structural. Matched as text, so it moves with the
@@ -85,14 +91,14 @@ FIRST_ANCHOR = r"\emph{And the absence is appropriate"
 LAST_ANCHOR = "reproduces every number in this paragraph."
 
 
-def paragraph() -> str:
+def paragraph(first: int = FIRST_LINE, last: int = LAST_LINE) -> str:
     lines = TEX.read_text(encoding="utf-8").splitlines()
-    para = "\n".join(lines[FIRST_LINE - 1:LAST_LINE])
+    para = "\n".join(lines[first - 1:last])
     assert para.lstrip().startswith(FIRST_ANCHOR), (
-        f"lines {FIRST_LINE}-{LAST_LINE} no longer start the overdamped paragraph; "
+        f"lines {first}-{last} no longer start the overdamped paragraph; "
         "the section moved and the range must be re-anchored deliberately")
     assert para.rstrip().endswith(LAST_ANCHOR), (
-        f"lines {FIRST_LINE}-{LAST_LINE} no longer end the overdamped paragraph")
+        f"lines {first}-{last} no longer end the overdamped paragraph")
     return para
 
 
@@ -268,3 +274,12 @@ def test_the_unit_group_guard_and_the_sign_both_detect_their_defect():
     assert [v for v, _ in literals(r"$-5\times10^{-5}$")] == [-5e-5]
     assert [v for v, _ in literals(r"$-10^{-3}$")] == [-1e-3]
     assert [v for v, _ in literals(r"$2\times10^{-5}$")] == [2e-5]     # unsigned unchanged
+
+
+# Planted defects: the window pointed where the paragraph used to be (-21, the stale window
+# #72 left behind), and one line early or late. Each must be refused, or the three tests
+# above that read the paragraph could pass on unrelated text without anyone noticing.
+@pytest.mark.parametrize("offset,anchor", [(-21, "start"), (-1, "end"), (+1, "start")])
+def test_control_a_misplaced_window_is_refused(offset, anchor):
+    with pytest.raises(AssertionError, match=f"no longer {anchor}"):
+        paragraph(FIRST_LINE + offset, LAST_LINE + offset)
