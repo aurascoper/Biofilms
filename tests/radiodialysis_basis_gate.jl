@@ -209,8 +209,8 @@
         # line break, or a field assignment all opened the gate while the census
         # stayed green -- a check asserting a bound it could not enforce.
         #
-        # This parses instead.  _opens_gate walks the Julia AST for assignments
-        # to basis_gate_ack in any syntactic form.
+        # This parses instead.  _ack_opening_count walks the Julia AST for
+        # every assignment that opens basis_gate_ack in any syntactic form.
         #
         # SCOPE, stated rather than implied: this is a STATIC check.  A value
         # computed at runtime and splatted in (`RadiolysisParams(; kw...)`) is
@@ -218,8 +218,11 @@
         # establish is that no site opens the gate by writing the field
         # directly, in any spelling.  The known-bad fixtures below prove it
         # catches each form rather than passing because it matches nothing.
-        function _opens_gate(ex)
-            hit = false
+        #
+        # Count occurrences rather than returning a Boolean: reducing the AST
+        # to a hit/no-hit flag would repeat the census defect at the next level.
+        function _ack_opening_count(ex)
+            count = 0
             walk(e) = begin
                 if e isa Expr
                     if e.head === :kw || e.head === :(=)
@@ -235,7 +238,9 @@
                         # see -- counts as opening the gate and must be listed.
                         forwards = rhs isa Expr && rhs.head === :. &&
                                    rhs.args[2] == QuoteNode(:basis_gate_ack)
-                        names && !forwards && rhs !== false && (hit = true)
+                        if names && !forwards && rhs !== false
+                            count += 1
+                        end
                     elseif e.head === :parameters
                         # KEYWORD SHORTHAND: `RadiolysisParams(; basis_gate_ack)`
                         # passes a same-named binding. The field name is
@@ -245,15 +250,19 @@
                         # Errs toward NAMING a site: a keyword parameter
                         # declared with this name fires too, failing the census
                         # loudly rather than missing an exemption.
-                        any(a -> a === :basis_gate_ack, e.args) && (hit = true)
+                        if any(a -> a === :basis_gate_ack, e.args)
+                            count += 1
+                        end
                     end
                     foreach(walk, e.args)
                 end
             end
             walk(ex)
-            return hit
+            return count
         end
+        _opens_gate(ex) = _ack_opening_count(ex) > 0
         opens(src) = _opens_gate(Meta.parseall(src))
+        opening_count(src) = _ack_opening_count(Meta.parseall(src))
 
         # The control: each of these bypassed the old literal grep.
         @test opens("RadiolysisParams(basis_gate_ack=true)")
@@ -280,39 +289,40 @@
         @test opens("(; basis_gate_ack)")
         @test !opens("RadiolysisParams(; Nr, D_eff)")
 
-        expected = Set([
-            "validate_serial.jl",              # CPM trajectory determinism
-            "tests/genealogy_tests.jl",        # legacy vs windowed API equivalence
-            "tests/checkpoint_io_tests.jl",    # snapshot/restart round trip
-            "tests/vti_export_tests.jl",       # snapshot fixture for the .vti
-                                              # round trip; asserts no magnitude
-            "export_checkpoint.jl",            # interchange export; labels the file
-            "lattice_evidence.jl",             # canonical labelled trajectory;
-                                              # production postflight checks 10x uptake
-            "tests/radiodialysis_basis_gate.jl",  # this file, testing the gate
-            "tests/jacc_parity_tests.jl",      # CPM acceptance counts; the
-                                              # 10x-uptake testset in that file
-                                              # holds the claim to account
-            "jacc_acceptance_figure.jl",      # fig5; plots the same acceptance
-                                              # quantities, same claim
-            "regenerate_fig3.jl",             # fig3 is m(t) and P_eff/P0, which
-                                              # the gated basis does not reach;
-                                              # that script proves it before it
-                                              # copies anything
-        ])
+        expected = Dict(
+            "validate_serial.jl" => 1,                # CPM trajectory determinism
+            "tests/genealogy_tests.jl" => 1,          # legacy vs windowed API equivalence
+            "tests/checkpoint_io_tests.jl" => 1,      # snapshot/restart round trip
+            "tests/vti_export_tests.jl" => 1,         # snapshot fixture for the .vti
+                                                      # round trip; asserts no magnitude
+            "export_checkpoint.jl" => 1,              # interchange export; labels the file
+            "lattice_evidence.jl" => 1,               # canonical labelled trajectory;
+                                                      # production postflight checks 10x uptake
+            "tests/radiodialysis_basis_gate.jl" => 1, # this file, testing the gate
+            "tests/jacc_parity_tests.jl" => 1,        # CPM acceptance counts; the
+                                                      # 10x-uptake testset in that file
+                                                      # holds the claim to account
+            "jacc_acceptance_figure.jl" => 1,        # fig5; plots the same acceptance
+                                                      # quantities, same claim
+            "regenerate_fig3.jl" => 1,               # fig3 is m(t) and P_eff/P0, which
+                                                      # the gated basis does not reach;
+                                                      # that script proves it before it
+                                                      # copies anything
+        )
         function check_ack_census(repo, expected)
-            found = Set{String}()
+            found = Dict{String,Int}()
             for (root, _, files) in walkdir(repo)
                 occursin("/.git", root) && continue
                 for fname in files
                     endswith(fname, ".jl") || continue
                     path = joinpath(root, fname)
                     src = read(path, String)
-                    parsed = Meta.parseall(src)
-                    _opens_gate(parsed) && push!(found, relpath(path, repo))
+                    n = _ack_opening_count(Meta.parseall(src))
+                    n == 0 && continue
+                    found[relpath(path, repo)] = n
                 end
             end
-            found == expected || error("unrecognised direct basis-gate acknowledgement: $(setdiff(found, expected)); missing: $(setdiff(expected, found))")
+            found == expected || error("unrecognised direct basis-gate acknowledgement counts: $(found); expected: $(expected)")
             return found
         end
         repo = dirname(@__DIR__)
@@ -322,11 +332,29 @@
         mktempdir() do scratch
             source = read(joinpath(repo, "lattice_evidence.jl"), String)
             write(joinpath(scratch, "lattice_evidence.jl"), source)
-            allowed = Set(["lattice_evidence.jl"])
+            allowed = Dict("lattice_evidence.jl" => 1)
             @test check_ack_census(scratch, allowed) == allowed
             write(joinpath(scratch, "unrecognised.jl"), source)
-            @test isfile(joinpath(scratch, "unrecognised.jl"))
             @test_throws ErrorException check_ack_census(scratch, allowed)
+        end
+
+        # Same-file negative control: select the existing opening from the
+        # actual allowlisted artifact, assert it exists, append a second
+        # opening to that exact file, and prove the occurrence count refuses it.
+        mktempdir() do scratch
+            path = joinpath(scratch, "lattice_evidence.jl")
+            source = read(joinpath(repo, "lattice_evidence.jl"), String)
+            baseline_count = opening_count(source)
+            @test baseline_count == 1
+            write(path, source)
+            planted = read(path, String) * "\n# Same-file widening plant\n" *
+                      "basis_gate_ack = should_ack()\n"
+            @test planted != source
+            @test occursin("basis_gate_ack = should_ack()", planted)
+            write(path, planted)
+            @test opening_count(read(path, String)) == baseline_count + 1
+            @test_throws ErrorException check_ack_census(
+                scratch, Dict("lattice_evidence.jl" => baseline_count))
         end
     end
 
