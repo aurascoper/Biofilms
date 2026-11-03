@@ -55,3 +55,29 @@ docs/visualization/lattice_viewer.md,"coupling/biofilm_openmc/results.py@`f[""me
 docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@02c3d28@`wait(GLMakie.Screen())`,fbc7a49dae9c1515
 docs/visualization/lattice_viewer.md,viewer/visualize_lattice.jl@`wait(out)`,fbc7a49dae9c1515
 docs/research/external_attribution_check_2026-09-30.md,"diagnostics/fitness_phase/phase.jl@`coherence(ids,theta) = isempty(ids) ? NaN : abs(sum(cis(theta[id])`",522e9ad3c52ac057
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`To model species transition probabilities modulated by neighbourhood phase states`,9ef3904f26b69c1b
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`Permutation matrix describing species-$s$ to species-$j$ transitions`,24522f42a9b1bd1e
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`controlled by $\mu_s$ and the transition matrix $P_{sj}$`,24522f42a9b1bd1e
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`would select one entry for each species`,24522f42a9b1bd1e
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`reported there as absent from this repository's simulation sources`,2bd11a8e1c19bb06
+docs/research/hamiltonian_knn_scope.md,"preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`names an operation defined by a distance metric, a ranking and a cutoff`",68389dbee12e7440
+docs/research/hamiltonian_knn_scope.md,data/claims_ledger.csv@`COINAGE DECLARED 2026-09-01`,68389dbee12e7440
+docs/research/hamiltonian_knn_scope.md,reactor_decision_tree.R@`k <- 3`,68389dbee12e7440
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`The active Metropolis rule contains four terms`,02f974ffb1092d04
+docs/research/hamiltonian_knn_scope.md,biofilms_potts.jl@`return t.adh + t.vol + t.rad + t.mel`,02f974ffb1092d04
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`Adaptive phase-locking coefficient`,982017152ea21744
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`Phase-locked kernel for species $s$`,982017152ea21744
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`Phase-locking synchronization deviation`,982017152ea21744
+docs/research/hamiltonian_knn_scope.md,preprint/modeling_radioresistance_and_radiotropic_fitness.tex@`conflicting stated roles for $P_{sj}$ and $\theta_s$`,982017152ea21744
+docs/research/hamiltonian_knn_scope.md,"diagnostics/fitness_phase/phase.jl@`v+=sum(A[i,j]*K[i,j]*sin(theta[j]-theta[i]) for j in 1:n)/d`",370b9de4ba4ff6c9
+docs/research/hamiltonian_knn_scope.md,diagnostics/fitness_phase/phase.jl@`exact zero-coupling integral for one MCS`,370b9de4ba4ff6c9
+docs/research/hamiltonian_knn_scope.md,diagnostics/fitness_phase/run.jl@`phase_feedback=false`,370b9de4ba4ff6c9
+docs/research/hamiltonian_knn_scope.md,"docs/research/phase_locking_spec.md@`A centroid k-nearest-neighbour graph is a separate, declared fallback`",370b9de4ba4ff6c9
+docs/research/hamiltonian_knn_scope.md,biofilms_potts.jl@`u = ΔH <= 0 ? NaN : rand(rng)`,80acc434d84a8fd1
+docs/research/hamiltonian_knn_scope.md,biofilms_potts.jl@`accept = ΔH <= 0 ? true : u < exp(-ΔH / p.T_cpm)`,80acc434d84a8fd1
+docs/research/hamiltonian_knn_scope.md,"biofilms_potts.jl@`dx, dy, dz = NEIGHBORS_26[rand(rng, 1:26)]`",80acc434d84a8fd1
+docs/research/hamiltonian_knn_scope.md,"biofilms_potts.jl@`on_proposal === nothing || on_proposal(terms, ΔH)`",0a2fc57a84742e3c
+docs/research/hamiltonian_knn_scope.md,"biofilms_potts.jl@`The hook is called before the draw, so a closure that`",0a2fc57a84742e3c
+docs/research/hamiltonian_knn_scope.md,"biofilms_potts.jl@`proposal_index = proposal_index,`",0a2fc57a84742e3c
+docs/research/hamiltonian_knn_scope.md,tests/rad_proposals_tests.jl@`@test drew.lattice != bare_lat`,b725805f474b0350
+docs/research/hamiltonian_knn_scope.md,"docs/research/survival_phase_factorial_spec.md@`a phase term in mechanics is a new coupled model requiring an equation, sign, units, update order, evidence boundary, positive control and separate preregistration`",61fe0a01c0ff1a84
