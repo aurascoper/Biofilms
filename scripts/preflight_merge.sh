@@ -389,11 +389,21 @@ if [[ ! "$TODAY" > "$SELF_REVIEW_EXPIRES" ]]; then
   fi
 fi
 
-# ---- 2. unresolved threads, by severity ------------------------------------
+# ---- 2. unresolved threads, by severity (and data/deferrals.csv) -----------
 # Severity comes from the badge Codex puts in the comment: ![P1 Badge](...).
 # An unresolved thread with no badge is still reported, at UNRANKED, because a
 # human comment nobody answered is exactly as unread as a P1 nobody answered.
+#
+# Issue #22 (GATE-06): a finding deferred to a tracking issue stays OPEN on
+# GitHub and is recorded in data/deferrals.csv (pr,thread_url,issue,rationale),
+# read from the working tree so a branch can register its own deferral. Only an
+# unresolved thread on this PR with a valid 4-column row and an OPEN issue is
+# downgraded from OPEN to DEFER; resolved threads, unmatched URLs, malformed
+# rows, and closed or missing issues all refuse.
 printf '\n'
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEFERRALS_FILE="${PREFLIGHT_DEFERRALS:-$ROOT_DIR/data/deferrals.csv}"
+
 threads="$(jq -r '
   .reviewThreads.nodes[]
   | select(.isResolved | not)
@@ -410,26 +420,159 @@ threads="$(jq -r '
       ($t.isOutdated | tostring),
       ($c.author.login // "?"),
       ( $b | gsub("\\*\\*|<sub>|</sub>|!\\[[^]]*\\]\\([^)]*\\)"; "")
-           | gsub("\\s+"; " ") | ltrimstr(" ") | .[0:96] )
+           | gsub("\\s+"; " ") | ltrimstr(" ") | .[0:96]
+           | if . == "" then "(no text)" else . end ),
+      (($c.url // "") | if . == "" then "-" else . end)
     ] | @tsv
 ' <<<"$PRJ")"
+
+resolved_urls="$(jq -r '
+  .reviewThreads.nodes[]
+  | select(.isResolved)
+  | (.comments.nodes[0].url // empty)
+' <<<"$PRJ")"
+
+unresolved_urls="$(jq -r '
+  .reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | (.comments.nodes[0].url // empty)
+' <<<"$PRJ")"
+
+valid_deferrals=""
+deferred_count=0
+deferred_issues=""
+checked_issues=""
+
+if [[ -f "$DEFERRALS_FILE" ]]; then
+  if ! parsed_deferrals="$(jq -R -s -r --arg pr "$PR" '
+    split("\n")
+    | map(sub("\r$"; ""))
+    | map(select((test("^\\s*$") | not) and (test("^\\s*#") | not) and (. != "pr,thread_url,issue,rationale")))
+    | .[]
+    | . as $raw
+    | (capture("^(?<pr>[^,]*),(?<thread_url>[^,]*),(?<issue>[^,]*),(?<rationale>.*)$") // null) as $m
+    | if $m == null then
+        "MALFORMED\t\($raw)"
+      else
+        ($m.pr | gsub("^\\s+|\\s+$"; "")) as $rpr
+        | ($m.thread_url | gsub("^\\s+|\\s+$"; "")) as $url
+        | ($m.issue | gsub("^\\s+|\\s+$"; "")) as $iss
+        | ($m.rationale | gsub("^\\s+|\\s+$"; "")) as $raw_rat
+        | (if ($raw_rat | startswith("\"")) then
+             if ($raw_rat | length) >= 2 and ($raw_rat | endswith("\"")) then
+               ($raw_rat[1:-1] | gsub("^\\s+|\\s+$"; ""))
+             else
+               ""
+             end
+           elif ($raw_rat | endswith("\"")) then
+             ""
+           else
+             $raw_rat
+           end) as $rat
+        | ($url | capture("/pull/(?<upr>[0-9]+)#") // null) as $um
+        | if ($rpr | test("^[0-9]+$") | not) or $url == "" or $um == null or ($iss | test("^[0-9]+$") | not) or $rat == "" then
+            "MALFORMED\t\($raw)"
+          elif $um.upr != $rpr then
+            "PRMISMATCH\t\($rpr)\t\($url)"
+          elif $rpr != $pr then
+            empty
+          else
+            "ROW\t\($url)\t\($iss)\t\($rat)"
+          end
+      end
+  ' "$DEFERRALS_FILE")"; then
+    printf '  COULD NOT READ DEFERRALS REGISTER (%s).\n' "$DEFERRALS_FILE"
+    fail=1
+    parsed_deferrals=""
+  fi
+
+  while IFS=$'\t' read -r kind f1 f2 f3; do
+    [[ -z "$kind" ]] && continue
+    if [[ "$kind" == "MALFORMED" ]]; then
+      printf '  MALFORMED DEFERRAL ROW in %s: %s\n' "$DEFERRALS_FILE" "$f1"
+      printf '  Every row requires pr (bare digits), thread_url, issue (bare digits, #N refused), and non-empty rationale.\n'
+      fail=1
+      continue
+    fi
+    if [[ "$kind" == "PRMISMATCH" ]]; then
+      printf '  PR MISMATCH IN DEFERRALS (%s): pr=%s disagrees with thread_url %s.\n' "$DEFERRALS_FILE" "$f1" "$f2"
+      fail=1
+      continue
+    fi
+    d_url="$f1"
+    d_issue="$f2"
+    d_rat="$f3"
+    if [[ -n "$valid_deferrals" ]] && awk -F'\t' -v u="$d_url" '$1 == u { found=1; exit } END { exit !found }' <<<"$valid_deferrals"; then
+      printf '  DUPLICATE DEFERRAL ROW in %s for thread %s.\n' "$DEFERRALS_FILE" "$d_url"
+      fail=1
+      continue
+    fi
+    if [[ -n "$resolved_urls" ]] && grep -qxF -- "$d_url" <<<"$resolved_urls"; then
+      printf '  RESOLVED THREAD IN DEFERRALS: %s (-> #%s) -- row for a resolved thread -- the deferral closed, delete the row.\n' "$d_url" "$d_issue"
+      fail=1
+      continue
+    fi
+    if [[ -z "$unresolved_urls" ]] || ! grep -qxF -- "$d_url" <<<"$unresolved_urls"; then
+      printf '  ORPHAN DEFERRAL ROW: %s (-> #%s) -- row matches no thread on this PR -- wrong URL, or a live blocker hiding behind one.\n' "$d_url" "$d_issue"
+      fail=1
+      continue
+    fi
+    if [[ -z "${PREFLIGHT_FIXTURE:-}" ]]; then
+      cached_state="$(awk -F'\t' -v i="$d_issue" '$1 == i { print $2; exit }' <<<"$checked_issues")"
+      if [[ -z "$cached_state" ]]; then
+        issue_state="$(gh issue view "$d_issue" --json state -q .state 2>/dev/null)" || issue_state=""
+        checked_issues+="${d_issue}"$'\t'"${issue_state:-MISSING}"$'\n'
+      else
+        issue_state="$cached_state"
+        [[ "$issue_state" == "MISSING" ]] && issue_state=""
+      fi
+      if [[ -z "$issue_state" ]]; then
+        printf '  DEFERRED ISSUE #%s NOT FOUND: gh issue view #%s failed.\n' "$d_issue" "$d_issue"
+        fail=1
+        continue
+      elif [[ "$issue_state" != "OPEN" ]]; then
+        printf '  DEFERRED ISSUE #%s IS %s: a deferral must point to an OPEN issue.\n' "$d_issue" "$issue_state"
+        fail=1
+        continue
+      fi
+    fi
+    valid_deferrals+="${d_url}"$'\t'"${d_issue}"$'\t'"${d_rat}"$'\n'
+  done <<<"$parsed_deferrals"
+fi
 
 if [[ -z "$threads" ]]; then
   printf '  No unresolved review threads.\n'
 else
-  while IFS=$'\t' read -r sev path line outdated who summary; do
+  while IFS=$'\t' read -r sev path line outdated who summary url; do
     [[ -z "$sev" ]] && continue
     mark=""
     [[ "$outdated" == "true" ]] && mark=" (on an outdated diff)"
-    printf '  OPEN  %-8s %s:%s%s\n        %s\n        — %s\n\n' \
-           "$sev" "$path" "$line" "$mark" "$summary" "$who"
-    # EVERY severity blocks, including P3 and unranked. The first version
-    # listed P1|P2|UNRANKED and let a P3-only pull request print "Clear to
-    # merge" while contradicting this script's own stated contract -- a check
-    # that could not fail, in the check written to stop checks that cannot
-    # fail. Severity ranks what to fix first; it does not rank what may be
-    # ignored, and an unread P3 is exactly as unread as an unread P1.
-    fail=1
+    matched_def=""
+    if [[ -n "$valid_deferrals" && "$url" != "-" ]]; then
+      matched_def="$(awk -F'\t' -v u="$url" '$1 == u { print $2 "\t" $3; exit }' <<<"$valid_deferrals")"
+    fi
+    if [[ -n "$matched_def" ]]; then
+      d_issue="${matched_def%%$'\t'*}"
+      d_rat="${matched_def#*$'\t'}"
+      printf '  DEFER %-8s %s:%s%s -> #%s (%s)\n        %s\n        -- %s\n\n' \
+             "$sev" "$path" "$line" "$mark" "$d_issue" "$d_rat" "$summary" "$who"
+      deferred_count=$((deferred_count + 1))
+      if [[ -z "$deferred_issues" ]]; then
+        deferred_issues="#$d_issue"
+      elif [[ ", $deferred_issues," != *", #$d_issue,"* ]]; then
+        deferred_issues="$deferred_issues, #$d_issue"
+      fi
+    else
+      printf '  OPEN  %-8s %s:%s%s\n        %s\n        -- %s\n\n' \
+             "$sev" "$path" "$line" "$mark" "$summary" "$who"
+      # EVERY un-deferred severity blocks, including P3 and unranked. The first
+      # version listed P1|P2|UNRANKED and let a P3-only pull request print "Clear
+      # to merge" while contradicting this script's own stated contract -- a check
+      # that could not fail, in the check written to stop checks that cannot
+      # fail. Severity ranks what to fix first; it does not rank what may be
+      # ignored, and an unread P3 is exactly as unread as an unread P1.
+      fail=1
+    fi
   done <<<"$threads"
 fi
 
@@ -440,4 +583,11 @@ if (( fail )); then
   printf '  resolving is the record that someone read it.\n\n'
   exit 1
 fi
-printf '  Clear to merge.\n\n'
+if (( deferred_count > 0 )); then
+  word="findings"
+  (( deferred_count == 1 )) && word="finding"
+  printf '  Clear to merge -- %d %s DEFERRED, not fixed: %s\n\n' \
+         "$deferred_count" "$word" "$deferred_issues"
+else
+  printf '  Clear to merge.\n\n'
+fi
