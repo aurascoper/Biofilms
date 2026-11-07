@@ -134,17 +134,20 @@ retracted_allowed(term) = get(RETRACTED_WORD_ALLOWED, term, ["calibration/tests/
 # why the model is not radiotrophic; a file-wide allowance would also pass a seventh use that
 # asserts it. A use is safe because of what its paragraph says, and the sentence that says it
 # can sit far from the word: a 40-character window missed one 138 characters away (Codex on
-# pull request #52, at 823f701). So each use is pinned by the sha256 of its enclosing <p>
-# element, in the text as _figure_norm gives it. A use outside a <p> element cannot be pinned,
-# and is a hit. Any edit to such a paragraph makes the file a hit until this is updated.
+# pull request #52, at 823f701), and a normalised digest that dropped punctuation and markup
+# let an HTML comment hide "the first. It cannot implement" without changing a letter or digit
+# (Codex on pull request #52, at e43ce4f; issue #53). So each use is pinned by the sha256 of
+# its raw enclosing <p>...</p> slice. A use outside a <p> element cannot be pinned, and is a
+# hit. Any edit to such a paragraph, including markup or comments, makes the file a hit until
+# this is updated.
 RETRACTED_WORD_PINNED = Dict(
     "post-biofilms-standalone.html" => Dict("radiotroph" => [
-        "8571966da9974f5b12c3594172d5412ec3175807f33fc0bdafe0ccad7b778055",   # the set used to be called ... it cannot implement the second
-        "8571966da9974f5b12c3594172d5412ec3175807f33fc0bdafe0ccad7b778055",   # the set used to be called ... it cannot implement the second
-        "1f37ae101d68cf8d92735cbc316a77ad49aafccb7eeffc1300285e7759937088",   # which is why ... cannot be in this model
-        "1f37ae101d68cf8d92735cbc316a77ad49aafccb7eeffc1300285e7759937088",   # which is why ... cannot be in this model
-        "9cc091bb8c9ffd9418158d8a8f95370c1b924b9d26c20501e86abd5201c247cb",   # literature claims come from the compatibility audit
-        "9cc091bb8c9ffd9418158d8a8f95370c1b924b9d26c20501e86abd5201c247cb",   # literature claims come from the compatibility audit
+        "fe313c86be800808c064f4c5358c283ea9e73326d5309ddd267d2a640260173e",   # the set used to be called ... it cannot implement the second
+        "fe313c86be800808c064f4c5358c283ea9e73326d5309ddd267d2a640260173e",   # the set used to be called ... it cannot implement the second
+        "50f4a09f39ac126a09899a9869fe8b3ff2a53cbfb37bde35431ceaeeaaa27012",   # which is why ... cannot be in this model
+        "50f4a09f39ac126a09899a9869fe8b3ff2a53cbfb37bde35431ceaeeaaa27012",   # which is why ... cannot be in this model
+        "29469b77429cb6c7799c46835a38be4aa24488efd7fa7dc69b0b0fa05c57f416",   # literature claims come from the compatibility audit
+        "29469b77429cb6c7799c46835a38be4aa24488efd7fa7dc69b0b0fa05c57f416",   # literature claims come from the compatibility audit
     ]),
 )
 const _FIGURE_SCAN_SKIPS = (".md", ".tex", ".txt", ".csv", ".tsv", ".json")
@@ -163,9 +166,7 @@ function _listed_text_files(root)
     files
 end
 using SHA
-# Normalised to lowercase letters and digits, one space between runs, before it is digested.
-_figure_norm(s) = strip(replace(lowercase(s), r"[^a-z0-9]+" => " "))
-# One digest per use of the term: the enclosing <p> element's, or a marker no pin equals.
+# One digest per use of the term: the raw enclosing <p>...</p> slice's, or a marker no pin equals.
 function _occurrences(text, pattern)
     opens = [first(r) for r in findall(r"<p[\s>]", text)]
     closes = [last(r) for r in findall("</p>", text)]
@@ -173,11 +174,13 @@ function _occurrences(text, pattern)
     for m in eachmatch(pattern, text)
         i = m.offset
         a, b = findlast(<(i), opens), findfirst(>(i), closes)
-        if a === nothing || b === nothing || any(c -> opens[a] < c < i, closes)
+        if a === nothing || b === nothing ||
+           any(c -> opens[a] < c < i, closes) ||
+           any(o -> opens[a] < o < closes[b], opens)
             push!(out, "no enclosing paragraph")
             continue
         end
-        push!(out, bytes2hex(sha256(String(_figure_norm(text[opens[a]:closes[b]])))))
+        push!(out, bytes2hex(sha256(text[opens[a]:closes[b]])))
     end
     out
 end
@@ -222,15 +225,32 @@ let
     open(io -> write(io, "<p>" * uppercasefirst(terms[1]) * "ic fungi grow toward the source.</p>\n"),
          joinpath(fresh, post), "a")
     @test post in _retracted_word_files(fresh, terms[1])
-    # Codex on pull request #52, at 823f701: the sentence that makes the second use safe starts
-    # 138 characters after the word, outside a 40-character window. An edit to that sentence
-    # alone must make the post a hit. The victim is taken from the post as it is.
+    # Codex on pull request #52, at 823f701 (plant from 761cbbe): the sentence that makes the
+    # second use safe starts 138 characters after the word, outside a 40-character window. An
+    # edit to that sentence alone must make the post a hit. The victim is taken from the post as it is.
     cp(joinpath(REPO, post), joinpath(fresh, post); force=true)
     src = read(joinpath(fresh, post), String)
     victim = "cannot implement the second"
     length(findall(victim, src)) == 1 || error("the victim occurs $(length(findall(victim, src))) times in the post")
     write(joinpath(fresh, post), replace(src, victim => "implements the second as well"))
     @test post in _retracted_word_files(fresh, terms[1])
+    # Codex on pull request #52, at e43ce4f (issue #53): _figure_norm stripped all
+    # non-alphanumeric characters before hashing, so wrapping "the first. It\ncannot implement"
+    # in <!-- ... --> hid those words from the reader while leaving the normalized digest
+    # unchanged. Hashing the raw <p>...</p> slice catches any markup or comment edit.
+    comment_victim = "the first. It\ncannot implement"
+    length(findall(comment_victim, src)) == 1 ||
+        error("the comment victim occurs $(length(findall(comment_victim, src))) times in the post")
+    comment_mutated = replace(src, comment_victim => "<!-- " * comment_victim * " -->")
+    @test comment_mutated != src
+    write(joinpath(fresh, post), comment_mutated)
+    @test post in _retracted_word_files(fresh, terms[1])
+    # A use outside a <p> element or inside an unclosed <p> before another <p> returns
+    # "no enclosing paragraph" and flags the file.
+    @test _occurrences("<p>unclosed " * terms[1] * " <p>closed</p>", r"radiotroph"i) == ["no enclosing paragraph"]
+    @test _occurrences("<div>" * terms[1] * "</div><p>closed</p>", r"radiotroph"i) == ["no enclosing paragraph"]
+    @test _occurrences("<p>first</p>" * terms[1] * "<p>second</p>", r"radiotroph"i) == ["no enclosing paragraph"]
+    @test _occurrences("<p>first</p>" * terms[1], r"radiotroph"i) == ["no enclosing paragraph"]
     # A pin whose file is gone is stale, and says so.
     listed = _listed_text_files(REPO)
     @test all(f -> f in listed, keys(RETRACTED_WORD_PINNED))
