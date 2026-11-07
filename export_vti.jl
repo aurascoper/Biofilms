@@ -15,8 +15,9 @@
 # Cell data (one value per lattice site, VTK x = Julia axis 1):
 #   species          UInt8   0 = medium or wall, 1..7 = species index
 #   cell_id          Int32   as stored: background and wall sentinels kept
-#   lineage_id, generation, interior_mask, radiation_cpm, melanin  as stored
-#   accumulated_dose_Gy      as stored; physical Gy, zero until a dose was imported
+#   lineage_id, interior_mask, radiation_cpm, melanin  as stored
+#   generation               as stored when non-zero; omitted while all-zero (issue #34)
+#   accumulated_dose_Gy      as stored when non-zero; physical Gy, omitted while all-zero (issue #34)
 #   nutrient                 only with --restart (the snapshot does not carry it)
 #                            and only from the same run: mcs, git_sha, cell_id,
 #                            interior_mask and melanin must match the snapshot
@@ -37,6 +38,11 @@ const SITE_ARRAYS = (("lattice/cell_id", "cell_id"), ("lattice/lineage_id", "lin
                      ("lattice/generation", "generation"), ("lattice/interior_mask", "interior_mask"),
                      ("fields/radiation_cpm", "radiation_cpm"), ("fields/melanin", "melanin"),
                      ("dose/accumulated_Gy", "accumulated_dose_Gy"))
+# Issue #34: generation (4 B Int32/site) and accumulated_dose_Gy (8 B Float64/site) are
+# identically zero until division or dose import occurs (25.5% of every frame's bytes carrying
+# zero bits of information). Omit them from VTKCellData while all(iszero, arr); write them as
+# soon as any site is non-zero.
+const OMIT_WHEN_ZERO = ("generation", "accumulated_dose_Gy")
 
 """
     export_vti(snapshot, stem; restart=nothing, dose=nothing, spacing=1.0, declared_pitch=nothing)
@@ -74,7 +80,9 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
         vtk = vtk_grid(stem, axes...; compress = false)
         vtk["species", VTKCellData()] = species
         for (ds, name) in SITE_ARRAYS
-            vtk[name, VTKCellData()] = read(f[ds])
+            arr = read(f[ds])
+            (name in OMIT_WHEN_ZERO && all(iszero, arr)) && continue
+            vtk[name, VTKCellData()] = arr
         end
         mcs = Int(read(a["mcs"]))
         if restart !== nothing

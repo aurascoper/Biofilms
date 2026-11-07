@@ -145,11 +145,12 @@ because the bytes are meaningless, not because anything is slow. Nothing here is
 
 ## Where the action lives
 
-The exporter half of this is filed as **issue #34**, not fixed here: the change touches
-`export_vti.jl` on `feat/lattice-viewer` (PR #25, on hold), and this diagnostic is on a
-branch off `master`. The issue ranks three fixes by cost. The free one, with no change to
-what a consumer must do, is to stop writing `generation` and `accumulated_dose_Gy` while
-they are identically zero: 25.5% of every frame carrying no information at all.
+The exporter half of this was filed as **issue #34** when `export_vti.jl` lived on
+`feat/lattice-viewer` (PR #25) while this diagnostic sat on a branch off `master`. The issue
+ranked three fixes by cost. The free one, with no change to what a consumer must do, is now
+implemented in `export_vti.jl` (`OMIT_WHEN_ZERO`): `generation` and `accumulated_dose_Gy` are
+omitted from `VTKCellData` while they are identically zero (saving 25.5% of every frame's bytes
+that carried no information) and written whenever any entry is non-zero.
 
 ## The constraint on all of it
 

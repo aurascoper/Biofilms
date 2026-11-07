@@ -83,18 +83,75 @@ N = (12, 12, 12)
         @test get_data(get_field_data(VTKFile(pseed))["cpm_seed"])[1] == 7.0
     end
     h5open(snap, "r") do h
+        cd = get_cell_data(f)
+        @test all(iszero, read(h["lattice/generation"]))
+        @test all(iszero, read(h["dose/accumulated_Gy"]))
+        @test !("generation" in keys(cd))
+        @test !("accumulated_dose_Gy" in keys(cd))
         for (ds, name) in SITE_ARRAYS
+            name in ("generation", "accumulated_dose_Gy") && continue
             src = read(h[ds])
-            back = reshape(get_data(get_cell_data(f)[name]), N)
+            back = reshape(get_data(cd[name]), N)
             @test eltype(back) == eltype(src)
             @test back == src
         end
-        species = reshape(get_data(get_cell_data(f)["species"]), N)
+        species = reshape(get_data(cd["species"]), N)
         @test eltype(species) == UInt8
         cid = read(h["lattice/cell_id"])
         @test all(species[cid .<= 0] .== 0)          # medium and wall are air
         @test species[cid .> 0] == UInt8.(read(h["lattice/species_id"])[cid .> 0])
         @test Set(unique(species)) ⊇ Set(0x01:0x07)  # the fixture places all seven
+    end
+
+    @testset "non-zero generation and accumulated_dose_Gy are written and round-trip (issue #34)" begin
+        # Negative control for OMIT_WHEN_ZERO: a blanket removal of generation and
+        # accumulated_dose_Gy from SITE_ARRAYS would pass the all-zero check above and
+        # silently drop real division or imported-dose data when present.
+        nz_snap = joinpath(tmp, "snap_nonzero.h5")
+        cp(snap, nz_snap; force = true)
+        gen_expected = zeros(Int32, N)
+        gen_expected[2, 3, 4] = Int32(2)
+        dose_expected = zeros(Float64, N)
+        dose_expected[5, 6, 7] = 1.25
+        h5open(nz_snap, "r+") do g
+            g["lattice/generation"][:, :, :] = gen_expected
+            g["dose/accumulated_Gy"][:, :, :] = dose_expected
+        end
+        nz_stem = joinpath(tmp, "rt_nonzero")
+        export_vti(nz_snap, nz_stem)
+        cd_nz = get_cell_data(VTKFile(nz_stem * ".vti"))
+        @test "generation" in keys(cd_nz)
+        @test "accumulated_dose_Gy" in keys(cd_nz)
+        gen_back = reshape(get_data(cd_nz["generation"]), N)
+        dose_back = reshape(get_data(cd_nz["accumulated_dose_Gy"]), N)
+        @test eltype(gen_back) == Int32 && gen_back == gen_expected
+        @test eltype(dose_back) == Float64 && dose_back == dose_expected
+
+        # Per-array independence: non-zero generation with all-zero accumulated_dose_Gy
+        # writes generation and still omits accumulated_dose_Gy.
+        half_snap = joinpath(tmp, "snap_half_nonzero.h5")
+        cp(snap, half_snap; force = true)
+        h5open(half_snap, "r+") do g
+            g["lattice/generation"][:, :, :] = gen_expected
+        end
+        half_stem = joinpath(tmp, "rt_half_nonzero")
+        export_vti(half_snap, half_stem)
+        cd_half = get_cell_data(VTKFile(half_stem * ".vti"))
+        @test "generation" in keys(cd_half)
+        @test !("accumulated_dose_Gy" in keys(cd_half))
+
+        # Symmetric independence: all-zero generation with non-zero accumulated_dose_Gy
+        # writes accumulated_dose_Gy and still omits generation.
+        dose_only_snap = joinpath(tmp, "snap_dose_only_nonzero.h5")
+        cp(snap, dose_only_snap; force = true)
+        h5open(dose_only_snap, "r+") do g
+            g["dose/accumulated_Gy"][:, :, :] = dose_expected
+        end
+        dose_only_stem = joinpath(tmp, "rt_dose_only_nonzero")
+        export_vti(dose_only_snap, dose_only_stem)
+        cd_dose_only = get_cell_data(VTKFile(dose_only_stem * ".vti"))
+        @test !("generation" in keys(cd_dose_only))
+        @test "accumulated_dose_Gy" in keys(cd_dose_only)
     end
 end
 
