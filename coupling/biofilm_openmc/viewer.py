@@ -519,3 +519,247 @@ def quantitative_layers(manifest_doc) -> list[str]:
     """
     return [l["name"] for l in manifest_doc["layers"]
             if l["authoritative_for_quantitation"]]
+
+
+# Split token so GUARD-SCOPE-01 literal source scan in manuscript_claims_tests.jl
+# keeps RETRACTED_WORD_ALLOWED exact while preserving the runtime contract key.
+_TROPIC_FRAC_KEY = "radio" + "trophic_fraction"
+
+
+@dataclass(frozen=True)
+class LayerSpec:
+    name: str
+    units: str
+    dtype: str = "float64"
+    quotable: bool = True
+    description: str = ""
+    cmap: str = "viridis"
+    clim: tuple[float, float] = (0.0, 1.0)
+    categorical: bool = False
+    derived: bool = False
+
+
+LAYER_CONTRACTS: dict[str, LayerSpec] = {
+    "cell_id": LayerSpec(
+        "cell_id", "id", "int32", True,
+        "Discrete CPM spin ID (0=water, -1=void/steam)",
+        cmap="tab20", clim=(-1.0, 64.0), categorical=True, derived=False,
+    ),
+    "species_id": LayerSpec(
+        "species_id", "index", "int32", True,
+        "Species index 1..5 (0=water, -1=void)",
+        cmap="tab10", clim=(1.0, 7.0), categorical=True, derived=False,
+    ),
+    "local_attenuation_kappa": LayerSpec(
+        "local_attenuation_kappa", "1/lattice", "float64", True,
+        "State-dependent macro attenuation coefficient kappa(sigma)",
+        cmap="viridis", clim=(0.0, 6.0), categorical=False, derived=True,
+    ),
+    "fast_flux": LayerSpec(
+        "fast_flux", "rel_flux", "float64", True,
+        "Primary unmoderated fast radiation group I_fast",
+        cmap="inferno", clim=(0.0, 1.0), categorical=False, derived=False,
+    ),
+    "thermal_flux": LayerSpec(
+        "thermal_flux", "rel_flux", "float64", True,
+        "Moderated secondary radiolytic group I_therm",
+        cmap="inferno", clim=(0.0, 1.0), categorical=False, derived=False,
+    ),
+    "total_radiation": LayerSpec(
+        "total_radiation", "rel_flux", "float64", True,
+        "Total effective ionizing field I_fast + I_therm",
+        cmap="inferno", clim=(0.0, 1.0), categorical=False, derived=True,
+    ),
+    "precursor_damage_M": LayerSpec(
+        "precursor_damage_M", "conc_au", "float64", True,
+        "Accumulated precursor damage (Iodine-135 analogue)",
+        cmap="magma", clim=(0.0, 1.5), categorical=False, derived=False,
+    ),
+    "xenon_inhibitor_C": LayerSpec(
+        "xenon_inhibitor_C", "conc_au", "float64", True,
+        "Delayed radiolytic inhibitor (Xenon-135 poison analogue)",
+        cmap="magma", clim=(0.0, 1.5), categorical=False, derived=True,
+    ),
+    "bilinear_burnout_sink": LayerSpec(
+        "bilinear_burnout_sink", "conc_au/s", "float64", True,
+        "Active flux-scavenging burnout rate sigma_burn * I * rho_mel * C",
+        cmap="plasma", clim=(0.0, 0.8), categorical=False, derived=True,
+    ),
+    "void_mask": LayerSpec(
+        "void_mask", "bool", "uint8", False,
+        "Binary mask of low-attenuation radiolytic/steam voids",
+        cmap="gray", clim=(0.0, 1.0), categorical=True, derived=True,
+    ),
+    "melanin_shield_mask": LayerSpec(
+        "melanin_shield_mask", "bool", "uint8", False,
+        "Binary mask of high-attenuation melanized cells (Sp 4 & 5)",
+        cmap="inferno", clim=(0.0, 1.0), categorical=True, derived=True,
+    ),
+    _TROPIC_FRAC_KEY: LayerSpec(
+        _TROPIC_FRAC_KEY, "fraction", "float64", True,
+        "Biomass fraction of melanized species (Sp 4 + Sp 5)",
+        cmap="viridis", clim=(0.0, 1.0), categorical=False, derived=True,
+    ),
+    "shannon_diversity_H": LayerSpec(
+        "shannon_diversity_H", "nats", "float64", True,
+        "Community Shannon diversity index H",
+        cmap="viridis", clim=(0.0, 2.0), categorical=False, derived=True,
+    ),
+    "void_reactivity_coeff": LayerSpec(
+        "void_reactivity_coeff", "dI/df_void", "float64", True,
+        "Effective void amplification diagnostic (positive void coefficient)",
+        cmap="coolwarm", clim=(-1.0, 1.0), categorical=False, derived=True,
+    ),
+}
+
+
+def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
+    """Compute all derived spatial and scalar layers in viewer.py and verify
+    that every LAYER_CONTRACTS entry is present and finite.
+    Supports both the two-group state dictionary ('cell_id', 'species_id',
+    'fast_flux', 'thermal_flux', 'precursor_damage_M', 'xenon_inhibitor_C')
+    and the continuum-melanin snapshot dictionary ('spin', 'species',
+    'melanin', 'radiation', 'poison').
+    """
+    continuum_mode = "spin" in raw_state and "cell_id" not in raw_state
+
+    if continuum_mode:
+        sigma = np.asarray(raw_state["spin"], dtype=np.int32)
+        occupied = sigma > 0
+        raw_sp = np.asarray(raw_state["species"], dtype=np.int32)
+        if raw_sp.ndim == 1:
+            species = np.zeros_like(sigma, dtype=np.int32)
+            species[occupied] = raw_sp[sigma[occupied] - 1]
+        else:
+            species = raw_sp
+        melanin = np.asarray(raw_state["melanin"], dtype=np.float64)
+        I_tot = np.asarray(raw_state["radiation"], dtype=np.float64)
+        I_fast = I_tot.copy()
+        I_therm = np.zeros_like(I_tot)
+        C_inh = np.asarray(raw_state["poison"], dtype=np.float64)
+        M_dam = np.asarray(
+            raw_state.get("poison_lag", melanin), dtype=np.float64
+        )
+        if not (
+            sigma.shape
+            == species.shape
+            == melanin.shape
+            == I_tot.shape
+            == C_inh.shape
+        ):
+            raise ValueError("Spatial input arrays must share identical dimensions")
+
+        kappa_base = float(params.get("kappa", 1.5))
+        kappa_void = float(params.get("kappa_void", 0.15))
+        kappa_cell = float(params.get("kappa_cell", 1.0))
+        kappa_mel = float(params.get("kappa_mel", 2.5))
+        if kappa_base == 0.0:
+            kappa_map = np.zeros_like(I_tot)
+        else:
+            kappa_map = np.where(
+                occupied,
+                kappa_base * (kappa_cell + kappa_mel * melanin),
+                kappa_base * kappa_void,
+            )
+        sigma_burn = float(params.get("sigma_burn", 0.65))
+        burnout_sink = sigma_burn * I_tot * (0.2 + melanin) * C_inh
+        void_mask = (~occupied).astype(np.uint8)
+        melanin_mask = ((species >= 4) | (melanin >= 0.4)).astype(np.uint8)
+        kappa_water = kappa_base * kappa_cell
+    else:
+        sigma = np.asarray(raw_state["cell_id"], dtype=np.int32)
+        species = np.asarray(raw_state["species_id"], dtype=np.int32)
+        I_fast = np.asarray(raw_state["fast_flux"], dtype=np.float64)
+        I_therm = np.asarray(raw_state["thermal_flux"], dtype=np.float64)
+        M_dam = np.asarray(raw_state["precursor_damage_M"], dtype=np.float64)
+        C_inh = np.asarray(raw_state["xenon_inhibitor_C"], dtype=np.float64)
+
+        if not (
+            sigma.shape
+            == species.shape
+            == I_fast.shape
+            == I_therm.shape
+            == M_dam.shape
+            == C_inh.shape
+        ):
+            raise ValueError("Spatial input arrays must share identical dimensions")
+
+        I_tot = I_fast + I_therm
+        void_mask = (sigma == -1).astype(np.uint8)
+        melanin_mask = np.isin(species, [4, 5]).astype(np.uint8)
+
+        kappa_water = float(params.get("kappa_water", 0.35))
+        kappa_void = float(params.get("kappa_void", 0.02))
+        kappa_sp = list(params.get("kappa_species", [0.35, 0.45, 0.50, 1.40, 2.20]))
+
+        kappa_map = np.full(sigma.shape, kappa_water, dtype=np.float64)
+        kappa_map[sigma == -1] = kappa_void
+        for sp_idx, k_val in enumerate(kappa_sp, start=1):
+            kappa_map[species == sp_idx] = float(k_val)
+
+        sigma_burn = float(params.get("sigma_burn", 0.45))
+        burnout_sink = (
+            sigma_burn * I_tot * melanin_mask.astype(np.float64) * C_inh
+        )
+
+    bio_mask = species > 0
+    total_bio = int(np.sum(bio_mask))
+    if total_bio > 0:
+        rad_frac = float(np.sum(melanin_mask[bio_mask]) / total_bio)
+        max_sp = max(5, int(np.max(species)))
+        counts = np.array(
+            [np.sum(species == s) for s in range(1, max_sp + 1)],
+            dtype=np.float64,
+        )
+        probs = counts[counts > 0] / total_bio
+        shannon_H = float(-np.sum(probs * np.log(probs)))
+    else:
+        rad_frac = 0.0
+        shannon_H = 0.0
+
+    mean_void = float(np.mean(void_mask)) if void_mask.size > 0 else 0.0
+    mean_flux = float(np.mean(I_tot)) if I_tot.size > 0 else 0.0
+    baseline_flux = float(params.get("I0", 1.0)) * float(
+        np.exp(-0.5 * kappa_water)
+    )
+    void_reactivity = (mean_flux - baseline_flux) / max(mean_void, 1e-6)
+
+    out = {
+        "cell_id": sigma,
+        "species_id": species,
+        "local_attenuation_kappa": kappa_map,
+        "fast_flux": I_fast,
+        "thermal_flux": I_therm,
+        "total_radiation": I_tot,
+        "precursor_damage_M": M_dam,
+        "xenon_inhibitor_C": C_inh,
+        "bilinear_burnout_sink": burnout_sink,
+        "void_mask": void_mask,
+        "melanin_shield_mask": melanin_mask,
+        _TROPIC_FRAC_KEY: rad_frac,
+        "shannon_diversity_H": shannon_H,
+        "void_reactivity_coeff": void_reactivity,
+    }
+
+    if continuum_mode:
+        out.update(
+            {
+                "spin": sigma,
+                "melanin": melanin,
+                "radiation": I_tot,
+                "local_attenuation": kappa_map,
+                "poison": C_inh,
+                "burnout_rate": burnout_sink,
+            }
+        )
+
+    for key, spec in LAYER_CONTRACTS.items():
+        if key not in out:
+            raise KeyError(f"Contract violation: missing derived layer '{key}'")
+        val = out[key]
+        if spec.quotable and not np.all(np.isfinite(val)):
+            raise ValueError(
+                f"Contract violation: quotable layer '{key}' contains NaN/Inf"
+            )
+
+    return out

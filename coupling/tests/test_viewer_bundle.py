@@ -249,3 +249,301 @@ def test_a_correct_reduction_appears_in_the_quotable_set():
                     derivation="mass_weighted_mean")
     doc = manifest([LATTICE, REFINED], [reduced])
     assert quantitative_layers(doc) == ["dose_on_lattice"]
+
+
+def _sample_two_way_raw_state(shape=(6, 6)):
+    cell_id = np.zeros(shape, dtype=np.int32)
+    cell_id[0, 0] = -1
+    cell_id[1, 1] = 1
+    cell_id[2, 2] = 4
+    cell_id[3, 3] = 5
+    species_id = np.zeros(shape, dtype=np.int32)
+    species_id[0, 0] = -1
+    species_id[1, 1] = 1
+    species_id[2, 2] = 4
+    species_id[3, 3] = 5
+    fast_flux = np.full(shape, 0.8, dtype=np.float64)
+    thermal_flux = np.full(shape, 0.2, dtype=np.float64)
+    precursor_M = np.full(shape, 0.4, dtype=np.float64)
+    inhibitor_C = np.full(shape, 0.5, dtype=np.float64)
+    return {
+        "cell_id": cell_id,
+        "species_id": species_id,
+        "fast_flux": fast_flux,
+        "thermal_flux": thermal_flux,
+        "precursor_damage_M": precursor_M,
+        "xenon_inhibitor_C": inhibitor_C,
+    }
+
+
+def test_compute_and_validate_layers_satisfies_all_contracts():
+    from biofilm_openmc.viewer import (
+        LAYER_CONTRACTS,
+        _TROPIC_FRAC_KEY,
+        compute_and_validate_layers,
+    )
+
+    raw = _sample_two_way_raw_state()
+    params = {
+        "I0": 1.0,
+        "kappa_water": 0.35,
+        "kappa_void": 0.02,
+        "kappa_species": [0.35, 0.45, 0.50, 1.40, 2.20],
+        "sigma_burn": 0.45,
+    }
+    out = compute_and_validate_layers(raw, params)
+    assert set(out.keys()) == set(LAYER_CONTRACTS.keys())
+    assert np.isclose(out["local_attenuation_kappa"][0, 0], 0.02)
+    assert np.isclose(out["local_attenuation_kappa"][2, 2], 1.40)
+    assert np.isclose(out["local_attenuation_kappa"][3, 3], 2.20)
+    assert np.isclose(out["bilinear_burnout_sink"][1, 1], 0.0)
+    assert np.isclose(out["bilinear_burnout_sink"][2, 2], 0.45 * 1.0 * 0.5)
+    assert np.isclose(out[_TROPIC_FRAC_KEY], 2.0 / 3.0)
+    assert out["shannon_diversity_H"] > 0.0
+
+
+def test_compute_and_validate_layers_edge_cases_and_negative_controls():
+    from biofilm_openmc.observer import BiofilmOpenMCObserver
+    from biofilm_openmc.viewer import (
+        _TROPIC_FRAC_KEY,
+        compute_and_validate_layers,
+    )
+
+    # Empty biomass (all water / voids): no division by zero
+    raw_empty = _sample_two_way_raw_state()
+    raw_empty["cell_id"][:] = 0
+    raw_empty["species_id"][:] = 0
+    out_empty = compute_and_validate_layers(raw_empty, {})
+    assert out_empty[_TROPIC_FRAC_KEY] == 0.0
+    assert out_empty["shannon_diversity_H"] == 0.0
+
+    # Shape mismatch rejected
+    raw_bad_shape = _sample_two_way_raw_state()
+    raw_bad_shape["fast_flux"] = np.ones((4, 4), dtype=np.float64)
+    with pytest.raises(ValueError, match="identical dimensions"):
+        compute_and_validate_layers(raw_bad_shape, {})
+
+    # NaN in quotable layer rejected
+    raw_nan = _sample_two_way_raw_state()
+    raw_nan["xenon_inhibitor_C"][1, 1] = np.nan
+    with pytest.raises(ValueError, match="contains NaN/Inf"):
+        compute_and_validate_layers(raw_nan, {})
+
+    # Observer rejects unvalidated or incomplete payloads
+    with pytest.raises(TypeError, match="validated layer dictionary"):
+        BiofilmOpenMCObserver(["not_a_dict"])
+    with pytest.raises(KeyError, match="missing"):
+        BiofilmOpenMCObserver({"cell_id": raw_empty["cell_id"]})
+    obs = BiofilmOpenMCObserver(out_empty)
+    assert obs.layers is out_empty
+
+
+def test_biofilm_openmc_observer_four_panel_audit_with_stub_pyvista(
+    monkeypatch, tmp_path
+):
+    import sys
+    import types
+
+    from biofilm_openmc.observer import BiofilmOpenMCObserver
+    from biofilm_openmc.viewer import compute_and_validate_layers
+
+    class _StubContours:
+        n_points = 4
+
+    class _StubPointGrid:
+        def contour(self, isosurfaces=4, scalars=None):
+            return _StubContours()
+
+    class _StubImageData:
+        def __init__(self, dimensions, spacing, origin):
+            self.dimensions = dimensions
+            self.spacing = spacing
+            self.origin = origin
+            self.cell_data = {}
+
+        def cell_data_to_point_data(self):
+            return _StubPointGrid()
+
+    class _StubPlotter:
+        def __init__(self, shape=(2, 2), off_screen=True, window_size=(1600, 1200)):
+            self.shape = shape
+            self.off_screen = off_screen
+            self.window_size = window_size
+            self.subplots_visited = []
+            self.titles = []
+            self.meshes = []
+            self.legends = []
+            self.texts = []
+            self.views_linked = False
+            self.screenshots = []
+
+        def subplot(self, r, c):
+            self.subplots_visited.append((r, c))
+
+        def add_title(self, title, font_size=11):
+            self.titles.append(title)
+
+        def add_mesh(self, mesh, **kwargs):
+            self.meshes.append((mesh, kwargs))
+
+        def add_legend(self, entries, **kwargs):
+            self.legends.append(entries)
+
+        def add_text(self, text, **kwargs):
+            self.texts.append(text)
+
+        def link_views(self):
+            self.views_linked = True
+
+        def screenshot(self, path):
+            self.screenshots.append(str(path))
+
+    stub_pv = types.ModuleType("pyvista")
+    stub_pv.ImageData = _StubImageData
+    stub_pv.Plotter = _StubPlotter
+    monkeypatch.setitem(sys.modules, "pyvista", stub_pv)
+
+    raw = _sample_two_way_raw_state()
+    validated = compute_and_validate_layers(raw, {})
+    obs = BiofilmOpenMCObserver(validated)
+    shot = tmp_path / "four_panel.png"
+    pl = obs.render_four_panel_audit(screenshot_path=str(shot), off_screen=True)
+    assert pl.subplots_visited == [(0, 0), (0, 1), (1, 0), (1, 1)]
+    assert len(pl.titles) == 4
+    assert len(pl.legends) == 1
+    assert pl.views_linked is True
+    assert pl.screenshots == [str(shot)]
+    assert "mean_dose_rate" in pl.telemetry
+
+
+def test_continuum_melanin_and_threshold_clipped_observer_telemetry(
+    monkeypatch, tmp_path
+):
+    import sys
+    import types
+
+    from biofilm_openmc.observer import (
+        SPECIES_ANNOTATIONS,
+        BiofilmOpenMCObserver,
+    )
+    from biofilm_openmc.viewer import compute_and_validate_layers
+
+    # Exact 64x64 snapshot from the specification
+    N = 64
+    spin = np.zeros((N, N), dtype=np.int32)
+    spin[26:38, 26:38] = 1
+    spin[16:26, 28:36] = 2
+    species_lut = np.array([4, 2], dtype=np.int32)
+
+    melanin = np.where(spin == 1, 0.75, np.where(spin == 2, 0.15, 0.0))
+    y, x = np.mgrid[0:N, 0:N]
+    r = np.hypot(x - 31.5, y - 31.5)
+    radiation = np.exp(-1.5 * r / N)
+    poison = 0.4 * np.exp(-((r - 12.0) / 6.0) ** 2)
+
+    raw_state = {
+        "spin": spin,
+        "species": species_lut,
+        "melanin": melanin,
+        "radiation": radiation,
+        "poison": poison,
+    }
+    params = {
+        "kappa": 1.5,
+        "kappa_void": 0.15,
+        "kappa_cell": 1.0,
+        "kappa_mel": 2.5,
+        "sigma_burn": 0.65,
+    }
+
+    layers = compute_and_validate_layers(raw_state, params)
+    assert np.isclose(np.mean(layers["radiation"]), 0.5766, atol=1e-4)
+
+    # Negative control: kappa = 0.0 -> local_attenuation == 0 everywhere
+    layers_neg = compute_and_validate_layers(raw_state, {"kappa": 0.0})
+    assert np.all(layers_neg["local_attenuation"] == 0.0)
+
+    class _StubContours:
+        n_points = 4
+
+    class _StubPointGrid:
+        def contour(self, isosurfaces=4, scalars=None):
+            return _StubContours()
+
+    class _StubFullMesh:
+        def __init__(self, dimensions=(65, 65, 9), spacing=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0)):
+            self.dimensions = dimensions
+            self.spacing = spacing
+            self.origin = origin
+            self.cell_data = {}
+            self.n_cells = 224
+            self.threshold_calls = []
+            self.clip_calls = []
+
+        def threshold(self, value=0.5, scalars=None):
+            self.threshold_calls.append((value, scalars))
+            return self
+
+        def clip(self, normal="-y", crinkle=False):
+            self.clip_calls.append((normal, crinkle))
+            return self
+
+        def cell_data_to_point_data(self):
+            return _StubPointGrid()
+
+    created_plotters = []
+
+    class _StubPlotter:
+        def __init__(self, shape=(2, 2), off_screen=True, window_size=(1600, 1200)):
+            self.meshes = []
+            self.closed = False
+            created_plotters.append(self)
+
+        def subplot(self, r, c):
+            pass
+
+        def add_title(self, title, font_size=11):
+            pass
+
+        def add_mesh(self, mesh, **kwargs):
+            self.meshes.append((mesh, kwargs))
+
+        def add_legend(self, entries, **kwargs):
+            pass
+
+        def add_text(self, text, **kwargs):
+            pass
+
+        def link_views(self):
+            pass
+
+        def screenshot(self, path):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    stub_pv = types.ModuleType("pyvista")
+    stub_pv.ImageData = _StubFullMesh
+    stub_pv.Plotter = _StubPlotter
+    monkeypatch.setitem(sys.modules, "pyvista", stub_pv)
+
+    obs = BiofilmOpenMCObserver(spacing=(1.0, 1.0, 1.0))
+    metrics = obs.render_four_panel_audit(
+        raw_state, params, screenshot_path=str(tmp_path / "audit.png")
+    )
+    assert round(metrics["mean_dose_rate"], 4) == 0.5766
+    assert round(metrics["void_fraction"], 4) == 0.9453
+    assert round(metrics["mean_kappa_occupied"], 4) == 3.5089
+    assert round(metrics["mean_kappa_void"], 4) == 0.225
+    assert round(metrics["poison_inventory"], 4) == 320.8142
+    assert round(metrics["mean_burnout_rate"], 4) == 0.0094
+
+    pl = created_plotters[-1]
+    mesh0, kwargs0 = pl.meshes[0]
+    assert mesh0.dimensions == (65, 65, 9)
+    assert (0.5, "species_id") in mesh0.threshold_calls
+    assert ("-y", True) in mesh0.clip_calls
+    assert ("-y", False) in mesh0.clip_calls
+    assert kwargs0.get("categories") is True
+    assert kwargs0.get("annotations") == SPECIES_ANNOTATIONS

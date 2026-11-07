@@ -31,8 +31,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .viewer import (BOOLEAN, CATEGORICAL, OUT_OF_DOMAIN, UNDECLARED,
-                     is_undeclared, read_layer, read_manifest)
+from .viewer import (BOOLEAN, CATEGORICAL, LAYER_CONTRACTS, OUT_OF_DOMAIN,
+                     UNDECLARED, _TROPIC_FRAC_KEY, is_undeclared, read_layer,
+                     read_manifest)
 
 # Same palette and labels as the serial model's figure section, carried across
 # from the CairoMakie prototype on `feat/visualize-3d`. That branch is otherwise
@@ -518,3 +519,279 @@ def plot_panels(panels, layer_name, *, plotter=None, link_views=True):
     if link_views and len(panels) > 1:
         p.link_views()
     return p
+
+
+SPECIES_ANNOTATIONS: dict[int, str] = {
+    -1: "Radiolytic / Steam Void (Low Attenuation)",
+    0: "Aqueous Coolant / EPS Medium (Moderator)",
+    1: "Sp1: Basal Heterotroph",
+    2: "Sp2: Structural EPS Producer",
+    3: "Sp3: Mildly Tolerant Commensal",
+    4: "Sp4: Melanin+ Tropism Core",
+    5: "Sp5: Melanin Hyper-Shield (Fast-Flux Scavenger)",
+}
+
+SPECIES_COLORS: dict[int, str] = {
+    -1: "#111111",
+    0: "#1f3b4d",
+    1: "#4daf4a",
+    2: "#377eb8",
+    3: "#984ea3",
+    4: "#ff7f00",
+    5: "#e41a1c",
+}
+
+
+class BiofilmOpenMCObserver:
+    """Read-only PyVista observer consuming pre-validated layers from viewer.py."""
+
+    def __init__(
+        self,
+        validated_layers: dict | None = None,
+        *,
+        spacing: tuple[float, float, float] = (1.0, 1.0, 1.0),
+    ) -> None:
+        self.spacing = spacing
+        self.last_telemetry: dict[str, float] = {}
+        if validated_layers is None:
+            self.layers = None
+            return
+        if (
+            isinstance(validated_layers, tuple)
+            and len(validated_layers) == 3
+            and all(isinstance(v, (int, float)) for v in validated_layers)
+        ):
+            self.spacing = (
+                float(validated_layers[0]),
+                float(validated_layers[1]),
+                float(validated_layers[2]),
+            )
+            self.layers = None
+            return
+        if not isinstance(validated_layers, dict):
+            raise TypeError(
+                "BiofilmOpenMCObserver requires a validated layer dictionary"
+            )
+        missing = [k for k in LAYER_CONTRACTS if k not in validated_layers]
+        if missing:
+            raise KeyError(
+                f"Observer received unvalidated payload; missing: {missing}"
+            )
+        self.layers = validated_layers
+
+    def build_voxel_grid(
+        self, layers: dict | None = None, nz_extrude: int = 1
+    ):
+        """Construct a PyVista ImageData / UniformGrid with all spatial layers
+        attached as cell data, optionally extruding 2D lattices to 3D thickness.
+        """
+        import pyvista as pv
+
+        active = layers if layers is not None else self.layers
+        if not isinstance(active, dict) or "cell_id" not in active:
+            raise KeyError("No validated layers available to build voxel grid")
+
+        sigma = active["cell_id"]
+        nx, ny = sigma.shape[:2]
+        if sigma.ndim == 3:
+            nz = sigma.shape[2]
+            promote_3d = False
+        else:
+            nz = max(1, int(nz_extrude))
+            promote_3d = nz > 1
+
+        grid_cls = getattr(pv, "ImageData", None) or getattr(pv, "UniformGrid")
+        grid = grid_cls(
+            dimensions=(nx + 1, ny + 1, nz + 1),
+            spacing=self.spacing,
+            origin=(0.0, 0.0, 0.0),
+        )
+
+        for key, val in active.items():
+            if isinstance(val, np.ndarray) and val.shape[:2] == (nx, ny):
+                vol = (
+                    np.repeat(val[:, :, np.newaxis], nz, axis=2)
+                    if promote_3d
+                    else val
+                )
+                grid.cell_data[key] = vol.flatten(order="F")
+
+        return grid
+
+    @staticmethod
+    def compute_telemetry(layers: dict) -> dict[str, float]:
+        """Compute macroscopic regime telemetry for claims ledger auditing."""
+        sigma = np.asarray(layers["cell_id"])
+        occupied = sigma > 0
+        rad = np.asarray(layers["total_radiation"], dtype=np.float64)
+        kappa = np.asarray(layers["local_attenuation_kappa"], dtype=np.float64)
+        poison = np.asarray(layers["xenon_inhibitor_C"], dtype=np.float64)
+        burn = np.asarray(layers["bilinear_burnout_sink"], dtype=np.float64)
+        return {
+            "mean_dose_rate": float(np.mean(rad)),
+            "void_fraction": float(np.mean(~occupied)),
+            "mean_kappa_occupied": (
+                float(np.mean(kappa[occupied])) if np.any(occupied) else 0.0
+            ),
+            "mean_kappa_void": (
+                float(np.mean(kappa[~occupied])) if np.any(~occupied) else 0.0
+            ),
+            "poison_inventory": float(np.sum(poison)),
+            "mean_burnout_rate": float(np.mean(burn)),
+        }
+
+    def render_four_panel_audit(
+        self,
+        raw_state: dict | None = None,
+        params: dict | None = None,
+        screenshot_path: str | None = None,
+        off_screen: bool = True,
+        plotter=None,
+    ):
+        """Render a 4-panel linked-view PyVista audit of:
+        (0,0) Thresholded Categorical Species & Void Architecture (crinkle-clipped)
+        (0,1) Clipped State-Dependent Attenuation Coefficient kappa(sigma)
+        (1,0) Clipped Two-Group Ionizing Flux I_fast + I_therm
+        (1,1) Clipped Delayed Inhibitor C & Bilinear Burnout Contours
+        """
+        import pyvista as pv
+
+        from .viewer import compute_and_validate_layers
+
+        return_telemetry = raw_state is not None
+        if raw_state is not None:
+            active_layers = compute_and_validate_layers(
+                raw_state, params or {}
+            )
+            self.layers = active_layers
+            nz_ext = 8
+        else:
+            if self.layers is None:
+                raise ValueError("No layers provided to render_four_panel_audit")
+            active_layers = self.layers
+            nz_ext = 1
+
+        grid = self.build_voxel_grid(active_layers, nz_extrude=nz_ext)
+        pl = plotter or pv.Plotter(
+            shape=(2, 2), off_screen=off_screen, window_size=(1600, 1200)
+        )
+
+        rad_frac = float(active_layers[_TROPIC_FRAC_KEY])
+        shannon_H = float(active_layers["shannon_diversity_H"])
+        void_coeff = float(active_layers["void_reactivity_coeff"])
+
+        # Panel (0, 0): Thresholded & Crinkle-Clipped Categorical Species Parcels
+        pl.subplot(0, 0)
+        pl.add_title("1. Species & Void Architecture", font_size=11)
+        if hasattr(grid, "threshold"):
+            biomass_mesh = grid.threshold(value=0.5, scalars="species_id")
+            if getattr(biomass_mesh, "n_cells", 0) > 0:
+                if hasattr(biomass_mesh, "clip"):
+                    biomass_mesh = biomass_mesh.clip(normal="-y", crinkle=True)
+                pl.add_mesh(
+                    biomass_mesh,
+                    scalars="species_id",
+                    categories=True,
+                    cmap="tab10",
+                    clim=(1, 5),
+                    annotations=SPECIES_ANNOTATIONS,
+                    show_edges=True,
+                    scalar_bar_args={"title": "Species ID (Thresholded > 0)"},
+                )
+        else:
+            pl.add_mesh(
+                grid,
+                scalars="species_id",
+                categories=True,
+                cmap="tab10",
+                clim=[-1, 5],
+                annotations=SPECIES_ANNOTATIONS,
+                show_edges=False,
+                scalar_bar_args={"title": "Species / Void ID"},
+            )
+        legend_entries = [
+            [SPECIES_ANNOTATIONS[k], SPECIES_COLORS[k]]
+            for k in [-1, 0, 1, 2, 3, 4, 5]
+        ]
+        pl.add_legend(
+            legend_entries, bcolor=(0.1, 0.1, 0.1), size=(0.38, 0.28)
+        )
+        pl.add_text(
+            f"Melanin+ Frac: {rad_frac:.2%} | H: {shannon_H:.2f}",
+            position="lower_left",
+            font_size=9,
+        )
+
+        # Panel (0, 1): State-Dependent Attenuation clipped across mid-plane
+        pl.subplot(0, 1)
+        pl.add_title("2. State-Dependent Attenuation kappa(sigma)", font_size=11)
+        att_mesh = (
+            grid.clip(normal="-y", crinkle=False)
+            if hasattr(grid, "clip")
+            else grid
+        )
+        pl.add_mesh(
+            att_mesh,
+            scalars="local_attenuation_kappa",
+            cmap="magma",
+            scalar_bar_args={"title": "kappa [1/lattice]"},
+        )
+        pl.add_text(
+            f"Void Reactivity alpha_V: {void_coeff:+.3f}",
+            position="lower_left",
+            font_size=9,
+        )
+
+        # Panel (1, 0): Two-Group Radiation Field clipped across mid-plane
+        pl.subplot(1, 0)
+        pl.add_title("3. Two-Group Radiation Field (Fast + Thermal)", font_size=11)
+        rad_mesh = (
+            grid.clip(normal="-y", crinkle=False)
+            if hasattr(grid, "clip")
+            else grid
+        )
+        pl.add_mesh(
+            rad_mesh,
+            scalars="total_radiation",
+            cmap="inferno",
+            scalar_bar_args={"title": "Flux I_tot [rel]"},
+        )
+
+        # Panel (1, 1): Delayed Inhibitor C & Bilinear Burnout Sink
+        pl.subplot(1, 1)
+        pl.add_title("4. Xenon-Style Inhibitor C & Burnout Sink", font_size=11)
+        inh_mesh = (
+            grid.clip(normal="-y", crinkle=False)
+            if hasattr(grid, "clip")
+            else grid
+        )
+        pl.add_mesh(
+            inh_mesh,
+            scalars="xenon_inhibitor_C",
+            cmap="viridis",
+            scalar_bar_args={"title": "Inhibitor C [a.u.]"},
+        )
+        if float(np.max(active_layers["bilinear_burnout_sink"])) > 1e-6:
+            point_grid = grid.cell_data_to_point_data()
+            contours = point_grid.contour(
+                isosurfaces=4, scalars="bilinear_burnout_sink"
+            )
+            if contours.n_points > 0:
+                pl.add_mesh(contours, color="cyan", line_width=2.5)
+
+        pl.link_views()
+        if screenshot_path:
+            pl.screenshot(screenshot_path)
+
+        telemetry = self.compute_telemetry(active_layers)
+        self.last_telemetry = telemetry
+        try:
+            pl.telemetry = telemetry
+        except Exception:
+            pass
+
+        if return_telemetry:
+            if hasattr(pl, "close"):
+                pl.close()
+            return telemetry
+        return pl

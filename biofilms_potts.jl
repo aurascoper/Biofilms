@@ -2289,6 +2289,599 @@ function advance_window!(sim::CoupledSimulation, n_mcs::Int;
 end
 
 # ============================================================
+#  12b. Two-Way State-Dependent Attenuation, Two-Group Cascade
+#       & Bilinear Poison Burnout Surrogate (BiofilmsPottsRad)
+# ============================================================
+module BiofilmsPottsRad
+
+using Random
+using Statistics
+
+export Params, State, init_state, local_attenuation, update_radiation_field!,
+       dH_radiation, step_cpm!, step_fields!, update_radial_metrics!,
+       compute_derived_layers, simulate_xenon_pit_hysteresis,
+       export_observer_payload, run_control_audit
+
+Base.@kwdef struct Params
+    N::Int = 48
+    N_types::Int = 5
+    R_wall::Float64 = 24.0
+    T::Float64 = 12.0
+    T_potts::Float64 = 1.0
+    λ_vol::Float64 = 2.5
+    V_target::Vector{Int} = Int[0, 16, 16, 18, 22, 24]
+    I0::Float64 = 1.0
+    κ::Float64 = 1.0
+    κ_water::Float64 = 0.35
+    κ_void::Float64 = 0.02
+    κ_cell::Float64 = 1.0
+    κ_mel::Float64 = 2.5
+    κ_species::Vector{Float64} = Float64[0.35, 0.45, 0.50, 1.40, 2.20]
+    Σ_water::Float64 = 0.35
+    Σ_void::Float64 = 0.01
+    Σ_scatter::Vector{Float64} = Float64[0.25, 0.30, 0.30, 0.45, 0.60]
+    κ_therm::Float64 = 1.10
+    beta_ion::Float64 = -4.0
+    β_ion::Vector{Float64} = Float64[0.0, 0.0, -0.5, -4.0, -6.5]
+    alpha_M_species::Vector{Float64} = Float64[0.05, 0.15, 0.25, 0.45, 0.85]
+    D_C::Float64 = 0.15
+    γ_prod::Float64 = 0.08
+    γ_delay::Float64 = 0.08
+    λ_decay::Float64 = 0.015
+    σ_burn::Float64 = 0.45
+end
+
+mutable struct State
+    σ::Matrix{Int}
+    cell_type::Dict{Int,Int}
+    cell_vol::Dict{Int,Int}
+    I_fast::Matrix{Float64}
+    I_therm::Matrix{Float64}
+    radiation::Matrix{Float64}
+    M_damage::Matrix{Float64}
+    C_inhib::Matrix{Float64}
+    mean_r_history::Vector{Vector{Float64}}
+    void_fraction_history::Vector{Float64}
+end
+
+"""
+    local_attenuation(state::State, p::Params, i::Int, j::Int) -> (κ, Σ_s)
+
+Return the local fast-group attenuation coefficient `κ` and fast-to-thermal
+moderation cross-section `Σ_s` at lattice site `(i, j)`.
+When `p.κ == 0.0` or all phase attenuation coefficients are zero, both
+attenuation and fast-to-thermal scattering vanish identically across water,
+voids, and occupied cells.
+"""
+@inline function local_attenuation(state::State, p::Params, i::Int, j::Int)
+    if p.κ == 0.0 || (p.κ_water == 0.0 && p.κ_void == 0.0 && all(==(0.0), p.κ_species))
+        return (0.0, 0.0)
+    end
+    cid = state.σ[i, j]
+    if cid == 0
+        return (p.κ * p.κ_water, p.κ * p.Σ_water)
+    elseif cid == -1
+        return (p.κ * p.κ_void, p.κ * p.Σ_void)
+    else
+        sp = state.cell_type[cid]
+        return (p.κ * p.κ_species[sp], p.κ * p.Σ_scatter[sp])
+    end
+end
+
+"""
+    init_rad_state(p::Params; seed::Int = 42, void_fraction::Float64 = 0.08) -> State
+
+Initialize a 2D lattice state with water (`0`), radiolytic gas/steam voids (`-1`),
+and `p.N_types` species distributed in radial shells around the central source.
+"""
+function init_rad_state(p::Params; seed::Int = 42, void_fraction::Float64 = 0.08)
+    rng = MersenneTwister(seed)
+    N = p.N
+    σ = zeros(Int, N, N)
+    cell_type = Dict{Int,Int}()
+    cell_vol = Dict{Int,Int}()
+    cx, cy = (N + 1) / 2.0, (N + 1) / 2.0
+    max_r = hypot(cx - 1.0, cy - 1.0)
+
+    next_cid = 1
+    for i in 2:3:(N - 1), j in 2:3:(N - 1)
+        r_norm = hypot(i - cx, j - cy) / max(max_r, 1.0)
+        if r_norm < 0.12
+            continue
+        end
+        u = rand(rng)
+        if u < void_fraction
+            σ[i, j] = -1
+            continue
+        elseif u < void_fraction + 0.22
+            continue
+        end
+        sp = clamp( 1 + floor(Int, ((i + j) % p.N_types)), 1, p.N_types )
+        cid = next_cid
+        next_cid += 1
+        cell_type[cid] = sp
+        vol = 0
+        for di in 0:1, dj in 0:1
+            ii = clamp(i + di, 1, N)
+            jj = clamp(j + dj, 1, N)
+            if σ[ii, jj] == 0
+                σ[ii, jj] = cid
+                vol += 1
+            end
+        end
+        if vol > 0
+            cell_vol[cid] = vol
+        else
+            delete!(cell_type, cid)
+        end
+    end
+
+    state = State(
+        σ,
+        cell_type,
+        cell_vol,
+        zeros(Float64, N, N),
+        zeros(Float64, N, N),
+        zeros(Float64, N, N),
+        zeros(Float64, N, N),
+        zeros(Float64, N, N),
+        [Float64[] for _ in 1:p.N_types],
+        Float64[],
+    )
+    update_radiation_field!(state, p)
+    update_radial_metrics!(state, p)
+    return state
+end
+
+const init_state = init_rad_state
+
+"""
+    update_radiation_field!(state::State, p::Params)
+
+Compute the two-group radiation field (`I_fast`, `I_therm`, and `radiation`)
+by integrating state-dependent attenuation and fast-to-thermal build-up along
+discrete rays from `(cx, cy)`.
+"""
+function update_radiation_field!(state::State, p::Params)
+    N = p.N
+    if p.κ == 0.0 || (p.κ_water == 0.0 && p.κ_void == 0.0 && all(==(0.0), p.κ_species))
+        fill!(state.I_fast, p.I0)
+        fill!(state.I_therm, 0.0)
+        fill!(state.radiation, p.I0)
+        return nothing
+    end
+    cx, cy = (N + 1) / 2.0, (N + 1) / 2.0
+
+    for j in 1:N, i in 1:N
+        dx = i - cx
+        dy = j - cy
+        dist = hypot(dx, dy)
+        steps = max(1, ceil(Int, dist))
+        ds = (dist / steps) / N
+
+        optical_depth_fast = 0.0
+        I_therm_acc = 0.0
+
+        for s in 1:steps
+            frac = (s - 0.5) / steps
+            ix = clamp(round(Int, cx + frac * dx), 1, N)
+            iy = clamp(round(Int, cy + frac * dy), 1, N)
+            κ_loc, Σ_loc = local_attenuation(state, p, ix, iy)
+            optical_depth_fast += κ_loc * ds
+            I_f_step = p.I0 * exp(-optical_depth_fast)
+            I_therm_acc = I_therm_acc * exp(-p.κ * p.κ_therm * ds) + Σ_loc * I_f_step * ds
+        end
+
+        I_f = p.I0 * exp(-optical_depth_fast)
+        state.I_fast[i, j] = I_f
+        state.I_therm[i, j] = I_therm_acc
+        state.radiation[i, j] = state.I_fast[i, j] + state.I_therm[i, j]
+    end
+    return nothing
+end
+
+"""
+    dH_radiation(state::State, p::Params, i_src::Int, j_src::Int, i_tgt::Int, j_tgt::Int) -> Float64
+
+Radiation Hamiltonian bias for copying `σ[i_src, j_src]` into `(i_tgt, j_tgt)`.
+"""
+@inline function dH_radiation(state::State, p::Params, i_src::Int, j_src::Int, i_tgt::Int, j_tgt::Int)
+    cid_src = state.σ[i_src, j_src]
+    cid_tgt = state.σ[i_tgt, j_tgt]
+    cid_src == cid_tgt && return 0.0
+
+    β_src = cid_src > 0 ? p.β_ion[state.cell_type[cid_src]] : 0.0
+    β_tgt = cid_tgt > 0 ? p.β_ion[state.cell_type[cid_tgt]] : 0.0
+
+    ΔI = state.radiation[i_tgt, j_tgt] - state.radiation[i_src, j_src]
+    return (β_src - β_tgt) * ΔI
+end
+
+"""
+    step_cpm!(state::State, p::Params; n_trials::Int = p.N * p.N, rng::AbstractRNG = Random.default_rng())
+
+Execute `n_trials` Metropolis copy attempts preserving exact `cell_vol` counts
+and updating the coupled two-group radiation field.
+"""
+function step_cpm!(state::State, p::Params; n_trials::Int = p.N * p.N, rng::AbstractRNG = Random.default_rng())
+    N = p.N
+    offsets = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1))
+    for _ in 1:n_trials
+        i_tgt = rand(rng, 1:N)
+        j_tgt = rand(rng, 1:N)
+        di, dj = offsets[rand(rng, 1:8)]
+        i_src = clamp(i_tgt + di, 1, N)
+        j_src = clamp(j_tgt + dj, 1, N)
+
+        cid_src = state.σ[i_src, j_src]
+        cid_tgt = state.σ[i_tgt, j_tgt]
+        cid_src == cid_tgt && continue
+        (cid_src == -1 || cid_tgt == -1) && continue
+
+        if cid_tgt > 0 && get(state.cell_vol, cid_tgt, 0) <= 1
+            continue
+        end
+
+        dH_vol = 0.0
+        if cid_src > 0
+            sp_s = state.cell_type[cid_src]
+            v_s = state.cell_vol[cid_src]
+            vt_s = p.V_target[sp_s + 1]
+            dH_vol += p.λ_vol * ((v_s + 1 - vt_s)^2 - (v_s - vt_s)^2)
+        end
+        if cid_tgt > 0
+            sp_t = state.cell_type[cid_tgt]
+            v_t = state.cell_vol[cid_tgt]
+            vt_t = p.V_target[sp_t + 1]
+            dH_vol += p.λ_vol * ((v_t - 1 - vt_t)^2 - (v_t - vt_t)^2)
+        end
+
+        dH = dH_vol + dH_radiation(state, p, i_src, j_src, i_tgt, j_tgt)
+        if dH <= 0.0 || rand(rng) < exp(-dH / p.T)
+            state.σ[i_tgt, j_tgt] = cid_src
+            if cid_src > 0
+                state.cell_vol[cid_src] = state.cell_vol[cid_src] + 1
+            end
+            if cid_tgt > 0
+                state.cell_vol[cid_tgt] = state.cell_vol[cid_tgt] - 1
+            end
+        end
+    end
+    update_radiation_field!(state, p)
+    return nothing
+end
+
+"""
+    step_fields!(state::State, p::Params; dt::Float64 = 0.2)
+
+Advance precursor damage `M_damage` (Iodine-135 analogue) and radiolytic inhibitor
+`C_inhib` (Xenon-135 analogue) with bilinear flux-melanin burnout sink.
+"""
+function step_fields!(state::State, p::Params; dt::Float64 = 0.2)
+    N = p.N
+    C_new = similar(state.C_inhib)
+
+    for j in 1:N, i in 1:N
+        cid = state.σ[i, j]
+        sp = cid > 0 ? state.cell_type[cid] : 0
+        ρ_mel = (sp == 4 || sp == 5) ? 1.0 : 0.0
+
+        state.M_damage[i, j] = (1.0 - 0.05 * dt) * state.M_damage[i, j] +
+                               dt * 0.12 * state.radiation[i, j]
+
+        im1 = max(1, i - 1)
+        ip1 = min(N, i + 1)
+        jm1 = max(1, j - 1)
+        jp1 = min(N, j + 1)
+        lap = state.C_inhib[im1, j] + state.C_inhib[ip1, j] +
+              state.C_inhib[i, jm1] + state.C_inhib[i, jp1] - 4.0 * state.C_inhib[i, j]
+
+        prod = p.γ_delay * state.M_damage[i, j]
+        decay = p.λ_decay * state.C_inhib[i, j]
+        burn = p.σ_burn * state.radiation[i, j] * ρ_mel * state.C_inhib[i, j]
+
+        C_new[i, j] = max(0.0, state.C_inhib[i, j] + dt * (p.D_C * lap + prod - decay - burn))
+    end
+    state.C_inhib .= C_new
+    return nothing
+end
+
+"""
+    simulate_xenon_pit_hysteresis(p::Params = Params(); steps_per_phase::Int = 30, dt::Float64 = 0.2)
+
+Run a 4-phase Chernobyl power protocol (Event 1: 50% power equilibrium -> Event 2: 30%
+step-down -> Event 3: 1% Xenon-135 pit -> Event 4/5: power step-up burnout) on a
+melanized site and compare `σ_burn > 0` against `σ_burn = 0`.
+"""
+function simulate_xenon_pit_hysteresis(p::Params = Params(); steps_per_phase::Int = 30, dt::Float64 = 0.2)
+    flux_schedule = vcat(
+        fill(0.50 * p.I0, steps_per_phase),
+        fill(0.30 * p.I0, steps_per_phase),
+        fill(0.01 * p.I0, steps_per_phase),
+        fill(0.85 * p.I0, steps_per_phase),
+    )
+    M_b = 0.0
+    C_b = 0.0
+    M_l = 0.0
+    C_l = 0.0
+    trace_bilinear = Float64[]
+    trace_linear = Float64[]
+
+    for I_t in flux_schedule
+        M_b = (1.0 - 0.05 * dt) * M_b + dt * 0.12 * I_t
+        C_b = max(0.0, C_b + dt * (p.γ_delay * M_b - p.λ_decay * C_b - p.σ_burn * I_t * C_b))
+        push!(trace_bilinear, C_b)
+
+        M_l = (1.0 - 0.05 * dt) * M_l + dt * 0.12 * I_t
+        C_l = max(0.0, C_l + dt * (p.γ_delay * M_l - p.λ_decay * C_l))
+        push!(trace_linear, C_l)
+    end
+
+    c_phase1_end = trace_bilinear[steps_per_phase]
+    c_pit_peak = maximum(trace_bilinear[(2 * steps_per_phase + 1):(3 * steps_per_phase)])
+    c_phase4_end = trace_bilinear[end]
+    return (
+        trace_bilinear = trace_bilinear,
+        trace_linear = trace_linear,
+        c_phase1_end = c_phase1_end,
+        c_pit_peak = c_pit_peak,
+        c_phase4_end = c_phase4_end,
+        pit_overshoot = c_pit_peak - c_phase1_end,
+        burnout_clearance = c_pit_peak - c_phase4_end,
+    )
+end
+
+"""
+    update_radial_metrics!(state::State, p::Params)
+
+Append species-wise mean radial distance `<r_sp>(t)` and void fraction `f_void(t)`.
+"""
+function update_radial_metrics!(state::State, p::Params)
+    N = p.N
+    cx, cy = (N + 1) / 2.0, (N + 1) / 2.0
+    r_sums = zeros(Float64, p.N_types)
+    counts = zeros(Int, p.N_types)
+    void_count = 0
+
+    for j in 1:N, i in 1:N
+        cid = state.σ[i, j]
+        if cid == -1
+            void_count += 1
+        elseif cid > 0
+            sp = state.cell_type[cid]
+            r_sums[sp] += hypot(i - cx, j - cy)
+            counts[sp] += 1
+        end
+    end
+
+    for sp in 1:p.N_types
+        mean_r = counts[sp] > 0 ? r_sums[sp] / counts[sp] : NaN
+        push!(state.mean_r_history[sp], mean_r)
+    end
+    push!(state.void_fraction_history, void_count / (N * N))
+    return nothing
+end
+
+"""
+    compute_derived_layers(state::State, p::Params) -> Dict{String, Any}
+
+Compute the complete dictionary of 2D spatial arrays and scalar regime diagnostics
+matching the Python `coupling/biofilm_openmc/viewer.py` layer contract.
+"""
+function compute_derived_layers(state::State, p::Params)
+    N = p.N
+    species_id = zeros(Int, N, N)
+    kappa_map = zeros(Float64, N, N)
+    burnout_sink = zeros(Float64, N, N)
+    void_mask = zeros(Int, N, N)
+    melanin_mask = zeros(Int, N, N)
+
+    sp_counts = zeros(Int, p.N_types)
+    total_bio = 0
+
+    for j in 1:N, i in 1:N
+        cid = state.σ[i, j]
+        κ_loc, _ = local_attenuation(state, p, i, j)
+        kappa_map[i, j] = κ_loc
+        if cid == -1
+            species_id[i, j] = -1
+            void_mask[i, j] = 1
+        elseif cid > 0
+            sp = state.cell_type[cid]
+            species_id[i, j] = sp
+            sp_counts[sp] += 1
+            total_bio += 1
+            if sp == 4 || sp == 5
+                melanin_mask[i, j] = 1
+                burnout_sink[i, j] = p.σ_burn * state.radiation[i, j] * state.C_inhib[i, j]
+            end
+        end
+    end
+
+    rad_frac = total_bio > 0 ? (sp_counts[4] + sp_counts[5]) / total_bio : 0.0
+    shannon_H = 0.0
+    if total_bio > 0
+        for c in sp_counts
+            if c > 0
+                prob = c / total_bio
+                shannon_H -= prob * log(prob)
+            end
+        end
+    end
+
+    mean_void = mean(void_mask)
+    mean_flux = mean(state.radiation)
+    baseline_flux = p.I0 * exp(-0.5 * p.κ * p.κ_water)
+    void_reactivity = (mean_flux - baseline_flux) / max(mean_void, 1e-6)
+
+    return Dict{String, Any}(
+        "cell_id" => copy(state.σ),
+        "species_id" => species_id,
+        "local_attenuation_kappa" => kappa_map,
+        "fast_flux" => copy(state.I_fast),
+        "thermal_flux" => copy(state.I_therm),
+        "total_radiation" => copy(state.radiation),
+        "precursor_damage_M" => copy(state.M_damage),
+        "xenon_inhibitor_C" => copy(state.C_inhib),
+        "bilinear_burnout_sink" => burnout_sink,
+        "void_mask" => void_mask,
+        "melanin_shield_mask" => melanin_mask,
+        "radiotrophic_fraction" => Float64(rad_frac),
+        "shannon_diversity_H" => Float64(shannon_H),
+        "void_reactivity_coeff" => Float64(void_reactivity),
+    )
+end
+
+function _matrix_to_json(mat::AbstractMatrix)
+    rows = String[]
+    for i in axes(mat, 1)
+        push!(rows, "[" * join(mat[i, :], ", ") * "]")
+    end
+    return "[" * join(rows, ", ") * "]"
+end
+
+"""
+    export_observer_payload(state::State, p::Params, path::AbstractString)
+
+Write a self-contained JSON payload of raw and derived spatial layers and scalar
+regime invariants for `viewer.py` and `observer.py`.
+"""
+function export_observer_payload(state::State, p::Params, path::AbstractString)
+    layers = compute_derived_layers(state, p)
+    spatial_keys = (
+        "cell_id",
+        "species_id",
+        "local_attenuation_kappa",
+        "fast_flux",
+        "thermal_flux",
+        "total_radiation",
+        "precursor_damage_M",
+        "xenon_inhibitor_C",
+        "bilinear_burnout_sink",
+        "void_mask",
+        "melanin_shield_mask",
+    )
+    open(path, "w") do io
+        write(io, "{\n")
+        write(io, "  \"N\": $(p.N),\n")
+        for k in spatial_keys
+            write(io, "  \"$k\": $(_matrix_to_json(layers[k])),\n")
+        end
+        write(io, "  \"radiotrophic_fraction\": $(layers["radiotrophic_fraction"]),\n")
+        write(io, "  \"shannon_diversity_H\": $(layers["shannon_diversity_H"]),\n")
+        write(io, "  \"void_reactivity_coeff\": $(layers["void_reactivity_coeff"])\n")
+        write(io, "}\n")
+    end
+    return path
+end
+
+"""
+    run_control_audit() -> NamedTuple
+
+Run negative and positive physical controls for the two-way radiation CPM and
+Xenon-135 bilinear burnout model:
+1. Negative control (`κ = 0`, `β_ion = 0`): uniform radiation (`Var(I) == 0`) and zero radial bias, even when `Σ_scatter` is non-zero.
+2. Positive control (`κ > 0`, `β_ion < 0` for Sp4/Sp5): non-zero attenuation gradient and inward migration (`Δ<r> < 0`) of melanized species.
+3. Void reactivity feedback (`κ_void << κ_water`): introducing voids increases mean interior flux (`α_V > 0`).
+4. Bilinear burnout hysteresis: step-down power creates a Xenon-135 poison pit (`c_pit_peak > c_phase1_end`) that is rapidly cleared upon power step-up (`burnout_clearance > 0`).
+5. Exact volume registry conservation (`cell_vol[cid] == count(==(cid), σ)` for all cells).
+"""
+function run_control_audit()
+    # 1a. Negative Control via phase κ = 0 (without manually zeroing Σ_scatter)
+    p_neg = Params(
+        N = 24,
+        I0 = 1.0,
+        κ_water = 0.0,
+        κ_void = 0.0,
+        κ_species = zeros(5),
+        β_ion = zeros(5),
+    )
+    st_neg = init_state(p_neg; seed = 101, void_fraction = 0.0)
+    update_radiation_field!(st_neg, p_neg)
+    var_I_neg = var(st_neg.radiation)
+    @assert isapprox(var_I_neg, 0.0; atol = 1e-12) "Negative control failed: radiation variance must be 0 when κ=0"
+    @assert all(st_neg.I_fast .== p_neg.I0) "Negative control failed: I_fast must equal I0 everywhere when κ=0"
+    @assert all(st_neg.radiation .== p_neg.I0) "Negative control failed: total radiation must equal I0 everywhere when κ=0"
+
+    # 1b. Negative Control via scalar κ = 0.0 multiplier
+    p_neg_scalar = Params(N = 24, I0 = 1.0, κ = 0.0)
+    st_neg_scalar = init_state(p_neg_scalar; seed = 101, void_fraction = 0.08)
+    @assert all(st_neg_scalar.radiation .== p_neg_scalar.I0) "Scalar κ=0 negative control failed"
+
+    # 2. Positive Control: state-dependent attenuation + inward tropism of Sp4/Sp5
+    p_pos = Params(
+        N = 24,
+        I0 = 2.0,
+        T = 1.5,
+        λ_vol = 2.0,
+        V_target = Int[0, 4, 4, 4, 5, 5],
+        κ_water = 0.85,
+        κ_species = Float64[0.85, 0.95, 1.05, 2.20, 3.10],
+        Σ_water = 0.05,
+        Σ_scatter = Float64[0.05, 0.05, 0.05, 0.10, 0.12],
+        β_ion = Float64[0.0, 0.0, -1.0, -45.0, -65.0],
+    )
+    st_pos = init_state(p_pos; seed = 101, void_fraction = 0.04)
+    r4_init = st_pos.mean_r_history[4][end]
+    r5_init = st_pos.mean_r_history[5][end]
+    rng = MersenneTwister(2026)
+    for _ in 1:60
+        step_cpm!(st_pos, p_pos; n_trials = 24 * 24, rng = rng)
+        step_fields!(st_pos, p_pos; dt = 0.2)
+    end
+    update_radial_metrics!(st_pos, p_pos)
+    r4_final = st_pos.mean_r_history[4][end]
+    r5_final = st_pos.mean_r_history[5][end]
+    var_I_pos = var(st_pos.radiation)
+    @assert var_I_pos > 1e-4 "Positive control failed: expected non-zero radiation variance"
+    @assert (r4_final < r4_init && r5_final < r5_init) "Positive control failed: melanized species must migrate inward down β_ion < 0"
+
+    # 3. Void Reactivity Feedback Control: replacing water/biomass with voids increases interior flux
+    st_dense = init_state(p_pos; seed = 303, void_fraction = 0.0)
+    st_voidy = init_state(p_pos; seed = 303, void_fraction = 0.35)
+    mean_I_dense = mean(st_dense.radiation)
+    mean_I_voidy = mean(st_voidy.radiation)
+    @assert mean_I_voidy > mean_I_dense "Void feedback control failed: higher void fraction must increase mean flux"
+
+    # 4. Xenon-135 Bilinear Burnout Hysteresis Control
+    hyst = simulate_xenon_pit_hysteresis(p_pos; steps_per_phase = 30, dt = 0.2)
+    @assert hyst.pit_overshoot > 0.0 "Xenon pit control failed: inhibitor C must accumulate during power step-down"
+    @assert hyst.burnout_clearance > 0.0 "Xenon burnout control failed: high flux must burn out inhibitor C"
+    @assert hyst.trace_bilinear[end] < hyst.trace_linear[end] "Identifiability control failed: bilinear burnout must clear C faster than linear decay alone"
+
+    # 5. Volume Registry Conservation Check
+    for (cid, v_reg) in st_pos.cell_vol
+        v_actual = count(==(cid), st_pos.σ)
+        @assert v_reg == v_actual "Volume registry mismatch for cell $cid: registered=$v_reg vs actual=$v_actual"
+    end
+
+    layers = compute_derived_layers(st_pos, p_pos)
+    @assert length(layers) == 14 "Derived layer dictionary must contain all 14 contracted entries"
+
+    mktempdir() do tmp
+        payload_path = joinpath(tmp, "observer_payload.json")
+        export_observer_payload(st_pos, p_pos, payload_path)
+        payload_txt = read(payload_path, String)
+        for req_key in ("cell_id", "species_id", "local_attenuation_kappa", "bilinear_burnout_sink")
+            @assert occursin("\"$req_key\": [[", payload_txt) "export_observer_payload missing 2D array for $req_key"
+        end
+    end
+
+    return (
+        var_I_neg = var_I_neg,
+        var_I_pos = var_I_pos,
+        delta_r_sp4 = r4_final - r4_init,
+        delta_r_sp5 = r5_final - r5_init,
+        mean_I_dense = mean_I_dense,
+        mean_I_voidy = mean_I_voidy,
+        pit_overshoot = hyst.pit_overshoot,
+        burnout_clearance = hyst.burnout_clearance,
+    )
+end
+
+end # module BiofilmsPottsRad
+
+# ============================================================
 #  13. Figure export (CairoMakie — headless, publication-ready)
 #
 #  Four figures produced by export_figures():
