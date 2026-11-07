@@ -701,3 +701,242 @@ def test_moving_a_cited_line_out_of_indented_code_changes_its_digest(tmp_path, m
     (root / "notes.md").write_text(f"Example:\n\n{code.strip()}\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 1 and "context changed" in got[0], got
+
+
+# Issue #74: the existing citation harnesses checked that every citation resolves and that every
+# \bibitem is cited, but not the inverse direction: a prose sentence in the manuscript claiming
+# what "the literature", "the published ...", "demonstrations ... have shown", "it is well known",
+# or "studies show" without a \cite{...} in that sentence (or a reason-keyed exemption). Commit
+# 3954094 shipped an unsourced quantitative claim ("The published demonstrations of observable-
+# choice remedies for structural non-identifiability sit at one or two parameters on single-species
+# models, so their transfer to a seven-species lattice is untested.") while all suites stayed green.
+PREPRINT_REL = "preprint/modeling_radioresistance_and_radiotropic_fitness.tex"
+
+LITERATURE_CLAIM_PHRASE = re.compile(
+    r"\b(?:"
+    r"the\s+literature|"
+    r"the\s+published|"
+    r"(?:published|prior|previous|existing)\s+"
+    r"(?:literature|demonstrations|studies|reports|measurements|experiments|work)|"
+    r"demonstrations\b[^.!?]*?\bhave\s+shown|"
+    r"it\s+is\s+well\s+known|"
+    r"studies\s+(?:have\s+)?show(?:n)?"
+    r")\b",
+    re.I,
+)
+
+_ABBREV_DOT = re.compile(
+    r"\b(?:et\s+al|e\.g|i\.e|cf|vs|Fig|Figs|Eq|Eqs|Sec|Secs|Ref|Refs|sp|spp|var|Dr|Prof)\."
+    r"|(?<=\\textit\{[A-Z])\.",
+)
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?\s+(?=[A-Z\\$`(\[0-9{])")
+_NONEMPTY_CITE = re.compile(r"\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+
+# Reason-keyed exemptions (AGENTS.md Rule 1 & Rule 3): every entry is keyed on the exact sentence
+# at the location where it is true, never via a surface-marker lookahead in the regex, and states
+# why the sentence is either a negative scope disclaimer or an internal cross-reference to this
+# manuscript's own tables/configuration.
+LITERATURE_DISCLAIMER_EXEMPTIONS = {
+    "The paper's question is then put to an ensemble, with the tests declared before it ran: 256 seeds at the published configuration, each run under four arms of the acceptance rule that zero the direct term, the melanin production, both, or neither, paired within seed.": (
+        "internal reference in Abstract to this manuscript's own shipped parameter configuration "
+        "(Table 1), not a claim about external literature"
+    ),
+    r"The literature ranges from which the species vectors take their midpoints are in Appendix~\ref{app:priors}, Table~\ref{tab:priors}.": (
+        "internal cross-reference in Section 3.1 pointing to Appendix B / Table 5, where every "
+        "species prior range carries its own \\cite{...}"
+    ),
+    r"\paragraph{Design.} The same 256 seeds, 42 to 297, at the published configuration, each run under four arms of the acceptance rule: the shipped parameters; $\beta_{s,\mathrm{ion}} = 0$ for every species, so $\Delta H_{\mathrm{rad}}$ is zero on every move; $\alpha_M = 0$ for every species, so the melanin field stays at its initial zero and $\Delta H_{\mathrm{mel}}$ is zero on every move (the coupling switched off without editing the literal that carries it); and both.": (
+        "internal reference in Section 6.3 Design to this manuscript's own shipped parameter "
+        "configuration, not a claim about external literature"
+    ),
+    "Whether those three exhaust the routes is a question about the literature and not one this model answers.": (
+        "negative scope disclaimer in Section 7.2: states that exhausting the literature routes "
+        "is outside the model's scope rather than asserting what the literature shows"
+    ),
+    "Whether an observable-choice remedy for structural non-identifiability transfers to a seven-species lattice was not tested here, and this work makes no claim about what the published demonstrations of such remedies have shown at other scales.": (
+        "negative scope disclaimer in Section 7.2 (c766e7b / #75): explicitly declines making any "
+        "claim about what the published demonstrations have shown"
+    ),
+    "Those four are the published numbers the ensemble bears on; no other published number is computed from a radial position.": (
+        "internal revision-note reference in Version 2.0 correction note to the four seed-42 "
+        "radial numbers from versions 1.0-1.2 recorded in data/claims_ledger.csv"
+    ),
+    r"The radial membrane-transport model, its two figures and its five references left the paper (Section~\ref{sec:radiodialysis}); the specification subsections and the literature priors moved to appendices; the parameter table is the executed model's.": (
+        "internal structural note in Version 2.0 correction note describing movement of Appendix B "
+        "(Literature Priors) within the manuscript"
+    ),
+    r"Table~\ref{tab:priors} holds the literature ranges whose midpoints the executed model uses as bare numbers (Table~\ref{tab:params}).": (
+        "internal cross-reference in Appendix B opening to Table 5 (tab:priors), whose rows hold "
+        "the individual citations"
+    ),
+}
+
+
+def _split_tex_sentences(para: str) -> list[str]:
+    protected = _ABBREV_DOT.sub(lambda m: m.group(0)[:-1] + "\x00", para.strip())
+    return [" ".join(s.replace("\x00", ".").split()) for s in _SENTENCE_SPLIT.split(protected)]
+
+
+def literature_claim_problems_in_tex(
+    tex: str,
+    exemptions: dict = LITERATURE_DISCLAIMER_EXEMPTIONS,
+) -> list:
+    """Return one problem string per uncited positive literature-claim sentence in `tex`, plus
+    one problem string per stale or reasonless entry in `exemptions`."""
+    if r"\begin{document}" not in tex or r"\begin{thebibliography}" not in tex:
+        raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
+    body = tex.split(r"\begin{document}", 1)[1].split(r"\begin{thebibliography}", 1)[0]
+    # Strip LaTeX comments first so a commented-out `%\cite{foo}` cannot satisfy the check.
+    body_nc = re.sub(r"(?m)(?<!\\)%.*", "", body)
+    body_nc = re.sub(
+        r"\\begin\{(equation|align|array|tabular|longtable|verbatim|lstlisting)\}.*?\\end\{\1\}",
+        " ",
+        body_nc,
+        flags=re.S,
+    )
+    problems = []
+    seen_exemptions = set()
+    matched_sentences = 0
+    for para in re.split(r"\n\s*\n", body_nc):
+        for clean in _split_tex_sentences(para):
+            if not clean or not LITERATURE_CLAIM_PHRASE.search(clean):
+                continue
+            matched_sentences += 1
+            if _NONEMPTY_CITE.search(clean):
+                continue
+            if clean in exemptions:
+                seen_exemptions.add(clean)
+                continue
+            problems.append(f"uncited literature claim in {PREPRINT_REL}: {clean!r}")
+    if matched_sentences == 0:
+        problems.append(f"detector vacuous on {PREPRINT_REL}: matched zero literature-claim sentences")
+    for sent, reason in sorted(exemptions.items()):
+        if not isinstance(reason, str) or not reason.strip():
+            problems.append(f"LITERATURE_DISCLAIMER_EXEMPTIONS entry lacks a reason: {sent!r}")
+        if sent not in seen_exemptions:
+            problems.append(
+                f"LITERATURE_DISCLAIMER_EXEMPTIONS names a sentence no longer needing exemption: {sent!r}"
+            )
+    return problems
+
+
+def literature_claim_problems(
+    root: Path = REPO,
+    exemptions: dict = LITERATURE_DISCLAIMER_EXEMPTIONS,
+) -> list:
+    return literature_claim_problems_in_tex(
+        (root / PREPRINT_REL).read_text(encoding="utf-8"),
+        exemptions=exemptions,
+    )
+
+
+def test_manuscript_literature_claims_are_cited_or_disclaimed():
+    assert literature_claim_problems(REPO) == []
+
+
+def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path):
+    """Artifact-derived negative control from 3954094 (issue #74), entering through the production
+    door `literature_claim_problems(root)` on a scratch repository: the withdrawn sentence about
+    published demonstrations sitting at one or two parameters on single-species models must be
+    caught directly from 3954094's manuscript text, as must the pre-fix Section 7.1 sentence,
+    a commented-out \\cite{...}, a neighboring sentence starting with math/quotes carrying a
+    citation, and each declared pattern class."""
+    tex_3954094 = _text(REPO, PREPRINT_REL, "3954094")
+    assert tex_3954094 is not None, "commit 3954094 must be reachable for the #74 negative control"
+    scratch_preprint = tmp_path / PREPRINT_REL
+    scratch_preprint.parent.mkdir(parents=True, exist_ok=True)
+    scratch_preprint.write_text(tex_3954094, encoding="utf-8")
+    # At 3954094, the #75 disclaimer sentence did not exist yet; keep all other exemptions so we
+    # isolate the uncited-claim detections from the stale-exemption check.
+    exemptions_at_3954094 = {
+        k: v for k, v in LITERATURE_DISCLAIMER_EXEMPTIONS.items()
+        if "makes no claim about what the published demonstrations" not in k
+    }
+    got_3954094 = literature_claim_problems(tmp_path, exemptions=exemptions_at_3954094)
+    assert any(
+        "The published demonstrations of observable-choice remedies for structural non-identifiability sit at one or two parameters on single-species models"
+        in p
+        for p in got_3954094
+    ), got_3954094
+    assert any(
+        "The literature contains organism-, genotype-, substrate- and radiation-modality-specific effects"
+        in p
+        for p in got_3954094
+    ), got_3954094
+
+    # A commented-out \cite{...} or empty/punctuation-only \cite{ , } must fail through `literature_claim_problems(tmp_path)`.
+    live_tex = (REPO / PREPRINT_REL).read_text(encoding="utf-8")
+    for bogus_cite in (
+        "advantage. % \\cite{cortesao2020,audit2026}",
+        "advantage~\\cite{}.",
+        "advantage~\\cite{ , }.",
+    ):
+        commented_cite = live_tex.replace(
+            r"advantage~\cite{cortesao2020,audit2026}.",
+            bogus_cite,
+        )
+        assert commented_cite != live_tex
+        scratch_preprint.write_text(commented_cite, encoding="utf-8")
+        got_commented = literature_claim_problems(tmp_path)
+        assert len(got_commented) == 1 and "The literature contains organism-" in got_commented[0], (
+            bogus_cite,
+            got_commented,
+        )
+
+    # Fail-open guard: an uncited claim followed by a sentence starting with math ($...$), LaTeX
+    # quotes (``...''), or a digit that carries \cite{...} must NOT inherit the neighbor's citation.
+    for neighbor in (
+        r"$\Delta H_{\mathrm{rad}}$ is bounded separately \cite{audit2026}.",
+        r"``Observable'' terminology is audited in \cite{audit2026}.",
+        r"256 seeds were evaluated in \cite{audit2026}.",
+    ):
+        planted = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n\nThe published demonstrations of remedies sit at two parameters. {neighbor}\n\n"
+            r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(planted, encoding="utf-8")
+        got_neighbor = literature_claim_problems(tmp_path)
+        assert len(got_neighbor) == 1 and "The published demonstrations of remedies" in got_neighbor[0], (
+            neighbor,
+            got_neighbor,
+        )
+
+    # Every declared pattern class in Issue #74 (and "the literature ranges ...") must fire when uncited.
+    for uncited_sentence in (
+        "The published models of structural non-identifiability sit at two parameters.",
+        "The literature ranges for this effect sit between 10 and 20 Gy.",
+        "Demonstrations of observable-choice remedies have shown that two parameters suffice.",
+        "It is well known that melanin scavenges free radicals.",
+        "Studies show that biofilm morphology depends on nutrient gradients.",
+    ):
+        planted = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n\n{uncited_sentence}\n\n" + r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(planted, encoding="utf-8")
+        got_class = literature_claim_problems(tmp_path)
+        assert len(got_class) == 1 and uncited_sentence in got_class[0], (uncited_sentence, got_class)
+
+    # A stale exemption, an empty reason, a vacuous zero-match body, or missing delimiters must fail loudly.
+    scratch_preprint.write_text(live_tex, encoding="utf-8")
+    stale_exemptions = dict(LITERATURE_DISCLAIMER_EXEMPTIONS, **{"Prior studies show X.": "stale"})
+    got_stale = literature_claim_problems(tmp_path, exemptions=stale_exemptions)
+    assert any("no longer needing exemption" in p for p in got_stale), got_stale
+    empty_reason = dict(LITERATURE_DISCLAIMER_EXEMPTIONS)
+    first_key = next(iter(empty_reason))
+    empty_reason[first_key] = "   "
+    got_empty_reason = literature_claim_problems(tmp_path, exemptions=empty_reason)
+    assert any("lacks a reason" in p for p in got_empty_reason), got_empty_reason
+
+    scratch_preprint.write_text(
+        r"\begin{document}No trigger phrases here.\begin{thebibliography}{1}\end{thebibliography}\end{document}",
+        encoding="utf-8",
+    )
+    got_vacuous = literature_claim_problems(tmp_path, exemptions={})
+    assert any("detector vacuous" in p for p in got_vacuous), got_vacuous
+
+    with pytest.raises(ValueError, match="must contain"):
+        literature_claim_problems_in_tex("plain text without latex delimiters", exemptions={})
