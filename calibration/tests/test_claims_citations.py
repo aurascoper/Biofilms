@@ -718,9 +718,9 @@ LITERATURE_CLAIM_PHRASE = re.compile(
     r"the\s+published|"
     r"(?:published|prior|previous|existing)\s+"
     r"(?:literature|demonstrations|studies|reports|measurements|experiments|work)|"
-    r"demonstrations\b[^.!?]*?\bhave\s+shown|"
+    r"demonstrations\b[^.!?]*?\b(?:(?:have|had)\s+shown|show(?:ed)?)|"
     r"it\s+is\s+well\s+known|"
-    r"studies\s+(?:have\s+)?show(?:n)?"
+    r"studies\s+(?:(?:have|had)\s+)?show(?:n|ed)?"
     r")\b",
     re.I,
 )
@@ -961,8 +961,11 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "The published models of structural non-identifiability sit at two parameters.",
         "The literature ranges for this effect sit between 10 and 20 Gy.",
         "Demonstrations of observable-choice remedies have shown that two parameters suffice.",
+        "Demonstrations of observable-choice remedies showed that two parameters suffice.",
         "It is well known that melanin scavenges free radicals.",
         "Studies show that biofilm morphology depends on nutrient gradients.",
+        "Studies showed that prior models explain X.",
+        "Studies had shown that prior models explain X.",
     ):
         planted = live_tex.replace(
             r"\begin{thebibliography}",
