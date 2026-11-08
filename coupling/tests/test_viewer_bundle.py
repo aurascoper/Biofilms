@@ -606,6 +606,7 @@ def test_two_way_attenuation_and_observer_scientific_review_contracts():
     for spec in LAYER_CONTRACTS.values():
         assert spec.native_openmc_field is False
         assert spec.grid_representation == "resampled_extruded_display_grid"
+        assert spec.authoritative_for_quantitation is False
 
     # 4. Observer remains strictly read-only and non-authoritative for quantitation
     assert BiofilmOpenMCObserver.READ_ONLY_OBSERVER is True
@@ -625,4 +626,3 @@ def test_two_way_attenuation_and_observer_scientific_review_contracts():
         assert spec.units == "rel_flux"
         assert "synthetic surrogate" in spec.description
     assert MELANIZED_FRAC_KEY == "melanized_fraction"
-

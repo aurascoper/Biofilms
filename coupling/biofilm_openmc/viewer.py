@@ -539,6 +539,7 @@ class LayerSpec:
     grid_representation: str = "resampled_extruded_display_grid"
     synthetic_surrogate: bool = True
     measured_physical_dose: bool = False
+    authoritative_for_quantitation: bool = False
 
 
 LAYER_CONTRACTS: dict[str, LayerSpec] = {

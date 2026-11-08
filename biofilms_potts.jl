@@ -2449,8 +2449,10 @@ Conservation & Normalization Contract:
 - For non-negative attenuation (`κ_loc >= 0`) and scattering (`Σ_loc >= 0`),
   `0 <= I_fast[i, j] <= p.I0` and `I_therm[i, j] >= 0` everywhere, with exact
   two-group additivity `radiation[i, j] == I_fast[i, j] + I_therm[i, j]`.
-- Under conservative down-scattering (`0 <= Σ_loc <= κ_loc <= p.κ * p.κ_therm`),
-  total two-group flux is bounded by the unattenuated source:
+- Effective moderation cross-section is bounded by local fast removal
+  (`0 <= Σ_eff = clamp(Σ_loc, 0.0, max(0.0, κ_loc)) <= κ_eff`) with
+  `κ_th_eff = max(0.0, p.κ * p.κ_therm) >= 0`, so total two-group flux never
+  multiplies above the unattenuated source:
   `0 <= I_fast[i, j] + I_therm[i, j] <= p.I0`.
 """
 function update_radiation_field!(state::State, p::Params)
@@ -2462,6 +2464,7 @@ function update_radiation_field!(state::State, p::Params)
         return nothing
     end
     cx, cy = (N + 1) / 2.0, (N + 1) / 2.0
+    κ_th_eff = max(0.0, p.κ * p.κ_therm)
 
     for j in 1:N, i in 1:N
         dx = i - cx
@@ -2478,9 +2481,11 @@ function update_radiation_field!(state::State, p::Params)
             ix = clamp(round(Int, cx + frac * dx), 1, N)
             iy = clamp(round(Int, cy + frac * dy), 1, N)
             κ_loc, Σ_loc = local_attenuation(state, p, ix, iy)
-            optical_depth_fast += κ_loc * ds
+            κ_eff = max(0.0, κ_loc)
+            Σ_eff = clamp(Σ_loc, 0.0, κ_eff)
+            optical_depth_fast += κ_eff * ds
             I_f_step = p.I0 * exp(-optical_depth_fast)
-            I_therm_acc = I_therm_acc * exp(-p.κ * p.κ_therm * ds) + Σ_loc * I_f_step * ds
+            I_therm_acc = I_therm_acc * exp(-κ_th_eff * ds) + Σ_eff * I_f_step * ds
         end
 
         I_f = p.I0 * exp(-optical_depth_fast)
@@ -2866,6 +2871,19 @@ function run_control_audit()
     @assert all(st_pos.I_therm .>= 0.0) "Thermal flux must be non-negative"
     @assert all(isapprox.(st_pos.radiation, st_pos.I_fast .+ st_pos.I_therm; atol = 1e-14)) "Total radiation must equal I_fast + I_therm"
     @assert all(0.0 .<= st_pos.radiation .<= p_pos.I0 * (1.0 + 1e-12)) "Conservative two-group cascade must satisfy I_fast + I_therm <= I0"
+
+    # 2c. Non-multiplying down-scattering guard even when nominal Σ_scatter > κ_species and κ_therm == 0
+    p_clamp = Params(
+        N = 16,
+        I0 = 1.5,
+        κ_water = 0.50,
+        Σ_water = 5.00,
+        κ_species = fill(0.60, 5),
+        Σ_scatter = fill(4.00, 5),
+        κ_therm = 0.0,
+    )
+    st_clamp = init_state(p_clamp; seed = 77, void_fraction = 0.05)
+    @assert all(0.0 .<= st_clamp.radiation .<= p_clamp.I0 * (1.0 + 1e-12)) "Down-scattering clamp must prevent unphysical flux multiplication above I0"
 
     # 3. Void Reactivity Feedback Control: replacing water/biomass with voids increases interior flux
     st_dense = init_state(p_pos; seed = 303, void_fraction = 0.0)

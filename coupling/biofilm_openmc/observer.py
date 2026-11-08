@@ -638,7 +638,11 @@ class BiofilmOpenMCObserver:
 
     @staticmethod
     def compute_telemetry(layers: dict) -> dict[str, float]:
-        """Compute macroscopic regime telemetry for claims ledger auditing."""
+        """Compute read-only display summary telemetry on the synthetic surrogate
+        layers (`mean_dose_rate` is dimensionless relative synthetic flux `I_tot`,
+        never measured physical dose in Gy/s and never authoritative for
+        quantitative campaign verdicts).
+        """
         sigma = np.asarray(layers["cell_id"])
         occupied = sigma > 0
         rad = np.asarray(layers["total_radiation"], dtype=np.float64)
