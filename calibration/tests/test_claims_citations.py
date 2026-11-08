@@ -701,3 +701,489 @@ def test_moving_a_cited_line_out_of_indented_code_changes_its_digest(tmp_path, m
     (root / "notes.md").write_text(f"Example:\n\n{code.strip()}\n", encoding="utf-8")
     got = markdown_problems(root)
     assert len(got) == 1 and "context changed" in got[0], got
+
+
+# Issue #74: the existing citation harnesses checked that every citation resolves and that every
+# \bibitem is cited, but not the inverse direction: a prose sentence in the manuscript claiming
+# what "the literature", "the published ...", "demonstrations ... have shown", "it is well known",
+# or "studies show" without a \cite{...} in that sentence (or a reason-keyed exemption). Commit
+# 3954094 shipped an unsourced quantitative claim ("The published demonstrations of observable-
+# choice remedies for structural non-identifiability sit at one or two parameters on single-species
+# models, so their transfer to a seven-species lattice is untested.") while all suites stayed green.
+PREPRINT_REL = "preprint/modeling_radioresistance_and_radiotropic_fitness.tex"
+
+LITERATURE_CLAIM_PHRASE = re.compile(
+    r"\b(?:"
+    r"the\s+literature|"
+    r"the\s+published|"
+    r"(?:published|prior|previous|existing)\s+"
+    r"(?:literature|demonstrations?|stud(?:y|ies)|reports?|measurements?|experiments?|works?)|"
+    r"demonstrations?\b[^.!?]*?\b(?:(?:have|has|had)\s+shown|shows?|showed)|"
+    r"it\s+(?:is|was)\s+well\s+known|"
+    r"stud(?:y|ies)\s+(?:(?:have|has|had)\s+)?(?:shown|shows?|showed)"
+    r")\b",
+    re.I,
+)
+
+_ABBREV_DOT = re.compile(
+    r"\b(?:et\s+al|e\.g|i\.e|cf|vs|Fig|Figs|Eq|Eqs|Sec|Secs|Ref|Refs|sp|spp|var|Dr|Prof)\."
+    r"|(?<=\\textit\{[A-Z])\.",
+)
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`(\[0-9{])")
+_NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)(?:\\\\)*\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+_BEGIN_DOC = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{document\}")
+_BEGIN_BIB = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{thebibliography\}")
+_INACTIVE_TEX_TOKEN = re.compile(
+    r"(?<!\\)(?<!\\string)((?:\\\\)*)(?:"
+    r"(?P<env>\\begin\{(verbatim\*?|lstlisting|comment)\}[\s\S]*?(?<!\\)\\end\{\3\})"
+    r"|(?P<verb>\\verb\*?([^\sA-Za-z*])[^\n]*?\5)"
+    r"|(?P<lst_delim>\\lstinline(?:\s*\[[^\]]*\])?([^\sA-Za-z\[{])[^\n]*?\7)"
+    r"|(?P<braced>(?:\\lstinline(?:\s*\[[^\]]*\])?|\\detokenize)\s*\{)"
+    r"|(?P<iffalse>\\iffalse(?![A-Za-z]))"
+    r"|(?P<iftrue>\\iftrue(?![A-Za-z]))"
+    r"|(?P<other_if>\\if(?!f(?![A-Za-z]))[A-Za-z]*)"
+    r"|(?P<else_tok>\\(?:else|or)(?![A-Za-z]))"
+    r"|(?P<fi_tok>\\fi(?![A-Za-z]))"
+    r"|(?P<comment>%[^\n]*)"
+    r")"
+)
+_COND_BRANCH_TOKEN = re.compile(
+    r"(?<!\\)(?<!\\string)((?:\\\\)*)(?:"
+    r"(?P<comment>%[^\n]*)"
+    r"|(?P<if_open>\\if(?!f(?![A-Za-z]))[A-Za-z]*)"
+    r"|(?P<else_tok>\\else(?![A-Za-z]))"
+    r"|(?P<fi_tok>\\fi(?![A-Za-z]))"
+    r")"
+)
+
+
+def _advance_past_false_branch(tex: str, pos: int, *, stop_on_else: bool) -> tuple[int, bool]:
+    """Advance `pos` past a false TeX conditional branch (`\\iffalse ...` or the `\\else ...`
+    branch of `\\iftrue`), respecting comments and nested `\\if...\\fi` blocks. Returns
+    `(new_pos, stopped_at_else)`."""
+    depth = 1
+    n = len(tex)
+    while pos < n and depth > 0:
+        cm = _COND_BRANCH_TOKEN.search(tex, pos)
+        if cm is None:
+            return n, False
+        if cm.group("comment") is not None:
+            pos = cm.end()
+            continue
+        if cm.group("if_open") is not None:
+            depth += 1
+            pos = cm.end()
+            continue
+        if cm.group("else_tok") is not None:
+            if stop_on_else and depth == 1:
+                return cm.end(), True
+            pos = cm.end()
+            continue
+        if cm.group("fi_tok") is not None:
+            depth -= 1
+            pos = cm.end()
+            if depth == 0:
+                return pos, False
+    return pos, False
+
+
+def _strip_inactive_tex(tex: str) -> str:
+    """Strip verbatim/comment environments, inline verbatim spans (including arbitrary balanced
+    braces in `\\detokenize{...}` and `\\lstinline{...}`), unconditionally false `\\iffalse` /
+    `\\iftrue ... \\else` conditional branches (preserving both branches of unknown conditionals
+    such as `\\ifdefined` as separate scan-visible paragraphs), and TeX comments in a single
+    left-to-right pass."""
+    out = []
+    cond_stack: list[str] = []
+    pos = 0
+    n = len(tex)
+    while pos < n:
+        m = _INACTIVE_TEX_TOKEN.search(tex, pos)
+        if m is None:
+            out.append(tex[pos:])
+            break
+        out.append(tex[pos : m.start()])
+        out.append(m.group(1))
+        if m.group("comment") is not None:
+            pos = m.end()
+            continue
+        if m.group("braced") is not None:
+            out.append(" ")
+            depth = 1
+            i = m.end()
+            while i < n and depth > 0:
+                if tex[i] == "\\":
+                    i += 2
+                    continue
+                if tex[i] == "%":
+                    nl = tex.find("\n", i)
+                    i = n if nl == -1 else nl + 1
+                    continue
+                if tex[i] == "{":
+                    depth += 1
+                elif tex[i] == "}":
+                    depth -= 1
+                i += 1
+            pos = i
+        elif m.group("iffalse") is not None:
+            out.append(" ")
+            pos, stopped_at_else = _advance_past_false_branch(tex, m.end(), stop_on_else=True)
+            if stopped_at_else:
+                cond_stack.append("iffalse_else")
+        elif m.group("iftrue") is not None:
+            out.append(" ")
+            cond_stack.append("iftrue")
+            pos = m.end()
+        elif m.group("other_if") is not None:
+            out.append("\n\n")
+            cond_stack.append("other")
+            pos = m.end()
+        elif m.group("else_tok") is not None:
+            if (
+                m.group("else_tok") == r"\else"
+                and cond_stack
+                and cond_stack[-1] == "iftrue"
+            ):
+                cond_stack.pop()
+                out.append(" ")
+                pos, _ = _advance_past_false_branch(tex, m.end(), stop_on_else=False)
+            else:
+                out.append("\n\n")
+                pos = m.end()
+        elif m.group("fi_tok") is not None:
+            top = cond_stack.pop() if cond_stack else None
+            out.append("\n\n" if top == "other" else " ")
+            pos = m.end()
+        else:
+            out.append(" ")
+            pos = m.end()
+    return "".join(out)
+
+# Reason-keyed exemptions (AGENTS.md Rule 1 & Rule 3): every entry is keyed on the exact sentence
+# at the location where it is true, never via a surface-marker lookahead in the regex, and states
+# why the sentence is either a negative scope disclaimer or an internal cross-reference to this
+# manuscript's own tables/configuration.
+LITERATURE_DISCLAIMER_EXEMPTIONS = {
+    "The paper's question is then put to an ensemble, with the tests declared before it ran: 256 seeds at the published configuration, each run under four arms of the acceptance rule that zero the direct term, the melanin production, both, or neither, paired within seed.": (
+        "internal reference in Abstract to this manuscript's own shipped parameter configuration "
+        "(Table 1), not a claim about external literature"
+    ),
+    r"The literature ranges from which the species vectors take their midpoints are in Appendix~\ref{app:priors}, Table~\ref{tab:priors}.": (
+        "internal cross-reference in Section 3.1 pointing to Appendix B / Table 5, where every "
+        "species prior range carries its own \\cite{...}"
+    ),
+    r"\paragraph{Design.} The same 256 seeds, 42 to 297, at the published configuration, each run under four arms of the acceptance rule: the shipped parameters; $\beta_{s,\mathrm{ion}} = 0$ for every species, so $\Delta H_{\mathrm{rad}}$ is zero on every move; $\alpha_M = 0$ for every species, so the melanin field stays at its initial zero and $\Delta H_{\mathrm{mel}}$ is zero on every move (the coupling switched off without editing the literal that carries it); and both.": (
+        "internal reference in Section 6.3 Design to this manuscript's own shipped parameter "
+        "configuration, not a claim about external literature"
+    ),
+    "Whether those three exhaust the routes is a question about the literature and not one this model answers.": (
+        "negative scope disclaimer in Section 7.2: states that exhausting the literature routes "
+        "is outside the model's scope rather than asserting what the literature shows"
+    ),
+    "Whether an observable-choice remedy for structural non-identifiability transfers to a seven-species lattice was not tested here, and this work makes no claim about what the published demonstrations of such remedies have shown at other scales.": (
+        "negative scope disclaimer in Section 7.2 (c766e7b / #75): explicitly declines making any "
+        "claim about what the published demonstrations have shown"
+    ),
+    "Those four are the published numbers the ensemble bears on; no other published number is computed from a radial position.": (
+        "internal revision-note reference in Version 2.0 correction note to the four seed-42 "
+        "radial numbers from versions 1.0-1.2 recorded in data/claims_ledger.csv"
+    ),
+    r"The radial membrane-transport model, its two figures and its five references left the paper (Section~\ref{sec:radiodialysis}); the specification subsections and the literature priors moved to appendices; the parameter table is the executed model's.": (
+        "internal structural note in Version 2.0 correction note describing movement of Appendix B "
+        "(Literature Priors) within the manuscript"
+    ),
+    r"Table~\ref{tab:priors} holds the literature ranges whose midpoints the executed model uses as bare numbers (Table~\ref{tab:params}).": (
+        "internal cross-reference in Appendix B opening to Table 5 (tab:priors), whose rows hold "
+        "the individual citations"
+    ),
+}
+
+
+def _split_tex_sentences(para: str) -> list[str]:
+    protected = _ABBREV_DOT.sub(lambda m: m.group(0)[:-1] + "\x00", para.strip())
+    return [" ".join(s.replace("\x00", ".").split()) for s in _SENTENCE_SPLIT.split(protected)]
+
+
+def literature_claim_problems_in_tex(
+    tex: str,
+    exemptions: dict = LITERATURE_DISCLAIMER_EXEMPTIONS,
+) -> list:
+    """Return one problem string per uncited positive literature-claim sentence in `tex`, plus
+    one problem string per stale or reasonless entry in `exemptions`."""
+    tex_nc = _strip_inactive_tex(tex)
+    doc_match = _BEGIN_DOC.search(tex_nc)
+    if doc_match is None:
+        raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
+    after_doc = tex_nc[doc_match.end():]
+    bib_match = _BEGIN_BIB.search(after_doc)
+    if bib_match is None:
+        raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
+    body_nc = after_doc[: bib_match.start() + len(bib_match.group(1))]
+    body_nc = re.sub(
+        r"(?<!\\)((?:\\\\)*)\\begin\{(equation\*?|align\*?|array|tabular|longtable)\}.*?\\end\{\2\}",
+        r"\1 ",
+        body_nc,
+        flags=re.S,
+    )
+    problems = []
+    seen_exemptions = set()
+    matched_sentences = 0
+    for para in re.split(r"\n\s*\n", body_nc):
+        for clean in _split_tex_sentences(para):
+            if not clean or not LITERATURE_CLAIM_PHRASE.search(clean):
+                continue
+            matched_sentences += 1
+            if _NONEMPTY_CITE.search(clean):
+                continue
+            if clean in exemptions:
+                seen_exemptions.add(clean)
+                continue
+            problems.append(f"uncited literature claim in {PREPRINT_REL}: {clean!r}")
+    if matched_sentences == 0:
+        problems.append(f"detector vacuous on {PREPRINT_REL}: matched zero literature-claim sentences")
+    for sent, reason in sorted(exemptions.items()):
+        if not isinstance(reason, str) or not reason.strip():
+            problems.append(f"LITERATURE_DISCLAIMER_EXEMPTIONS entry lacks a reason: {sent!r}")
+        if sent not in seen_exemptions:
+            problems.append(
+                f"LITERATURE_DISCLAIMER_EXEMPTIONS names a sentence no longer needing exemption: {sent!r}"
+            )
+    return problems
+
+
+def literature_claim_problems(
+    root: Path = REPO,
+    exemptions: dict = LITERATURE_DISCLAIMER_EXEMPTIONS,
+) -> list:
+    return literature_claim_problems_in_tex(
+        (root / PREPRINT_REL).read_text(encoding="utf-8"),
+        exemptions=exemptions,
+    )
+
+
+def test_manuscript_literature_claims_are_cited_or_disclaimed():
+    assert literature_claim_problems(REPO) == []
+
+
+def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path):
+    """Artifact-derived negative control from 3954094 (issue #74), entering through the production
+    door `literature_claim_problems(root)` on a scratch repository: the withdrawn sentence about
+    published demonstrations sitting at one or two parameters on single-species models must be
+    caught directly from 3954094's manuscript text, as must the pre-fix Section 7.1 sentence,
+    a commented-out \\cite{...}, a neighboring sentence starting with math/quotes carrying a
+    citation, and each declared pattern class."""
+    tex_3954094 = _text(REPO, PREPRINT_REL, "3954094")
+    assert tex_3954094 is not None, "commit 3954094 must be reachable for the #74 negative control"
+    scratch_preprint = tmp_path / PREPRINT_REL
+    scratch_preprint.parent.mkdir(parents=True, exist_ok=True)
+    scratch_preprint.write_text(tex_3954094, encoding="utf-8")
+    # At 3954094, the #75 disclaimer sentence did not exist yet; keep all other exemptions so we
+    # isolate the uncited-claim detections from the stale-exemption check.
+    exemptions_at_3954094 = {
+        k: v for k, v in LITERATURE_DISCLAIMER_EXEMPTIONS.items()
+        if "makes no claim about what the published demonstrations" not in k
+    }
+    got_3954094 = literature_claim_problems(tmp_path, exemptions=exemptions_at_3954094)
+    assert any(
+        "The published demonstrations of observable-choice remedies for structural non-identifiability sit at one or two parameters on single-species models"
+        in p
+        for p in got_3954094
+    ), got_3954094
+    assert any(
+        "The literature contains organism-, genotype-, substrate- and radiation-modality-specific effects"
+        in p
+        for p in got_3954094
+    ), got_3954094
+
+    # A commented-out \cite{...} (including after a `\\` line-break command as `\\% \cite{...}`),
+    # a `\\cite{...}` where `\\` is a line break and `cite{...}` is literal text, an inline
+    # verbatim `\verb|\cite{...}|` / `\lstinline`, or an empty/punctuation-only \cite{ , } must
+    # fail through `literature_claim_problems(tmp_path)`.
+    live_tex = (REPO / PREPRINT_REL).read_text(encoding="utf-8")
+    for bogus_cite in (
+        "advantage. % \\cite{cortesao2020,audit2026}",
+        "advantage.\\\\% \\cite{cortesao2020,audit2026}",
+        "advantage. \\\\\\% \\cite{cortesao2020,audit2026}",
+        "advantage.\\\\\\\\% \\cite{cortesao2020,audit2026}",
+        "advantage (50\\% effect). % \\cite{cortesao2020,audit2026}",
+        "advantage~\\\\cite{cortesao2020,audit2026}.",
+        "advantage \\\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\\\cite{cortesao2020,audit2026}.",
+        "advantage (\\verb|\\cite{cortesao2020,audit2026}|).",
+        "advantage (\\verb*|\\cite{cortesao2020,audit2026}|).",
+        "advantage (\\verb+\\cite{cortesao2020,audit2026}+).",
+        "advantage (\\lstinline|\\cite{cortesao2020,audit2026}|).",
+        "advantage (\\lstinline{\\cite{cortesao2020,audit2026}}).",
+        "advantage (\\lstinline{{\\cite{cortesao2020,audit2026}}}).",
+        "advantage (\\detokenize{\\cite{cortesao2020,audit2026}}).",
+        "advantage (\\detokenize{{\\cite{cortesao2020,audit2026}}}).",
+        "advantage (\\detokenize{{{\\cite{cortesao2020,audit2026}}}}).",
+        "advantage (\\string\\cite{cortesao2020,audit2026}).",
+        "advantage \\iffalse \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\iffalse \\iftrue \\cite{cortesao2020,audit2026} \\fi \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\iftrue \\else \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\ifdefined\\someflag \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\begin{verbatim}\\\\end{verbatim}\\cite{cortesao2020,audit2026}\\end{verbatim}.",
+        "advantage~\\cite{}.",
+        "advantage~\\cite{ , }.",
+    ):
+        commented_cite = live_tex.replace(
+            r"advantage~\cite{cortesao2020,audit2026}.",
+            bogus_cite,
+        )
+        assert commented_cite != live_tex
+        scratch_preprint.write_text(commented_cite, encoding="utf-8")
+        got_commented = literature_claim_problems(tmp_path)
+        assert len(got_commented) == 1 and "The literature contains organism-" in got_commented[0], (
+            bogus_cite,
+            got_commented,
+        )
+
+    # Odd numbers of backslashes before `%` (`\%` and `\\\%`), `%` inside `\verb|...|`, and odd
+    # numbers of backslashes before `cite{...}` (`\\\cite{...}` = `\\` line break + `\cite{...}`)
+    # preserve a real citation on that sentence.
+    for valid_escaped_pct in (
+        "advantage (50\\% effect)~\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\% effect~\\cite{cortesao2020,audit2026}.",
+        "advantage (\\verb|50% effect|)~\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\\\\\cite{cortesao2020,audit2026}.",
+        "advantage \\iffalse ignored \\else \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\iftrue \\cite{cortesao2020,audit2026} \\else ignored \\fi.",
+    ):
+        escaped_pct_tex = live_tex.replace(
+            r"advantage~\cite{cortesao2020,audit2026}.",
+            valid_escaped_pct,
+        )
+        assert escaped_pct_tex != live_tex
+        scratch_preprint.write_text(escaped_pct_tex, encoding="utf-8")
+        assert literature_claim_problems(tmp_path) == [], valid_escaped_pct
+
+    # Fail-open guard: an uncited claim followed by a sentence starting with math ($...$), LaTeX
+    # quotes (``...''), or a digit that carries \cite{...} must NOT inherit the neighbor's citation.
+    for neighbor in (
+        r"$\Delta H_{\mathrm{rad}}$ is bounded separately \cite{audit2026}.",
+        r"``Observable'' terminology is audited in \cite{audit2026}.",
+        r"256 seeds were evaluated in \cite{audit2026}.",
+    ):
+        planted = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n\nThe published demonstrations of remedies sit at two parameters. {neighbor}\n\n"
+            r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(planted, encoding="utf-8")
+        got_neighbor = literature_claim_problems(tmp_path)
+        assert len(got_neighbor) == 1 and "The published demonstrations of remedies" in got_neighbor[0], (
+            neighbor,
+            got_neighbor,
+        )
+
+    # An uncited claim inside the \else branch (or the if branch) of a conditional other than
+    # \iffalse / \iftrue (e.g., \ifdefined) must stay scan-visible and be caught.
+    for cond_block in (
+        "\\ifdefined\\someflag\n"
+        "The published demonstrations of remedies sit at two parameters \\cite{audit2026}.\n"
+        "\\else\n"
+        "The published demonstrations of remedies sit at two parameters.\n"
+        "\\fi",
+        "\\ifdefined\\someflag\n"
+        "The published demonstrations of remedies sit at two parameters.\n"
+        "\\else\n"
+        "The published demonstrations of remedies sit at two parameters \\cite{audit2026}.\n"
+        "\\fi",
+    ):
+        planted_cond = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n\n{cond_block}\n\n" r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(planted_cond, encoding="utf-8")
+        got_cond = literature_claim_problems(tmp_path)
+        assert len(got_cond) == 1 and "The published demonstrations of remedies" in got_cond[0], (
+            cond_block,
+            got_cond,
+        )
+
+    # A commented-out \begin{verbatim} or \begin{lstlisting} before live prose and a later real
+    # verbatim block, or a commented/verbatim \begin{thebibliography} before live prose, must NOT
+    # swallow or truncate the intervening live prose.
+    for env_name in ("verbatim", "lstlisting"):
+        commented_env = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n% \\begin{{{env_name}}}\n\n"
+            "The published demonstrations of remedies sit at two parameters.\n\n"
+            f"\\begin{{{env_name}}}\n\\cite{{audit2026}}\n\\end{{{env_name}}}\n\n"
+            r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(commented_env, encoding="utf-8")
+        got_env = literature_claim_problems(tmp_path)
+        assert len(got_env) == 1 and "The published demonstrations of remedies" in got_env[0], (
+            env_name,
+            got_env,
+        )
+
+    for fake_bib in (
+        "% \\begin{thebibliography}{99}",
+        "\\verb|\\begin{thebibliography}{99}|",
+        "\\begin{verbatim}\n\\begin{thebibliography}{99}\n\\end{verbatim}",
+    ):
+        premature_bib = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n{fake_bib}\n\n"
+            "The published demonstrations of remedies sit at two parameters.\n\n"
+            r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(premature_bib, encoding="utf-8")
+        got_bib = literature_claim_problems(tmp_path)
+        assert len(got_bib) == 1 and "The published demonstrations of remedies" in got_bib[0], (
+            fake_bib,
+            got_bib,
+        )
+
+    # Every declared pattern class in Issue #74 (and "the literature ranges ...") must fire when uncited.
+    for uncited_sentence in (
+        "The published models of structural non-identifiability sit at two parameters.",
+        "The literature ranges for this effect sit between 10 and 20 Gy.",
+        "Demonstrations of observable-choice remedies have shown that two parameters suffice.",
+        "Demonstrations of observable-choice remedies showed that two parameters suffice.",
+        "A demonstration of observable-choice remedies has shown that two parameters suffice.",
+        "It is well known that melanin scavenges free radicals.",
+        "Studies show that biofilm morphology depends on nutrient gradients.",
+        "Studies showed that prior models explain X.",
+        "Studies had shown that prior models explain X.",
+        "A prior study showed that two parameters suffice.",
+        "A previous study has shown that two parameters suffice.",
+        "One study shows that two parameters suffice.",
+    ):
+        planted = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n\n{uncited_sentence}\n\n" + r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(planted, encoding="utf-8")
+        got_class = literature_claim_problems(tmp_path)
+        assert len(got_class) == 1 and uncited_sentence in got_class[0], (uncited_sentence, got_class)
+
+    # A stale exemption, an empty reason, a vacuous zero-match body, or missing delimiters must fail loudly.
+    scratch_preprint.write_text(live_tex, encoding="utf-8")
+    stale_exemptions = dict(LITERATURE_DISCLAIMER_EXEMPTIONS, **{"Prior studies show X.": "stale"})
+    got_stale = literature_claim_problems(tmp_path, exemptions=stale_exemptions)
+    assert any("no longer needing exemption" in p for p in got_stale), got_stale
+    empty_reason = dict(LITERATURE_DISCLAIMER_EXEMPTIONS)
+    first_key = next(iter(empty_reason))
+    empty_reason[first_key] = "   "
+    got_empty_reason = literature_claim_problems(tmp_path, exemptions=empty_reason)
+    assert any("lacks a reason" in p for p in got_empty_reason), got_empty_reason
+
+    scratch_preprint.write_text(
+        r"\begin{document}No trigger phrases here.\begin{thebibliography}{1}\end{thebibliography}\end{document}",
+        encoding="utf-8",
+    )
+    got_vacuous = literature_claim_problems(tmp_path, exemptions={})
+    assert any("detector vacuous" in p for p in got_vacuous), got_vacuous
+
+    with pytest.raises(ValueError, match="must contain"):
+        literature_claim_problems_in_tex("plain text without latex delimiters", exemptions={})
