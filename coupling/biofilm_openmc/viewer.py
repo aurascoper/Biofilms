@@ -521,9 +521,7 @@ def quantitative_layers(manifest_doc) -> list[str]:
             if l["authoritative_for_quantitation"]]
 
 
-# Split token so GUARD-SCOPE-01 literal source scan in manuscript_claims_tests.jl
-# keeps RETRACTED_WORD_ALLOWED exact while preserving the runtime contract key.
-_TROPIC_FRAC_KEY = "radio" + "trophic_fraction"
+MELANIZED_FRAC_KEY = "melanized_fraction"
 
 
 @dataclass(frozen=True)
@@ -537,6 +535,10 @@ class LayerSpec:
     clim: tuple[float, float] = (0.0, 1.0)
     categorical: bool = False
     derived: bool = False
+    native_openmc_field: bool = False
+    grid_representation: str = "resampled_extruded_display_grid"
+    synthetic_surrogate: bool = True
+    measured_physical_dose: bool = False
 
 
 LAYER_CONTRACTS: dict[str, LayerSpec] = {
@@ -557,17 +559,17 @@ LAYER_CONTRACTS: dict[str, LayerSpec] = {
     ),
     "fast_flux": LayerSpec(
         "fast_flux", "rel_flux", "float64", True,
-        "Primary unmoderated fast radiation group I_fast",
+        "Primary unmoderated fast radiation group I_fast (synthetic surrogate, not measured Gy)",
         cmap="inferno", clim=(0.0, 1.0), categorical=False, derived=False,
     ),
     "thermal_flux": LayerSpec(
         "thermal_flux", "rel_flux", "float64", True,
-        "Moderated secondary radiolytic group I_therm",
+        "Moderated secondary radiolytic group I_therm (synthetic surrogate, not measured Gy)",
         cmap="inferno", clim=(0.0, 1.0), categorical=False, derived=False,
     ),
     "total_radiation": LayerSpec(
         "total_radiation", "rel_flux", "float64", True,
-        "Total effective ionizing field I_fast + I_therm",
+        "Total effective ionizing field I_fast + I_therm (synthetic surrogate, not measured Gy)",
         cmap="inferno", clim=(0.0, 1.0), categorical=False, derived=True,
     ),
     "precursor_damage_M": LayerSpec(
@@ -595,8 +597,8 @@ LAYER_CONTRACTS: dict[str, LayerSpec] = {
         "Binary mask of high-attenuation melanized cells (Sp 4 & 5)",
         cmap="inferno", clim=(0.0, 1.0), categorical=True, derived=True,
     ),
-    _TROPIC_FRAC_KEY: LayerSpec(
-        _TROPIC_FRAC_KEY, "fraction", "float64", True,
+    MELANIZED_FRAC_KEY: LayerSpec(
+        MELANIZED_FRAC_KEY, "fraction", "float64", True,
         "Biomass fraction of melanized species (Sp 4 + Sp 5)",
         cmap="viridis", clim=(0.0, 1.0), categorical=False, derived=True,
     ),
@@ -620,25 +622,32 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
     'fast_flux', 'thermal_flux', 'precursor_damage_M', 'xenon_inhibitor_C')
     and the continuum-melanin snapshot dictionary ('spin', 'species',
     'melanin', 'radiation', 'poison').
+
+    Scientific & Software Contract:
+    - Never mutates `raw_state` or `params`.
+    - All radiation/flux layers (`fast_flux`, `thermal_flux`, `total_radiation`)
+      are dimensionless synthetic surrogates (`rel_flux`), never measured
+      physical dose (`Gy` or `Gy/s`), and are defined on the CPM display grid
+      rather than a native OpenMC transport tally mesh.
     """
     continuum_mode = "spin" in raw_state and "cell_id" not in raw_state
 
     if continuum_mode:
-        sigma = np.asarray(raw_state["spin"], dtype=np.int32)
+        sigma = np.array(raw_state["spin"], dtype=np.int32, copy=True)
         occupied = sigma > 0
         raw_sp = np.asarray(raw_state["species"], dtype=np.int32)
         if raw_sp.ndim == 1:
             species = np.zeros_like(sigma, dtype=np.int32)
             species[occupied] = raw_sp[sigma[occupied] - 1]
         else:
-            species = raw_sp
-        melanin = np.asarray(raw_state["melanin"], dtype=np.float64)
-        I_tot = np.asarray(raw_state["radiation"], dtype=np.float64)
+            species = np.array(raw_sp, dtype=np.int32, copy=True)
+        melanin = np.array(raw_state["melanin"], dtype=np.float64, copy=True)
+        I_tot = np.array(raw_state["radiation"], dtype=np.float64, copy=True)
         I_fast = I_tot.copy()
         I_therm = np.zeros_like(I_tot)
-        C_inh = np.asarray(raw_state["poison"], dtype=np.float64)
-        M_dam = np.asarray(
-            raw_state.get("poison_lag", melanin), dtype=np.float64
+        C_inh = np.array(raw_state["poison"], dtype=np.float64, copy=True)
+        M_dam = np.array(
+            raw_state.get("poison_lag", melanin), dtype=np.float64, copy=True
         )
         if not (
             sigma.shape
@@ -667,12 +676,12 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
         melanin_mask = ((species >= 4) | (melanin >= 0.4)).astype(np.uint8)
         kappa_water = kappa_base * kappa_cell
     else:
-        sigma = np.asarray(raw_state["cell_id"], dtype=np.int32)
-        species = np.asarray(raw_state["species_id"], dtype=np.int32)
-        I_fast = np.asarray(raw_state["fast_flux"], dtype=np.float64)
-        I_therm = np.asarray(raw_state["thermal_flux"], dtype=np.float64)
-        M_dam = np.asarray(raw_state["precursor_damage_M"], dtype=np.float64)
-        C_inh = np.asarray(raw_state["xenon_inhibitor_C"], dtype=np.float64)
+        sigma = np.array(raw_state["cell_id"], dtype=np.int32, copy=True)
+        species = np.array(raw_state["species_id"], dtype=np.int32, copy=True)
+        I_fast = np.array(raw_state["fast_flux"], dtype=np.float64, copy=True)
+        I_therm = np.array(raw_state["thermal_flux"], dtype=np.float64, copy=True)
+        M_dam = np.array(raw_state["precursor_damage_M"], dtype=np.float64, copy=True)
+        C_inh = np.array(raw_state["xenon_inhibitor_C"], dtype=np.float64, copy=True)
 
         if not (
             sigma.shape
@@ -705,7 +714,7 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
     bio_mask = species > 0
     total_bio = int(np.sum(bio_mask))
     if total_bio > 0:
-        rad_frac = float(np.sum(melanin_mask[bio_mask]) / total_bio)
+        mel_frac = float(np.sum(melanin_mask[bio_mask]) / total_bio)
         max_sp = max(5, int(np.max(species)))
         counts = np.array(
             [np.sum(species == s) for s in range(1, max_sp + 1)],
@@ -714,7 +723,7 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
         probs = counts[counts > 0] / total_bio
         shannon_H = float(-np.sum(probs * np.log(probs)))
     else:
-        rad_frac = 0.0
+        mel_frac = 0.0
         shannon_H = 0.0
 
     mean_void = float(np.mean(void_mask)) if void_mask.size > 0 else 0.0
@@ -736,7 +745,7 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
         "bilinear_burnout_sink": burnout_sink,
         "void_mask": void_mask,
         "melanin_shield_mask": melanin_mask,
-        _TROPIC_FRAC_KEY: rad_frac,
+        MELANIZED_FRAC_KEY: mel_frac,
         "shannon_diversity_H": shannon_H,
         "void_reactivity_coeff": void_reactivity,
     }

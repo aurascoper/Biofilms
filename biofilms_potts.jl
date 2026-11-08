@@ -2441,6 +2441,17 @@ const init_state = init_rad_state
 Compute the two-group radiation field (`I_fast`, `I_therm`, and `radiation`)
 by integrating state-dependent attenuation and fast-to-thermal build-up along
 discrete rays from `(cx, cy)`.
+
+Conservation & Normalization Contract:
+- All flux arrays (`I_fast`, `I_therm`, `radiation`) are dimensionless relative
+  synthetic surrogates (`rel_flux`, normalized to source `I0`), NOT measured
+  physical dose (`Gy` or `Gy/s`).
+- For non-negative attenuation (`κ_loc >= 0`) and scattering (`Σ_loc >= 0`),
+  `0 <= I_fast[i, j] <= p.I0` and `I_therm[i, j] >= 0` everywhere, with exact
+  two-group additivity `radiation[i, j] == I_fast[i, j] + I_therm[i, j]`.
+- Under conservative down-scattering (`0 <= Σ_loc <= κ_loc <= p.κ * p.κ_therm`),
+  total two-group flux is bounded by the unattenuated source:
+  `0 <= I_fast[i, j] + I_therm[i, j] <= p.I0`.
 """
 function update_radiation_field!(state::State, p::Params)
     N = p.N
@@ -2556,6 +2567,14 @@ end
 
 Advance precursor damage `M_damage` (Iodine-135 analogue) and radiolytic inhibitor
 `C_inhib` (Xenon-135 analogue) with bilinear flux-melanin burnout sink.
+
+State & Inventory Accounting Contract:
+- The 5-point stencil with reflective Neumann indices (`max(1, i-1)`, `min(N, i+1)`)
+  has zero net boundary flux (`sum(lap) == 0.0` to machine precision), so diffusion
+  strictly redistributes `C_inhib` without creating or destroying inventory.
+- Before non-negativity clamping (`C_new >= 0`), the domain-integrated inhibitor
+  inventory satisfies exact step balance:
+  `sum(C_new) - sum(C_old) == dt * sum(prod - decay - burn)`.
 """
 function step_fields!(state::State, p::Params; dt::Float64 = 0.2)
     N = p.N
@@ -2698,7 +2717,7 @@ function compute_derived_layers(state::State, p::Params)
         end
     end
 
-    rad_frac = total_bio > 0 ? (sp_counts[4] + sp_counts[5]) / total_bio : 0.0
+    mel_frac = total_bio > 0 ? (sp_counts[4] + sp_counts[5]) / total_bio : 0.0
     shannon_H = 0.0
     if total_bio > 0
         for c in sp_counts
@@ -2726,7 +2745,7 @@ function compute_derived_layers(state::State, p::Params)
         "bilinear_burnout_sink" => burnout_sink,
         "void_mask" => void_mask,
         "melanin_shield_mask" => melanin_mask,
-        "radiotrophic_fraction" => Float64(rad_frac),
+        "melanized_fraction" => Float64(mel_frac),
         "shannon_diversity_H" => Float64(shannon_H),
         "void_reactivity_coeff" => Float64(void_reactivity),
     )
@@ -2744,7 +2763,8 @@ end
     export_observer_payload(state::State, p::Params, path::AbstractString)
 
 Write a self-contained JSON payload of raw and derived spatial layers and scalar
-regime invariants for `viewer.py` and `observer.py`.
+regime invariants for `viewer.py` and `observer.py`, including explicit flags
+marking the payload as a synthetic surrogate on a non-OpenMC display grid.
 """
 function export_observer_payload(state::State, p::Params, path::AbstractString)
     layers = compute_derived_layers(state, p)
@@ -2764,10 +2784,14 @@ function export_observer_payload(state::State, p::Params, path::AbstractString)
     open(path, "w") do io
         write(io, "{\n")
         write(io, "  \"N\": $(p.N),\n")
+        write(io, "  \"synthetic_surrogate\": true,\n")
+        write(io, "  \"measured_physical_dose\": false,\n")
+        write(io, "  \"native_openmc_field\": false,\n")
+        write(io, "  \"authoritative_for_quantitation\": false,\n")
         for k in spatial_keys
             write(io, "  \"$k\": $(_matrix_to_json(layers[k])),\n")
         end
-        write(io, "  \"radiotrophic_fraction\": $(layers["radiotrophic_fraction"]),\n")
+        write(io, "  \"melanized_fraction\": $(layers["melanized_fraction"]),\n")
         write(io, "  \"shannon_diversity_H\": $(layers["shannon_diversity_H"]),\n")
         write(io, "  \"void_reactivity_coeff\": $(layers["void_reactivity_coeff"])\n")
         write(io, "}\n")
@@ -2782,9 +2806,10 @@ Run negative and positive physical controls for the two-way radiation CPM and
 Xenon-135 bilinear burnout model:
 1. Negative control (`κ = 0`, `β_ion = 0`): uniform radiation (`Var(I) == 0`) and zero radial bias, even when `Σ_scatter` is non-zero.
 2. Positive control (`κ > 0`, `β_ion < 0` for Sp4/Sp5): non-zero attenuation gradient and inward migration (`Δ<r> < 0`) of melanized species.
-3. Void reactivity feedback (`κ_void << κ_water`): introducing voids increases mean interior flux (`α_V > 0`).
-4. Bilinear burnout hysteresis: step-down power creates a Xenon-135 poison pit (`c_pit_peak > c_phase1_end`) that is rapidly cleared upon power step-up (`burnout_clearance > 0`).
-5. Exact volume registry conservation (`cell_vol[cid] == count(==(cid), σ)` for all cells).
+3. Two-group attenuation cascade conservation and normalization (`I_tot == I_fast + I_therm`, `0 <= I_fast <= I0`, `0 <= I_therm`, and `0 <= I_tot <= I0` under conservative scattering).
+4. Void reactivity feedback (`κ_void << κ_water`): introducing voids increases mean interior flux (`α_V > 0`).
+5. Bilinear burnout hysteresis and discrete zero-flux Neumann inventory balance (`sum(lap) == 0.0` and exact step accounting).
+6. Exact volume registry conservation (`cell_vol[cid] == count(==(cid), σ)` for all cells).
 """
 function run_control_audit()
     # 1a. Negative Control via phase κ = 0 (without manually zeroing Σ_scatter)
@@ -2836,6 +2861,12 @@ function run_control_audit()
     @assert var_I_pos > 1e-4 "Positive control failed: expected non-zero radiation variance"
     @assert (r4_final < r4_init && r5_final < r5_init) "Positive control failed: melanized species must migrate inward down β_ion < 0"
 
+    # 2b. Two-group attenuation cascade conservation and normalization check
+    @assert all(0.0 .<= st_pos.I_fast .<= p_pos.I0) "Fast flux must satisfy 0 <= I_fast <= I0"
+    @assert all(st_pos.I_therm .>= 0.0) "Thermal flux must be non-negative"
+    @assert all(isapprox.(st_pos.radiation, st_pos.I_fast .+ st_pos.I_therm; atol = 1e-14)) "Total radiation must equal I_fast + I_therm"
+    @assert all(0.0 .<= st_pos.radiation .<= p_pos.I0 * (1.0 + 1e-12)) "Conservative two-group cascade must satisfy I_fast + I_therm <= I0"
+
     # 3. Void Reactivity Feedback Control: replacing water/biomass with voids increases interior flux
     st_dense = init_state(p_pos; seed = 303, void_fraction = 0.0)
     st_voidy = init_state(p_pos; seed = 303, void_fraction = 0.35)
@@ -2843,11 +2874,36 @@ function run_control_audit()
     mean_I_voidy = mean(st_voidy.radiation)
     @assert mean_I_voidy > mean_I_dense "Void feedback control failed: higher void fraction must increase mean flux"
 
-    # 4. Xenon-135 Bilinear Burnout Hysteresis Control
+    # 4. Xenon-135 Bilinear Burnout Hysteresis & Discrete State Accounting Control
     hyst = simulate_xenon_pit_hysteresis(p_pos; steps_per_phase = 30, dt = 0.2)
     @assert hyst.pit_overshoot > 0.0 "Xenon pit control failed: inhibitor C must accumulate during power step-down"
     @assert hyst.burnout_clearance > 0.0 "Xenon burnout control failed: high flux must burn out inhibitor C"
     @assert hyst.trace_bilinear[end] < hyst.trace_linear[end] "Identifiability control failed: bilinear burnout must clear C faster than linear decay alone"
+
+    # Verify discrete zero-flux Neumann Laplacian conservation and exact step inventory balance
+    N_acc = p_pos.N
+    C_before = copy(st_pos.C_inhib)
+    M_next = (1.0 - 0.05 * 0.2) .* st_pos.M_damage .+ (0.2 * 0.12) .* st_pos.radiation
+    lap_sum = 0.0
+    net_source_sum = 0.0
+    for j in 1:N_acc, i in 1:N_acc
+        im1 = max(1, i - 1)
+        ip1 = min(N_acc, i + 1)
+        jm1 = max(1, j - 1)
+        jp1 = min(N_acc, j + 1)
+        lap_ij = C_before[im1, j] + C_before[ip1, j] + C_before[i, jm1] + C_before[i, jp1] - 4.0 * C_before[i, j]
+        lap_sum += lap_ij
+        cid = st_pos.σ[i, j]
+        sp = cid > 0 ? st_pos.cell_type[cid] : 0
+        ρ_mel = (sp == 4 || sp == 5) ? 1.0 : 0.0
+        prod_ij = p_pos.γ_delay * M_next[i, j]
+        decay_ij = p_pos.λ_decay * C_before[i, j]
+        burn_ij = p_pos.σ_burn * st_pos.radiation[i, j] * ρ_mel * C_before[i, j]
+        net_source_sum += (prod_ij - decay_ij - burn_ij)
+    end
+    @assert abs(lap_sum) < 1e-12 "Neumann discrete Laplacian must conserve inventory (sum(lap) == 0)"
+    step_fields!(st_pos, p_pos; dt = 0.2)
+    @assert isapprox(sum(st_pos.C_inhib) - sum(C_before), 0.2 * net_source_sum; atol = 1e-12) "Inhibitor step inventory change must equal dt * sum(prod - decay - burn)"
 
     # 5. Volume Registry Conservation Check
     for (cid, v_reg) in st_pos.cell_vol
@@ -2857,6 +2913,7 @@ function run_control_audit()
 
     layers = compute_derived_layers(st_pos, p_pos)
     @assert length(layers) == 14 "Derived layer dictionary must contain all 14 contracted entries"
+    @assert haskey(layers, "melanized_fraction") "Derived layer dictionary must use melanized_fraction key"
 
     mktempdir() do tmp
         payload_path = joinpath(tmp, "observer_payload.json")
@@ -2865,6 +2922,9 @@ function run_control_audit()
         for req_key in ("cell_id", "species_id", "local_attenuation_kappa", "bilinear_burnout_sink")
             @assert occursin("\"$req_key\": [[", payload_txt) "export_observer_payload missing 2D array for $req_key"
         end
+        @assert occursin("\"melanized_fraction\":", payload_txt) "export_observer_payload missing melanized_fraction"
+        @assert occursin("\"synthetic_surrogate\": true", payload_txt) "export_observer_payload missing synthetic_surrogate flag"
+        @assert occursin("\"measured_physical_dose\": false", payload_txt) "export_observer_payload missing measured_physical_dose flag"
     end
 
     return (

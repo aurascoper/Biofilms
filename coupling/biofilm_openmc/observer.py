@@ -31,8 +31,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .viewer import (BOOLEAN, CATEGORICAL, LAYER_CONTRACTS, OUT_OF_DOMAIN,
-                     UNDECLARED, _TROPIC_FRAC_KEY, is_undeclared, read_layer,
+from .viewer import (BOOLEAN, CATEGORICAL, LAYER_CONTRACTS, MELANIZED_FRAC_KEY,
+                     OUT_OF_DOMAIN, UNDECLARED, is_undeclared, read_layer,
                      read_manifest)
 
 # Same palette and labels as the serial model's figure section, carried across
@@ -543,7 +543,25 @@ SPECIES_COLORS: dict[int, str] = {
 
 
 class BiofilmOpenMCObserver:
-    """Read-only PyVista observer consuming pre-validated layers from viewer.py."""
+    """Read-only PyVista observer consuming pre-validated layers from viewer.py.
+
+    Scientific & Software Contract:
+    - Strictly read-only (`READ_ONLY_OBSERVER = True`): never modifies input arrays,
+      never imports `feedback_uq` or `synthetic_gate`, and cannot emit quantitative
+      campaign verdicts (`AUTHORITATIVE_FOR_QUANTITATION = False`).
+    - Operates on a resampled/extruded CPM display grid (`NATIVE_OPENMC_FIELD = False`,
+      `GRID_REPRESENTATION = "resampled_extruded_display_grid"`).
+    - All radiation/flux fields are dimensionless relative synthetic surrogates
+      (`SYNTHETIC_SURROGATE_ONLY = True`, `MEASURED_PHYSICAL_DOSE = False`) and
+      must never be interpreted as measured physical dose in Gy or Gy/s.
+    """
+
+    READ_ONLY_OBSERVER: bool = True
+    AUTHORITATIVE_FOR_QUANTITATION: bool = False
+    NATIVE_OPENMC_FIELD: bool = False
+    SYNTHETIC_SURROGATE_ONLY: bool = True
+    MEASURED_PHYSICAL_DOSE: bool = False
+    GRID_REPRESENTATION: str = "resampled_extruded_display_grid"
 
     def __init__(
         self,
@@ -676,7 +694,7 @@ class BiofilmOpenMCObserver:
             shape=(2, 2), off_screen=off_screen, window_size=(1600, 1200)
         )
 
-        rad_frac = float(active_layers[_TROPIC_FRAC_KEY])
+        mel_frac = float(active_layers[MELANIZED_FRAC_KEY])
         shannon_H = float(active_layers["shannon_diversity_H"])
         void_coeff = float(active_layers["void_reactivity_coeff"])
 
@@ -717,7 +735,7 @@ class BiofilmOpenMCObserver:
             legend_entries, bcolor=(0.1, 0.1, 0.1), size=(0.38, 0.28)
         )
         pl.add_text(
-            f"Melanin+ Frac: {rad_frac:.2%} | H: {shannon_H:.2f}",
+            f"Melanin+ Frac: {mel_frac:.2%} | H: {shannon_H:.2f}",
             position="lower_left",
             font_size=9,
         )
@@ -754,7 +772,7 @@ class BiofilmOpenMCObserver:
             rad_mesh,
             scalars="total_radiation",
             cmap="inferno",
-            scalar_bar_args={"title": "Flux I_tot [rel]"},
+            scalar_bar_args={"title": "Flux I_tot [rel, synthetic surrogate - NOT Gy]"},
         )
 
         # Panel (1, 1): Delayed Inhibitor C & Bilinear Burnout Sink

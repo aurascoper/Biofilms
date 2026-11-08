@@ -279,7 +279,7 @@ def _sample_two_way_raw_state(shape=(6, 6)):
 def test_compute_and_validate_layers_satisfies_all_contracts():
     from biofilm_openmc.viewer import (
         LAYER_CONTRACTS,
-        _TROPIC_FRAC_KEY,
+        MELANIZED_FRAC_KEY,
         compute_and_validate_layers,
     )
 
@@ -298,14 +298,14 @@ def test_compute_and_validate_layers_satisfies_all_contracts():
     assert np.isclose(out["local_attenuation_kappa"][3, 3], 2.20)
     assert np.isclose(out["bilinear_burnout_sink"][1, 1], 0.0)
     assert np.isclose(out["bilinear_burnout_sink"][2, 2], 0.45 * 1.0 * 0.5)
-    assert np.isclose(out[_TROPIC_FRAC_KEY], 2.0 / 3.0)
+    assert np.isclose(out[MELANIZED_FRAC_KEY], 2.0 / 3.0)
     assert out["shannon_diversity_H"] > 0.0
 
 
 def test_compute_and_validate_layers_edge_cases_and_negative_controls():
     from biofilm_openmc.observer import BiofilmOpenMCObserver
     from biofilm_openmc.viewer import (
-        _TROPIC_FRAC_KEY,
+        MELANIZED_FRAC_KEY,
         compute_and_validate_layers,
     )
 
@@ -314,7 +314,7 @@ def test_compute_and_validate_layers_edge_cases_and_negative_controls():
     raw_empty["cell_id"][:] = 0
     raw_empty["species_id"][:] = 0
     out_empty = compute_and_validate_layers(raw_empty, {})
-    assert out_empty[_TROPIC_FRAC_KEY] == 0.0
+    assert out_empty[MELANIZED_FRAC_KEY] == 0.0
     assert out_empty["shannon_diversity_H"] == 0.0
 
     # Shape mismatch rejected
@@ -547,3 +547,82 @@ def test_continuum_melanin_and_threshold_clipped_observer_telemetry(
     assert ("-y", False) in mesh0.clip_calls
     assert kwargs0.get("categories") is True
     assert kwargs0.get("annotations") == SPECIES_ANNOTATIONS
+
+
+def test_two_way_attenuation_and_observer_scientific_review_contracts():
+    """Verify the five scientific and software review contracts for the
+    two-way attenuation cascade, poison-burnout surrogate, display vs native
+    OpenMC grid distinction, read-only observer isolation, and synthetic
+    surrogate dose labeling.
+    """
+    from biofilm_openmc.observer import BiofilmOpenMCObserver
+    from biofilm_openmc.viewer import (
+        LAYER_CONTRACTS,
+        MELANIZED_FRAC_KEY,
+        compute_and_validate_layers,
+    )
+
+    # 1. Two-group attenuation cascade conservation and normalization
+    raw = _sample_two_way_raw_state(shape=(8, 8))
+    raw_copy = {k: v.copy() for k, v in raw.items()}
+    params = {
+        "I0": 1.0,
+        "kappa_water": 0.35,
+        "kappa_void": 0.02,
+        "kappa_species": [0.35, 0.45, 0.50, 1.40, 2.20],
+        "sigma_burn": 0.45,
+    }
+    out = compute_and_validate_layers(raw, params)
+    assert np.all(out["fast_flux"] >= 0.0) and np.all(out["fast_flux"] <= params["I0"])
+    assert np.all(out["thermal_flux"] >= 0.0)
+    assert np.allclose(out["total_radiation"], out["fast_flux"] + out["thermal_flux"])
+    assert np.all(out["total_radiation"] <= params["I0"] + 1e-12)
+
+    # 2. Energy/state accounting in the poison-burnout surrogate
+    mel_mask = np.isin(raw["species_id"], [4, 5]).astype(np.float64)
+    expected_burn = params["sigma_burn"] * out["total_radiation"] * mel_mask * raw["xenon_inhibitor_C"]
+    assert np.allclose(out["bilinear_burnout_sink"], expected_burn)
+    assert np.all(out["bilinear_burnout_sink"] >= 0.0)
+
+    # Discrete zero-flux Neumann 5-point Laplacian sum is identically zero
+    C = raw["xenon_inhibitor_C"].copy()
+    C[2, 3] = 1.25
+    C[0, 0] = 0.05
+    C[7, 7] = 0.90
+    nx, ny = C.shape
+    lap = np.zeros_like(C)
+    for i in range(nx):
+        for j in range(ny):
+            im1 = max(0, i - 1)
+            ip1 = min(nx - 1, i + 1)
+            jm1 = max(0, j - 1)
+            jp1 = min(ny - 1, j + 1)
+            lap[i, j] = C[im1, j] + C[ip1, j] + C[i, jm1] + C[i, jp1] - 4.0 * C[i, j]
+    assert np.isclose(np.sum(lap), 0.0, atol=1e-14)
+
+    # 3. Native OpenMC fields vs resampled/extruded display fields
+    assert BiofilmOpenMCObserver.NATIVE_OPENMC_FIELD is False
+    assert BiofilmOpenMCObserver.GRID_REPRESENTATION == "resampled_extruded_display_grid"
+    for spec in LAYER_CONTRACTS.values():
+        assert spec.native_openmc_field is False
+        assert spec.grid_representation == "resampled_extruded_display_grid"
+
+    # 4. Observer remains strictly read-only and non-authoritative for quantitation
+    assert BiofilmOpenMCObserver.READ_ONLY_OBSERVER is True
+    assert BiofilmOpenMCObserver.AUTHORITATIVE_FOR_QUANTITATION is False
+    for k, arr in raw.items():
+        assert np.array_equal(arr, raw_copy[k])
+    out["total_radiation"][0, 0] = 999.0
+    assert np.array_equal(raw["fast_flux"], raw_copy["fast_flux"])
+
+    # 5. Synthetic neutron/dose outputs cannot be mistaken for measured physical dose
+    assert BiofilmOpenMCObserver.SYNTHETIC_SURROGATE_ONLY is True
+    assert BiofilmOpenMCObserver.MEASURED_PHYSICAL_DOSE is False
+    for flux_key in ("fast_flux", "thermal_flux", "total_radiation"):
+        spec = LAYER_CONTRACTS[flux_key]
+        assert spec.synthetic_surrogate is True
+        assert spec.measured_physical_dose is False
+        assert spec.units == "rel_flux"
+        assert "synthetic surrogate" in spec.description
+    assert MELANIZED_FRAC_KEY == "melanized_fraction"
+

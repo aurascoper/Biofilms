@@ -400,6 +400,10 @@ fi
 # unresolved thread on this PR with a valid 4-column row and an OPEN issue is
 # downgraded from OPEN to DEFER; resolved threads, unmatched URLs, malformed
 # rows, and closed or missing issues all refuse.
+# Format scope: the register is parsed per physical line (split("\n")). Quoted
+# rationales containing commas and escaped double quotes ("") are supported on a
+# single physical line; embedded newlines inside quoted fields are intentionally
+# unsupported (single-line rationales are required).
 printf '\n'
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFERRALS_FILE="${PREFLIGHT_DEFERRALS:-$ROOT_DIR/data/deferrals.csv}"
