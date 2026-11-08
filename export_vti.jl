@@ -16,8 +16,12 @@
 #   species          UInt8   0 = medium or wall, 1..7 = species index
 #   cell_id          Int32   as stored: background and wall sentinels kept
 #   lineage_id, interior_mask, radiation_cpm, melanin  as stored
-#   generation               as stored when non-zero; omitted while all-zero (issue #34)
-#   accumulated_dose_Gy      as stored when non-zero; physical Gy, omitted while all-zero (issue #34)
+#   generation               as stored when non-zero; omitted from CellData while all-zero,
+#                            with FieldData generation_zero and generation_cell_data stating
+#                            founder (0) semantics and whether the array was omitted (issue #34)
+#   accumulated_dose_Gy      as stored when non-zero; physical Gy, omitted from CellData while
+#                            all-zero, with FieldData accumulated_dose_Gy_units and
+#                            accumulated_dose_Gy_cell_data stating omission (issue #34)
 #   nutrient                 only with --restart (the snapshot does not carry it)
 #                            and only from the same run: mcs, git_sha, cell_id,
 #                            interior_mask and melanin must match the snapshot
@@ -39,9 +43,10 @@ const SITE_ARRAYS = (("lattice/cell_id", "cell_id"), ("lattice/lineage_id", "lin
                      ("fields/radiation_cpm", "radiation_cpm"), ("fields/melanin", "melanin"),
                      ("dose/accumulated_Gy", "accumulated_dose_Gy"))
 # Issue #34: generation (4 B Int32/site) and accumulated_dose_Gy (8 B Float64/site) are
-# identically zero until division or dose import occurs (25.5% of every frame's bytes carrying
-# zero bits of information). Omit them from VTKCellData while all(iszero, arr); write them as
-# soon as any site is non-zero.
+# identically zero until division or dose import occurs (12 of 38 B/site = 31.6% of this
+# exporter's default cell arrays, and 12 of 47 B/site = 25.5% in the 10-array payload census).
+# Omit them from VTKCellData while all(iszero, arr), write them as soon as any site is
+# non-zero, and always record in VTKFieldData whether each was omitted as all-zero or written.
 const OMIT_WHEN_ZERO = ("generation", "accumulated_dose_Gy")
 
 """
@@ -79,9 +84,14 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
         axes = ntuple(i -> range(0.0, step = Float64(spacing), length = N[i] + 1), 3)
         vtk = vtk_grid(stem, axes...; compress = false)
         vtk["species", VTKCellData()] = species
+        omitted_zero = Dict{String, Bool}()
         for (ds, name) in SITE_ARRAYS
             arr = read(f[ds])
-            (name in OMIT_WHEN_ZERO && all(iszero, arr)) && continue
+            if name in OMIT_WHEN_ZERO
+                is_zero = all(iszero, arr)
+                omitted_zero[name] = is_zero
+                is_zero && continue
+            end
             vtk[name, VTKCellData()] = arr
         end
         mcs = Int(read(a["mcs"]))
@@ -143,8 +153,17 @@ function export_vti(snapshot::AbstractString, stem::AbstractString;
         end
         vtk["units", VTKFieldData()] = units
         vtk["species_zero", VTKFieldData()] = "0 = medium or wall (cell_id $background or $wall); 1..7 = species index"
+        vtk["generation_zero", VTKFieldData()] =
+            "0 = founder on occupied sites (cell_id > 0), 0 on medium or wall (cell_id $background or $wall); " *
+            "schema lattice/generation: " *
+            (omitted_zero["generation"] ? "omitted from CellData because all sites are 0" : "present in CellData")
+        vtk["generation_cell_data", VTKFieldData()] =
+            omitted_zero["generation"] ? "omitted_all_zero" : "present"
         vtk["accumulated_dose_Gy_units", VTKFieldData()] =
-            "Gy, physical, schema dose/accumulated_Gy: zeros until a dose was imported"
+            "Gy, physical, schema dose/accumulated_Gy: zeros until a dose was imported (" *
+            (omitted_zero["accumulated_dose_Gy"] ? "omitted from CellData because all sites are 0.0" : "present in CellData") * ")"
+        vtk["accumulated_dose_Gy_cell_data", VTKFieldData()] =
+            omitted_zero["accumulated_dose_Gy"] ? "omitted_all_zero" : "present"
         for k in CARRIED_NUMERIC
             vtk[k, VTKFieldData()] = Float64(read(a[k]))
         end

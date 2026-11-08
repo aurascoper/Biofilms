@@ -45,7 +45,12 @@ N = (12, 12, 12)
     # with that default: the path the tests read is the path a user gets.
     @test !occursin("compressor=", read(path, String)) && occursin("encoding=\"raw\"", read(path, String))
     @test vti_field_string(path, "units") == "lattice"
+    @test occursin("0 = founder on occupied sites (cell_id > 0)", vti_field_string(path, "generation_zero"))
+    @test occursin("omitted from CellData because all sites are 0", vti_field_string(path, "generation_zero"))
+    @test vti_field_string(path, "generation_cell_data") == "omitted_all_zero"
     @test occursin("zeros until a dose was imported", vti_field_string(path, "accumulated_dose_Gy_units"))
+    @test occursin("omitted from CellData because all sites are 0.0", vti_field_string(path, "accumulated_dose_Gy_units"))
+    @test vti_field_string(path, "accumulated_dose_Gy_cell_data") == "omitted_all_zero"
     @test vti_field_string(path, "logical_axis_order") == "xyz"
     fd = get_field_data(f)
     @test get_data(fd["mcs"])[1] == 2.0
@@ -119,9 +124,14 @@ N = (12, 12, 12)
         end
         nz_stem = joinpath(tmp, "rt_nonzero")
         export_vti(nz_snap, nz_stem)
-        cd_nz = get_cell_data(VTKFile(nz_stem * ".vti"))
+        nz_path = nz_stem * ".vti"
+        cd_nz = get_cell_data(VTKFile(nz_path))
         @test "generation" in keys(cd_nz)
         @test "accumulated_dose_Gy" in keys(cd_nz)
+        @test vti_field_string(nz_path, "generation_cell_data") == "present"
+        @test vti_field_string(nz_path, "accumulated_dose_Gy_cell_data") == "present"
+        @test occursin("present in CellData", vti_field_string(nz_path, "generation_zero"))
+        @test occursin("present in CellData", vti_field_string(nz_path, "accumulated_dose_Gy_units"))
         gen_back = reshape(get_data(cd_nz["generation"]), N)
         dose_back = reshape(get_data(cd_nz["accumulated_dose_Gy"]), N)
         @test eltype(gen_back) == Int32 && gen_back == gen_expected
@@ -136,9 +146,12 @@ N = (12, 12, 12)
         end
         half_stem = joinpath(tmp, "rt_half_nonzero")
         export_vti(half_snap, half_stem)
-        cd_half = get_cell_data(VTKFile(half_stem * ".vti"))
+        half_path = half_stem * ".vti"
+        cd_half = get_cell_data(VTKFile(half_path))
         @test "generation" in keys(cd_half)
         @test !("accumulated_dose_Gy" in keys(cd_half))
+        @test vti_field_string(half_path, "generation_cell_data") == "present"
+        @test vti_field_string(half_path, "accumulated_dose_Gy_cell_data") == "omitted_all_zero"
 
         # Symmetric independence: all-zero generation with non-zero accumulated_dose_Gy
         # writes accumulated_dose_Gy and still omits generation.
@@ -149,9 +162,12 @@ N = (12, 12, 12)
         end
         dose_only_stem = joinpath(tmp, "rt_dose_only_nonzero")
         export_vti(dose_only_snap, dose_only_stem)
-        cd_dose_only = get_cell_data(VTKFile(dose_only_stem * ".vti"))
+        dose_only_path = dose_only_stem * ".vti"
+        cd_dose_only = get_cell_data(VTKFile(dose_only_path))
         @test !("generation" in keys(cd_dose_only))
         @test "accumulated_dose_Gy" in keys(cd_dose_only)
+        @test vti_field_string(dose_only_path, "generation_cell_data") == "omitted_all_zero"
+        @test vti_field_string(dose_only_path, "accumulated_dose_Gy_cell_data") == "present"
     end
 end
 
