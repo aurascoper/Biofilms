@@ -145,11 +145,16 @@ because the bytes are meaningless, not because anything is slow. Nothing here is
 
 ## Where the action lives
 
-The exporter half of this is filed as **issue #34**, not fixed here: the change touches
-`export_vti.jl` on `feat/lattice-viewer` (PR #25, on hold), and this diagnostic is on a
-branch off `master`. The issue ranks three fixes by cost. The free one, with no change to
-what a consumer must do, is to stop writing `generation` and `accumulated_dose_Gy` while
-they are identically zero: 25.5% of every frame carrying no information at all.
+The exporter half of this was filed as **issue #34** when `export_vti.jl` lived on
+`feat/lattice-viewer` (PR #25) while this diagnostic sat on a branch off `master`. The issue
+ranked three fixes by cost. The free one is now implemented in `export_vti.jl`
+(`OMIT_WHEN_ZERO`): `generation` (4 B/site) and `accumulated_dose_Gy` (8 B/site) are omitted
+from `VTKCellData` while they are identically zero, removing 12 of the 38 bytes/site (31.6%)
+across `export_vti.jl`'s eight default cell arrays (or 12 of the 47 bytes/site, 25.5%, in the
+ten-array `inert_signal` census above), written whenever any entry is non-zero, and paired
+with in-band `VTKFieldData` declarations (`generation_zero`, `generation_cell_data`,
+`accumulated_dose_Gy_units`, `accumulated_dose_Gy_cell_data`) so a consumer can tell an
+all-zero founder/dose omission from an unrecorded field.
 
 ## The constraint on all of it
 

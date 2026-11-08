@@ -132,10 +132,11 @@ on VTK (x,y,z) with no permutation. That is a claim, so it is tested, twice (bel
 |---|---|---|
 | `species` | UInt8 | 0 where cell_id is background or wall; the species id elsewhere |
 | `cell_id` | Int32 | as stored, sentinels kept |
-| `lineage_id`, `generation` | Int32 | as stored |
+| `lineage_id` | Int32 | as stored |
+| `generation` | Int32 | as stored when non-zero; omitted while all-zero (issue #34) |
 | `interior_mask` | UInt8 | as stored |
 | `radiation_cpm`, `melanin` | Float64 | as stored |
-| `accumulated_dose_Gy` | Float64 | as stored; field data `accumulated_dose_Gy_units` says "Gy, physical, schema dose/accumulated_Gy: zeros until a dose was imported" |
+| `accumulated_dose_Gy` | Float64 | as stored when non-zero, omitted while all-zero (issue #34); field data `accumulated_dose_Gy_units` says "Gy, physical, schema dose/accumulated_Gy: zeros until a dose was imported" |
 | `nutrient` | Float64 | only with `--restart`, from `fields/nutrient` |
 | `dose_rate_mean_Gy_s` | Float64 | only with `--dose`, from `mesh/dose_rate_mean_Gy_s`; refused unless its mesh is the lattice (the exporter resamples nothing; `viewer_bundle.h5` is where that happens), and refused unless the file carries `target_calibration` and `source_rate_photons_per_s`, which are written into the unit string beside the array, so a synthetic source rate reads "synthetic source rate, not a physical target" wherever ParaView shows the number |
 
@@ -175,9 +176,11 @@ The fixture is an N = 12 snapshot with two cells per species written by `export_
 after two MCS (N = 8 cannot be initialised; N = 10 places five of seven species). The
 fixture's `basis_gate_ack` is enumerated in the census in `tests/radiodialysis_basis_gate.jl`.
 
-- Round trip. Every site array reads back equal, element type included; `species` is 0 exactly
-  where `cell_id <= 0` and the species id elsewhere; all seven species present; spacing 1.0;
-  `units = lattice`; the dose unit string and `logical_axis_order` read back.
+- Round trip. Every non-zero site array reads back equal, element type included, while all-zero
+  `generation` and `accumulated_dose_Gy` are omitted in the default snapshot and read back equal in
+  the non-zero control (issue #34); `species` is 0 exactly where `cell_id <= 0` and the species id
+  elsewhere; all seven species present; spacing 1.0; `units = lattice`; the dose unit string and
+  `logical_axis_order` read back.
 - Sentinels. Background 0 and wall -1 survive in `cell_id`.
 - Orientation, twice. A 3x4x5 array valued 100i+10j+k reads back index for index, and the
   exporter's own `cell_id` output satisfies every row of the snapshot's `orientation_probes`.
