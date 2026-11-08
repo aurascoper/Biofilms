@@ -730,7 +730,7 @@ _ABBREV_DOT = re.compile(
     r"|(?<=\\textit\{[A-Z])\.",
 )
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`(\[0-9{])")
-_NONEMPTY_CITE = re.compile(r"\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+_NONEMPTY_CITE = re.compile(r"(?<!\\)\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
 
 # Reason-keyed exemptions (AGENTS.md Rule 1 & Rule 3): every entry is keyed on the exact sentence
 # at the location where it is true, never via a surface-marker lookahead in the regex, and states
@@ -866,8 +866,9 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         for p in got_3954094
     ), got_3954094
 
-    # A commented-out \cite{...} (including after a `\\` line-break command as `\\% \cite{...}`)
-    # or empty/punctuation-only \cite{ , } must fail through `literature_claim_problems(tmp_path)`.
+    # A commented-out \cite{...} (including after a `\\` line-break command as `\\% \cite{...}`),
+    # a `\\cite{...}` where `\\` is a line break and `cite{...}` is literal text, or an
+    # empty/punctuation-only \cite{ , } must fail through `literature_claim_problems(tmp_path)`.
     live_tex = (REPO / PREPRINT_REL).read_text(encoding="utf-8")
     for bogus_cite in (
         "advantage. % \\cite{cortesao2020,audit2026}",
@@ -875,6 +876,9 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "advantage. \\\\\\% \\cite{cortesao2020,audit2026}",
         "advantage.\\\\\\\\% \\cite{cortesao2020,audit2026}",
         "advantage (50\\% effect). % \\cite{cortesao2020,audit2026}",
+        "advantage~\\\\cite{cortesao2020,audit2026}.",
+        "advantage \\\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\\\cite{cortesao2020,audit2026}.",
         "advantage~\\cite{}.",
         "advantage~\\cite{ , }.",
     ):
