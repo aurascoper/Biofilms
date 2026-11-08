@@ -729,7 +729,7 @@ _ABBREV_DOT = re.compile(
     r"\b(?:et\s+al|e\.g|i\.e|cf|vs|Fig|Figs|Eq|Eqs|Sec|Secs|Ref|Refs|sp|spp|var|Dr|Prof)\."
     r"|(?<=\\textit\{[A-Z])\.",
 )
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?\s+(?=[A-Z\\$`(\[0-9{])")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`(\[0-9{])")
 _NONEMPTY_CITE = re.compile(r"\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
 
 # Reason-keyed exemptions (AGENTS.md Rule 1 & Rule 3): every entry is keyed on the exact sentence
@@ -786,8 +786,10 @@ def literature_claim_problems_in_tex(
     if r"\begin{document}" not in tex or r"\begin{thebibliography}" not in tex:
         raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
     body = tex.split(r"\begin{document}", 1)[1].split(r"\begin{thebibliography}", 1)[0]
-    # Strip LaTeX comments first so a commented-out `%\cite{foo}` cannot satisfy the check.
-    body_nc = re.sub(r"(?m)(?<!\\)%.*", "", body)
+    # Strip LaTeX comments first so a commented-out `%\cite{foo}` or `\\%\cite{foo}` (a `\\`
+    # line-break command followed by an unescaped `%` comment) cannot satisfy the check, while
+    # odd-backslash `\%` and `\\\%` remain escaped percent literals.
+    body_nc = re.sub(r"(?m)(?<!\\)((?:\\\\)*)%.*", r"\1", body)
     body_nc = re.sub(
         r"\\begin\{(equation|align|array|tabular|longtable|verbatim|lstlisting)\}.*?\\end\{\1\}",
         " ",
@@ -864,10 +866,15 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         for p in got_3954094
     ), got_3954094
 
-    # A commented-out \cite{...} or empty/punctuation-only \cite{ , } must fail through `literature_claim_problems(tmp_path)`.
+    # A commented-out \cite{...} (including after a `\\` line-break command as `\\% \cite{...}`)
+    # or empty/punctuation-only \cite{ , } must fail through `literature_claim_problems(tmp_path)`.
     live_tex = (REPO / PREPRINT_REL).read_text(encoding="utf-8")
     for bogus_cite in (
         "advantage. % \\cite{cortesao2020,audit2026}",
+        "advantage.\\\\% \\cite{cortesao2020,audit2026}",
+        "advantage. \\\\\\% \\cite{cortesao2020,audit2026}",
+        "advantage.\\\\\\\\% \\cite{cortesao2020,audit2026}",
+        "advantage (50\\% effect). % \\cite{cortesao2020,audit2026}",
         "advantage~\\cite{}.",
         "advantage~\\cite{ , }.",
     ):
@@ -882,6 +889,20 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
             bogus_cite,
             got_commented,
         )
+
+    # Odd numbers of backslashes before `%` (`\%` and `\\\%`) are escaped percent literals, not
+    # comments, so a real \cite{...} later on that line still satisfies the detector.
+    for valid_escaped_pct in (
+        "advantage (50\\% effect)~\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\% effect~\\cite{cortesao2020,audit2026}.",
+    ):
+        escaped_pct_tex = live_tex.replace(
+            r"advantage~\cite{cortesao2020,audit2026}.",
+            valid_escaped_pct,
+        )
+        assert escaped_pct_tex != live_tex
+        scratch_preprint.write_text(escaped_pct_tex, encoding="utf-8")
+        assert literature_claim_problems(tmp_path) == [], valid_escaped_pct
 
     # Fail-open guard: an uncited claim followed by a sentence starting with math ($...$), LaTeX
     # quotes (``...''), or a digit that carries \cite{...} must NOT inherit the neighbor's citation.
