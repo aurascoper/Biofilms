@@ -16,7 +16,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import h5py
+try:
+    import h5py
+except ModuleNotFoundError:  # pragma: no cover
+    h5py = None
 import numpy as np
 
 

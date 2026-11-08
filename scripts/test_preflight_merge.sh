@@ -759,6 +759,13 @@ run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
 1,$URL1,21,\"unclosed quote rationale"
 verdict "a deferral row with an unclosed quote in rationale blocks" 1 $? "MALFORMED DEFERRAL ROW"
 
+# Control (8d): quoted rationale with an embedded newline blocks as malformed -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"first line of rationale
+second line of rationale\""
+verdict "a deferral row with an embedded newline in a quoted rationale blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
 # Fake-gh controls for `gh issue view`: PREFLIGHT_FIXTURE bypasses `gh`, so these
 # run through a fake `gh` on PATH. Control (3) (OPEN issue clears) is placed FIRST
 # so a broken `gh issue view` invocation cannot make (1) and (2) pass by failing everything.

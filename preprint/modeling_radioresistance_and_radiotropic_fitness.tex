@@ -597,7 +597,7 @@ and, when a source rate is supplied, to Gy\,s$^{-1}$. The physical dose field is
 the Julia axis convention and joined to current cell, lineage and generation labels. The executed
 end-to-end validation uses an explicitly synthetic reference system with
 \texttt{target\_calibration=false} and stops before changing the Hamiltonian, melanin drive,
-membrane state, accumulated dose, or CPM clock.
+membrane state, accumulated dose, or CPM clock. While the executed OpenMC snapshot exchange is one-way, the repository's radiation coupling is no longer strictly one-way when the optional state-dependent attenuation surrogate (\texttt{BiofilmsPottsRad}, \texttt{target\_calibration=false}) is active, which recomputes two-group relative flux from evolving lattice occupancy and fixed per-species coefficients while driving a separate one-way precursor and inhibitor burnout field.
 
 \paragraph{Reproducibility and implementation contracts.}
 The serial CPM has a byte-pinned regression fixture. The JACC port is tested by per-kernel agreement
@@ -920,7 +920,7 @@ exchange boundary. The run stopped before any physical dose changed the Hamilton
 membrane state or CPM clock. This validates the implementation path, not the physical target. The
 ensemble of Section~\ref{sec:radial_ensemble} runs under the analytic field of
 Eq.~\ref{eq:gamma_field}; the transport path contributes no number to it, and the interface is
-reported here as executed, with no result of its own.
+reported here as executed, with no result of its own; in code, coupling is no longer strictly one-way when the opt-in state-dependent two-way attenuation and two-group cascade surrogate (\texttt{BiofilmsPottsRad}, accompanied by a one-way radiation-driven inhibitor burnout field and the 4-panel observer contract) is enabled.
 
 % ---- 7. Discussion -------------------------------------------
 \section{Discussion}
@@ -1713,7 +1713,7 @@ consequential half. Two further caveats belong with it: the matrix term is not s
 the CPM changes occupancy, so $\mu_{\mathrm{matrix}}$ varies over a run, and at low loading that
 is plausibly the larger effect --- and preferential absorption of low-energy photons hardens the
 local spectrum, which is \emph{beam} hardening, an ordinary transport phenomenon and not an
-adaptive biological response.
+adaptive biological response. In the repository code, an opt-in deterministic surrogate (\texttt{BiofilmsPottsRad}) relaxes the strictly one-way static-field assumption for occupancy by recomputing local fast-group attenuation and fast-to-thermal moderation from evolving lattice occupancy (water, void, and cell sites) and fixed per-species coefficients in a non-multiplying two-group cascade, while driving precursor damage and bilinear inhibitor burnout as a one-way radiation output rather than feeding sorbed inventory or an evolving melanin field back into $\mu(\mathbf{r})$ (\texttt{target\_calibration=false}); the Monte Carlo OpenMC transport exchange likewise remains one-way pending the physical composition measurements above.
 
 \emph{A single-parameter exponential damage scalar is a strong structural prior.} A form such as
 $\gamma = 1 - e^{-\lambda D}$, applied as
