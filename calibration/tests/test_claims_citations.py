@@ -733,8 +733,9 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`
 _NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
 _INLINE_VERBATIM_OR_COMMENT = re.compile(
     r"(?<!\\)((?:\\\\)*)(?:"
-    r"\\verb\*?([^\sA-Za-z*])[^\n]*?\2"
-    r"|\\lstinline(?:\[[^\]]*\])?(?:\{(?:[^{}]|\{[^{}]*\})*\}|([^\sA-Za-z\[{])[^\n]*?\3)"
+    r"\\begin\{(verbatim\*?|lstlisting)\}[\s\S]*?\\end\{\2\}"
+    r"|\\verb\*?([^\sA-Za-z*])[^\n]*?\3"
+    r"|\\lstinline(?:\[[^\]]*\])?(?:\{(?:[^{}]|\{[^{}]*\})*\}|([^\sA-Za-z\[{])[^\n]*?\4)"
     r"|\\detokenize\{(?:[^{}]|\{[^{}]*\})*\}"
     r"|%[^\n]*"
     r")"
@@ -794,23 +795,20 @@ def literature_claim_problems_in_tex(
     if r"\begin{document}" not in tex or r"\begin{thebibliography}" not in tex:
         raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
     body = tex.split(r"\begin{document}", 1)[1].split(r"\begin{thebibliography}", 1)[0]
-    # Strip verbatim-like environments first so `%` or `\cite{...}` inside a verbatim block is
-    # never interpreted as a comment or citation.
-    body_nv = re.sub(
-        r"\\begin\{(verbatim\*?|lstlisting)\}.*?\\end\{\1\}",
-        " ",
+    # Scan left-to-right in a single pass for verbatim environments (`verbatim`, `verbatim*`,
+    # `lstlisting`), inline verbatim spans (`\verb|...|`, `\verb*|...|`, `\lstinline|...|`,
+    # `\lstinline{...}`, `\detokenize{...}`), and TeX comments (`%...` or `\\%...` with an even
+    # number of preceding backslashes). Because this runs in one left-to-right pass, a commented
+    # `% \begin{verbatim}` is consumed as a comment rather than swallowing live prose up to a
+    # later `\end{verbatim}`, while `%` inside a real verbatim block or `\verb|...|` is consumed
+    # as verbatim content.
+    body_nc = _INLINE_VERBATIM_OR_COMMENT.sub(
+        lambda m: m.group(1) if m.group(0)[len(m.group(1)):].startswith("%") else m.group(1) + " ",
         body,
-        flags=re.S,
     )
-    # Scan each line left-to-right for inline verbatim spans (`\verb|...|`, `\verb*|...|`,
-    # `\lstinline|...|`, `\lstinline{...}`, `\detokenize{...}`) and TeX comments (`%...` or
-    # `\\%...` with an even number of preceding backslashes) so neither an inline verbatim
-    # `\verb|\cite{foo}|` nor a commented `%\cite{foo}` can satisfy the citation check, while
-    # odd-backslash `\%` / `\\\%` and `%` inside `\verb|...|` are handled faithfully.
-    body_nc = _INLINE_VERBATIM_OR_COMMENT.sub(r"\1", body_nv)
     body_nc = re.sub(
-        r"\\begin\{(equation|align|array|tabular|longtable)\}.*?\\end\{\1\}",
-        " ",
+        r"(?<!\\)((?:\\\\)*)\\begin\{(equation\*?|align\*?|array|tabular|longtable)\}.*?\\end\{\2\}",
+        r"\1 ",
         body_nc,
         flags=re.S,
     )
@@ -954,6 +952,24 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         assert len(got_neighbor) == 1 and "The published demonstrations of remedies" in got_neighbor[0], (
             neighbor,
             got_neighbor,
+        )
+
+    # A commented-out \begin{verbatim} or \begin{lstlisting} before live prose and a later real
+    # verbatim block must NOT swallow the intervening live prose.
+    for env_name in ("verbatim", "lstlisting"):
+        commented_env = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n% \\begin{{{env_name}}}\n\n"
+            "The published demonstrations of remedies sit at two parameters.\n\n"
+            f"\\begin{{{env_name}}}\n\\cite{{audit2026}}\n\\end{{{env_name}}}\n\n"
+            r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(commented_env, encoding="utf-8")
+        got_env = literature_claim_problems(tmp_path)
+        assert len(got_env) == 1 and "The published demonstrations of remedies" in got_env[0], (
+            env_name,
+            got_env,
         )
 
     # Every declared pattern class in Issue #74 (and "the literature ranges ...") must fire when uncited.
