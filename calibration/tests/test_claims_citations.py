@@ -733,15 +733,50 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`
 _NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)(?:\\\\)*\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
 _BEGIN_DOC = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{document\}")
 _BEGIN_BIB = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{thebibliography\}")
-_INLINE_VERBATIM_OR_COMMENT = re.compile(
+_INACTIVE_TEX_TOKEN = re.compile(
     r"(?<!\\)((?:\\\\)*)(?:"
-    r"\\begin\{(verbatim\*?|lstlisting)\}[\s\S]*?\\end\{\2\}"
-    r"|\\verb\*?([^\sA-Za-z*])[^\n]*?\3"
-    r"|\\lstinline(?:\[[^\]]*\])?(?:\{(?:[^{}]|\{[^{}]*\})*\}|([^\sA-Za-z\[{])[^\n]*?\4)"
-    r"|\\detokenize\{(?:[^{}]|\{[^{}]*\})*\}"
-    r"|%[^\n]*"
+    r"(?P<env>\\begin\{(verbatim\*?|lstlisting)\}[\s\S]*?\\end\{\3\})"
+    r"|(?P<verb>\\verb\*?([^\sA-Za-z*])[^\n]*?\5)"
+    r"|(?P<lst_delim>\\lstinline(?:\s*\[[^\]]*\])?([^\sA-Za-z\[{])[^\n]*?\7)"
+    r"|(?P<braced>(?:\\lstinline(?:\s*\[[^\]]*\])?|\\detokenize)\s*\{)"
+    r"|(?P<comment>%[^\n]*)"
     r")"
 )
+
+
+def _strip_inactive_tex(tex: str) -> str:
+    """Strip verbatim environments, inline verbatim spans (including arbitrary balanced braces in
+    `\\detokenize{...}` and `\\lstinline{...}`), and TeX comments in a single left-to-right pass."""
+    out = []
+    pos = 0
+    n = len(tex)
+    while pos < n:
+        m = _INACTIVE_TEX_TOKEN.search(tex, pos)
+        if m is None:
+            out.append(tex[pos:])
+            break
+        out.append(tex[pos : m.start()])
+        out.append(m.group(1))
+        if m.group("comment") is not None:
+            pos = m.end()
+            continue
+        out.append(" ")
+        if m.group("braced") is not None:
+            depth = 1
+            i = m.end()
+            while i < n and depth > 0:
+                if tex[i] == "\\":
+                    i += 2
+                    continue
+                if tex[i] == "{":
+                    depth += 1
+                elif tex[i] == "}":
+                    depth -= 1
+                i += 1
+            pos = i
+        else:
+            pos = m.end()
+    return "".join(out)
 
 # Reason-keyed exemptions (AGENTS.md Rule 1 & Rule 3): every entry is keyed on the exact sentence
 # at the location where it is true, never via a surface-marker lookahead in the regex, and states
@@ -794,16 +829,7 @@ def literature_claim_problems_in_tex(
 ) -> list:
     """Return one problem string per uncited positive literature-claim sentence in `tex`, plus
     one problem string per stale or reasonless entry in `exemptions`."""
-    # Scan left-to-right across the entire document first for verbatim environments (`verbatim`,
-    # `verbatim*`, `lstlisting`), inline verbatim spans (`\verb|...|`, `\verb*|...|`,
-    # `\lstinline|...|`, `\lstinline{...}`, `\detokenize{...}`), and TeX comments (`%...` or
-    # `\\%...` with an even number of preceding backslashes) before locating `\begin{document}`
-    # and `\begin{thebibliography}`, so a commented or verbatim `\begin{thebibliography}` cannot
-    # truncate the body early and a commented `% \begin{verbatim}` cannot swallow live prose.
-    tex_nc = _INLINE_VERBATIM_OR_COMMENT.sub(
-        lambda m: m.group(1) if m.group(0)[len(m.group(1)):].startswith("%") else m.group(1) + " ",
-        tex,
-    )
+    tex_nc = _strip_inactive_tex(tex)
     doc_match = _BEGIN_DOC.search(tex_nc)
     if doc_match is None:
         raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
@@ -907,7 +933,10 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "advantage (\\verb+\\cite{cortesao2020,audit2026}+).",
         "advantage (\\lstinline|\\cite{cortesao2020,audit2026}|).",
         "advantage (\\lstinline{\\cite{cortesao2020,audit2026}}).",
+        "advantage (\\lstinline{{\\cite{cortesao2020,audit2026}}}).",
         "advantage (\\detokenize{\\cite{cortesao2020,audit2026}}).",
+        "advantage (\\detokenize{{\\cite{cortesao2020,audit2026}}}).",
+        "advantage (\\detokenize{{{\\cite{cortesao2020,audit2026}}}}).",
         "advantage (\\string\\cite{cortesao2020,audit2026}).",
         "advantage~\\cite{}.",
         "advantage~\\cite{ , }.",
