@@ -730,7 +730,9 @@ _ABBREV_DOT = re.compile(
     r"|(?<=\\textit\{[A-Z])\.",
 )
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`(\[0-9{])")
-_NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+_NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)(?:\\\\)*\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+_BEGIN_DOC = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{document\}")
+_BEGIN_BIB = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{thebibliography\}")
 _INLINE_VERBATIM_OR_COMMENT = re.compile(
     r"(?<!\\)((?:\\\\)*)(?:"
     r"\\begin\{(verbatim\*?|lstlisting)\}[\s\S]*?\\end\{\2\}"
@@ -792,20 +794,24 @@ def literature_claim_problems_in_tex(
 ) -> list:
     """Return one problem string per uncited positive literature-claim sentence in `tex`, plus
     one problem string per stale or reasonless entry in `exemptions`."""
-    if r"\begin{document}" not in tex or r"\begin{thebibliography}" not in tex:
-        raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
-    body = tex.split(r"\begin{document}", 1)[1].split(r"\begin{thebibliography}", 1)[0]
-    # Scan left-to-right in a single pass for verbatim environments (`verbatim`, `verbatim*`,
-    # `lstlisting`), inline verbatim spans (`\verb|...|`, `\verb*|...|`, `\lstinline|...|`,
-    # `\lstinline{...}`, `\detokenize{...}`), and TeX comments (`%...` or `\\%...` with an even
-    # number of preceding backslashes). Because this runs in one left-to-right pass, a commented
-    # `% \begin{verbatim}` is consumed as a comment rather than swallowing live prose up to a
-    # later `\end{verbatim}`, while `%` inside a real verbatim block or `\verb|...|` is consumed
-    # as verbatim content.
-    body_nc = _INLINE_VERBATIM_OR_COMMENT.sub(
+    # Scan left-to-right across the entire document first for verbatim environments (`verbatim`,
+    # `verbatim*`, `lstlisting`), inline verbatim spans (`\verb|...|`, `\verb*|...|`,
+    # `\lstinline|...|`, `\lstinline{...}`, `\detokenize{...}`), and TeX comments (`%...` or
+    # `\\%...` with an even number of preceding backslashes) before locating `\begin{document}`
+    # and `\begin{thebibliography}`, so a commented or verbatim `\begin{thebibliography}` cannot
+    # truncate the body early and a commented `% \begin{verbatim}` cannot swallow live prose.
+    tex_nc = _INLINE_VERBATIM_OR_COMMENT.sub(
         lambda m: m.group(1) if m.group(0)[len(m.group(1)):].startswith("%") else m.group(1) + " ",
-        body,
+        tex,
     )
+    doc_match = _BEGIN_DOC.search(tex_nc)
+    if doc_match is None:
+        raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
+    after_doc = tex_nc[doc_match.end():]
+    bib_match = _BEGIN_BIB.search(after_doc)
+    if bib_match is None:
+        raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
+    body_nc = after_doc[: bib_match.start() + len(bib_match.group(1))]
     body_nc = re.sub(
         r"(?<!\\)((?:\\\\)*)\\begin\{(equation\*?|align\*?|array|tabular|longtable)\}.*?\\end\{\2\}",
         r"\1 ",
@@ -918,13 +924,15 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
             got_commented,
         )
 
-    # Odd numbers of backslashes before `%` (`\%` and `\\\%`) and `%` inside `\verb|...|` are
-    # literal percent signs, not comments, so a real \cite{...} later on that line still satisfies
-    # the detector.
+    # Odd numbers of backslashes before `%` (`\%` and `\\\%`), `%` inside `\verb|...|`, and odd
+    # numbers of backslashes before `cite{...}` (`\\\cite{...}` = `\\` line break + `\cite{...}`)
+    # preserve a real citation on that sentence.
     for valid_escaped_pct in (
         "advantage (50\\% effect)~\\cite{cortesao2020,audit2026}.",
         "advantage\\\\\\% effect~\\cite{cortesao2020,audit2026}.",
         "advantage (\\verb|50% effect|)~\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\cite{cortesao2020,audit2026}.",
+        "advantage\\\\\\\\\\cite{cortesao2020,audit2026}.",
     ):
         escaped_pct_tex = live_tex.replace(
             r"advantage~\cite{cortesao2020,audit2026}.",
@@ -955,7 +963,8 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         )
 
     # A commented-out \begin{verbatim} or \begin{lstlisting} before live prose and a later real
-    # verbatim block must NOT swallow the intervening live prose.
+    # verbatim block, or a commented/verbatim \begin{thebibliography} before live prose, must NOT
+    # swallow or truncate the intervening live prose.
     for env_name in ("verbatim", "lstlisting"):
         commented_env = live_tex.replace(
             r"\begin{thebibliography}",
@@ -970,6 +979,25 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         assert len(got_env) == 1 and "The published demonstrations of remedies" in got_env[0], (
             env_name,
             got_env,
+        )
+
+    for fake_bib in (
+        "% \\begin{thebibliography}{99}",
+        "\\verb|\\begin{thebibliography}{99}|",
+        "\\begin{verbatim}\n\\begin{thebibliography}{99}\n\\end{verbatim}",
+    ):
+        premature_bib = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n{fake_bib}\n\n"
+            "The published demonstrations of remedies sit at two parameters.\n\n"
+            r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(premature_bib, encoding="utf-8")
+        got_bib = literature_claim_problems(tmp_path)
+        assert len(got_bib) == 1 and "The published demonstrations of remedies" in got_bib[0], (
+            fake_bib,
+            got_bib,
         )
 
     # Every declared pattern class in Issue #74 (and "the literature ranges ...") must fire when uncited.
