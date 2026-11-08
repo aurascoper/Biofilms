@@ -450,25 +450,15 @@ if [[ -f "$DEFERRALS_FILE" ]]; then
     | map(select((test("^\\s*$") | not) and (test("^\\s*#") | not) and (. != "pr,thread_url,issue,rationale")))
     | .[]
     | . as $raw
-    | (capture("^(?<pr>[^,]*),(?<thread_url>[^,]*),(?<issue>[^,]*),(?<rationale>.*)$") // null) as $m
+    | (capture("^(?<pr>[^,\"]*),(?<thread_url>[^,\"]*),(?<issue>[^,\"]*),(?:\\s*\"(?<qrat>(?:[^\"]|\"\")*)\"\\s*|(?<urat>[^,\"]*))$") // null) as $m
     | if $m == null then
         "MALFORMED\t\($raw)"
       else
         ($m.pr | gsub("^\\s+|\\s+$"; "")) as $rpr
         | ($m.thread_url | gsub("^\\s+|\\s+$"; "")) as $url
         | ($m.issue | gsub("^\\s+|\\s+$"; "")) as $iss
-        | ($m.rationale | gsub("^\\s+|\\s+$"; "")) as $raw_rat
-        | (if ($raw_rat | startswith("\"")) then
-             if ($raw_rat | length) >= 2 and ($raw_rat | endswith("\"")) then
-               ($raw_rat[1:-1] | gsub("^\\s+|\\s+$"; ""))
-             else
-               ""
-             end
-           elif ($raw_rat | endswith("\"")) then
-             ""
-           else
-             $raw_rat
-           end) as $rat
+        | ((if $m.qrat != null then ($m.qrat | gsub("\"\""; "\"")) else ($m.urat // "") end)
+           | gsub("^\\s+|\\s+$"; "") | gsub("\\t+"; " ")) as $rat
         | ($url | capture("/pull/(?<upr>[0-9]+)#") // null) as $um
         | if ($rpr | test("^[0-9]+$") | not) or $url == "" or $um == null or ($iss | test("^[0-9]+$") | not) or $rat == "" then
             "MALFORMED\t\($raw)"

@@ -715,6 +715,30 @@ run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
 1,$URL1,21,"
 verdict "a deferral row with an empty rationale field blocks" 1 $? "MALFORMED DEFERRAL ROW"
 
+# Control (7b): empty rationale followed by an extra CSV column (1,url,21,,typo) blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,,typo"
+verdict "a deferral row with empty rationale and extra column (1,url,21,,typo) blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7c): unquoted comma in rationale / five CSV columns blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,first clause, unquoted second clause"
+verdict "a deferral row with unquoted comma (five columns) blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7d): quoted rationale followed by an extra CSV column blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"quoted, rationale\",extra"
+verdict "a deferral row with quoted rationale plus extra column blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7e): quoted rationale with RFC-4180 doubled quotes ("""") clears and unescapes.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"Tracked as \"\"phase-2\"\", see issue\""
+verdict "quoted rationale with escaped double-quotes clears and unescapes" 0 $? "Tracked as \"phase-2\", see issue"
+
 # Control (8): a deferral row for this PR whose thread_url matches no thread on the PR at all
 # (neither open nor resolved) blocks with its own message -> exits 1.
 run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
