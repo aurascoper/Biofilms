@@ -734,19 +734,60 @@ _NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)(?:\\\\)*\\cite\{[^{}]*[A-Za-z
 _BEGIN_DOC = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{document\}")
 _BEGIN_BIB = re.compile(r"(?<!\\)(?<!\\string)((?:\\\\)*)\\begin\{thebibliography\}")
 _INACTIVE_TEX_TOKEN = re.compile(
-    r"(?<!\\)((?:\\\\)*)(?:"
-    r"(?P<env>\\begin\{(verbatim\*?|lstlisting)\}[\s\S]*?\\end\{\3\})"
+    r"(?<!\\)(?<!\\string)((?:\\\\)*)(?:"
+    r"(?P<env>\\begin\{(verbatim\*?|lstlisting|comment)\}[\s\S]*?(?<!\\)\\end\{\3\})"
     r"|(?P<verb>\\verb\*?([^\sA-Za-z*])[^\n]*?\5)"
     r"|(?P<lst_delim>\\lstinline(?:\s*\[[^\]]*\])?([^\sA-Za-z\[{])[^\n]*?\7)"
     r"|(?P<braced>(?:\\lstinline(?:\s*\[[^\]]*\])?|\\detokenize)\s*\{)"
+    r"|(?P<iffalse>\\iffalse(?![A-Za-z]))"
+    r"|(?P<else_tok>\\else(?![A-Za-z]))"
+    r"|(?P<cond_marker>\\(?:iftrue|fi)(?![A-Za-z]))"
     r"|(?P<comment>%[^\n]*)"
+    r")"
+)
+_COND_BRANCH_TOKEN = re.compile(
+    r"(?<!\\)(?<!\\string)((?:\\\\)*)(?:"
+    r"(?P<comment>%[^\n]*)"
+    r"|(?P<if_open>\\if[A-Za-z]+)"
+    r"|(?P<else_tok>\\else(?![A-Za-z]))"
+    r"|(?P<fi_tok>\\fi(?![A-Za-z]))"
     r")"
 )
 
 
+def _advance_past_false_branch(tex: str, pos: int, *, stop_on_else: bool) -> int:
+    """Advance `pos` past a false TeX conditional branch (`\\iffalse ...` or the `\\else ...`
+    branch of `\\iftrue`), respecting comments and nested `\\if...\\fi` blocks."""
+    depth = 1
+    n = len(tex)
+    while pos < n and depth > 0:
+        cm = _COND_BRANCH_TOKEN.search(tex, pos)
+        if cm is None:
+            return n
+        if cm.group("comment") is not None:
+            pos = cm.end()
+            continue
+        if cm.group("if_open") is not None:
+            depth += 1
+            pos = cm.end()
+            continue
+        if cm.group("else_tok") is not None:
+            if stop_on_else and depth == 1:
+                return cm.end()
+            pos = cm.end()
+            continue
+        if cm.group("fi_tok") is not None:
+            depth -= 1
+            pos = cm.end()
+            if depth == 0:
+                return pos
+    return pos
+
+
 def _strip_inactive_tex(tex: str) -> str:
-    """Strip verbatim environments, inline verbatim spans (including arbitrary balanced braces in
-    `\\detokenize{...}` and `\\lstinline{...}`), and TeX comments in a single left-to-right pass."""
+    """Strip verbatim/comment environments, inline verbatim spans (including arbitrary balanced
+    braces in `\\detokenize{...}` and `\\lstinline{...}`), disabled `\\iffalse` / `\\else`
+    conditional branches, and TeX comments in a single left-to-right pass."""
     out = []
     pos = 0
     n = len(tex)
@@ -768,12 +809,20 @@ def _strip_inactive_tex(tex: str) -> str:
                 if tex[i] == "\\":
                     i += 2
                     continue
+                if tex[i] == "%":
+                    nl = tex.find("\n", i)
+                    i = n if nl == -1 else nl + 1
+                    continue
                 if tex[i] == "{":
                     depth += 1
                 elif tex[i] == "}":
                     depth -= 1
                 i += 1
             pos = i
+        elif m.group("iffalse") is not None:
+            pos = _advance_past_false_branch(tex, m.end(), stop_on_else=True)
+        elif m.group("else_tok") is not None:
+            pos = _advance_past_false_branch(tex, m.end(), stop_on_else=False)
         else:
             pos = m.end()
     return "".join(out)
@@ -938,6 +987,10 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "advantage (\\detokenize{{\\cite{cortesao2020,audit2026}}}).",
         "advantage (\\detokenize{{{\\cite{cortesao2020,audit2026}}}}).",
         "advantage (\\string\\cite{cortesao2020,audit2026}).",
+        "advantage \\iffalse \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\iffalse \\iftrue \\cite{cortesao2020,audit2026} \\fi \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\iftrue \\else \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\begin{verbatim}\\\\end{verbatim}\\cite{cortesao2020,audit2026}\\end{verbatim}.",
         "advantage~\\cite{}.",
         "advantage~\\cite{ , }.",
     ):
@@ -962,6 +1015,8 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "advantage (\\verb|50% effect|)~\\cite{cortesao2020,audit2026}.",
         "advantage\\\\\\cite{cortesao2020,audit2026}.",
         "advantage\\\\\\\\\\cite{cortesao2020,audit2026}.",
+        "advantage \\iffalse ignored \\else \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\iftrue \\cite{cortesao2020,audit2026} \\else ignored \\fi.",
     ):
         escaped_pct_tex = live_tex.replace(
             r"advantage~\cite{cortesao2020,audit2026}.",
