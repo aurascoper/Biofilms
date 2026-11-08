@@ -619,6 +619,198 @@ $SCOPE
 findings: none" OWNER aurascoper 2026-09-15T21:00:00Z)")"
 verdict "a later clean comment does not cancel an earlier open finding" 1 $? "the earlier comment still says open"
 
+# ---------------------------------------------------------------------------
+# DEFERRALS REGISTER (data/deferrals.csv, issue #22 / GATE-06).
+# Eight fixture controls + three fake-gh controls exercising `gh issue view`.
+printf '\n  deferrals register (data/deferrals.csv, issue #22)\n  %s\n' \
+       "──────────────────────────────────────────"
+
+t_node() {  # $1 sev, $2 isResolved, $3 url, $4 path
+  printf '{"isResolved":%s,"isOutdated":false,"path":"%s","line":10,
+           "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+           "body":"![%s Badge](x) finding at %s","url":"%s"}]}}' \
+         "$2" "${4:-a/b.py}" "$1" "${4:-a/b.py}" "$3"
+}
+
+run_deferral_fixture() {  # $1 threads JSON array, $2 deferrals.csv content
+  cat >"$TMP/fixture.json" <<JSON
+{"data":{"repository":{"pullRequest":{
+  "title":"deferral fixture","headRefOid":"$HEAD_SHA",
+  "reviews":{"nodes":[$(r_codex "$HEAD_SHA")]},
+  "comments":{"nodes":[]},
+  "reviewThreads":{"nodes":$1}
+}}}}
+JSON
+  printf '%s\n' "$2" >"$TMP/deferrals.csv"
+  PREFLIGHT_DEFERRALS="$TMP/deferrals.csv" PREFLIGHT_FIXTURE="$TMP/fixture.json" "$GATE" 1 >"$TMP/out" 2>&1
+}
+
+URL1="https://github.com/aurascoper/Biofilms/pull/1#discussion_r101"
+URL2="https://github.com/aurascoper/Biofilms/pull/1#discussion_r102"
+
+# Control (1): one unresolved P2 thread + matching row -> exits 0, output contains
+# DEFER, #21, Clear to merge, and "1 finding DEFERRED, not fixed: #21".
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,tracked in issue 21"
+verdict "one deferred P2 thread clears and names #21" 0 $? "1 finding DEFERRED, not fixed: #21"
+verdict "deferred thread prints DEFER tag" 0 0 "DEFER"
+
+# Control (1b): quoted rationale containing commas clears and preserves full rationale text.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"Resolution limit, fix and negative control in issue\""
+verdict "quoted rationale with commas clears and preserves full rationale" 0 $? "Resolution limit, fix and negative control in issue"
+
+# Control (2): two unresolved threads, only one in deferrals.csv -> exits 1,
+# the deferred one prints DEFER and the other prints OPEN.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl"),$(t_node P1 false "$URL2" "src/b.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,tracked in issue 21"
+got=$?
+verdict "two unresolved threads with only one deferred blocks (OPEN)" 1 "$got" "OPEN"
+verdict "two unresolved threads with only one deferred still marks DEFER" 1 "$got" "DEFER"
+
+# Control (3): two threads deferred to two issues -> prints "2 findings DEFERRED, not fixed: #21, #22".
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl"),$(t_node P3 false "$URL2" "src/b.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,first deferral
+1,$URL2,22,second deferral"
+verdict "two threads deferred to two issues clears with plural summary" 0 $? "2 findings DEFERRED, not fixed: #21, #22"
+
+# Control (4): a valid deferral row for another PR number (both pr and URL say 99)
+# does not match this PR's thread -> exits 1 with OPEN.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+99,https://github.com/aurascoper/Biofilms/pull/99#discussion_r101,21,different pull request"
+verdict "a deferral row for another PR number does not match this PR" 1 $? "OPEN"
+
+# Control (4b): pr mismatch (pr column disagrees with /pull/<N># in thread_url) refuses.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+99,$URL1,21,pr disagrees with thread url"
+verdict "a deferral row whose pr disagrees with thread_url blocks" 1 $? "PR MISMATCH IN DEFERRALS"
+
+# Control (5): a deferral row naming a resolved thread blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 true "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,thread was resolved"
+verdict "a deferral row naming a resolved thread blocks" 1 $? "row for a resolved thread"
+
+# Control (6): a deferral row with '#21' spelling in issue field blocks (bare digits required) -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,#21,hash prefix in issue column must be refused"
+verdict "a deferral row with #21 spelling in issue field blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (6b): a deferral row with an empty issue field blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,,missing issue number"
+verdict "a deferral row with an empty issue field blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7): a deferral row with an empty rationale field blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,"
+verdict "a deferral row with an empty rationale field blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7b): empty rationale followed by an extra CSV column (1,url,21,,typo) blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,,typo"
+verdict "a deferral row with empty rationale and extra column (1,url,21,,typo) blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7c): unquoted comma in rationale / five CSV columns blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,first clause, unquoted second clause"
+verdict "a deferral row with unquoted comma (five columns) blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7d): quoted rationale followed by an extra CSV column blocks -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"quoted, rationale\",extra"
+verdict "a deferral row with quoted rationale plus extra column blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Control (7e): quoted rationale with RFC-4180 doubled quotes ("""") clears and unescapes.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"Tracked as \"\"phase-2\"\", see issue\""
+verdict "quoted rationale with escaped double-quotes clears and unescapes" 0 $? "Tracked as \"phase-2\", see issue"
+
+# Control (8): a deferral row for this PR whose thread_url matches no thread on the PR at all
+# (neither open nor resolved) blocks with its own message -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,https://github.com/aurascoper/Biofilms/pull/1#discussion_r999,21,mistyped url"
+verdict "a deferral row whose URL matches no thread on the PR blocks as orphan" 1 $? "row matches no thread on this PR"
+
+# Control (8b): duplicate deferral rows for the same thread_url block -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,first entry
+1,$URL1,22,duplicate entry for same thread"
+verdict "duplicate deferral rows for the same thread block" 1 $? "DUPLICATE DEFERRAL ROW"
+
+# Control (8c): unbalanced quote in rationale blocks as malformed -> exits 1.
+run_deferral_fixture "[$(t_node P2 false "$URL1" "src/a.jl")]" \
+"pr,thread_url,issue,rationale
+1,$URL1,21,\"unclosed quote rationale"
+verdict "a deferral row with an unclosed quote in rationale blocks" 1 $? "MALFORMED DEFERRAL ROW"
+
+# Fake-gh controls for `gh issue view`: PREFLIGHT_FIXTURE bypasses `gh`, so these
+# run through a fake `gh` on PATH. Control (3) (OPEN issue clears) is placed FIRST
+# so a broken `gh issue view` invocation cannot make (1) and (2) pass by failing everything.
+FAKEBIN_DEF="$TMP/bin_def"; mkdir -p "$FAKEBIN_DEF"
+cat >"$FAKEBIN_DEF/gh" <<'FAKEGH'
+#!/usr/bin/env bash
+if [[ "$1" == "repo" ]]; then echo "aurascoper/Biofilms"; exit 0; fi
+if [[ "$1" == "issue" && "$2" == "view" ]]; then
+  iss="$3"
+  [[ "$*" == *"--json state"* && "$*" == *"-q .state"* ]] || exit 1
+  if [[ "$iss" == "21" ]]; then echo "${FAKE_ISSUE_21_STATE:-OPEN}"; exit 0; fi
+  if [[ "$iss" == "999" ]]; then exit 1; fi
+  exit 1
+fi
+if [[ "$*" == *"comments(first:100"* ]]; then
+  cat <<'CJSON'
+{"data":{"repository":{"pullRequest":{"comments":{"pageInfo":{"hasNextPage":false,"endCursor":"C"},"nodes":[]}}}}}
+CJSON
+  exit 0
+fi
+cat <<'PJSON'
+{"data":{"repository":{"pullRequest":{
+  "title":"gh deferral test","headRefOid":"abc1234def5678",
+  "reviews":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+    "submittedAt":"2026-08-16T00:00:00Z",
+    "body":"**Reviewed commit:** `abc1234def5678`"}]},
+  "reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"T"},
+    "nodes":[{"isResolved":false,"isOutdated":false,"path":"a/b.py","line":7,
+      "comments":{"nodes":[{"author":{"login":"chatgpt-codex-connector"},
+      "body":"![P2 Badge](x) deferred via real gh path",
+      "url":"https://github.com/aurascoper/Biofilms/pull/1#discussion_r101"}]}}]}}}}}
+PJSON
+FAKEGH
+chmod +x "$FAKEBIN_DEF/gh"
+
+printf '%s\n' "pr,thread_url,issue,rationale
+1,$URL1,21,open issue via fake gh" >"$TMP/deferrals_gh.csv"
+
+# Fake-gh control (3) FIRST: OPEN issue clears.
+FAKE_ISSUE_21_STATE=OPEN PATH="$FAKEBIN_DEF:$PATH" PREFLIGHT_DEFERRALS="$TMP/deferrals_gh.csv" "$GATE" 1 >"$TMP/out" 2>&1
+verdict "fake-gh: a deferral row naming an OPEN issue clears" 0 $? "1 finding DEFERRED, not fixed: #21"
+
+# Fake-gh control (1): CLOSED issue blocks.
+FAKE_ISSUE_21_STATE=CLOSED PATH="$FAKEBIN_DEF:$PATH" PREFLIGHT_DEFERRALS="$TMP/deferrals_gh.csv" "$GATE" 1 >"$TMP/out" 2>&1
+verdict "fake-gh: a deferral row naming a CLOSED issue blocks" 1 $? "DEFERRED ISSUE #21 IS CLOSED"
+
+# Fake-gh control (2): nonexistent issue blocks.
+printf '%s\n' "pr,thread_url,issue,rationale
+1,$URL1,999,nonexistent issue via fake gh" >"$TMP/deferrals_gh_missing.csv"
+PATH="$FAKEBIN_DEF:$PATH" PREFLIGHT_DEFERRALS="$TMP/deferrals_gh_missing.csv" "$GATE" 1 >"$TMP/out" 2>&1
+verdict "fake-gh: a deferral row naming a nonexistent issue blocks" 1 $? "DEFERRED ISSUE #999 NOT FOUND"
+
 printf '  %s\n' "──────────────────────────────────────────"
 if (( fail )); then printf '  FAILED\n\n'; exit 1; fi
 printf '  all pass\n\n'
