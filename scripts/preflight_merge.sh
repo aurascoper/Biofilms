@@ -454,7 +454,8 @@ if [[ -f "$DEFERRALS_FILE" ]]; then
     | map(select((test("^\\s*$") | not) and (test("^\\s*#") | not) and (. != "pr,thread_url,issue,rationale")))
     | .[]
     | . as $raw
-    | (capture("^(?<pr>[^,\"]*),(?<thread_url>[^,\"]*),(?<issue>[^,\"]*),(?:\\s*\"(?<qrat>(?:[^\"]|\"\")*)\"\\s*|(?<urat>[^,\"]*))$") // null) as $m
+    | (([ $raw | scan("\"") ] | length) % 2 == 1) as $odd_quotes
+    | (if $odd_quotes then null else (capture("^(?<pr>[^,\"]*),(?<thread_url>[^,\"]*),(?<issue>[^,\"]*),(?:\\s*\"(?<qrat>(?:[^\"]|\"\")*)\"\\s*|(?<urat>[^,\"]*))$") // null) end) as $m
     | if $m == null then
         "MALFORMED\t\($raw)"
       else
@@ -484,7 +485,7 @@ if [[ -f "$DEFERRALS_FILE" ]]; then
     [[ -z "$kind" ]] && continue
     if [[ "$kind" == "MALFORMED" ]]; then
       printf '  MALFORMED DEFERRAL ROW in %s: %s\n' "$DEFERRALS_FILE" "$f1"
-      printf '  Every row requires pr (bare digits), thread_url, issue (bare digits, #N refused), and non-empty rationale.\n'
+      printf '  Every row requires pr (bare digits), thread_url, issue (bare digits, #N refused), and a single-line non-empty rationale (embedded newlines and unclosed quotes are refused).\n'
       fail=1
       continue
     fi
