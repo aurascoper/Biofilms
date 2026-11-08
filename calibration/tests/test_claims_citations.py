@@ -730,7 +730,15 @@ _ABBREV_DOT = re.compile(
     r"|(?<=\\textit\{[A-Z])\.",
 )
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?:''|\"|\)|'])?(?:\\\\)?\s+(?=[A-Z\\$`(\[0-9{])")
-_NONEMPTY_CITE = re.compile(r"(?<!\\)\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+_NONEMPTY_CITE = re.compile(r"(?<!\\)(?<!\\string)\\cite\{[^{}]*[A-Za-z0-9][^{}]*\}")
+_INLINE_VERBATIM_OR_COMMENT = re.compile(
+    r"(?<!\\)((?:\\\\)*)(?:"
+    r"\\verb\*?([^\sA-Za-z*])[^\n]*?\2"
+    r"|\\lstinline(?:\[[^\]]*\])?(?:\{(?:[^{}]|\{[^{}]*\})*\}|([^\sA-Za-z\[{])[^\n]*?\3)"
+    r"|\\detokenize\{(?:[^{}]|\{[^{}]*\})*\}"
+    r"|%[^\n]*"
+    r")"
+)
 
 # Reason-keyed exemptions (AGENTS.md Rule 1 & Rule 3): every entry is keyed on the exact sentence
 # at the location where it is true, never via a surface-marker lookahead in the regex, and states
@@ -786,12 +794,22 @@ def literature_claim_problems_in_tex(
     if r"\begin{document}" not in tex or r"\begin{thebibliography}" not in tex:
         raise ValueError("preprint .tex must contain \\begin{document} and \\begin{thebibliography}")
     body = tex.split(r"\begin{document}", 1)[1].split(r"\begin{thebibliography}", 1)[0]
-    # Strip LaTeX comments first so a commented-out `%\cite{foo}` or `\\%\cite{foo}` (a `\\`
-    # line-break command followed by an unescaped `%` comment) cannot satisfy the check, while
-    # odd-backslash `\%` and `\\\%` remain escaped percent literals.
-    body_nc = re.sub(r"(?m)(?<!\\)((?:\\\\)*)%.*", r"\1", body)
+    # Strip verbatim-like environments first so `%` or `\cite{...}` inside a verbatim block is
+    # never interpreted as a comment or citation.
+    body_nv = re.sub(
+        r"\\begin\{(verbatim\*?|lstlisting)\}.*?\\end\{\1\}",
+        " ",
+        body,
+        flags=re.S,
+    )
+    # Scan each line left-to-right for inline verbatim spans (`\verb|...|`, `\verb*|...|`,
+    # `\lstinline|...|`, `\lstinline{...}`, `\detokenize{...}`) and TeX comments (`%...` or
+    # `\\%...` with an even number of preceding backslashes) so neither an inline verbatim
+    # `\verb|\cite{foo}|` nor a commented `%\cite{foo}` can satisfy the citation check, while
+    # odd-backslash `\%` / `\\\%` and `%` inside `\verb|...|` are handled faithfully.
+    body_nc = _INLINE_VERBATIM_OR_COMMENT.sub(r"\1", body_nv)
     body_nc = re.sub(
-        r"\\begin\{(equation|align|array|tabular|longtable|verbatim|lstlisting)\}.*?\\end\{\1\}",
+        r"\\begin\{(equation|align|array|tabular|longtable)\}.*?\\end\{\1\}",
         " ",
         body_nc,
         flags=re.S,
@@ -867,8 +885,9 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
     ), got_3954094
 
     # A commented-out \cite{...} (including after a `\\` line-break command as `\\% \cite{...}`),
-    # a `\\cite{...}` where `\\` is a line break and `cite{...}` is literal text, or an
-    # empty/punctuation-only \cite{ , } must fail through `literature_claim_problems(tmp_path)`.
+    # a `\\cite{...}` where `\\` is a line break and `cite{...}` is literal text, an inline
+    # verbatim `\verb|\cite{...}|` / `\lstinline`, or an empty/punctuation-only \cite{ , } must
+    # fail through `literature_claim_problems(tmp_path)`.
     live_tex = (REPO / PREPRINT_REL).read_text(encoding="utf-8")
     for bogus_cite in (
         "advantage. % \\cite{cortesao2020,audit2026}",
@@ -879,6 +898,13 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "advantage~\\\\cite{cortesao2020,audit2026}.",
         "advantage \\\\cite{cortesao2020,audit2026}.",
         "advantage\\\\\\\\cite{cortesao2020,audit2026}.",
+        "advantage (\\verb|\\cite{cortesao2020,audit2026}|).",
+        "advantage (\\verb*|\\cite{cortesao2020,audit2026}|).",
+        "advantage (\\verb+\\cite{cortesao2020,audit2026}+).",
+        "advantage (\\lstinline|\\cite{cortesao2020,audit2026}|).",
+        "advantage (\\lstinline{\\cite{cortesao2020,audit2026}}).",
+        "advantage (\\detokenize{\\cite{cortesao2020,audit2026}}).",
+        "advantage (\\string\\cite{cortesao2020,audit2026}).",
         "advantage~\\cite{}.",
         "advantage~\\cite{ , }.",
     ):
@@ -894,11 +920,13 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
             got_commented,
         )
 
-    # Odd numbers of backslashes before `%` (`\%` and `\\\%`) are escaped percent literals, not
-    # comments, so a real \cite{...} later on that line still satisfies the detector.
+    # Odd numbers of backslashes before `%` (`\%` and `\\\%`) and `%` inside `\verb|...|` are
+    # literal percent signs, not comments, so a real \cite{...} later on that line still satisfies
+    # the detector.
     for valid_escaped_pct in (
         "advantage (50\\% effect)~\\cite{cortesao2020,audit2026}.",
         "advantage\\\\\\% effect~\\cite{cortesao2020,audit2026}.",
+        "advantage (\\verb|50% effect|)~\\cite{cortesao2020,audit2026}.",
     ):
         escaped_pct_tex = live_tex.replace(
             r"advantage~\cite{cortesao2020,audit2026}.",
