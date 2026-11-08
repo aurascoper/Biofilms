@@ -740,30 +740,33 @@ _INACTIVE_TEX_TOKEN = re.compile(
     r"|(?P<lst_delim>\\lstinline(?:\s*\[[^\]]*\])?([^\sA-Za-z\[{])[^\n]*?\7)"
     r"|(?P<braced>(?:\\lstinline(?:\s*\[[^\]]*\])?|\\detokenize)\s*\{)"
     r"|(?P<iffalse>\\iffalse(?![A-Za-z]))"
-    r"|(?P<else_tok>\\else(?![A-Za-z]))"
-    r"|(?P<cond_marker>\\(?:iftrue|fi)(?![A-Za-z]))"
+    r"|(?P<iftrue>\\iftrue(?![A-Za-z]))"
+    r"|(?P<other_if>\\if(?!f(?![A-Za-z]))[A-Za-z]*)"
+    r"|(?P<else_tok>\\(?:else|or)(?![A-Za-z]))"
+    r"|(?P<fi_tok>\\fi(?![A-Za-z]))"
     r"|(?P<comment>%[^\n]*)"
     r")"
 )
 _COND_BRANCH_TOKEN = re.compile(
     r"(?<!\\)(?<!\\string)((?:\\\\)*)(?:"
     r"(?P<comment>%[^\n]*)"
-    r"|(?P<if_open>\\if[A-Za-z]+)"
+    r"|(?P<if_open>\\if(?!f(?![A-Za-z]))[A-Za-z]*)"
     r"|(?P<else_tok>\\else(?![A-Za-z]))"
     r"|(?P<fi_tok>\\fi(?![A-Za-z]))"
     r")"
 )
 
 
-def _advance_past_false_branch(tex: str, pos: int, *, stop_on_else: bool) -> int:
+def _advance_past_false_branch(tex: str, pos: int, *, stop_on_else: bool) -> tuple[int, bool]:
     """Advance `pos` past a false TeX conditional branch (`\\iffalse ...` or the `\\else ...`
-    branch of `\\iftrue`), respecting comments and nested `\\if...\\fi` blocks."""
+    branch of `\\iftrue`), respecting comments and nested `\\if...\\fi` blocks. Returns
+    `(new_pos, stopped_at_else)`."""
     depth = 1
     n = len(tex)
     while pos < n and depth > 0:
         cm = _COND_BRANCH_TOKEN.search(tex, pos)
         if cm is None:
-            return n
+            return n, False
         if cm.group("comment") is not None:
             pos = cm.end()
             continue
@@ -773,22 +776,25 @@ def _advance_past_false_branch(tex: str, pos: int, *, stop_on_else: bool) -> int
             continue
         if cm.group("else_tok") is not None:
             if stop_on_else and depth == 1:
-                return cm.end()
+                return cm.end(), True
             pos = cm.end()
             continue
         if cm.group("fi_tok") is not None:
             depth -= 1
             pos = cm.end()
             if depth == 0:
-                return pos
-    return pos
+                return pos, False
+    return pos, False
 
 
 def _strip_inactive_tex(tex: str) -> str:
     """Strip verbatim/comment environments, inline verbatim spans (including arbitrary balanced
-    braces in `\\detokenize{...}` and `\\lstinline{...}`), disabled `\\iffalse` / `\\else`
-    conditional branches, and TeX comments in a single left-to-right pass."""
+    braces in `\\detokenize{...}` and `\\lstinline{...}`), unconditionally false `\\iffalse` /
+    `\\iftrue ... \\else` conditional branches (preserving both branches of unknown conditionals
+    such as `\\ifdefined` as separate scan-visible paragraphs), and TeX comments in a single
+    left-to-right pass."""
     out = []
+    cond_stack: list[str] = []
     pos = 0
     n = len(tex)
     while pos < n:
@@ -801,8 +807,8 @@ def _strip_inactive_tex(tex: str) -> str:
         if m.group("comment") is not None:
             pos = m.end()
             continue
-        out.append(" ")
         if m.group("braced") is not None:
+            out.append(" ")
             depth = 1
             i = m.end()
             while i < n and depth > 0:
@@ -820,10 +826,36 @@ def _strip_inactive_tex(tex: str) -> str:
                 i += 1
             pos = i
         elif m.group("iffalse") is not None:
-            pos = _advance_past_false_branch(tex, m.end(), stop_on_else=True)
+            out.append(" ")
+            pos, stopped_at_else = _advance_past_false_branch(tex, m.end(), stop_on_else=True)
+            if stopped_at_else:
+                cond_stack.append("iffalse_else")
+        elif m.group("iftrue") is not None:
+            out.append(" ")
+            cond_stack.append("iftrue")
+            pos = m.end()
+        elif m.group("other_if") is not None:
+            out.append("\n\n")
+            cond_stack.append("other")
+            pos = m.end()
         elif m.group("else_tok") is not None:
-            pos = _advance_past_false_branch(tex, m.end(), stop_on_else=False)
+            if (
+                m.group("else_tok") == r"\else"
+                and cond_stack
+                and cond_stack[-1] == "iftrue"
+            ):
+                cond_stack.pop()
+                out.append(" ")
+                pos, _ = _advance_past_false_branch(tex, m.end(), stop_on_else=False)
+            else:
+                out.append("\n\n")
+                pos = m.end()
+        elif m.group("fi_tok") is not None:
+            top = cond_stack.pop() if cond_stack else None
+            out.append("\n\n" if top == "other" else " ")
+            pos = m.end()
         else:
+            out.append(" ")
             pos = m.end()
     return "".join(out)
 
@@ -990,6 +1022,7 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "advantage \\iffalse \\cite{cortesao2020,audit2026} \\fi.",
         "advantage \\iffalse \\iftrue \\cite{cortesao2020,audit2026} \\fi \\cite{cortesao2020,audit2026} \\fi.",
         "advantage \\iftrue \\else \\cite{cortesao2020,audit2026} \\fi.",
+        "advantage \\ifdefined\\someflag \\cite{cortesao2020,audit2026} \\fi.",
         "advantage \\begin{verbatim}\\\\end{verbatim}\\cite{cortesao2020,audit2026}\\end{verbatim}.",
         "advantage~\\cite{}.",
         "advantage~\\cite{ , }.",
@@ -1044,6 +1077,32 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         assert len(got_neighbor) == 1 and "The published demonstrations of remedies" in got_neighbor[0], (
             neighbor,
             got_neighbor,
+        )
+
+    # An uncited claim inside the \else branch (or the if branch) of a conditional other than
+    # \iffalse / \iftrue (e.g., \ifdefined) must stay scan-visible and be caught.
+    for cond_block in (
+        "\\ifdefined\\someflag\n"
+        "The published demonstrations of remedies sit at two parameters \\cite{audit2026}.\n"
+        "\\else\n"
+        "The published demonstrations of remedies sit at two parameters.\n"
+        "\\fi",
+        "\\ifdefined\\someflag\n"
+        "The published demonstrations of remedies sit at two parameters.\n"
+        "\\else\n"
+        "The published demonstrations of remedies sit at two parameters \\cite{audit2026}.\n"
+        "\\fi",
+    ):
+        planted_cond = live_tex.replace(
+            r"\begin{thebibliography}",
+            f"\n\n{cond_block}\n\n" r"\begin{thebibliography}",
+            1,
+        )
+        scratch_preprint.write_text(planted_cond, encoding="utf-8")
+        got_cond = literature_claim_problems(tmp_path)
+        assert len(got_cond) == 1 and "The published demonstrations of remedies" in got_cond[0], (
+            cond_block,
+            got_cond,
         )
 
     # A commented-out \begin{verbatim} or \begin{lstlisting} before live prose and a later real
