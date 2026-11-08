@@ -107,3 +107,16 @@ let
     @test mean(drift_cn) < 0    # negative-β cell moves toward the axis: a TROPISM
     @test mean(drift_so) > 0    # radiosensitive-signed cell moves outward
 end
+
+# ---------- (d) BiofilmsPottsRad two-way attenuation & burnout controls ----------
+
+let
+    audit = SR.BiofilmsPottsRad.run_control_audit()
+    @test isapprox(audit.var_I_neg, 0.0; atol = 1e-12)
+    @test audit.var_I_pos > 1e-4
+    @test audit.delta_r_sp4 < 0.0
+    @test audit.delta_r_sp5 < 0.0
+    @test audit.mean_I_voidy > audit.mean_I_dense
+    @test audit.pit_overshoot > 0.0
+    @test audit.burnout_clearance > 0.0
+end

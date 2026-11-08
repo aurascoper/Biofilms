@@ -2483,9 +2483,14 @@ function update_radiation_field!(state::State, p::Params)
             κ_loc, Σ_loc = local_attenuation(state, p, ix, iy)
             κ_eff = max(0.0, κ_loc)
             Σ_eff = clamp(Σ_loc, 0.0, κ_eff)
+            I_f_in = p.I0 * exp(-optical_depth_fast)
             optical_depth_fast += κ_eff * ds
-            I_f_step = p.I0 * exp(-optical_depth_fast)
-            I_therm_acc = I_therm_acc * exp(-κ_th_eff * ds) + Σ_eff * I_f_step * ds
+            transfer = if abs(κ_eff - κ_th_eff) * ds > 1e-12
+                Σ_eff * I_f_in * (exp(-κ_th_eff * ds) - exp(-κ_eff * ds)) / (κ_eff - κ_th_eff)
+            else
+                Σ_eff * I_f_in * ds * exp(-κ_th_eff * ds)
+            end
+            I_therm_acc = I_therm_acc * exp(-κ_th_eff * ds) + transfer
         end
 
         I_f = p.I0 * exp(-optical_depth_fast)
@@ -2722,7 +2727,7 @@ function compute_derived_layers(state::State, p::Params)
         end
     end
 
-    mel_frac = total_bio > 0 ? (sp_counts[4] + sp_counts[5]) / total_bio : 0.0
+    mel_frac = total_bio > 0 ? sum(melanin_mask) / total_bio : 0.0
     shannon_H = 0.0
     if total_bio > 0
         for c in sp_counts
@@ -2872,18 +2877,21 @@ function run_control_audit()
     @assert all(isapprox.(st_pos.radiation, st_pos.I_fast .+ st_pos.I_therm; atol = 1e-14)) "Total radiation must equal I_fast + I_therm"
     @assert all(0.0 .<= st_pos.radiation .<= p_pos.I0 * (1.0 + 1e-12)) "Conservative two-group cascade must satisfy I_fast + I_therm <= I0"
 
-    # 2c. Non-multiplying down-scattering guard even when nominal Σ_scatter > κ_species and κ_therm == 0
+    # 2c. Non-multiplying down-scattering guard and lossless pure-scattering conservation (Σ_eff == κ_eff, κ_therm == 0 -> I_tot == I0)
     p_clamp = Params(
         N = 16,
         I0 = 1.5,
         κ_water = 0.50,
         Σ_water = 5.00,
+        κ_void = 0.10,
+        Σ_void = 1.00,
         κ_species = fill(0.60, 5),
         Σ_scatter = fill(4.00, 5),
         κ_therm = 0.0,
     )
     st_clamp = init_state(p_clamp; seed = 77, void_fraction = 0.05)
     @assert all(0.0 .<= st_clamp.radiation .<= p_clamp.I0 * (1.0 + 1e-12)) "Down-scattering clamp must prevent unphysical flux multiplication above I0"
+    @assert all(isapprox.(st_clamp.radiation, p_clamp.I0; atol = 1e-13)) "Lossless pure scattering (Σ_eff == κ_eff, κ_therm == 0) must conserve total flux I_fast + I_therm == I0 everywhere"
 
     # 3. Void Reactivity Feedback Control: replacing water/biomass with voids increases interior flux
     st_dense = init_state(p_pos; seed = 303, void_fraction = 0.0)
@@ -2932,6 +2940,19 @@ function run_control_audit()
     layers = compute_derived_layers(st_pos, p_pos)
     @assert length(layers) == 14 "Derived layer dictionary must contain all 14 contracted entries"
     @assert haskey(layers, "melanized_fraction") "Derived layer dictionary must use melanized_fraction key"
+
+    # 5b. Species-ablation safety (N_types < 5 must not throw BoundsError)
+    p_ablate = Params(
+        N = 12,
+        N_types = 3,
+        V_target = Int[0, 4, 4, 4],
+        κ_species = Float64[0.85, 0.95, 1.05],
+        Σ_scatter = Float64[0.05, 0.05, 0.05],
+        β_ion = Float64[0.0, 0.0, -1.0],
+    )
+    st_ablate = init_state(p_ablate; seed = 19, void_fraction = 0.05)
+    layers_ablate = compute_derived_layers(st_ablate, p_ablate)
+    @assert layers_ablate["melanized_fraction"] == 0.0 "N_types=3 ablation must report melanized_fraction == 0.0 without BoundsError"
 
     mktempdir() do tmp
         payload_path = joinpath(tmp, "observer_payload.json")

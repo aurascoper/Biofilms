@@ -656,6 +656,7 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
             == melanin.shape
             == I_tot.shape
             == C_inh.shape
+            == M_dam.shape
         ):
             raise ValueError("Spatial input arrays must share identical dimensions")
 
@@ -698,14 +699,18 @@ def compute_and_validate_layers(raw_state: dict, params: dict) -> dict:
         void_mask = (sigma == -1).astype(np.uint8)
         melanin_mask = np.isin(species, [4, 5]).astype(np.uint8)
 
-        kappa_water = float(params.get("kappa_water", 0.35))
-        kappa_void = float(params.get("kappa_void", 0.02))
+        kappa_mult = float(params.get("kappa", 1.0))
+        kappa_water = kappa_mult * float(params.get("kappa_water", 0.35))
+        kappa_void = kappa_mult * float(params.get("kappa_void", 0.02))
         kappa_sp = list(params.get("kappa_species", [0.35, 0.45, 0.50, 1.40, 2.20]))
 
-        kappa_map = np.full(sigma.shape, kappa_water, dtype=np.float64)
-        kappa_map[sigma == -1] = kappa_void
-        for sp_idx, k_val in enumerate(kappa_sp, start=1):
-            kappa_map[species == sp_idx] = float(k_val)
+        if kappa_mult == 0.0:
+            kappa_map = np.zeros(sigma.shape, dtype=np.float64)
+        else:
+            kappa_map = np.full(sigma.shape, kappa_water, dtype=np.float64)
+            kappa_map[sigma == -1] = kappa_void
+            for sp_idx, k_val in enumerate(kappa_sp, start=1):
+                kappa_map[species == sp_idx] = kappa_mult * float(k_val)
 
         sigma_burn = float(params.get("sigma_burn", 0.45))
         burnout_sink = (

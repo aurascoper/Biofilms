@@ -639,24 +639,31 @@ class BiofilmOpenMCObserver:
     @staticmethod
     def compute_telemetry(layers: dict) -> dict[str, float]:
         """Compute read-only display summary telemetry on the synthetic surrogate
-        layers (`mean_dose_rate` is dimensionless relative synthetic flux `I_tot`,
-        never measured physical dose in Gy/s and never authoritative for
-        quantitative campaign verdicts).
+        layers (`mean_relative_flux` / `mean_dose_rate` is dimensionless relative
+        synthetic flux `I_tot`, never measured physical dose in Gy/s and never
+        authoritative for quantitative campaign verdicts).
         """
         sigma = np.asarray(layers["cell_id"])
         occupied = sigma > 0
+        void_bool = (
+            np.asarray(layers["void_mask"], dtype=bool)
+            if "void_mask" in layers
+            else ~occupied
+        )
         rad = np.asarray(layers["total_radiation"], dtype=np.float64)
         kappa = np.asarray(layers["local_attenuation_kappa"], dtype=np.float64)
         poison = np.asarray(layers["xenon_inhibitor_C"], dtype=np.float64)
         burn = np.asarray(layers["bilinear_burnout_sink"], dtype=np.float64)
+        mean_flux = float(np.mean(rad))
         return {
-            "mean_dose_rate": float(np.mean(rad)),
-            "void_fraction": float(np.mean(~occupied)),
+            "mean_relative_flux": mean_flux,
+            "mean_dose_rate": mean_flux,
+            "void_fraction": float(np.mean(void_bool)),
             "mean_kappa_occupied": (
                 float(np.mean(kappa[occupied])) if np.any(occupied) else 0.0
             ),
             "mean_kappa_void": (
-                float(np.mean(kappa[~occupied])) if np.any(~occupied) else 0.0
+                float(np.mean(kappa[void_bool])) if np.any(void_bool) else 0.0
             ),
             "poison_inventory": float(np.sum(poison)),
             "mean_burnout_rate": float(np.mean(burn)),

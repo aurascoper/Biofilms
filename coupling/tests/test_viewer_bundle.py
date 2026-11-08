@@ -611,10 +611,45 @@ def test_two_way_attenuation_and_observer_scientific_review_contracts():
     # 4. Observer remains strictly read-only and non-authoritative for quantitation
     assert BiofilmOpenMCObserver.READ_ONLY_OBSERVER is True
     assert BiofilmOpenMCObserver.AUTHORITATIVE_FOR_QUANTITATION is False
+    for out_key in (
+        "cell_id",
+        "species_id",
+        "fast_flux",
+        "thermal_flux",
+        "precursor_damage_M",
+        "xenon_inhibitor_C",
+        "total_radiation",
+    ):
+        out[out_key].flat[0] = 999
     for k, arr in raw.items():
         assert np.array_equal(arr, raw_copy[k])
-    out["total_radiation"][0, 0] = 999.0
-    assert np.array_equal(raw["fast_flux"], raw_copy["fast_flux"])
+
+    # Scalar kappa=0 in two-group mode yields zero attenuation map
+    out_zero_k = compute_and_validate_layers(raw, {**params, "kappa": 0.0})
+    assert np.all(out_zero_k["local_attenuation_kappa"] == 0.0)
+
+    # Water (cell_id == 0) in two-group mode is not miscounted as void (cell_id == -1)
+    raw_no_void = {k: v.copy() for k, v in raw.items()}
+    raw_no_void["cell_id"][raw_no_void["cell_id"] == -1] = 0
+    raw_no_void["species_id"][raw_no_void["species_id"] == -1] = 0
+    layers_no_void = compute_and_validate_layers(raw_no_void, params)
+    tel_no_void = BiofilmOpenMCObserver.compute_telemetry(layers_no_void)
+    assert tel_no_void["void_fraction"] == 0.0
+    assert tel_no_void["mean_relative_flux"] == tel_no_void["mean_dose_rate"]
+
+    # Continuum-mode poison_lag shape mismatch is rejected
+    with pytest.raises(ValueError, match="identical dimensions"):
+        compute_and_validate_layers(
+            {
+                "spin": np.zeros((4, 4), dtype=np.int32),
+                "species": np.zeros((4, 4), dtype=np.int32),
+                "melanin": np.zeros((4, 4), dtype=np.float64),
+                "radiation": np.ones((4, 4), dtype=np.float64),
+                "poison": np.zeros((4, 4), dtype=np.float64),
+                "poison_lag": np.zeros((3, 3), dtype=np.float64),
+            },
+            {},
+        )
 
     # 5. Synthetic neutron/dose outputs cannot be mistaken for measured physical dose
     assert BiofilmOpenMCObserver.SYNTHETIC_SURROGATE_ONLY is True
