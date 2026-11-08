@@ -717,10 +717,10 @@ LITERATURE_CLAIM_PHRASE = re.compile(
     r"the\s+literature|"
     r"the\s+published|"
     r"(?:published|prior|previous|existing)\s+"
-    r"(?:literature|demonstrations|studies|reports|measurements|experiments|work)|"
-    r"demonstrations\b[^.!?]*?\b(?:(?:have|had)\s+shown|show(?:ed)?)|"
-    r"it\s+is\s+well\s+known|"
-    r"studies\s+(?:(?:have|had)\s+)?show(?:n|ed)?"
+    r"(?:literature|demonstrations?|stud(?:y|ies)|reports?|measurements?|experiments?|works?)|"
+    r"demonstrations?\b[^.!?]*?\b(?:(?:have|has|had)\s+shown|shows?|showed)|"
+    r"it\s+(?:is|was)\s+well\s+known|"
+    r"stud(?:y|ies)\s+(?:(?:have|has|had)\s+)?(?:shown|shows?|showed)"
     r")\b",
     re.I,
 )
@@ -962,10 +962,14 @@ def test_literature_claim_detector_catches_3954094_and_uncited_controls(tmp_path
         "The literature ranges for this effect sit between 10 and 20 Gy.",
         "Demonstrations of observable-choice remedies have shown that two parameters suffice.",
         "Demonstrations of observable-choice remedies showed that two parameters suffice.",
+        "A demonstration of observable-choice remedies has shown that two parameters suffice.",
         "It is well known that melanin scavenges free radicals.",
         "Studies show that biofilm morphology depends on nutrient gradients.",
         "Studies showed that prior models explain X.",
         "Studies had shown that prior models explain X.",
+        "A prior study showed that two parameters suffice.",
+        "A previous study has shown that two parameters suffice.",
+        "One study shows that two parameters suffice.",
     ):
         planted = live_tex.replace(
             r"\begin{thebibliography}",
